@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-sre-服务安装</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">scripts-sre-服务安装</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgddf7e00">准备数据目录（可单独挂载磁盘）</a></li>
+<li><a href="#orgfdb8144">安装 java</a>
+<ul>
+<li><a href="#org9bc804a">scripts-sre-java 多版本</a></li>
+</ul>
+</li>
+<li><a href="#orgefeff59">docker</a></li>
+<li><a href="#org3c7bdbc">mysql</a>
+<ul>
+<li><a href="#orgd0a4d3b">docker-compose</a></li>
+</ul>
+</li>
+<li><a href="#org4e61d9a">redis</a>
+<ul>
+<li><a href="#orga577be7">redis docker compose</a></li>
+</ul>
+</li>
+<li><a href="#org3830151">nginx</a>
+<ul>
+<li><a href="#org42689f2">nginx-ldap</a></li>
+</ul>
+</li>
+<li><a href="#org1e472a7">haproxy</a></li>
+<li><a href="#org065efae">elasticsearch</a>
+<ul>
+<li><a href="#orga842746">elasticsearch docker compose</a></li>
+</ul>
+</li>
+<li><a href="#org6db9003">rocketmq</a>
+<ul>
+<li><a href="#org45ccd8a">rocketmq docker compose</a></li>
+</ul>
+</li>
+<li><a href="#orgf8e2475">zookeeper</a>
+<ul>
+<li><a href="#orga4a1b17">kubernetes-zookeeper-3.7.1</a>
+<ul>
+<li><a href="#org7c8d769">dockerfile</a></li>
+<li><a href="#org0a0ef1e">Makefile</a></li>
+<li><a href="#org4cf58cb">构建镜像</a></li>
+<li><a href="#org93cef1e">kubernetes 部署</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#orgfeea830">web</a>
+<ul>
+<li><a href="#org679015d">web docker compose</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+
+<p>
+前置准备:docker &gt;=18.09
+docker-compose 3.5
+</p>
+
+
+<p>
+mysql: 5.7
+elasticsearch: 7.2.1
+redis:5.0.7
+rocketmq: 4.5.2
+jenkins: 2.222.1
+</p>
+
+<section id="outline-container-orgddf7e00" class="outline-2">
+<h2 id="orgddf7e00">准备数据目录（可单独挂载磁盘）</h2>
+<div class="outline-text-2" id="text-orgddf7e00">
+<p>
+/data
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26684;&#24335;&#21270;&#30913;&#30424; </span>
+fdisk -l <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#25968;&#25454;&#30424;&#26159;&#21738;&#20010;&#65292;&#36825;&#37324;&#30475;&#21040;&#26159; /dev/vdb 500G</span>
+parted /dev/vdb mklabel gpt
+parted -s /dev/vdb <span style="color: #8b2252;">'mkpart primary 1049k -1'</span>
+ls /dev/vd*
+mkfs.ext4  /dev/vdb1
+
+<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"/dev/vdb1  /data                       ext4    defaults,nodelalloc,noatime       0 2"</span> &gt;&gt; /etc/fstab
+mount -a
+</pre>
+</div>
+</div>
+</section>
+
+<section id="outline-container-orgfdb8144" class="outline-2">
+<h2 id="orgfdb8144">安装 java</h2>
+<div class="outline-text-2" id="text-orgfdb8144">
+<p>
+官方下载地址：<a href="https://www.oracle.com/java/technologies/downloads/">https://www.oracle.com/java/technologies/downloads/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shelll">tar xf jdk-8u351-linux-x64.tar.gz -C /usr/local/
+ln -sv /usr/local/jdk1.8.0_351/  /usr/local/java
+
+cat /etc/profile.d/java.sh
+export JAVA_HOME=/usr/local/java
+export JRE_HOME=/usr/local/java/jre
+export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
+export PATH=$JAVA_HOME/bin:$PATH
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org9bc804a" class="outline-3">
+<h3 id="org9bc804a">scripts-sre-java 多版本</h3>
+<div class="outline-text-3" id="text-org9bc804a">
+<p>
+默认 jdk8，使用 jdk8, jdk11 命令切换环境
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@ip-10-204-3-118 ~]# cat /etc/profile.d/os_env.sh
+<span style="color: #a0522d;">JAVA_8_HOME</span>=<span style="color: #8b2252;">"/usr/local/jdk1.8.0_351"</span>
+<span style="color: #a0522d;">JAVA_11_HOME</span>=<span style="color: #8b2252;">"/usr/local/jdk-11.0.18"</span>
+<span style="color: #a0522d;">JRE_8_HOME</span>=/usr/local/jdk1.8.0_351/jre
+<span style="color: #a0522d;">JRE_11_HOME</span>=/usr/local/jdk-11.0.18/jre
+
+<span style="color: #483d8b;">alias</span> <span style="color: #a0522d;">jdk8</span>=<span style="color: #8b2252;">"export JAVA_HOME=$JAVA_8_HOME  JRE_HOME=$JRE_8_HOME  PATH=$JAVA_8_HOME/bin:$PATH"</span>
+<span style="color: #483d8b;">alias</span> <span style="color: #a0522d;">jdk11</span>=<span style="color: #8b2252;">"export JAVA_HOME=$JAVA_11_HOME JRE_HOME=$JRE_11_HOME PATH=$JAVA_11_HOME/bin:$PATH "</span>
+
+<span style="color: #a0522d;">JAVA_HOME</span>=$<span style="color: #a0522d;">JAVA_8_HOME</span>
+<span style="color: #a0522d;">JRE_HOME</span>=$<span style="color: #a0522d;">JAVA_8_HOME</span>/jre
+
+<span style="color: #483d8b;">export</span> <span style="color: #a0522d;">JAVA_HOME</span>=/usr/local/java
+<span style="color: #483d8b;">export</span> <span style="color: #a0522d;">CLASSPATH</span>=.:$<span style="color: #a0522d;">JAVA_HOME</span>/lib/dt.jar:/lib/tools.jar:$<span style="color: #a0522d;">JRE_HOME</span>/lib:$<span style="color: #a0522d;">CLASSPATH</span>
+<span style="color: #483d8b;">export</span> <span style="color: #a0522d;">PATH</span>=$<span style="color: #a0522d;">JAVA_HOME</span>/bin:$<span style="color: #a0522d;">PATH</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@ip-10-204-3-118 ~]# java -version
+java version <span style="color: #8b2252;">"1.8.0_351"</span>
+<span style="color: #0000ff;">Java</span>(TM) SE Runtime Environment (build 1.8.0_351-b10)
+Java HotSpot(TM) 64-Bit Server VM (build 25.351-b10, mixed mode)
+[root@ip-10-204-3-118 ~]# jdk11
+[root@ip-10-204-3-118 ~]# java -version
+java version <span style="color: #8b2252;">"11.0.18"</span> 2023-01-17 LTS
+<span style="color: #0000ff;">Java</span>(TM) SE Runtime Environment 18.9 (build 11.0.18+9-LTS-195)
+Java HotSpot(TM) 64-Bit Server VM 18.9 (build 11.0.18+9-LTS-195, mixed mode)
+</pre>
+</div>
+</div>
+</div>
+</section>
+
+<section id="outline-container-orgefeff59" class="outline-2">
+<h2 id="orgefeff59">docker</h2>
+<div class="outline-text-2" id="text-orgefeff59">
+<p>
+部署参考：<a href="https://docs.docker.com/engine/install/centos/">https://docs.docker.com/engine/install/centos/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">sudo yum remove docker <span style="color: #8b2252;">\</span>
+docker-client <span style="color: #8b2252;">\</span>
+docker-client-latest <span style="color: #8b2252;">\</span>
+docker-common <span style="color: #8b2252;">\</span>
+docker-latest <span style="color: #8b2252;">\</span>
+docker-latest-logrotate <span style="color: #8b2252;">\</span>
+docker-logrotate <span style="color: #8b2252;">\</span>
+docker-engine
+sudo yum install -y yum-utils
+sudo yum-config-manager <span style="color: #8b2252;">\</span>
+--add-repo <span style="color: #8b2252;">\</span>
+https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl start docker
+sudo systemctl enable docker
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25351;&#23450; docker &#25968;&#25454;&#30446;&#24405; /data/docker_data</span>
+mkdir /data/docker_data
+cat /etc/docker/daemon.json
+{
+<span style="color: #8b2252;">"registry-mirrors"</span>: [
+<span style="color: #8b2252;">"https://dockerhub.azk8s.cn"</span>,
+<span style="color: #8b2252;">"https://docker.mirrors.ustc.edu.cn"</span>,
+<span style="color: #8b2252;">"http://hub-mirror.c.163.com"</span>
+],
+<span style="color: #8b2252;">"max-concurrent-downloads"</span>: 10,
+<span style="color: #8b2252;">"log-driver"</span>: <span style="color: #8b2252;">"json-file"</span>,
+<span style="color: #8b2252;">"log-level"</span>: <span style="color: #8b2252;">"warn"</span>,
+<span style="color: #8b2252;">"log-opts"</span>: {
+<span style="color: #8b2252;">"max-size"</span>: <span style="color: #8b2252;">"10m"</span>,
+<span style="color: #8b2252;">"max-file"</span>: <span style="color: #8b2252;">"3"</span>
+},
+<span style="color: #8b2252;">"data-root"</span>: <span style="color: #8b2252;">"/data/docker_data"</span>
+}
+sudo systemctl restart docker
+</pre>
+</div>
+</div>
+</section>
+
+
+<section id="outline-container-org3c7bdbc" class="outline-2">
+<h2 id="org3c7bdbc">mysql</h2>
+<div class="outline-text-2" id="text-org3c7bdbc">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /data/mysql/data
+
+cat /data/mysql/my.cnf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">For advice on how to change settings please see</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">http://dev.mysql.com/doc/refman/5.6/en/server-configuration-defaults.html</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">*** DO NOT EDIT THIS FILE. It's a template which will be copied to the</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">*** default location during install, and will be replaced if you</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">*** upgrade to a newer version of MySQL.</span>
+
+[mysqld]
+<span style="color: #b22222;">#</span><span style="color: #b22222;">basedir=/var/lib/mysql</span>
+<span style="color: #a0522d;">datadir</span>=/var/lib/mysql
+<span style="color: #b22222;">#</span><span style="color: #b22222;">socket=/var/lib/mysql/tmp/mysql.sock</span>
+<span style="color: #a0522d;">socket</span>=/var/run/mysqld/mysqld.sock
+secure-file-priv=/var/lib/mysql-files
+<span style="color: #a0522d;">user</span>=mysql
+<span style="color: #b22222;">#</span><span style="color: #b22222;">tmpdir=/tmp</span>
+<span style="color: #a0522d;">max_connections</span>=2000
+character-set-server=utf8
+<span style="color: #b22222;">#</span><span style="color: #b22222;">sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</span>
+<span style="color: #a0522d;">lower_case_table_names</span>=1
+skip-name-resolve
+<span style="color: #a0522d;">max_connections</span>=3000
+<span style="color: #b22222;">## </span><span style="color: #b22222;">&#26381;&#21153;&#31471;&#20351;&#29992;&#30340;&#23383;&#31526;&#38598;&#40664;&#35748;&#20026;8&#27604;&#29305;&#32534;&#30721;&#30340;latin1&#23383;&#31526;&#38598;</span>
+character-set-server=utf8mb4
+<span style="color: #b22222;">## </span><span style="color: #b22222;">&#21019;&#24314;&#26032;&#34920;&#26102;&#23558;&#20351;&#29992;&#30340;&#40664;&#35748;&#23384;&#20648;&#24341;&#25806;</span>
+default-storage-engine=INNODB
+<span style="color: #b22222;">#</span><span style="color: #b22222;">lower_case_table_name=1</span>
+<span style="color: #a0522d;">max_allowed_packet</span>=1024M
+<span style="color: #a0522d;">max_length_for_sort_data</span>=838860
+<span style="color: #a0522d;">group_concat_max_len</span>=1844674407370954752
+<span style="color: #a0522d;">query_cache_type</span>=1
+<span style="color: #a0522d;">loose_max_statement_time</span>=3000000
+<span style="color: #a0522d;">table_open_cache</span>=4096
+<span style="color: #a0522d;">max_connect_errors</span>=100000
+<span style="color: #a0522d;">sort_buffer_size</span>=3M
+<span style="color: #a0522d;">join_buffer_size</span>=3M
+<span style="color: #a0522d;">log_bin_trust_function_creators</span>=1
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#24320;&#21551;&#24930;&#26085;&#24535;</span>
+<span style="color: #a0522d;">log_output</span>=file
+<span style="color: #a0522d;">slow_query_log</span>=on
+slow_query_log_file = /var/lib/mysql/mysql-slow.log
+<span style="color: #a0522d;">log_queries_not_using_indexes</span>=on
+long_query_time = 1
+sql_mode = <span style="color: #8b2252;">"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,ALLOW_INVALID_DATES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Remove leading # and set to the amount of RAM for the most important data</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">cache in MySQL. Start at 70% of total RAM for dedicated server, else 10%.</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">innodb_buffer_pool_size = 128M</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Remove leading # to turn on a very important data integrity option: logging</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">changes to the binary log between backups.</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">log_bin</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">These are commonly set, remove the # and set as required.</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">basedir = .....</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">datadir = .....</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">port = .....</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">server_id = .....</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">socket = .....</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Remove leading # to set options mainly useful for reporting servers.</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">The server defaults are faster for transactions and fast SELECTs.</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Adjust sizes as needed, experiment to find the optimal values.</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">join_buffer_size = 128M</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">sort_buffer_size = 2M</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">read_rnd_buffer_size = 2M</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES</span>
+[mysqld_safe]
+log-error=/var/lib/mysql/error.log
+pid-file=/var/lib/mysql/mysql.pid
+[mysqldump]
+<span style="color: #a0522d;">user</span>=root
+<span style="color: #a0522d;">password</span>=VW4rbQfLTn
+
+
+cat /data/mysql/start.sh
+docker run -d -p 3306:3306 --restart always -v /data/mysql/data:/var/lib/mysql -v /data/mysql/my.cnf:/etc/my.cnf -e <span style="color: #8b2252;">"MYSQL_ROOT_PASSWORD=VW4rbQfLTn"</span> -e <span style="color: #8b2252;">"TZ=Asia/Shanghai"</span> --name mysql mysql:5.7
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#21160;</span>
+bash /data/mysql/start.sh
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgd0a4d3b" class="outline-3">
+<h3 id="orgd0a4d3b">docker-compose</h3>
+<div class="outline-text-3" id="text-orgd0a4d3b">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#30446;&#24405;</span>
+$ mkdir -p /data/mysql
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">mysql&#37197;&#32622;&#25991;&#20214;</span>
+cat &lt;&lt; EOF &gt; my.cnf
+<span style="color: #ffa54f;">#For advice on how to change settings please see</span>
+<span style="color: #ffa54f;"># http://dev.mysql.com/doc/refman/5.6/en/server-configuration-defaults.html</span>
+<span style="color: #ffa54f;"># *** DO NOT EDIT THIS FILE. It's a template which will be copied to the</span>
+<span style="color: #ffa54f;"># *** default location during install, and will be replaced if you</span>
+<span style="color: #ffa54f;"># *** upgrade to a newer version of MySQL.</span>
+
+<span style="color: #ffa54f;">[mysqld]</span>
+<span style="color: #ffa54f;">basedir=/var/lib/mysql</span>
+<span style="color: #ffa54f;">datadir=/var/lib/mysql</span>
+<span style="color: #ffa54f;">socket=/var/lib/mysql/tmp/mysql.sock</span>
+<span style="color: #ffa54f;">user=mysql</span>
+<span style="color: #ffa54f;">tmpdir=/tmp</span>
+<span style="color: #ffa54f;">max_connections=200</span>
+<span style="color: #ffa54f;">character-set-server=utf8</span>
+<span style="color: #ffa54f;">#sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</span>
+<span style="color: #ffa54f;">max_connections=100</span>
+<span style="color: #ffa54f;">character-set-server=utf8</span>
+<span style="color: #ffa54f;">lower_case_table_names=1</span>
+<span style="color: #ffa54f;">skip-name-resolve</span>
+<span style="color: #ffa54f;">max_connections=3000</span>
+<span style="color: #ffa54f;">## &#26381;&#21153;&#31471;&#20351;&#29992;&#30340;&#23383;&#31526;&#38598;&#40664;&#35748;&#20026;8&#27604;&#29305;&#32534;&#30721;&#30340;latin1&#23383;&#31526;&#38598;</span>
+<span style="color: #ffa54f;">character-set-server=utf8mb4</span>
+<span style="color: #ffa54f;">## &#21019;&#24314;&#26032;&#34920;&#26102;&#23558;&#20351;&#29992;&#30340;&#40664;&#35748;&#23384;&#20648;&#24341;&#25806;</span>
+<span style="color: #ffa54f;">default-storage-engine=INNODB</span>
+<span style="color: #ffa54f;">#lower_case_table_name=1</span>
+<span style="color: #ffa54f;">max_allowed_packet=1024M</span>
+<span style="color: #ffa54f;">max_length_for_sort_data=838860</span>
+<span style="color: #ffa54f;">group_concat_max_len=1844674407370954752</span>
+<span style="color: #ffa54f;">query_cache_type=1</span>
+<span style="color: #ffa54f;">loose_max_statement_time=3000000</span>
+<span style="color: #ffa54f;">table_open_cache=4096</span>
+<span style="color: #ffa54f;">max_connect_errors=100000</span>
+<span style="color: #ffa54f;">sort_buffer_size=3M</span>
+<span style="color: #ffa54f;">join_buffer_size=3M</span>
+<span style="color: #ffa54f;">log_bin_trust_function_creators=1</span>
+<span style="color: #ffa54f;">#&#24320;&#21551;&#24930;&#26085;&#24535;</span>
+<span style="color: #ffa54f;">log_output=file</span>
+<span style="color: #ffa54f;">slow_query_log=on</span>
+<span style="color: #ffa54f;">slow_query_log_file = /var/lib/mysql/mysql-slow.log</span>
+<span style="color: #ffa54f;">log_queries_not_using_indexes=on</span>
+<span style="color: #ffa54f;">long_query_time = 1</span>
+<span style="color: #ffa54f;">sql_mode = "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,ALLOW_INVALID_DATES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"</span>
+
+<span style="color: #ffa54f;"># Remove leading # and set to the amount of RAM for the most important data</span>
+<span style="color: #ffa54f;"># cache in MySQL. Start at 70% of total RAM for dedicated server, else 10%.</span>
+<span style="color: #ffa54f;"># innodb_buffer_pool_size = 128M</span>
+
+<span style="color: #ffa54f;"># Remove leading # to turn on a very important data integrity option: logging</span>
+<span style="color: #ffa54f;"># changes to the binary log between backups.</span>
+<span style="color: #ffa54f;"># log_bin</span>
+
+<span style="color: #ffa54f;"># These are commonly set, remove the # and set as required.</span>
+<span style="color: #ffa54f;"># basedir = .....</span>
+<span style="color: #ffa54f;"># datadir = .....</span>
+<span style="color: #ffa54f;"># port = .....</span>
+<span style="color: #ffa54f;"># server_id = .....</span>
+<span style="color: #ffa54f;"># socket = .....</span>
+
+<span style="color: #ffa54f;"># Remove leading # to set options mainly useful for reporting servers.</span>
+<span style="color: #ffa54f;"># The server defaults are faster for transactions and fast SELECTs.</span>
+<span style="color: #ffa54f;"># Adjust sizes as needed, experiment to find the optimal values.</span>
+<span style="color: #ffa54f;"># join_buffer_size = 128M</span>
+<span style="color: #ffa54f;"># sort_buffer_size = 2M</span>
+<span style="color: #ffa54f;"># read_rnd_buffer_size = 2M</span>
+
+<span style="color: #ffa54f;">#sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES</span>
+<span style="color: #ffa54f;">[mysqld_safe]</span>
+<span style="color: #ffa54f;">log-error=/var/lib/mysql/error.log</span>
+<span style="color: #ffa54f;">pid-file=/var/lib/mysql/mysql.pid</span>
+<span style="color: #ffa54f;">[mysqldump]</span>
+<span style="color: #ffa54f;">user=root</span>
+<span style="color: #ffa54f;">password=123</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">mysql docker-compose</span>
+$ cat &lt;&lt; EOF &gt; /data/mysql/mysql-single.yaml
+<span style="color: #ffa54f;">version: "3.5"</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  db:</span>
+<span style="color: #ffa54f;">    image: mysql:5.7</span>
+<span style="color: #ffa54f;">    container_name: mysql</span>
+<span style="color: #ffa54f;">    hostname: mysql</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./data:/var/lib/mysql</span>
+<span style="color: #ffa54f;">      - ./my.cnf:/etc/my.cnf</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - "3306:3306"</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - MYSQL_ROOT_PASSWORD=123</span>
+<span style="color: #ffa54f;">      - TZ=Asia/Shanghai</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      mysql:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - db</span>
+
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  mysql:</span>
+<span style="color: #ffa54f;">    name: mysql</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#21160; mysql</span>
+$ docker-compose -f /data/mysql/mysql-single.yaml up -d
+</pre>
+</div>
+</div>
+</div>
+</section>
+
+<section id="outline-container-org4e61d9a" class="outline-2">
+<h2 id="org4e61d9a">redis</h2>
+<div class="outline-text-2" id="text-org4e61d9a">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /data/redis/{data,conf}
+
+cat /data/redis/conf/redis.conf
+<span style="color: #483d8b;">bind</span> 0.0.0.0
+protected-mode yes
+port 6379
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+daemonize no
+supervised no
+loglevel notice
+databases 16
+save 900 1
+save 300 10
+save 60 10000
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum yes
+dbfilename dump.rdb
+maxclients 10000
+maxmemory 8g
+maxmemory-policy volatile-lru
+dir /data/redis
+slave-serve-stale-data yes
+slave-read-only yes
+repl-diskless-sync no
+repl-diskless-sync-delay 5
+repl-disable-tcp-nodelay no
+slave-priority 100
+appendonly no
+appendfilename <span style="color: #8b2252;">"appendonly.aof"</span>
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+aof-load-truncated yes
+lua-time-limit 5000
+slowlog-log-slower-than 10000
+slowlog-max-len 128
+latency-monitor-threshold 0
+notify-keyspace-events <span style="color: #8b2252;">""</span>
+hash-max-ziplist-entries 512
+hash-max-ziplist-value 64
+list-max-ziplist-size -2
+list-compress-depth 0
+set-max-intset-entries 512
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+hll-sparse-max-bytes 3000
+activerehashing yes
+client-output-buffer-limit normal 0 0 0
+client-output-buffer-limit slave 256mb 64mb 60
+client-output-buffer-limit pubsub 32mb 8mb 60
+hz 10
+aof-rewrite-incremental-fsync yes
+
+cat /data/redis/start.sh
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+docker run -d -p 6379:6379 --restart always -v /data/redis/conf:/usr/local/etc/redis -v /data/redis/data:/data/redis --name redis redis:3.2.12 /usr/local/etc/redis/redis.conf
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#21160;</span>
+bash /data/redis/start.sh
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga577be7" class="outline-3">
+<h3 id="orga577be7">redis docker compose</h3>
+<div class="outline-text-3" id="text-orga577be7">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#23478;&#30446;&#24405;</span>
+$ mkdir -p /data/redis
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23548;&#20837;docker-compose&#25991;&#20214;</span>
+$ cat &lt;&lt; EOF &gt; /data/redis/redis-single.yaml
+<span style="color: #ffa54f;">version: "3.5"</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  redis:</span>
+<span style="color: #ffa54f;">    image: redis:5.0.8</span>
+<span style="color: #ffa54f;">    container_name: redis</span>
+<span style="color: #ffa54f;">    hostname: redis</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./data:/data</span>
+<span style="color: #ffa54f;">      - ./redis.conf:/etc/redis.conf</span>
+<span style="color: #ffa54f;">    command: redis-server /etc/redis.conf</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - "6379:6379"</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - TZ=Asia/Shanghai</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      redis:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - redis-server</span>
+
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  redis:</span>
+<span style="color: #ffa54f;">    name: redis</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23548;&#20837; redis &#37197;&#32622;&#25991;&#20214;</span>
+$ cat &lt;&lt; EOF &gt; /data/redis/redis.conf
+<span style="color: #ffa54f;">bind 0.0.0.0</span>
+<span style="color: #ffa54f;">protected-mode yes</span>
+<span style="color: #ffa54f;">port 6379</span>
+<span style="color: #ffa54f;">tcp-backlog 511</span>
+<span style="color: #ffa54f;">timeout 0</span>
+<span style="color: #ffa54f;">tcp-keepalive 300</span>
+<span style="color: #ffa54f;">daemonize no</span>
+<span style="color: #ffa54f;">supervised no</span>
+<span style="color: #ffa54f;">pidfile /var/run/redis_6379.pid</span>
+<span style="color: #ffa54f;">loglevel notice</span>
+<span style="color: #ffa54f;">databases 16</span>
+<span style="color: #ffa54f;">always-show-logo yes</span>
+<span style="color: #ffa54f;">save 900 1</span>
+<span style="color: #ffa54f;">save 300 10</span>
+<span style="color: #ffa54f;">save 60 10000</span>
+<span style="color: #ffa54f;">stop-writes-on-bgsave-error yes</span>
+<span style="color: #ffa54f;">rdbcompression yes</span>
+<span style="color: #ffa54f;">rdbchecksum yes</span>
+<span style="color: #ffa54f;">dbfilename dump.rdb</span>
+<span style="color: #ffa54f;">dir /data</span>
+<span style="color: #ffa54f;">slave-serve-stale-data yes</span>
+<span style="color: #ffa54f;">slave-read-only yes</span>
+<span style="color: #ffa54f;">repl-diskless-sync no</span>
+<span style="color: #ffa54f;">repl-diskless-sync-delay 5</span>
+<span style="color: #ffa54f;">repl-disable-tcp-nodelay no</span>
+<span style="color: #ffa54f;">slave-priority 100</span>
+<span style="color: #ffa54f;">requirepass "123456"</span>
+<span style="color: #ffa54f;">lazyfree-lazy-eviction no</span>
+<span style="color: #ffa54f;">lazyfree-lazy-expire no</span>
+<span style="color: #ffa54f;">lazyfree-lazy-server-del no</span>
+<span style="color: #ffa54f;">slave-lazy-flush no</span>
+<span style="color: #ffa54f;">appendonly yes</span>
+<span style="color: #ffa54f;">appendfilename "appendonly.aof"</span>
+<span style="color: #ffa54f;">appendfsync everysec</span>
+<span style="color: #ffa54f;">no-appendfsync-on-rewrite yes</span>
+<span style="color: #ffa54f;">auto-aof-rewrite-percentage 100</span>
+<span style="color: #ffa54f;">auto-aof-rewrite-min-size 64mb</span>
+<span style="color: #ffa54f;">aof-load-truncated yes</span>
+<span style="color: #ffa54f;">aof-use-rdb-preamble no</span>
+<span style="color: #ffa54f;">lua-time-limit 5000</span>
+<span style="color: #ffa54f;">slowlog-log-slower-than 10000</span>
+<span style="color: #ffa54f;">slowlog-max-len 128</span>
+<span style="color: #ffa54f;">latency-monitor-threshold 0</span>
+<span style="color: #ffa54f;">notify-keyspace-events ""</span>
+<span style="color: #ffa54f;">hash-max-ziplist-entries 512</span>
+<span style="color: #ffa54f;">hash-max-ziplist-value 64</span>
+<span style="color: #ffa54f;">list-max-ziplist-size -2</span>
+<span style="color: #ffa54f;">list-compress-depth 0</span>
+<span style="color: #ffa54f;">set-max-intset-entries 512</span>
+<span style="color: #ffa54f;">zset-max-ziplist-entries 128</span>
+<span style="color: #ffa54f;">zset-max-ziplist-value 64</span>
+<span style="color: #ffa54f;">hll-sparse-max-bytes 3000</span>
+<span style="color: #ffa54f;">activerehashing yes</span>
+<span style="color: #ffa54f;">client-output-buffer-limit normal 0 0 0</span>
+<span style="color: #ffa54f;">client-output-buffer-limit slave 256mb 64mb 60</span>
+<span style="color: #ffa54f;">client-output-buffer-limit pubsub 32mb 8mb 60</span>
+<span style="color: #ffa54f;">hz 10</span>
+<span style="color: #ffa54f;">aof-rewrite-incremental-fsync yes</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#37096;&#32626;redis</span>
+$ docker-compose -f /data/redis/redis-single.yaml up -d
+</pre>
+</div>
+</div>
+</div>
+</section>
+
+<section id="outline-container-org3830151" class="outline-2">
+<h2 id="org3830151">nginx</h2>
+<div class="outline-text-2" id="text-org3830151">
+</div>
+<div id="outline-container-org42689f2" class="outline-3">
+<h3 id="org42689f2">nginx-ldap</h3>
+<div class="outline-text-3" id="text-org42689f2">
+<p>
+<a href="https://github.com/AxisCommunications/docker-nginx-ldap">https://github.com/AxisCommunications/docker-nginx-ldap</a>
+docker pull axistools/nginx-ldap:1.23.2-alpine
+</p>
+</div>
+</div>
+</section>
+
+
+<section id="outline-container-org1e472a7" class="outline-2">
+<h2 id="org1e472a7">haproxy</h2>
+<div class="outline-text-2" id="text-org1e472a7">
+<p>
+harpoxy 代理两台 k8s node节点的 NodePort 端口
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#32534;&#36753;&#37197;&#32622;&#25991;&#20214;</span>
+$ cat &lt;&lt; EOF &gt; ./haproxy.cfg
+<span style="color: #ffa54f;">global</span>
+<span style="color: #ffa54f;">    daemon</span>
+<span style="color: #ffa54f;">    nbproc 1</span>
+<span style="color: #ffa54f;">    chroot /usr/local/etc/haproxy</span>
+
+<span style="color: #ffa54f;">defaults</span>
+<span style="color: #ffa54f;">    mode tcp</span>
+<span style="color: #ffa54f;">    retries 2</span>
+<span style="color: #ffa54f;">    option redispatch</span>
+<span style="color: #ffa54f;">    #option abortonclos</span>
+<span style="color: #ffa54f;">    maxconn 4096</span>
+<span style="color: #ffa54f;">    timeout connect 5000ms</span>
+<span style="color: #ffa54f;">    timeout client 30000ms</span>
+<span style="color: #ffa54f;">    timeout server 30000ms</span>
+<span style="color: #ffa54f;">    #timeout check 200</span>
+<span style="color: #ffa54f;">    log 127.0.0.1 local0 err</span>
+
+<span style="color: #ffa54f;">listen  admin_stats</span>
+<span style="color: #ffa54f;">    bind  0.0.0.0:8888              # haproxy&#30417;&#25511;&#31471;&#21475;</span>
+<span style="color: #ffa54f;">    mode        http</span>
+<span style="color: #ffa54f;">    stats uri   /dbs</span>
+<span style="color: #ffa54f;">    stats realm     Global\ statistics</span>
+<span style="color: #ffa54f;">    stats auth  admin:123456</span>
+
+<span style="color: #ffa54f;">listen k8s_80</span>
+<span style="color: #ffa54f;">    bind 0.0.0.0:80</span>
+<span style="color: #ffa54f;">    mode tcp</span>
+<span style="color: #ffa54f;">    #maxconn 4086</span>
+<span style="color: #ffa54f;">    #log 127.0.0.1 local0 debug</span>
+<span style="color: #ffa54f;">    server s1 10.0.1.94:23456 check     # &#30495;&#23454;&#21518;&#31471;&#26381;&#21153;&#22120;</span>
+<span style="color: #ffa54f;">    server s2 10.0.1.95:23456 check     # &#30495;&#23454;&#21518;&#31471;&#26381;&#21153;&#22120;</span>
+<span style="color: #ffa54f;">EOF</span>
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#21160; haproxy</span>
+$ docker run -d -p 8888:8888 -p 80:80 --name haproxy -e <span style="color: #a0522d;">LANG</span>=en_US.UTF-8 -v ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg 10.0.1.84/public/haproxy:latest
+</pre>
+</div>
+</div>
+</section>
+
+
+<section id="outline-container-org065efae" class="outline-2">
+<h2 id="org065efae">elasticsearch</h2>
+<div class="outline-text-2" id="text-org065efae">
+</div>
+<div id="outline-container-orga842746" class="outline-3">
+<h3 id="orga842746">elasticsearch docker compose</h3>
+<div class="outline-text-3" id="text-orga842746">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#23478;&#30446;&#24405;</span>
+$ mkdir -p /data/elasticsearch
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23548;&#20837;docker-compose&#25991;&#20214;</span>
+$ cat &lt;&lt; EOF &gt; /data/elasticsearch/es-single.yaml
+<span style="color: #ffa54f;">version: "3.5"</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  elasticsearch:</span>
+<span style="color: #ffa54f;">    image: docker.elastic.co/elasticsearch/elasticsearch:7.2.1</span>
+<span style="color: #ffa54f;">    container_name: elasticsearch</span>
+<span style="color: #ffa54f;">    hostname: elasticsearch</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./data:/usr/share/elasticsearch/data</span>
+<span style="color: #ffa54f;">      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml</span>
+<span style="color: #ffa54f;">      - ./jvm.options:/usr/share/elasticsearch/config/jvm.options</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9200:9200</span>
+<span style="color: #ffa54f;">      - 9300:9300</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - TZ=Asia/Shanghai</span>
+<span style="color: #ffa54f;">      - discovery.type=single-node</span>
+<span style="color: #ffa54f;">      - xpack.security.enabled=false</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      es:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - elasticsearch</span>
+
+<span style="color: #ffa54f;">  kibana:</span>
+<span style="color: #ffa54f;">    image: docker.elastic.co/kibana/kibana:7.2.1</span>
+<span style="color: #ffa54f;">    container_name: kibana</span>
+<span style="color: #ffa54f;">    hostname: kibana</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - "5601:5601"</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - TZ=Asia/Shanghai</span>
+<span style="color: #ffa54f;">      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200</span>
+<span style="color: #ffa54f;">    depends_on:</span>
+<span style="color: #ffa54f;">      - elasticsearch</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      es:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - kibana</span>
+
+<span style="color: #ffa54f;">  cerebro:</span>
+<span style="color: #ffa54f;">    image: lmenezes/cerebro</span>
+<span style="color: #ffa54f;">    container_name: es-cerebro</span>
+<span style="color: #ffa54f;">    hostname: es-cerebro</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9000:9000</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - TZ=Asia/Shanghai</span>
+<span style="color: #ffa54f;">    depends_on:</span>
+<span style="color: #ffa54f;">      - elasticsearch</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      es:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - cerebro</span>
+
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  es:</span>
+<span style="color: #ffa54f;">    name: es</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23548;&#20837; elasticsearch &#37197;&#32622;&#25991;&#20214;</span>
+$ cat &lt;&lt; EOF &gt; /data/elasticsearch/elasticsearch.yml
+<span style="color: #ffa54f;">cluster.name: "docker-cluster"</span>
+<span style="color: #ffa54f;">network.host: 0.0.0.0</span>
+<span style="color: #ffa54f;">discovery.zen.fd.ping_timeout: 1m</span>
+<span style="color: #ffa54f;">discovery.zen.fd.ping_retries: 5</span>
+<span style="color: #ffa54f;"># &#26159;&#21542;&#25903;&#25345;&#36328;&#22495;</span>
+<span style="color: #ffa54f;">http.cors.enabled: true</span>
+<span style="color: #ffa54f;"># *&#34920;&#31034;&#25903;&#25345;&#25152;&#26377;&#22495;&#21517;</span>
+<span style="color: #ffa54f;">http.cors.allow-origin: "*"</span>
+<span style="color: #ffa54f;">EOF</span>
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23548;&#20837;jvm&#21442;&#25968;&#37197;&#32622;</span>
+$ cat &lt;&lt; EOF &gt; /data/elasticsearch/jvm.options
+<span style="color: #ffa54f;">## JVM configuration</span>
+
+<span style="color: #ffa54f;">################################################################</span>
+<span style="color: #ffa54f;">## IMPORTANT: JVM heap size</span>
+<span style="color: #ffa54f;">################################################################</span>
+<span style="color: #ffa54f;">##</span>
+<span style="color: #ffa54f;">## You should always set the min and max JVM heap</span>
+<span style="color: #ffa54f;">## size to the same value. For example, to set</span>
+<span style="color: #ffa54f;">## the heap to 4 GB, set:</span>
+<span style="color: #ffa54f;">##</span>
+<span style="color: #ffa54f;">## -Xms4g</span>
+<span style="color: #ffa54f;">## -Xmx4g</span>
+<span style="color: #ffa54f;">##</span>
+<span style="color: #ffa54f;">## See https://www.elastic.co/guide/en/elasticsearch/reference/current/heap-size.html</span>
+<span style="color: #ffa54f;">## for more information</span>
+<span style="color: #ffa54f;">##</span>
+<span style="color: #ffa54f;">################################################################</span>
+
+<span style="color: #ffa54f;"># Xms represents the initial size of total heap space</span>
+<span style="color: #ffa54f;"># Xmx represents the maximum size of total heap space</span>
+
+<span style="color: #ffa54f;">-Xms4g</span>
+<span style="color: #ffa54f;">-Xmx4g</span>
+
+<span style="color: #ffa54f;">################################################################</span>
+<span style="color: #ffa54f;">## Expert settings</span>
+<span style="color: #ffa54f;">################################################################</span>
+<span style="color: #ffa54f;">##</span>
+<span style="color: #ffa54f;">## All settings below this section are considered</span>
+<span style="color: #ffa54f;">## expert settings. Don't tamper with them unless</span>
+<span style="color: #ffa54f;">## you understand what you are doing</span>
+<span style="color: #ffa54f;">##</span>
+<span style="color: #ffa54f;">################################################################</span>
+
+<span style="color: #ffa54f;">## GC configuration</span>
+<span style="color: #ffa54f;">-XX:+UseConcMarkSweepGC</span>
+<span style="color: #ffa54f;">-XX:CMSInitiatingOccupancyFraction=75</span>
+<span style="color: #ffa54f;">-XX:+UseCMSInitiatingOccupancyOnly</span>
+
+<span style="color: #ffa54f;">## G1GC Configuration</span>
+<span style="color: #ffa54f;"># NOTE: G1GC is only supported on JDK version 10 or later.</span>
+<span style="color: #ffa54f;"># To use G1GC uncomment the lines below.</span>
+<span style="color: #ffa54f;"># 10-:-XX:-UseConcMarkSweepGC</span>
+<span style="color: #ffa54f;"># 10-:-XX:-UseCMSInitiatingOccupancyOnly</span>
+<span style="color: #ffa54f;"># 10-:-XX:+UseG1GC</span>
+<span style="color: #ffa54f;"># 10-:-XX:InitiatingHeapOccupancyPercent=75</span>
+
+<span style="color: #ffa54f;">## DNS cache policy</span>
+<span style="color: #ffa54f;"># cache ttl in seconds for positive DNS lookups noting that this overrides the</span>
+<span style="color: #ffa54f;"># JDK security property networkaddress.cache.ttl; set to -1 to cache forever</span>
+<span style="color: #ffa54f;">-Des.networkaddress.cache.ttl=60</span>
+<span style="color: #ffa54f;"># cache ttl in seconds for negative DNS lookups noting that this overrides the</span>
+<span style="color: #ffa54f;"># JDK security property networkaddress.cache.negative ttl; set to -1 to cache</span>
+<span style="color: #ffa54f;"># forever</span>
+<span style="color: #ffa54f;">-Des.networkaddress.cache.negative.ttl=10</span>
+
+<span style="color: #ffa54f;">## optimizations</span>
+
+<span style="color: #ffa54f;"># pre-touch memory pages used by the JVM during initialization</span>
+<span style="color: #ffa54f;">-XX:+AlwaysPreTouch</span>
+
+<span style="color: #ffa54f;">## basic</span>
+
+<span style="color: #ffa54f;"># explicitly set the stack size</span>
+<span style="color: #ffa54f;">-Xss1m</span>
+
+<span style="color: #ffa54f;"># set to headless, just in case</span>
+<span style="color: #ffa54f;">-Djava.awt.headless=true</span>
+
+<span style="color: #ffa54f;"># ensure UTF-8 encoding by default (e.g. filenames)</span>
+<span style="color: #ffa54f;">-Dfile.encoding=UTF-8</span>
+
+<span style="color: #ffa54f;"># use our provided JNA always versus the system one</span>
+<span style="color: #ffa54f;">-Djna.nosys=true</span>
+
+<span style="color: #ffa54f;"># turn off a JDK optimization that throws away stack traces for common</span>
+<span style="color: #ffa54f;"># exceptions because stack traces are important for debugging</span>
+<span style="color: #ffa54f;">-XX:-OmitStackTraceInFastThrow</span>
+
+<span style="color: #ffa54f;"># flags to configure Netty</span>
+<span style="color: #ffa54f;">-Dio.netty.noUnsafe=true</span>
+<span style="color: #ffa54f;">-Dio.netty.noKeySetOptimization=true</span>
+<span style="color: #ffa54f;">-Dio.netty.recycler.maxCapacityPerThread=0</span>
+
+<span style="color: #ffa54f;"># log4j 2</span>
+<span style="color: #ffa54f;">-Dlog4j.shutdownHookEnabled=false</span>
+<span style="color: #ffa54f;">-Dlog4j2.disable.jmx=true</span>
+
+<span style="color: #ffa54f;">-Djava.io.tmpdir=${ES_TMPDIR}</span>
+
+<span style="color: #ffa54f;">## heap dumps</span>
+
+<span style="color: #ffa54f;"># generate a heap dump when an allocation from the Java heap fails</span>
+<span style="color: #ffa54f;"># heap dumps are created in the working directory of the JVM</span>
+<span style="color: #ffa54f;">-XX:+HeapDumpOnOutOfMemoryError</span>
+
+<span style="color: #ffa54f;"># specify an alternative path for heap dumps; ensure the directory exists and</span>
+<span style="color: #ffa54f;"># has sufficient space</span>
+<span style="color: #ffa54f;">-XX:HeapDumpPath=data</span>
+
+<span style="color: #ffa54f;"># specify an alternative path for JVM fatal error logs</span>
+<span style="color: #ffa54f;">-XX:ErrorFile=logs/hs_err_pid%p.log</span>
+
+<span style="color: #ffa54f;">## JDK 8 GC logging</span>
+
+<span style="color: #ffa54f;">8:-XX:+PrintGCDetails</span>
+<span style="color: #ffa54f;">8:-XX:+PrintGCDateStamps</span>
+<span style="color: #ffa54f;">8:-XX:+PrintTenuringDistribution</span>
+<span style="color: #ffa54f;">8:-XX:+PrintGCApplicationStoppedTime</span>
+<span style="color: #ffa54f;">8:-Xloggc:logs/gc.log</span>
+<span style="color: #ffa54f;">8:-XX:+UseGCLogFileRotation</span>
+<span style="color: #ffa54f;">8:-XX:NumberOfGCLogFiles=32</span>
+<span style="color: #ffa54f;">8:-XX:GCLogFileSize=64m</span>
+
+<span style="color: #ffa54f;"># JDK 9+ GC logging</span>
+<span style="color: #ffa54f;">9-:-Xlog:gc*,gc+age=trace,safepoint:file=logs/gc.log:utctime,pid,tags:filecount=32,filesize=64m</span>
+<span style="color: #ffa54f;"># due to internationalization enhancements in JDK 9 Elasticsearch need to set the provider to COMPAT otherwise</span>
+<span style="color: #ffa54f;"># time/date parsing will break in an incompatible way for some date patterns and locals</span>
+<span style="color: #ffa54f;">9-:-Djava.locale.providers=COMPAT</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#37096;&#32626; elasticsearch</span>
+$ docker-compose -f /data/elasticsearch/es-single.yaml up -d
+</pre>
+</div>
+</div>
+</div>
+</section>
+
+<section id="outline-container-org6db9003" class="outline-2">
+<h2 id="org6db9003">rocketmq</h2>
+<div class="outline-text-2" id="text-org6db9003">
+</div>
+<div id="outline-container-org45ccd8a" class="outline-3">
+<h3 id="org45ccd8a">rocketmq docker compose</h3>
+<div class="outline-text-3" id="text-org45ccd8a">
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF &gt; rocketmq/broker-a.conf 
+<span style="color: #ffa54f;"># Licensed to the Apache Software Foundation (ASF) under one or more</span>
+<span style="color: #ffa54f;"># contributor license agreements.  See the NOTICE file distributed with</span>
+<span style="color: #ffa54f;"># this work for additional information regarding copyright ownership.</span>
+<span style="color: #ffa54f;"># The ASF licenses this file to You under the Apache License, Version 2.0</span>
+<span style="color: #ffa54f;"># (the "License"); you may not use this file except in compliance with</span>
+<span style="color: #ffa54f;"># the License.  You may obtain a copy of the License at</span>
+<span style="color: #ffa54f;">#</span>
+<span style="color: #ffa54f;">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span style="color: #ffa54f;">#</span>
+<span style="color: #ffa54f;">#  Unless required by applicable law or agreed to in writing, software</span>
+<span style="color: #ffa54f;">#  distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span style="color: #ffa54f;">#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span style="color: #ffa54f;">#  See the License for the specific language governing permissions and</span>
+<span style="color: #ffa54f;">#  limitations under the License.</span>
+
+<span style="color: #ffa54f;"># &#25152;&#23646;&#38598;&#32676;&#21517;&#23383;</span>
+<span style="color: #ffa54f;">brokerClusterName=DefaultCluster</span>
+
+<span style="color: #ffa54f;"># broker &#21517;&#23383;&#65292;&#27880;&#24847;&#27492;&#22788;&#19981;&#21516;&#30340;&#37197;&#32622;&#25991;&#20214;&#22635;&#20889;&#30340;&#19981;&#19968;&#26679;&#65292;&#22914;&#26524;&#22312; broker-a.properties &#20351;&#29992;: broker-a,</span>
+<span style="color: #ffa54f;"># &#22312; broker-b.properties &#20351;&#29992;: broker-b</span>
+<span style="color: #ffa54f;">brokerName=broker-a</span>
+
+<span style="color: #ffa54f;"># 0 &#34920;&#31034; Master&#65292;&gt; 0 &#34920;&#31034; Slave</span>
+<span style="color: #ffa54f;">brokerId=0</span>
+
+<span style="color: #ffa54f;"># nameServer&#22320;&#22336;&#65292;&#20998;&#21495;&#20998;&#21106;</span>
+<span style="color: #ffa54f;"># namesrvAddr=rocketmq-nameserver1:9876;rocketmq-nameserver2:9876</span>
+
+<span style="color: #ffa54f;"># &#21551;&#21160;IP,&#22914;&#26524; docker &#25253; com.alibaba.rocketmq.remoting.exception.RemotingConnectException: connect to &lt;192.168.0.120:10909&gt; failed</span>
+<span style="color: #ffa54f;"># &#35299;&#20915;&#26041;&#24335;1 &#21152;&#19978;&#19968;&#21477; producer.setVipChannelEnabled(false);&#65292;&#35299;&#20915;&#26041;&#24335;2 brokerIP1 &#35774;&#32622;&#23487;&#20027;&#26426;IP&#65292;&#19981;&#35201;&#20351;&#29992;docker &#20869;&#37096;IP</span>
+<span style="color: #ffa54f;"># brokerIP1=192.168.0.253</span>
+
+<span style="color: #ffa54f;"># &#22312;&#21457;&#36865;&#28040;&#24687;&#26102;&#65292;&#33258;&#21160;&#21019;&#24314;&#26381;&#21153;&#22120;&#19981;&#23384;&#22312;&#30340;topic&#65292;&#40664;&#35748;&#21019;&#24314;&#30340;&#38431;&#21015;&#25968;</span>
+<span style="color: #ffa54f;">defaultTopicQueueNums=4</span>
+
+<span style="color: #ffa54f;"># &#26159;&#21542;&#20801;&#35768; Broker &#33258;&#21160;&#21019;&#24314; Topic&#65292;&#24314;&#35758;&#32447;&#19979;&#24320;&#21551;&#65292;&#32447;&#19978;&#20851;&#38381; &#65281;&#65281;&#65281;&#36825;&#37324;&#20180;&#32454;&#30475;&#26159; false&#65292;false&#65292;false</span>
+<span style="color: #ffa54f;">autoCreateTopicEnable=true</span>
+
+<span style="color: #ffa54f;"># &#26159;&#21542;&#20801;&#35768; Broker &#33258;&#21160;&#21019;&#24314;&#35746;&#38405;&#32452;&#65292;&#24314;&#35758;&#32447;&#19979;&#24320;&#21551;&#65292;&#32447;&#19978;&#20851;&#38381;</span>
+<span style="color: #ffa54f;">autoCreateSubscriptionGroup=true</span>
+
+<span style="color: #ffa54f;"># Broker &#23545;&#22806;&#26381;&#21153;&#30340;&#30417;&#21548;&#31471;&#21475;</span>
+<span style="color: #ffa54f;">listenPort=10911</span>
+
+<span style="color: #ffa54f;"># &#21024;&#38500;&#25991;&#20214;&#26102;&#38388;&#28857;&#65292;&#40664;&#35748;&#20940;&#26216;4&#28857;</span>
+<span style="color: #ffa54f;">deleteWhen=04</span>
+
+<span style="color: #ffa54f;"># &#25991;&#20214;&#20445;&#30041;&#26102;&#38388;&#65292;&#40664;&#35748;48&#23567;&#26102;</span>
+<span style="color: #ffa54f;">fileReservedTime=120</span>
+
+<span style="color: #ffa54f;"># commitLog &#27599;&#20010;&#25991;&#20214;&#30340;&#22823;&#23567;&#40664;&#35748;1G</span>
+<span style="color: #ffa54f;">mapedFileSizeCommitLog=1073741824</span>
+
+<span style="color: #ffa54f;"># ConsumeQueue &#27599;&#20010;&#25991;&#20214;&#40664;&#35748;&#23384; 30W &#26465;&#65292;&#26681;&#25454;&#19994;&#21153;&#24773;&#20917;&#35843;&#25972;</span>
+<span style="color: #ffa54f;">mapedFileSizeConsumeQueue=300000</span>
+
+<span style="color: #ffa54f;"># &#26816;&#27979;&#29289;&#29702;&#25991;&#20214;&#30913;&#30424;&#31354;&#38388;</span>
+<span style="color: #ffa54f;">diskMaxUsedSpaceRatio=88</span>
+
+<span style="color: #ffa54f;"># &#38480;&#21046;&#30340;&#28040;&#24687;&#22823;&#23567;</span>
+<span style="color: #ffa54f;">maxMessageSize=65536</span>
+
+<span style="color: #ffa54f;"># Broker &#30340;&#35282;&#33394;</span>
+<span style="color: #ffa54f;"># - ASYNC_MASTER &#24322;&#27493;&#22797;&#21046;Master</span>
+<span style="color: #ffa54f;"># - SYNC_MASTER &#21516;&#27493;&#21452;&#20889;Master</span>
+<span style="color: #ffa54f;"># - SLAVE</span>
+<span style="color: #ffa54f;">brokerRole=ASYNC_MASTER</span>
+
+<span style="color: #ffa54f;"># &#21047;&#30424;&#26041;&#24335;</span>
+<span style="color: #ffa54f;"># - ASYNC_FLUSH &#24322;&#27493;&#21047;&#30424;</span>
+<span style="color: #ffa54f;"># - SYNC_FLUSH &#21516;&#27493;&#21047;&#30424;</span>
+<span style="color: #ffa54f;">flushDiskType=ASYNC_FLUSH</span>
+<span style="color: #ffa54f;">EOF</span>
+
+
+cat &lt;&lt;\EOF&gt; rocketmq/rocketmq-single.yaml
+
+<span style="color: #ffa54f;">version: '3.5'</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  rmqnamesrv:</span>
+<span style="color: #ffa54f;">    image: foxiswho/rocketmq:server-4.5.2</span>
+<span style="color: #ffa54f;">    container_name: rmqnamesrv</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9876:9876</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./namesrv/logs:/opt/logs</span>
+<span style="color: #ffa54f;">      - ./namesrv/store:/opt/store</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      TZ: Asia/Shanghai</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">        rmq:</span>
+<span style="color: #ffa54f;">          aliases:</span>
+<span style="color: #ffa54f;">            - rmqnamesrv</span>
+
+<span style="color: #ffa54f;">  rmqbroker:</span>
+<span style="color: #ffa54f;">    image: foxiswho/rocketmq:broker-4.5.2</span>
+<span style="color: #ffa54f;">    container_name: rmqbroker</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 10909:10909</span>
+<span style="color: #ffa54f;">      - 10911:10911</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./broker-a/logs:/opt/logs</span>
+<span style="color: #ffa54f;">      - ./broker-a/store:/opt/store</span>
+<span style="color: #ffa54f;">      - ./broker-a.conf:/etc/rocketmq/broker-a.conf</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      TZ: Asia/Shanghai</span>
+<span style="color: #ffa54f;">      NAMESRV_ADDR: "rmqnamesrv:9876"</span>
+<span style="color: #ffa54f;">      JAVA_OPTS: " -Duser.home=/opt"</span>
+<span style="color: #ffa54f;">      JAVA_OPT_EXT: "-server -Xms2048m -Xmx2048m -Xmn512m"</span>
+<span style="color: #ffa54f;">    command: mqbroker -c /etc/rocketmq/broker-a.conf</span>
+<span style="color: #ffa54f;">    depends_on:</span>
+<span style="color: #ffa54f;">      - rmqnamesrv</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      rmq:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - rmqbroker</span>
+
+<span style="color: #ffa54f;">  rmqconsole:</span>
+<span style="color: #ffa54f;">    image: styletang/rocketmq-console-ng</span>
+<span style="color: #ffa54f;">    container_name: rmqconsole</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9898:8080</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      JAVA_OPTS: "-Drocketmq.namesrv.addr=rmqnamesrv:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false"</span>
+<span style="color: #ffa54f;">    depends_on:</span>
+<span style="color: #ffa54f;">      - rmqnamesrv</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      rmq:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - rmqconsole</span>
+
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  rmq:</span>
+<span style="color: #ffa54f;">    name: rmq</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+
+<section id="outline-container-orgf8e2475" class="outline-2">
+<h2 id="orgf8e2475">zookeeper</h2>
+<div class="outline-text-2" id="text-orgf8e2475">
+</div>
+<div id="outline-container-orga4a1b17" class="outline-3">
+<h3 id="orga4a1b17">kubernetes-zookeeper-3.7.1</h3>
+<div class="outline-text-3" id="text-orga4a1b17">
+<p>
+参考：
+<a href="https://stackoverflow.com/questions/48376819/find-dockerfile-build-for-k8s-gcr-io-kubernetes-zookeeper1-0-3-4-10">https://stackoverflow.com/questions/48376819/find-dockerfile-build-for-k8s-gcr-io-kubernetes-zookeeper1-0-3-4-10</a>
+</p>
+</div>
+
+<div id="outline-container-org7c8d769" class="outline-4">
+<h4 id="org7c8d769">dockerfile</h4>
+<div class="outline-text-4" id="text-org7c8d769">
+<p>
+下载配置文件：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">wget https://github.com/kow3ns/kubernetes-zookeeper.git
+<span style="color: #483d8b;">cd</span> kubernetes-zookeeper/docker/
+</pre>
+</div>
+
+<p>
+修改脚本文件 scripts/start-zookeeper
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">create_config &#20989;&#25968;&#20013; &#22686;&#21152;4&#23383;&#21629;&#20196;&#37197;&#32622;</span>
+<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">'4lw.commands.whitelist=*'</span> &gt;&gt; $<span style="color: #a0522d;">CONFIG_FILE</span>
+</pre>
+</div>
+
+<p>
+Dockerfile
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">FROM ubuntu:16.04
+ENV <span style="color: #a0522d;">ZK_USER</span>=zookeeper <span style="color: #8b2252;">\</span>
+<span style="color: #a0522d;">ZK_DATA_DIR</span>=/var/lib/zookeeper/data <span style="color: #8b2252;">\</span>
+<span style="color: #a0522d;">ZK_DATA_LOG_DIR</span>=/var/lib/zookeeper/log <span style="color: #8b2252;">\</span>
+<span style="color: #a0522d;">ZK_LOG_DIR</span>=/var/log/zookeeper <span style="color: #8b2252;">\</span>
+<span style="color: #a0522d;">JAVA_HOME</span>=/usr/lib/jvm/java-8-openjdk-amd64
+
+ARG <span style="color: #a0522d;">GPG_KEY</span>=DFF24FB8323ADAC90E3CF36F729E61230EA917E9
+ARG <span style="color: #a0522d;">ZK_DIST</span>=apache-zookeeper-3.7.1-bin
+ARG <span style="color: #a0522d;">ZK_V</span>=zookeeper-3.7.1
+RUN set -x <span style="color: #8b2252;">\</span>
+    &amp;&amp; apt-get update <span style="color: #8b2252;">\</span>
+    &amp;&amp; apt-get install -y openjdk-8-jre-headless wget netcat-openbsd <span style="color: #8b2252;">\</span>
+        &amp;&amp; wget -q <span style="color: #8b2252;">"https://archive.apache.org/dist/zookeeper/$ZK_V/$ZK_DIST.tar.gz"</span> <span style="color: #8b2252;">\</span>
+    &amp;&amp; wget -q <span style="color: #8b2252;">"https://archive.apache.org/dist/zookeeper/$ZK_V/$ZK_DIST.tar.gz.asc"</span> <span style="color: #8b2252;">\</span>
+    &amp;&amp; <span style="color: #483d8b;">export</span> <span style="color: #a0522d;">GNUPGHOME</span>=<span style="color: #8b2252;">"$(</span><span style="color: #ff00ff;">mktemp -d</span><span style="color: #8b2252;">)"</span>; <span style="color: #8b2252;">\</span>
+    gpg --keyserver hkp://keyserver.pgp.com --recv-key <span style="color: #8b2252;">"$GPG_KEY"</span> || <span style="color: #8b2252;">\</span>
+     gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys <span style="color: #8b2252;">"$GPG_KEY"</span> || <span style="color: #8b2252;">\</span>
+     gpg --keyserver hkp://pgp.mit.edu --recv-keys <span style="color: #8b2252;">"$GPG_KEY"</span>; <span style="color: #8b2252;">\</span>
+    gpg --batch --verify <span style="color: #8b2252;">"$ZK_DIST.tar.gz.asc"</span> <span style="color: #8b2252;">"$ZK_DIST.tar.gz"</span> <span style="color: #8b2252;">\</span>
+    &amp;&amp; tar -xzf <span style="color: #8b2252;">"$ZK_DIST.tar.gz"</span> -C /opt <span style="color: #8b2252;">\</span>
+    &amp;&amp; rm -r <span style="color: #8b2252;">"$GNUPGHOME"</span> <span style="color: #8b2252;">"$ZK_DIST.tar.gz"</span> <span style="color: #8b2252;">"$ZK_DIST.tar.gz.asc"</span> <span style="color: #8b2252;">\</span>
+    &amp;&amp; ln -s /opt/$<span style="color: #a0522d;">ZK_DIST</span> /opt/zookeeper <span style="color: #8b2252;">\</span>
+    &amp;&amp; rm -rf /opt/zookeeper/CHANGES.txt <span style="color: #8b2252;">\</span>
+    /opt/zookeeper/README.md <span style="color: #8b2252;">\</span>
+    /opt/zookeeper/NOTICE.txt <span style="color: #8b2252;">\</span>
+    /opt/zookeeper/README_packaging.md <span style="color: #8b2252;">\</span>
+    /opt/zookeeper/docs <span style="color: #8b2252;">\</span>
+        &amp;&amp; apt-get autoremove -y wget <span style="color: #8b2252;">\</span>
+        &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Copy configuration generator script to bin</span>
+COPY scripts /opt/zookeeper/bin/
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Create a user for the zookeeper process and configure file system ownership</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">for nessecary directories and symlink the distribution as a user executable</span>
+RUN set -x <span style="color: #8b2252;">\</span>
+        &amp;&amp; useradd $<span style="color: #a0522d;">ZK_USER</span> <span style="color: #8b2252;">\</span>
+    &amp;&amp; [ <span style="color: #ff00ff;">`id -u $ZK_USER`</span> -eq 1000 ] <span style="color: #8b2252;">\</span>
+    &amp;&amp; [ <span style="color: #ff00ff;">`id -g $ZK_USER`</span> -eq 1000 ] <span style="color: #8b2252;">\</span>
+    &amp;&amp; mkdir -p $<span style="color: #a0522d;">ZK_DATA_DIR</span> $<span style="color: #a0522d;">ZK_DATA_LOG_DIR</span> $<span style="color: #a0522d;">ZK_LOG_DIR</span> /usr/share/zookeeper /tmp/zookeeper /usr/etc/ <span style="color: #8b2252;">\</span>
+        &amp;&amp; chown -R <span style="color: #8b2252;">"$ZK_USER:$ZK_USER"</span> /opt/$<span style="color: #a0522d;">ZK_DIST</span> $<span style="color: #a0522d;">ZK_DATA_DIR</span> $<span style="color: #a0522d;">ZK_LOG_DIR</span> $<span style="color: #a0522d;">ZK_DATA_LOG_DIR</span> /tmp/zookeeper <span style="color: #8b2252;">\</span>
+        &amp;&amp; ln -s /opt/zookeeper/conf/ /usr/etc/zookeeper <span style="color: #8b2252;">\</span>
+        &amp;&amp; ln -s /opt/zookeeper/bin/* /usr/bin <span style="color: #8b2252;">\</span>
+        &amp;&amp; ln -s /opt/zookeeper/lib/* /usr/share/zookeeper
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0a0ef1e" class="outline-4">
+<h4 id="org0a0ef1e">Makefile</h4>
+<div class="outline-text-4" id="text-org0a0ef1e">
+<div class="org-src-container">
+<pre class="src src-sh">[root@ip-10-204-68-236 docker]# cat Makefile
+<span style="color: #b22222;">#</span><span style="color: #b22222;">VERSION=1.0-3.4.10</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">PROJECT_ID=google_containers</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">PROJECT=gcr.io/${PROJECT_ID}</span>
+
+<span style="color: #a0522d;">VERSION</span>=1.0-3.7.1
+<span style="color: #a0522d;">PROJECT</span>=harbor.xxxx.com/devops
+
+all: build
+
+build:
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">docker build --pull -t ${PROJECT}/kubernetes-zookeeper:${VERSION} .</span>
+        docker buildx build -t  ${<span style="color: #a0522d;">PROJECT</span>}/kubernetes-zookeeper:${<span style="color: #a0522d;">VERSION</span>} --platform=linux/arm64,linux/amd64 --push .
+
+push: build
+        gcloud docker -- push ${<span style="color: #a0522d;">PROJECT</span>}/kubernetes-zookeeper:${<span style="color: #a0522d;">VERSION</span>}
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">.PHONY: all build push</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4cf58cb" class="outline-4">
+<h4 id="org4cf58cb">构建镜像</h4>
+<div class="outline-text-4" id="text-org4cf58cb">
+<p>
+这里使用多平台构建
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">make build
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org93cef1e" class="outline-4">
+<h4 id="org93cef1e">kubernetes 部署</h4>
+<div class="outline-text-4" id="text-org93cef1e">
+<p>
+参考官方yaml文件，修改镜像地址，再发布
+<a href="https://kubernetes.io/docs/tutorials/stateful-application/zookeeper/">https://kubernetes.io/docs/tutorials/stateful-application/zookeeper/</a>
+</p>
+</div>
+</div>
+</div>
+</section>
+
+
+<section id="outline-container-orgfeea830" class="outline-2">
+<h2 id="orgfeea830">web</h2>
+<div class="outline-text-2" id="text-orgfeea830">
+</div>
+<div id="outline-container-org679015d" class="outline-3">
+<h3 id="org679015d">web docker compose</h3>
+<div class="outline-text-3" id="text-org679015d">
+<div class="org-src-container">
+<pre class="src src-sh">mkdir -pv web/{code,conf.d,mysql-data}
+<span style="color: #483d8b;">cd</span> web
+
+cat &lt;&lt;\EOF&gt;conf.d/default.conf
+<span style="color: #ffa54f;">server {</span>
+<span style="color: #ffa54f;">    listen    80;</span>
+<span style="color: #ffa54f;">    server_name _;</span>
+<span style="color: #ffa54f;">    root /code;</span>
+<span style="color: #ffa54f;">    index index.php;</span>
+
+<span style="color: #ffa54f;">    location / {</span>
+<span style="color: #ffa54f;">        index index.php;</span>
+<span style="color: #ffa54f;">    }</span>
+<span style="color: #ffa54f;">    location ~ \.php$ {</span>
+<span style="color: #ffa54f;">        try_files $uri /index.php =404;</span>
+<span style="color: #ffa54f;">        fastcgi_pass php:9000;</span>
+<span style="color: #ffa54f;">        fastcgi_index index.php;</span>
+<span style="color: #ffa54f;">        fastcgi_buffers 16 16k;</span>
+<span style="color: #ffa54f;">        fastcgi_buffer_size 32k;</span>
+<span style="color: #ffa54f;">        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;</span>
+<span style="color: #ffa54f;">        include fastcgi_params;</span>
+<span style="color: #ffa54f;">    }</span>
+<span style="color: #ffa54f;">}</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; code/phpinfo.php
+<span style="color: #ffa54f;">&lt;?php phpinfo();?&gt;</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; code/a.html
+<span style="color: #ffa54f;">&lt;p&gt;hello.world&lt;/p&gt;</span>
+<span style="color: #ffa54f;">EOF</span>
+
+
+cat &lt;&lt;\EOF&gt; www.conf
+<span style="color: #ffa54f;">[www]</span>
+<span style="color: #ffa54f;">user = root</span>
+<span style="color: #ffa54f;">group = root</span>
+<span style="color: #ffa54f;">listen = 127.0.0.1:9000</span>
+<span style="color: #ffa54f;">pm = dynamic</span>
+<span style="color: #ffa54f;">pm.max_children = 5</span>
+<span style="color: #ffa54f;">pm.start_servers = 2</span>
+<span style="color: #ffa54f;">pm.min_spare_servers = 1</span>
+<span style="color: #ffa54f;">pm.max_spare_servers = 3</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+docker-compose.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yaml
+<span style="color: #ffa54f;">version: '3.5'</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  nginx:</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    image: nginx</span>
+<span style="color: #ffa54f;">    container_name: nginx</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 8082:80</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./conf.d:/etc/nginx/conf.d</span>
+<span style="color: #ffa54f;">      - ./code:/code</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      TZ: Asia/Shanghai</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">        web:</span>
+<span style="color: #ffa54f;">          aliases:</span>
+<span style="color: #ffa54f;">            - nginx</span>
+<span style="color: #ffa54f;">  php:</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    image: php:7.4-fpm</span>
+<span style="color: #ffa54f;">    #image: hrak/php-5.3:latest</span>
+<span style="color: #ffa54f;">    container_name: php-fpm</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./code:/code</span>
+<span style="color: #ffa54f;">      - ./www.conf:/usr/local/etc/php-fpm.d/www.conf</span>
+<span style="color: #ffa54f;">    privileged: true</span>
+<span style="color: #ffa54f;">    command: "/usr/local/sbin/php-fpm -R"</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      TZ: Asia/Shanghai</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      web:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - php</span>
+<span style="color: #ffa54f;">  db:</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    image: mysql:5.7</span>
+<span style="color: #ffa54f;">    container_name: mysql</span>
+<span style="color: #ffa54f;">    hostname: mysql</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./mysql-data:/var/lib/mysql</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - "13306:3306"</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - MYSQL_ROOT_PASSWORD=123</span>
+<span style="color: #ffa54f;">      - TZ=Asia/Shanghai</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      web:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - db</span>
+<span style="color: #ffa54f;">  phpmyadmin:</span>
+<span style="color: #ffa54f;">    restart: always</span>
+<span style="color: #ffa54f;">    image: phpmyadmin/phpmyadmin</span>
+<span style="color: #ffa54f;">    depends_on:</span>
+<span style="color: #ffa54f;">      - db</span>
+<span style="color: #ffa54f;">    environment:</span>
+<span style="color: #ffa54f;">      - PMA_HOST=db</span>
+<span style="color: #ffa54f;">      - PMA_USER=root</span>
+<span style="color: #ffa54f;">      - PMA_PASSWORD=123</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - "18082:80"</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      web:</span>
+<span style="color: #ffa54f;">        aliases:</span>
+<span style="color: #ffa54f;">          - phpmyadmin</span>
+
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  web:</span>
+<span style="color: #ffa54f;">    name: web</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+启动
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">docker compose up -d
+</pre>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=1234" data-v-1d178813="">
+          京公安网备
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aws ec2 批量修改标签</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">aws ec2 批量修改标签</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org86f7f68">过滤 ec2 标签</a></li>
+<li><a href="#org56d561a">生成 xls 文件 ec2.xls</a></li>
+<li><a href="#orgd2b6fcb">修改 ec2 标签</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Script</a></li>
+</ul>
+
+<section id="outline-container-org86f7f68" class="outline-2">
+<h2 id="org86f7f68">过滤 ec2 标签</h2>
+<div class="outline-text-2" id="text-org86f7f68">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#33719;&#21462; ec2 &#35814;&#24773; json</span>
+aws ec2 describe-instances --region ap-south-1 &gt; ec2.log
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#20135; csv &#25991;&#20214; ec2.csv</span>
+cat ec2.log |jq <span style="color: #8b2252;">'.Reservations[].Instances[]|[ ([.Tags[]?|(if .Key == "Name" then .Value  else ""  end )]|join("")), .InstanceId, .PrivateIpAddress, .KeyName, .VpcId, .SubnetId, .State.Name, ([(.Tags[]?|[(.Key, .Value)]|join("="))]|join("@"))] | join(",")'</span>  | sed <span style="color: #8b2252;">'s/"//g'</span> |sed <span style="color: #8b2252;">'1i \Name,InstanceId,PrivateIpAddress,KeyName,VpcId,SubnetId,State.Name,Tags(kv1@kv2)'</span> &gt; ec2.csv
+</pre>
+</div>
+</div>
+</section>
+
+<section id="outline-container-org56d561a" class="outline-2">
+<h2 id="org56d561a">生成 xls 文件 ec2.xls</h2>
+<div class="outline-text-2" id="text-org56d561a">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#37325;&#26032;&#20248;&#21270;&#26631;&#31614;</span>
+import numpy as np
+import pandas as pd
+
+source_file = <span style="color: #8b2252;">"ec2.csv"</span>
+dist_file = <span style="color: #8b2252;">"ec2.xls"</span>
+
+def read_csv(file: str) -&gt; [str]:
+    with open(file, <span style="color: #8b2252;">"r"</span>) as f:
+        data = f.readlines()
+        <span style="color: #a020f0;">return</span> data
+    <span style="color: #a020f0;">return</span> []
+
+
+def write_excel(file: str, data):
+    A = np.array(data)
+    data = pd.DataFrame(A)
+
+    writer = pd.ExcelWriter(file)  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20889;&#20837;Excel&#25991;&#20214;</span>
+    data.to_excel(writer, <span style="color: #8b2252;">'page_1'</span>, )  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#8216;page_1&#8217;&#26159;&#20889;&#20837;excel&#30340;sheet&#21517;</span>
+    writer.save()
+
+
+def process():
+    dist_data = []
+    title = [<span style="color: #8b2252;">'Name'</span>, <span style="color: #8b2252;">'InstanceId'</span>, <span style="color: #8b2252;">'PrivateIpAddress'</span>, <span style="color: #8b2252;">'KeyName'</span>, <span style="color: #8b2252;">'VpcId'</span>, <span style="color: #8b2252;">'SubnetId'</span>, <span style="color: #8b2252;">'State'</span>]
+    data = read_csv(source_file)
+    <span style="color: #a020f0;">for</span> index, row<span style="color: #a020f0;"> in</span> enumerate(data):
+        dist_row = [<span style="color: #8b2252;">""</span>] * 100
+        <span style="color: #a020f0;">if</span> index == 0:
+            dist_data.append(title)
+            <span style="color: #a020f0;">continue</span>
+        info = row.split(<span style="color: #8b2252;">","</span>)
+        <span style="color: #a020f0;">for</span> index, i<span style="color: #a020f0;"> in</span> enumerate(info):
+            <span style="color: #a020f0;">if</span> index &lt; 7:
+                dist_row[index] = i
+            <span style="color: #a020f0;">if</span> index == 7:
+                <span style="color: #a020f0;">for</span> kvs<span style="color: #a020f0;"> in</span> i.split(<span style="color: #8b2252;">"@"</span>):
+                    kv = kvs.split(<span style="color: #8b2252;">"="</span>)
+                    <span style="color: #a020f0;">if</span> len(kv) != 2:
+                        <span style="color: #a020f0;">continue</span>
+                    k = kv[0]
+                    v = kv[1]
+                    <span style="color: #a020f0;">if</span> k not<span style="color: #a020f0;"> in</span> title:
+                        title.append(k)
+                    dist_row[title.index(k)] = v
+        dist_data.append(dist_row)
+    write_excel(dist_file, dist_data)
+
+
+<span style="color: #a020f0;">if</span> __name__ == <span style="color: #8b2252;">'__main__'</span>:
+    process()
+</pre>
+</div>
+
+<p>
+<b>通知业务相关人员添加指定标签</b>
+</p>
+</div>
+</section>
+
+<section id="outline-container-orgd2b6fcb" class="outline-2">
+<h2 id="orgd2b6fcb">修改 ec2 标签</h2>
+<div class="outline-text-2" id="text-orgd2b6fcb">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1. &#21019;&#24314;&#33050;&#26412; ec2.sh</span>
+cat &lt;&lt;\EOF &gt;ec2.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;"># version=1.0</span>
+
+<span style="color: #ffa54f;"># tag.log &#20869;&#23481;&#23545;&#24212; instanceid _Environment  _Usage  _Application    _SubModule</span>
+<span style="color: #ffa54f;">file=tag.log</span>
+
+<span style="color: #ffa54f;">function e_t() {</span>
+<span style="color: #ffa54f;">while read line; do</span>
+<span style="color: #ffa54f;">    echo $line</span>
+<span style="color: #ffa54f;">    i=$(</span><span style="color: #ff00ff;">echo "$line"|awk '{print $1}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">    v1=$(</span><span style="color: #ff00ff;">echo "$line"|awk '{print $2}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">    v2=$(</span><span style="color: #ff00ff;">echo "$line"|awk '{print $3}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">    v3=$(</span><span style="color: #ff00ff;">echo "$line"|awk '{print $4}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">    v4=$(</span><span style="color: #ff00ff;">echo "$line"|awk '{print $5}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">    echo "aws ec2 create-tags --resources $i --tags Key=_Environment,Value=${v1}  Key=_Usage,Value=${v2} Key=_Application,Value=${v3}  Key=_SubModule,Value=${v4}"</span>
+<span style="color: #ffa54f;">    aws ec2 create-tags --resources $i --tags Key=_Environment,Value=${v1}  Key=_Usage,Value=${v2} Key=_Application,Value=${v3}  Key=_SubModule,Value=${v4}</span>
+<span style="color: #ffa54f;">    sleep 0.02</span>
+<span style="color: #ffa54f;">done &lt; $1</span>
+
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">function z() {</span>
+<span style="color: #ffa54f;">  #_Environment _Usage  _Application    _SubModule</span>
+<span style="color: #ffa54f;">  #local t="Production     Others  Data   Data"</span>
+<span style="color: #ffa54f;">  local t="Production     Others  Platform   CAS"</span>
+<span style="color: #ffa54f;">  #local t="Production     RDS  Data   Data"</span>
+
+<span style="color: #ffa54f;">  local i="\</span>
+<span style="color: #ffa54f;">i-02f9b98d699d8130c</span>
+<span style="color: #ffa54f;">i-0e040729e5dd15342</span>
+<span style="color: #ffa54f;">i-07b0bc1a33460d52f</span>
+<span style="color: #ffa54f;">i-0fea62a77a95e5158</span>
+<span style="color: #ffa54f;">i-079cab501dd9c980b</span>
+<span style="color: #ffa54f;">"</span>
+<span style="color: #ffa54f;">  e_t &lt;(for e in $i;do echo $e $t; done)</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">main() {</span>
+<span style="color: #ffa54f;">  # &#25991;&#20214;</span>
+<span style="color: #ffa54f;">  #e_t $file</span>
+
+<span style="color: #ffa54f;">  # &#33258;&#23450;&#20041;</span>
+<span style="color: #ffa54f;">  z</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">main</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2. &#25191;&#34892;&#33050;&#26412;</span>
+bash ec2.sh
+</pre>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=1234" data-v-1d178813="">
+          京公安网备
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

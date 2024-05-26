@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>入侵防御</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">入侵防御</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgc80d4dc">IPS</a>
+<ul>
+<li><a href="#开启-csp-内容安全策略">开启 CSP 内容安全策略</a>
+<ul>
+<li><a href="#nginx-中开户-csp-日志">nginx 中开户 CSP 日志</a></li>
+</ul>
+</li>
+<li><a href="#开启-hsts">开启 HSTS</a></li>
+<li><a href="#nginx-安全配置">nginx 安全配置</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+
+<section id="outline-container-orgc80d4dc" class="outline-2">
+<h2 id="orgc80d4dc">IPS</h2>
+<div class="outline-text-2" id="text-orgc80d4dc">
+<p>
+初级安全防护
+</p>
+<ul class="org-ul">
+<li>IDS/IPS：入侵检测/入侵防护(Intrusion Detection System/Intrusion Prevention System)，主机层防护。虽然IPS即可以入侵检测也可以入侵防护，但有的业务场景不需要入侵防护，所有会有IDS</li>
+</ul>
+</div>
+
+
+<div id="outline-container-开启-csp-内容安全策略" class="outline-3">
+<h3 id="开启-csp-内容安全策略">开启 CSP 内容安全策略</h3>
+<div class="outline-text-3" id="text-开启-csp-内容安全策略">
+<p>
+主要操作：
+</p>
+
+<ol class="org-ol">
+<li>明确域名下各目录路径资源，查找对应要访问的域名和协议 主要：</li>
+
+<li>执行。可能有用多种方式，如 header 中添加、代码中添加</li>
+
+<li>验证
+
+<ul class="org-ul">
+<li>添加 header方式：可通过浏览器访问验证，页面正常打开且有对应的
+header头部说明策略生效</li>
+
+<li>代码中添加：添加不在访问范围内资源验证</li>
+</ul></li>
+</ol>
+
+<p>
+<b>nginx 配置文件</b>
+</p>
+
+<pre class="example" id="org2178177">
+add_header Report-To '{"group": "csp-reports","max_age":31536000,"endpoints":[{"url":"https://pathstaging.xxx.com/_csp/prod"}]}';
+
+add_header Content-Security-Policy "object-src 'none';script-src 'self' 'unsafe-eval' 'unsafe-inline' https: http: *.xxx.com *.pxxx.com 39.97.xx.xx;report-uri https://pathstaging.xxx.com/_csp/prod;report-to csp-reports;";
+</pre>
+
+<pre class="example" id="org6b393c3">
+语法说明：
+object-src：插件
+script-src：外部脚本
+'none'：禁止加载任何外部资源，需要加引号
+'unsafe-inline'：'unsafe-inline'允许使用内联资源，如内联&lt;script&gt;元素，javascript:URL，内联事件处理程序和内联&lt;style&gt;元素。
+'unsafe-eval'：允许将字符串当作代码执行，比如使用eval、setTimeout、setInterval和Function等函数。
+</pre>
+
+<p>
+<b>html 文件</b>
+</p>
+
+<p>
+范例：index.html
+</p>
+<pre class="example" id="org03ceb4d">
+&lt;meta http-equiv="Content-Security-Policy" content="object-src 'none';script-src 'self' 'unsafe-eval' 'unsafe-inline' https: http: *.xxx.com *.pxxx.com 39.97.xx.xx;"&gt;
+</pre>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://content-security-policy.com/">https://content-security-policy.com/</a></li>
+<li><a href="https://developer.mozilla.org/zh-CN/docs/Web/HTTP/CSP">CSP mozilla</a></li>
+<li><a href="https://cloud.tencent.com/developer/section/1189876">CSP qq</a></li>
+</ul>
+</div>
+
+<div id="outline-container-nginx-中开户-csp-日志" class="outline-4">
+<h4 id="nginx-中开户-csp-日志">nginx 中开户 CSP 日志</h4>
+<div class="outline-text-4" id="text-nginx-中开户-csp-日志">
+<p>
+<b>nginx 中网站开启 CSP</b>
+</p>
+
+<p>
+添加对应的 header 头部。report-to 在 CSP3 中取代了 report-uri。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">location /path-h5/ {
+    access_log  /var/log/nginx/path_h5_access.log  main;
+    add_header Report-To <span style="color: #8b2252;">'{"group": "csp-reports","max_age":31536000,"endpoints":[{"url":"https://pathstaging.xxx.com/_csp"}]}'</span>;
+    add_header Content-Security-Policy <span style="color: #8b2252;">"object-src 'none';script-src 'self' 'unsafe-eval' 'unsafe-inline' https: http: ws: wss: *.xxx.com 39.97.xx.xx;report-uri https://pathstaging.xxx.com/_csp;report-to csp-reports;"</span>;
+    <span style="color: #483d8b;">alias</span>  /xxx/path/path-h5/staging/;
+    index bonus-account.html;
+}
+</pre>
+</div>
+
+<p>
+<b>nginx 中 CSP 日志配置</b>
+</p>
+
+<p>
+1.格式化日志 conf.d/csp.conf
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">log_format CSP <span style="color: #a0522d;">escape</span>=json <span style="color: #8b2252;">'{</span>
+<span style="color: #8b2252;">           "date":"$time_local",</span>
+<span style="color: #8b2252;">           "IP address":"$remote_addr",</span>
+<span style="color: #8b2252;">           "http_x_forwarded_for":"$http_x_forwarded_for",</span>
+<span style="color: #8b2252;">           "status":"$status",</span>
+<span style="color: #8b2252;">           "http_user_agent":"$http_user_agent",</span>
+<span style="color: #8b2252;">           "body_bytes_sent":"$body_bytes_sent",</span>
+<span style="color: #8b2252;">           "request":"$request",</span>
+<span style="color: #8b2252;">           "request_body": "$request_body"}'</span>;
+</pre>
+</div>
+
+<p>
+sites-available/default
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">server {
+    listen 443 ssl http2 default_server;
+    server_name example.org;
+
+    location = /_csp {
+            access_log /var/log/nginx/csp.log CSP;
+            proxy_pass http://127.0.0.1/_csp_response;
+    }
+}
+
+server {
+    listen 80 default_server;
+    server_name example.org;
+
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">More config here</span>
+
+    location /_csp_response {
+            access_log off;
+            <span style="color: #a020f0;">return</span> 204;
+    }
+}
+</pre>
+</div>
+
+<p>
+2.CSP 日志报告说明
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat /var/log/nginx/csp.log | jq -r <span style="color: #8b2252;">'.request_body | fromjson'</span>
+[
+  {
+    <span style="color: #8b2252;">"age"</span>: 1,
+    <span style="color: #8b2252;">"body"</span>: {
+      <span style="color: #8b2252;">"blockedURL"</span>: <span style="color: #8b2252;">"https://pathstaging.xxx.com/path-h5/js/chunk-common.6fb7c2f8.js"</span>,
+      <span style="color: #8b2252;">"disposition"</span>: <span style="color: #8b2252;">"enforce"</span>,
+      <span style="color: #8b2252;">"documentURL"</span>: <span style="color: #8b2252;">"https://pathstaging.xxx.com/path-h5/lucky-card.html"</span>,
+      <span style="color: #8b2252;">"effectiveDirective"</span>: <span style="color: #8b2252;">"script-src-elem"</span>,
+      <span style="color: #8b2252;">"lineNumber"</span>: 1,
+      <span style="color: #8b2252;">"originalPolicy"</span>: <span style="color: #8b2252;">"object-src 'none';script-src 'self' 'strict-dynamic' 'unsafe-eval' 'unsafe-inline' https: http: *.xxx.com 39.97.124.19;report-to csp-reports;"</span>,
+      <span style="color: #8b2252;">"referrer"</span>: <span style="color: #8b2252;">""</span>,
+      <span style="color: #8b2252;">"sample"</span>: <span style="color: #8b2252;">""</span>,
+      <span style="color: #8b2252;">"sourceFile"</span>: <span style="color: #8b2252;">"https://pathstaging.xxx.com/path-h5/lucky-card.html"</span>,
+      <span style="color: #8b2252;">"statusCode"</span>: 200
+    },
+    <span style="color: #8b2252;">"type"</span>: <span style="color: #8b2252;">"csp-violation"</span>,
+    <span style="color: #8b2252;">"url"</span>: <span style="color: #8b2252;">"https://pathstaging.xxx.com/path-h5/lucky-card.html"</span>,
+    <span style="color: #8b2252;">"user_agent"</span>: <span style="color: #8b2252;">"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"</span>
+  }
+]
+</pre>
+</div>
+
+<p>
+报告的JSON对象报告包含了以下数据：
+</p>
+
+<ul class="org-ul">
+<li>document-uri: 发生违规的文档的URI。</li>
+<li>referrer: 违规发生处的文档引用（地址）。</li>
+<li>blocked-uri:被CSP阻止的资源URI。如果被阻止的URI来自不同的源而非文档
+URI，那么被阻止的资源URI会被删减，仅保留协议，主机和端口号。</li>
+<li>violated-directive: 违反的策略名称。</li>
+<li>original-policy: 在 Content-Security-Policy HTTP
+头部中指明的原始策略。</li>
+</ul>
+
+<p>
+参考： <a href="https://mgdm.net/weblog/csp-logging-with-nginx/">CSP logging with nginx</a>
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-开启-hsts" class="outline-3">
+<h3 id="开启-hsts">开启 HSTS</h3>
+<div class="outline-text-3" id="text-开启-hsts">
+<p>
+参考：
+</p>
+
+<ul class="org-ul">
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security">Strict-Transport-Security - HTTP | MDN</a></li>
+<li><a href="https://www.cnblogs.com/upyun/p/10767548.html">HSTS 详解，让 HTTPS更安全</a></li>
+</ul>
+
+<p>
+优点：
+</p>
+
+<ul class="org-ul">
+<li>比传统的302重定向更加安全，不会被劫持；</li>
+<li>对访问速度有提示，302 跳转需要一个 RTT消耗，浏览器执行跳转也需要時間。</li>
+</ul>
+
+<p>
+缺点：
+</p>
+
+<ul class="org-ul">
+<li>使用者首次访问某网站是不受HSTS保护的。這是因为首次访问时，浏览器还未
+收到HSTS，所以仍有可能通过明文HTTP來访问。</li>
+<li>HSTS会在一定时间段后失效，需要手动设定快取期。</li>
+</ul>
+
+<p>
+HSTS Header的语法如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Strict-Transport-Security: &lt;max-age=&gt;[; includeSubDomains][; preload]
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>max-age是必选参数，是一个以秒为单位的数值，它代表着HSTS Header的过期
+时间，通常设置为1年，即31536000秒。</li>
+<li>includeSubDomains是可选参数，如果包含它，则意味着当前域名及其子域名
+均开启HSTS保护。</li>
+<li>preload是可选参数，只有当你申请将自己的域名加入到浏览器内置列表的时
+候才需要使用到它。通过 <a href="https://hstspreload.appspot.com/">https://hstspreload.appspot.com/</a> 提交其域名。</li>
+</ul>
+
+<p>
+nginx
+</p>
+
+<pre class="example" id="org0bd7e38">
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains;" always;
+</pre>
+
+<ul class="org-ul">
+<li>always:表示无论哪种请求都将HSTS的头发送给客户端，也包括错误响应。默
+认情况404等是不发送HSTS头的。</li>
+<li>要注意 add_header 这个指令的继承方式，如果一个子配置块中设置了
+add_header 指令，那么在上层配置块中的 add_header指令是不会被继承的。
+如果你需要在子配置中添加额外的 add_header指令，那么有关HSTS那部分要
+复制到子配置中。</li>
+</ul>
+
+<p>
+ingress
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">cat admin-website-ingress.yaml</span>
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50M
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: <span style="color: #8b2252;">"600"</span>
+    nginx.ingress.kubernetes.io/proxy-read-timeout: <span style="color: #8b2252;">"600"</span>
+    nginx.ingress.kubernetes.io/proxy-send-timeout: <span style="color: #8b2252;">"600"</span>
+    nginx.ingress.kubernetes.io/server-snippet: |
+        location ~* /api/actuator {
+            deny all;
+        }
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+        add_header Strict-Transport-Security <span style="color: #8b2252;">'max-age=31536000; includeSubDomains;'</span> always;
+        more_set_headers <span style="color: #8b2252;">"xxerver: hide"</span>;
+  name: rummy-admin-website
+  namespace: rummy
+spec:
+  rules:
+    - host: cmsstaging.xxx.com
+      http:
+        paths:
+          - backend:
+              serviceName: rummy-admin-website
+              servicePort: 80
+            path: /
+</pre>
+</div>
+
+<p>
+验证
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ curl -kIs https://example.com | grep Strict
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+</pre>
+</div>
+
+<p>
+网站评级：<a href="https://www.ssllabs.com/">https://www.ssllabs.com/</a>
+</p>
+
+<p>
+清除浏览器 HSTS 设置
+</p>
+
+<p>
+<a href="https://www.ssl2buy.com/wiki/how-to-clear-hsts-settings-on-chrome-firefox-and-ie-browsers">https://www.ssl2buy.com/wiki/how-to-clear-hsts-settings-on-chrome-firefox-and-ie-browsers</a>
+</p>
+
+<p>
+删除Chrome中的HSTS设置
+</p>
+
+<ul class="org-ul">
+<li>导航到chrome://net-internals/#hsts</li>
+<li>确认Chrome记录了域名的HSTS设置，请在页面底部的查询域名部分输入主机名。如www.example.com或example.com</li>
+<li>在删除域名部分中输入相同的主机名并点击</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-nginx-安全配置" class="outline-3">
+<h3 id="nginx-安全配置">nginx 安全配置</h3>
+<div class="outline-text-3" id="text-nginx-安全配置">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#38450;&#27490;&#23884;&#20837; &#21040;frame &#20013;&#65307;&#36991;&#20813;&#28857;&#20987;&#21163;&#25345;***</span>
+add_header X-Frame-Options  DENY ;
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#31105;&#27490;&#26381;&#21153;&#22120;&#33258;&#21160;&#35299;&#26512;&#36164;&#28304;&#31867;&#22411;</span>
+add_header X-Content-Type-Options  nosniff ;
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#38450;XSS***</span>
+add_header X-Xss-Protection 1;
+</pre>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

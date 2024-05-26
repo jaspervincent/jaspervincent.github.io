@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>07-k8s-拓展-网络策略</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">07-k8s-拓展-网络策略</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org12facbb">k8s-拓展-网络策略Network Policy</a>
+<ul>
+<li><a href="#org533d4b9">什么是NetworkPolicy？</a></li>
+<li><a href="#orgcc517b2">NetworkPolicy配置详解</a>
+<ul>
+<li><a href="#orgfb449dd">NetworkPolicy注意事项</a></li>
+</ul>
+</li>
+<li><a href="#orgf2f6c8f">NetworkPolicy示例</a>
+<ul>
+<li><a href="#orgab847f8">NetworkPolicy示例1：隔离中间件服务</a></li>
+<li><a href="#org8c2829e">NetworkPolicy示例2：服务发布限制</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+
+
+<section id="outline-container-org12facbb" class="outline-2">
+<h2 id="org12facbb">k8s-拓展-网络策略Network Policy</h2>
+<div class="outline-text-2" id="text-org12facbb">
+</div>
+<div id="outline-container-org533d4b9" class="outline-3">
+<h3 id="org533d4b9">什么是NetworkPolicy？</h3>
+<div class="outline-text-3" id="text-org533d4b9">
+<p>
+<b>K8s命名空间隔离性</b><br>
+</p>
+
+
+<figure id="org93562bf">
+<img src="./images/Snipaste_2023-01-04_22-21-40.png" alt="Snipaste_2023-01-04_22-21-40.png"><br>
+
+</figure>
+
+<p>
+不同名称空间下的资源类型名称是可以相同的。只要在资源名称后面加上 namesapce 名称就可以跨名称空间访问，所以这是一种软隔离。<br>
+</p>
+
+<p>
+<b>K8s Pod之间无隔离性</b><br>
+</p>
+
+
+<figure id="org1896ec7">
+<img src="./images/Snipaste_2023-01-04_22-22-32.png" alt="Snipaste_2023-01-04_22-22-32.png"><br>
+
+</figure>
+
+<p>
+如果知道 pod 的 ip 地址，不同名称空间下的任一 pod 都能访问。<br>
+</p>
+
+<p>
+K8s 网络策略<br>
+</p>
+
+
+<figure id="org20ed9d4">
+<img src="./images/Snipaste_2023-01-04_22-23-14.png" alt="Snipaste_2023-01-04_22-23-14.png"><br>
+
+</figure>
+
+<p>
+可以对名称空间做隔离、服务限制访问<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcc517b2" class="outline-3">
+<h3 id="orgcc517b2">NetworkPolicy配置详解</h3>
+<div class="outline-text-3" id="text-orgcc517b2">
+<p>
+参考：<a href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">https://kubernetes.io/docs/concepts/services-networking/network-policies/</a><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default
+spec:
+  podSelector:  # 对哪些 pod 生效
+    matchLabels:
+      role: db
+  policyTypes: # 限制入口还是出口，Ingress 入口，Egress 出口。未指定 policyTypes 则默认情况下始终设置 Ingress； 如果 NetworkPolicy 有任何出口规则的话则设置 Egress
+    - Ingress
+    - Egress
+  ingress:
+    - from: # 限制容器或者 ip 地址访问。ipBlock、namespaceSelector、podSelector 各自有一个横杠表示或者的关系，包含在一个横杠中表示且的关系
+	- ipBlock:           # ip 限制。是网段内的 pod 可以访问。 是 172.17.0.0/16 网，但排除 172.17.1.0/24 网段。
+	    cidr: 172.17.0.0/16
+	    except:
+	      - 172.17.1.0/24
+	- namespaceSelector: # namespace 限制。
+	    matchLabels:
+	      project: myproject
+	- podSelector:       # pod 限制。
+	    matchLabels:
+	      role: frontend
+      ports:
+	- protocol: TCP
+	  port: 6379
+  egress:
+    - to:
+	- ipBlock:
+	    cidr: 10.0.0.0/24
+      ports:
+	- protocol: TCP
+	  port: 5978
+</pre>
+</div>
+
+<p>
+说明：<br>
+</p>
+<ul class="org-ul">
+<li>必需字段：与所有其他的 Kubernetes 配置一样，NetworkPolicy 需要 apiVersion、 kind 和 metadata 字段。<br></li>
+<li>spec：NetworkPolicy 规约 中包含了在一个名字空间中定义特定网络策略所需的所有信息。<br></li>
+
+<li>podSelector：每个 NetworkPolicy 都包括一个 podSelector， 它对该策略所适用的一组 Pod 进行选择。示例中的策略选择带有 "role=db" 标签的 Pod。 空的 podSelector 选择名字空间下的所有 Pod。<br></li>
+
+<li>policyTypes：每个 NetworkPolicy 都包含一个 policyTypes 列表，其中包含 Ingress 或 Egress 或两者兼具。policyTypes 字段表示给定的策略是应用于进入所选 Pod 的入站流量还是来自所选 Pod 的出站流量，或两者兼有。 如果 NetworkPolicy 未指定 policyTypes 则默认情况下始终设置 Ingress； 如果 NetworkPolicy 有任何出口规则的话则设置 Egress。<br></li>
+
+<li>ingress：每个 NetworkPolicy 可包含一个 ingress 规则的白名单列表。 每个规则都允许同时匹配 from 和 ports 部分的流量。示例策略中包含一条简单的规则： 它匹配某个特定端口，来自三个来源中的一个，第一个通过 ipBlock 指定，第二个通过 namespaceSelector 指定，第三个通过 podSelector 指定。<br></li>
+
+<li>egress：每个 NetworkPolicy 可包含一个 egress 规则的白名单列表。 每个规则都允许匹配 to 和 port 部分的流量。该示例策略包含一条规则， 该规则将指定端口上的流量匹配到 10.0.0.0/24 中的任何目的地。<br></li>
+</ul>
+
+<p>
+所以，该网络策略示例:<br>
+</p>
+<ul class="org-ul">
+<li>隔离 default 名字空间下 role=db 的 Pod （如果它们不是已经被隔离的话）。<br></li>
+<li>（Ingress 规则）允许以下 Pod 连接到 default 名字空间下的带有 role=db 标签的所有 Pod 的 6379 TCP 端口：<br>
+<ul class="org-ul">
+<li>default 名字空间下带有 role=frontend 标签的所有 Pod<br></li>
+<li>带有 project=myproject 标签的所有名字空间中的 Pod<br></li>
+<li>IP 地址范围为 172.17.0.0–172.17.0.255 和 172.17.2.0–172.17.255.255 （即，除了 172.17.1.0/24 之外的所有 172.17.0.0/16）<br></li>
+</ul></li>
+<li>（Egress 规则）允许 default 名字空间中任何带有标签 role=db 的 Pod 到 CIDR 10.0.0.0/24 下 5978 TCP 端口的连接。<br></li>
+</ul>
+
+<p>
+参阅声明网络策略演练了解更多示例。<br>
+</p>
+</div>
+
+<div id="outline-container-orgfb449dd" class="outline-4">
+<h4 id="orgfb449dd">NetworkPolicy注意事项</h4>
+<div class="outline-text-4" id="text-orgfb449dd">
+<p>
+ipBlock、namespaceSelector、podSelector 各自有一个横杠表示或者的关系，包含在一个横杠中表示且的关系<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21516;&#32423;&#21035;&#25110;&#32773;&#30340;&#20851;&#31995;</span>
+ - from:
+    - ipBlock:
+        cidr: 172.17.0.0/16
+        except:
+        - 172.17.1.0/24
+    - namespaceSelector:
+        matchLabels:
+          project: myproject
+    - podSelector:
+        matchLabels:
+          role: frontend
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">namespaceSelector &#21644; podSelector &#26159;&#19988;&#30340;&#20851;&#31995;&#65292;&#25972;&#20307;&#19982; ipBlock &#26159;&#25110;&#32773;&#30340;&#20851;&#31995;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20801;&#35768; `project=myproject` &#26631;&#31614;&#30340;&#21517;&#31216;&#31354;&#38388;&#19979; `role=frontend` &#30340;pod &#35775;&#38382;&#65292;&#25110;&#32773; ip &#38500;&#20102; 172.17.1.0/24 &#20043;&#22806;&#30340;&#25152;&#26377;  172.17.0.0/16 &#30340; pod &#35775;&#38382;&#12290;</span>
+ - from:
+    - ipBlock:
+        cidr: 172.17.0.0/16
+        except:
+        - 172.17.1.0/24
+    - namespaceSelector:
+        matchLabels:
+          project: myproject
+      podSelector:
+        matchLabels:
+          role: frontend
+</pre>
+</div>
+
+<p>
+ip 不建议使用，因为 pod ip 会改变。另外有目标地址转换的也不建议使用。<br>
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf2f6c8f" class="outline-3">
+<h3 id="orgf2f6c8f">NetworkPolicy示例</h3>
+<div class="outline-text-3" id="text-orgf2f6c8f">
+</div>
+<div id="outline-container-orgab847f8" class="outline-4">
+<h4 id="orgab847f8">NetworkPolicy示例1：隔离中间件服务</h4>
+</div>
+
+<div id="outline-container-org8c2829e" class="outline-4">
+<h4 id="org8c2829e">NetworkPolicy示例2：服务发布限制</h4>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

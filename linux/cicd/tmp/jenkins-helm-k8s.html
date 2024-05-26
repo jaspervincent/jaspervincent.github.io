@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>jenkins-helm-k8s</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">jenkins-helm-k8s</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orge54a6ec">jenkins</a>
+<ul>
+<li><a href="#org490ea41">后端</a></li>
+</ul>
+</li>
+<li><a href="#orga9d6f7f">gitlab</a>
+<ul>
+<li><a href="#orgbe426e2">后端</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<p>
+jenkins 页面构建通过 helm 发布到 k8s 集群中<br>
+</p>
+
+<section id="outline-container-orge54a6ec" class="outline-2">
+<h2 id="orge54a6ec">jenkins</h2>
+<div class="outline-text-2" id="text-orge54a6ec">
+</div>
+<div id="outline-container-org490ea41" class="outline-3">
+<h3 id="org490ea41">后端</h3>
+<div class="outline-text-3" id="text-org490ea41">
+<p>
+选项参数<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">branch: master
+SVC_ENV: prod
+PORT: 8080
+JAVA_OPT: &#31354;
+Nacos_Server: http://nacos-headless.nacos.svc:8848
+Nacos_Namespace: 0096540d-c49f-4f87-b3d8-274ef675efda
+replicas: 2
+k8s_namespace: xxx-dev
+skywalking: xxx:11800
+</pre>
+</div>
+
+<p>
+流水线<br>
+</p>
+<ul class="org-ul">
+<li>SCM<br>
+<ul class="org-ul">
+<li>git<br>
+<ul class="org-ul">
+<li>repository url  代码仓库<br></li>
+<li>脚本路径: deploy/Jenkinsfile<br></li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+</div>
+</section>
+
+<section id="outline-container-orga9d6f7f" class="outline-2">
+<h2 id="orga9d6f7f">gitlab</h2>
+<div class="outline-text-2" id="text-orga9d6f7f">
+</div>
+<div id="outline-container-orgbe426e2" class="outline-3">
+<h3 id="orgbe426e2">后端</h3>
+<div class="outline-text-3" id="text-orgbe426e2">
+<p>
+deploy/Jenkinsfile<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;">#</span><span style="color: #b22222;">!groovy</span>
+<span style="color: #0000ff;">node</span>(<span style="color: #8b2252;">'master'</span>) {
+    def jobname = env.JOB_BASE_NAME
+    def name = jobname.split(/(dev-|qa-|prod-)/)[1]
+    def workdir = env.WORKSPACE
+    def port = env.PORT
+    def nacosserver = env.Nacos_Server
+    def nacosns = env.Nacos_Namespace
+    def dockerid = env.BUILD_TAG
+    def appenv = env.SVC_ENV
+    def k8sns = env.k8s_namespace
+    def k8sreplicas = env.replicas
+    def skywalking = env.skywalking
+
+    stage(<span style="color: #8b2252;">'&#20195;&#30721;&#33719;&#21462;'</span>) {
+        dir(<span style="color: #8b2252;">"${workdir}"</span>) {
+            checkout scm
+        }
+    }
+
+    stage(<span style="color: #8b2252;">'&#26500;&#24314;&#20195;&#30721;'</span>) {
+        sh <span style="color: #8b2252;">"mvn clean package"</span>
+        sh <span style="color: #8b2252;">"cp ${name}/target/${name}.jar deploy"</span>
+    }
+
+    stage(<span style="color: #8b2252;">'&#26500;&#24314;Docker&#38236;&#20687;'</span>) {
+        docker.withRegistry(<span style="color: #8b2252;">'https://registry-vpc.cn-beijing.aliyuncs.com'</span>, <span style="color: #8b2252;">'e87917f6-1219-4d80-8c3e-d054ecbe268d'</span>) {
+            def Image = docker.build(<span style="color: #8b2252;">"registry-vpc.cn-beijing.aliyuncs.com/xxx-${appenv}/${name}:latest"</span>, <span style="color: #8b2252;">"./deploy --build-arg JAR_FILE=${name}.jar --build-arg SERVER_NAME=${name} --build-arg PORT=${port} --build-arg ENV=${appenv} --build-arg NACOS_SERVER=${nacosserver} --build-arg NACOS_NS=${nacosns} --build-arg SKYWALKING_SERVER=${skywalking}"</span>)
+            Image.push(<span style="color: #8b2252;">"${dockerid}"</span>)
+            Image.push(<span style="color: #8b2252;">"latest"</span>)
+        }
+    }
+
+    try {
+        stage(<span style="color: #8b2252;">'&#21368;&#36733;&#26381;&#21153;'</span>) {
+            sh <span style="color: #8b2252;">"helm --kubeconfig /root/.kube/bookask/${appenv}-config uninstall ${name} -n ${k8sns}"</span>
+            sh <span style="color: #8b2252;">"sed -i 's/service-name/${name}/g' deploy/helm/Chart.yaml"</span>
+        }
+    } catch (Exception e) {
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"continue"</span>
+    }
+
+    stage(<span style="color: #8b2252;">'&#21457;&#24067;&#26381;&#21153;'</span>) {
+        sh <span style="color: #8b2252;">"helm --kubeconfig /root/.kube/bookask/${appenv}-config upgrade ${name} deploy/helm \</span>
+<span style="color: #8b2252;">             --install \</span>
+<span style="color: #8b2252;">             --timeout 5m0s \</span>
+<span style="color: #8b2252;">             --namespace ${k8sns} \</span>
+<span style="color: #8b2252;">             --set service.port=${port} \</span>
+<span style="color: #8b2252;">             --set name=${name} \</span>
+<span style="color: #8b2252;">             --set replicas=${k8sreplicas} \</span>
+<span style="color: #8b2252;">             --set deployment.image.registry=registry-vpc.cn-beijing.aliyuncs.com/bookask-${appenv}/${name} \</span>
+<span style="color: #8b2252;">             --set deployment.image.version=${dockerid}"</span>
+    }
+
+    stage(<span style="color: #8b2252;">'&#26381;&#21153;&#21015;&#34920;'</span>) {
+        sh <span style="color: #8b2252;">"helm --kubeconfig /root/.kube/bookask/${appenv}-config list -A | grep ${name}"</span>
+    }
+}
+</pre>
+</div>
+
+<p>
+deploy/Dockerfile<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">FROM registry-vpc.cn-beijing.aliyuncs.com/bookask-dev/openjdk8:oap-latest
+
+ARG JAR_FILE 
+ARG PORT
+ARG ENV
+ARG NACOS_SERVER
+ARG NACOS_NS
+ARG JAVA_OPT
+ARG SKYWALKING_SERVER 
+ARG SERVER_NAME
+
+ENV <span style="color: #a0522d;">TZ</span>=Asia/Shanghai
+ENV <span style="color: #a0522d;">JAR_FILE</span>=${<span style="color: #a0522d;">JAR_FILE</span>}
+ENV <span style="color: #a0522d;">PORT</span>=${<span style="color: #a0522d;">PORT</span>}
+ENV <span style="color: #a0522d;">ENV</span>=${<span style="color: #a0522d;">ENV</span>}
+ENV <span style="color: #a0522d;">NACOS_SERVER</span>=${<span style="color: #a0522d;">NACOS_SERVER</span>}
+ENV <span style="color: #a0522d;">NACOS_NS</span>=${<span style="color: #a0522d;">NACOS_NS</span>}
+ENV <span style="color: #a0522d;">JAVA_OPT</span>=${<span style="color: #a0522d;">JAVA_OPT</span>}
+ENV <span style="color: #a0522d;">SKYWALKING_SERVER</span>=${<span style="color: #a0522d;">SKYWALKING_SERVER</span>}
+ENV <span style="color: #a0522d;">SERVER_NAME</span>=${<span style="color: #a0522d;">SERVER_NAME</span>}
+
+WORKDIR /app
+
+COPY ${<span style="color: #a0522d;">JAR_FILE</span>} <span style="color: #483d8b;">.</span> 
+COPY down_nacos.sh .
+
+EXPOSE ${<span style="color: #a0522d;">PORT</span>}
+
+ENTRYPOINT exec java ${<span style="color: #a0522d;">JAVA_OPT</span>} -javaagent:/opt/apache-skywalking-apm-bin/agent/skywalking-agent.jar -Dskywalking.agent.service_name=${<span style="color: #a0522d;">SERVER_NAME</span>} -Dskywalking.collector.backend_service=${<span style="color: #a0522d;">SKYWALKING_SERVER</span>} -jar ${<span style="color: #a0522d;">JAR_FILE</span>} --server.port=${<span style="color: #a0522d;">PORT</span>} --spring.profiles.active=${<span style="color: #a0522d;">ENV</span>} --spring.cloud.nacos.config.server-addr=${<span style="color: #a0522d;">NACOS_SERVER</span>} --spring.cloud.nacos.config.namespace=${<span style="color: #a0522d;">NACOS_NS</span>}
+
+</pre>
+</div>
+
+<p>
+deploy/down_nacos.sh<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #a0522d;">ip</span>=<span style="color: #ff00ff;">`ifconfig  | grep inet | awk '{print $2}' | grep -v "127.0.0.1"`</span>
+<span style="color: #a0522d;">serviceName</span>=<span style="color: #ff00ff;">`ls /app | grep *.jar | awk -F '.' '{print $1}'`</span>
+<span style="color: #a0522d;">port</span>=<span style="color: #ff00ff;">`ps -ef | grep java | grep -v grep  | awk -F '--server.port=' '{print $2}' | awk '{print $1}'`</span>
+<span style="color: #a0522d;">namespacesId</span>=<span style="color: #ff00ff;">`ps -ef | grep java | grep -v grep  | awk -F '--spring.cloud.nacos.config.namespace=' '{print $2}' | awk '{print $1}'`</span>
+<span style="color: #a0522d;">nacosServer</span>=<span style="color: #ff00ff;">`ps -ef | grep java | grep -v grep  | awk -F '--spring.cloud.nacos.config.server-addr=' '{print $2}' | awk '{print $1}'`</span>
+
+curl -X PUT -d <span style="color: #8b2252;">"serviceName=$serviceName"</span> -d <span style="color: #8b2252;">"ip=$ip"</span> -d <span style="color: #8b2252;">"port=$port"</span> -d <span style="color: #8b2252;">"enabled=false"</span> -d <span style="color: #8b2252;">"namespacesId=$namespacesId"</span> $<span style="color: #a0522d;">nacosServer</span>/nacos/v1/ns/instance<span style="color: #8b2252;">\?</span>serviceName<span style="color: #8b2252;">\=</span>$<span style="color: #a0522d;">serviceName</span><span style="color: #8b2252;">\&amp;</span>ip<span style="color: #8b2252;">\=</span>$<span style="color: #a0522d;">ip</span><span style="color: #8b2252;">\&amp;</span>port<span style="color: #8b2252;">\=</span>$<span style="color: #a0522d;">port</span><span style="color: #8b2252;">\&amp;</span>enabled<span style="color: #8b2252;">\=</span>false<span style="color: #8b2252;">\&amp;</span>namespaceId<span style="color: #8b2252;">\=</span>$<span style="color: #a0522d;">namespacesId</span>
+
+sleep 30
+</pre>
+</div>
+
+
+<p>
+deploy/helm/Chart.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+description: service-name service 
+name: service-name-helm
+version: 1.0.0 
+</pre>
+</div>
+
+<p>
+deploy/helm/values.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">name: bookask-gateway 
+
+replicas: 2
+
+service:
+  port: 9999
+  check: /health
+
+deployment:
+  image:
+    registry: registry.cn-beijing.aliyuncs.com/bookask-dev/bookask-gateway 
+    version: latest
+    pullSecretName: bookask-dev-registry 
+</pre>
+</div>
+
+<p>
+deploy/helm/templates/deployment.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    bookask.apps: {{.Values.name}}
+  name: {{.Values.name}}
+  namespace: {{.Values.namespace}}
+spec:
+  replicas: {{.Values.replicas}} 
+  selector:
+    matchLabels:
+      bookask.apps: {{.Values.name}}
+  template:
+    metadata:
+      labels:
+        bookask.apps: {{.Values.name}}
+    spec:
+{{- with .Values.deployment.image}}
+      imagePullSecrets:      
+      - name: {{.pullSecretName}}
+      containers:
+      - image: {{ .registry}}:{{.version}}
+        imagePullPolicy: {{ .pullPolicy | default <span style="color: #8b2252;">"Always"</span> | quote }}
+{{- end}}
+        name: {{.Values.name}}
+        ports:
+        - containerPort: {{.Values.service.port}} 
+        readinessProbe:
+          httpGet:
+            path: {{.Values.service.check}}
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 2
+          successThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: {{.Values.service.check}}
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 1
+          successThreshold: 1
+        lifecycle:
+          preStop:
+            <span style="color: #a020f0;">exec</span>:
+              <span style="color: #483d8b;">command</span>: [<span style="color: #8b2252;">"/bin/bash"</span>, <span style="color: #8b2252;">"/app/down_nacos.sh"</span>]
+        resources:
+          requests:
+            memory: <span style="color: #8b2252;">"2000Mi"</span>
+      restartPolicy: Always
+</pre>
+</div>
+
+<p>
+deploy/helm/templates/service.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    bookask.apps: {{.Values.name}}
+  name: {{.Values.name}}
+  namespace: {{.Values.namespace}} 
+spec:
+  selector:
+    bookask.apps: {{.Values.name}}
+  ports:
+  - name: tcp 
+    port: {{.Values.service.port}}
+    targetPort: {{.Values.service.port}}
+</pre>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

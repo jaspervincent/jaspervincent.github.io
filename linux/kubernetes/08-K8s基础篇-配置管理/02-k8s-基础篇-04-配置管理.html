@@ -11,6 +11,27 @@
 <link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="me" href="https://emacs.ch/@jasperhsu">
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        displayAlign: "center",
+        displayIndent: "0em",
+
+        "HTML-CSS": { scale: 100,
+                        linebreaks: { automatic: "false" },
+                        webFont: "TeX"
+                       },
+        SVG: {scale: 100,
+              linebreaks: { automatic: "false" },
+              font: "TeX"},
+        NativeMML: {scale: 100},
+        TeX: { equationNumbers: {autoNumber: "AMS"},
+               MultLineWidth: "85%",
+               TagSide: "right",
+               TagIndent: ".8em"
+             }
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS_HTML"></script>
 </head>
 <body>
 <header id="preamble" class="status">
@@ -105,6 +126,7 @@
 <li><a href="#org9f8511e">ConfigMap&amp;Secret 热更新</a></li>
 <li><a href="#orgd0fb0a0">ConfigMap&amp;Secret使用限制</a></li>
 <li><a href="#org756e62c">k8s1.19的不可变Secret和ConfigMap</a></li>
+<li><a href="#org5ab4228">解决 configmap 乱码</a></li>
 </ul>
 </li>
 </ul>
@@ -138,7 +160,6 @@
 </div>
 </div>
 
-
 <div id="outline-container-org6d7dbda" class="outline-4">
 <h4 id="org6d7dbda">什么是configmap</h4>
 <div class="outline-text-4" id="text-org6d7dbda">
@@ -159,7 +180,6 @@ Secret: Secret更倾向于存储和共享敏感、加密的配置信息。<br>
 </p>
 </div>
 </div>
-
 
 
 <div id="outline-container-org734146d" class="outline-4">
@@ -251,7 +271,6 @@ metadata:
 </div>
 
 
-
 <div id="outline-container-orge1275b9" class="outline-5">
 <h5 id="orge1275b9">基于key-value字符串的环境变量创建 ConfigMap</h5>
 <div class="outline-text-5" id="text-orge1275b9">
@@ -321,7 +340,6 @@ data:
 </div>
 </div>
 </div>
-
 
 <div id="outline-container-org7ab8705" class="outline-4">
 <h4 id="org7ab8705">使用 ConfigMap</h4>
@@ -606,7 +624,6 @@ PreStop.sh  PreStop.sh.bak
 </div>
 
 
-
 <div id="outline-container-orgc66c0c0" class="outline-5">
 <h5 id="orgc66c0c0">自定义挂载权限及名称</h5>
 <div class="outline-text-5" id="text-orgc66c0c0">
@@ -692,7 +709,6 @@ total 8
 <li>使用 kustomize 来创建 Secret<br></li>
 </ul>
 </div>
-
 
 
 <div id="outline-container-org26d1633" class="outline-5">
@@ -784,7 +800,6 @@ S!B\*d$zDsb=<br>
 </div>
 </li>
 
-
 <li><a id="org8e06a16"></a>证书<br>
 <div class="outline-text-6" id="text-org8e06a16">
 <div class="org-src-container">
@@ -833,7 +848,6 @@ stringData:
 </ul>
 </div>
 </div>
-
 
 <div id="outline-container-org207520c" class="outline-4">
 <h4 id="org207520c">使用 Secret</h4>
@@ -936,7 +950,6 @@ spec:
 </div>
 </div>
 
-
 <div id="outline-container-org9f8511e" class="outline-4">
 <h4 id="org9f8511e">ConfigMap&amp;Secret 热更新</h4>
 <div class="outline-text-4" id="text-org9f8511e">
@@ -1001,6 +1014,34 @@ immutable: true
 说明：<br>
 一旦一个 Secret 或 ConfigMap 被标记为不可更改，撤销此操作或者更改 data 字段的内容都是 不 可能的。 只能删除并重新创建这个 Secret。现有的 Pod 将维持对已删除 Secret 的挂载点 &#x2013; 建议重新创建这些 Pod。<br>
 </p>
+</div>
+</div>
+
+
+<div id="outline-container-org5ab4228" class="outline-4">
+<h4 id="org5ab4228">解决 configmap 乱码</h4>
+<div class="outline-text-4" id="text-org5ab4228">
+<p>
+制表符TAB、尾随空格<br>
+</p>
+
+<p>
+Kubernetes ConfigMap在load过程中发现文件中包含tab缩进，直接转化为\n\t。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#20351;&#29992;&#20197;&#19979;&#26041;&#27861;&#21024;&#38500;&#23614;&#38543;&#31354;&#26684;&#65292;&#31354;&#26684;&#26367;&#25442;&#21046;&#34920;&#31526;</span>
+sed -i -E <span style="color: #8b2252;">'s/[[:space:]]+$//g'</span> file.txt
+sed -i <span style="color: #8b2252;">'s/\t/    /g'</span> file.txt
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl get cm my-cm -o json | jq <span style="color: #8b2252;">'.data."nginx.conf"'</span> -r
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23558;my-cm&#36825;&#20010;configmap&#36164;&#28304;&#20197;json&#26684;&#24335;&#21270;&#36755;&#20986;&#65292;&#26684;&#24335;&#21270;&#33539;&#22260;&#26159;/data/nginx.conf&#20869;&#23481;</span>
+</pre>
+</div>
 </div>
 </div>
 </div>

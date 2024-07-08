@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>k8s 进阶篇-细粒度权限控制</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">k8s 进阶篇-细粒度权限控制</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org702ab43">进阶-细粒度权限控制</a>
+<ul>
+<li><a href="#org937224d">RBAC</a>
+<ul>
+<li><a href="#orgcda8d68">什么是RBAC？</a></li>
+<li><a href="#org5f08605">RBAC分类介绍（API 对象）</a>
+<ul>
+<li><a href="#org4dca7aa">RBAC有4种顶级资源</a></li>
+<li><a href="#orge86450a">资源介绍</a></li>
+</ul>
+</li>
+<li><a href="#org778068c">范例</a>
+<ul>
+<li><a href="#org1cee5a5">Role 示例</a></li>
+<li><a href="#org2426f11">ClusterRole 示例</a></li>
+<li><a href="#org587b1ae">RoleBinding 示例</a></li>
+<li><a href="#org053fd20">ClusterRoleBinding 示例</a></li>
+</ul>
+</li>
+<li><a href="#org2cede66">聚合的 ClusterRole</a></li>
+<li><a href="#org67777c4">RBAC 企业实战</a>
+<ul>
+<li><a href="#orgeeeed10">如何管理权限和用户</a></li>
+<li><a href="#orgcea5640">不同用户不同权限</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org167032c">Dashboard使用用户名密码形式登录</a>
+<ul>
+<li><a href="#org4f82ecd"><b><b>1、基本说明</b></b></a></li>
+<li><a href="#orgf1dc140"><b><b>2、更改Dashboard认证方式</b></b></a></li>
+<li><a href="#org757458e"><b><b>3、添加默认权限</b></b></a></li>
+<li><a href="#orge42de2c"><b><b>4、配置权限</b></b></a>
+<ul>
+<li><a href="#org708c868">方式1</a></li>
+<li><a href="#org6847b09">方式2</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org6c65ee9">Ratel 工具图形化管理多 k8s 集群</a>
+<ul>
+<li><a href="#org0cc7d3d">Ratel 介绍</a></li>
+<li><a href="#orgc079c8e">安装Ratel</a>
+<ul>
+<li><a href="#org0a8d36c">安装说明</a></li>
+<li><a href="#org61836d5">创建RBAC</a></li>
+<li><a href="#org9f8cc3b">部署ratel</a></li>
+<li><a href="#orga5aea1b">Service和Ingress配置</a></li>
+<li><a href="#org526ad5b">访问ratel</a></li>
+<li><a href="#org422ecb0">资源列表</a></li>
+</ul>
+</li>
+<li><a href="#org7522fdf">图形化管理多租户权限</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a><br></li>
+</ul>
+
+<section id="outline-container-org702ab43" class="outline-2">
+<h2 id="org702ab43">进阶-细粒度权限控制</h2>
+<div class="outline-text-2" id="text-org702ab43">
+</div>
+<div id="outline-container-org937224d" class="outline-3">
+<h3 id="org937224d">RBAC</h3>
+<div class="outline-text-3" id="text-org937224d">
+<p>
+文档：<a href="https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/">https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/</a><br>
+</p>
+</div>
+
+<div id="outline-container-orgcda8d68" class="outline-4">
+<h4 id="orgcda8d68">什么是RBAC？</h4>
+<div class="outline-text-4" id="text-orgcda8d68">
+<p>
+RBAC 全称Role-based access control  即基于角色（Role）的访问控制，它是一种基于组织中用户的角色来调节控制对 计算机或网络资源的访问的方法。<br>
+</p>
+
+<p>
+RBAC 鉴权机制使用 rbac.authorization.k8s.io API 组 来驱动鉴权决定，允许你通过 Kubernetes API 动态配置策略。<br>
+</p>
+
+<p>
+要启用 RBAC，在启动 API 服务器 时将 &#x2013;authorization-mode 参数设置为一个逗号分隔的列表并确保其中包含 RBAC。<br>
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-org5f08605" class="outline-4">
+<h4 id="org5f08605">RBAC分类介绍（API 对象）</h4>
+<div class="outline-text-4" id="text-org5f08605">
+</div>
+<div id="outline-container-org4dca7aa" class="outline-5">
+<h5 id="org4dca7aa">RBAC有4种顶级资源</h5>
+<div class="outline-text-5" id="text-org4dca7aa">
+
+<figure id="org109facf">
+<img src="./images/Snipaste_2022-09-29_10-19-22.png" alt="Snipaste_2022-09-29_10-19-22.png"><br>
+
+</figure>
+
+<ul class="org-ul">
+<li>Role<br></li>
+<li>ClusterRole<br></li>
+<li>RoleBinding<br></li>
+<li>ClusterRoleBinding<br></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orge86450a" class="outline-5">
+<h5 id="orge86450a">资源介绍</h5>
+<div class="outline-text-5" id="text-orge86450a">
+<p>
+Role：角色，包含一组权限的规则。没有拒绝规则，只是附加允许。Namespace隔离，只作用于命名空间内！<br>
+</p>
+
+<p>
+ClusterRole：集群角色，和Role一样。和Role的区别，Role是只作用于命名空间内，ClusterRole作用于整个集群！<br>
+</p>
+
+<p>
+RoleBinding：作用于命令空间内，将ClusterRole或者Role绑定到User、Group、ServiceAccount！<br>
+</p>
+
+<p>
+ClusterRoleBinding：作用于整个集群。<br>
+</p>
+
+<p>
+中文官方文档：<a href="https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/">https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/</a><br>
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org778068c" class="outline-4">
+<h4 id="org778068c">范例</h4>
+<div class="outline-text-4" id="text-org778068c">
+<ul class="org-ul">
+<li>apiGroup  资源属于哪个组的，  <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#-strong-api-groups-strong-">https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#-strong-api-groups-strong-</a><br></li>
+<li>resoures 资源类型，* 代表所有，查询 `kubectl api-resources`<br></li>
+<li>verbs 可执行的操作，* 代表所有，<br>
+<ul class="org-ul">
+<li>`["get", "list", "watch", "create", "update", "patch", "delete", "post"]`<br></li>
+</ul></li>
+</ul>
+</div>
+
+<div id="outline-container-org1cee5a5" class="outline-5">
+<h5 id="org1cee5a5">Role 示例</h5>
+<div class="outline-text-5" id="text-org1cee5a5">
+<p>
+Role 总是用来在某个名字空间内设置访问权限；在你创建 Role 时，你必须指定该 Role 所属的名字空间<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""] # "" 标明 core API 组
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2426f11" class="outline-5">
+<h5 id="org2426f11">ClusterRole 示例</h5>
+<div class="outline-text-5" id="text-org2426f11">
+<p>
+ClusterRole 有若干用法。你可以用它来：<br>
+</p>
+
+<ol class="org-ol">
+<li>定义对某名字空间域对象的访问权限，并将在各个名字空间内完成授权；<br></li>
+<li>为名字空间作用域的对象设置访问权限，并跨所有名字空间执行授权；<br></li>
+<li>为集群作用域的资源定义访问权限。<br></li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  # "namespace" 被忽略，因为 ClusterRoles 不受名字空间限制
+  name: secret-reader
+rules:
+- apiGroups: [""]
+  # 在 HTTP 层面，用来访问 Secret 对象的资源的名称为 "secrets"
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org587b1ae" class="outline-5">
+<h5 id="org587b1ae">RoleBinding 示例</h5>
+<div class="outline-text-5" id="text-org587b1ae">
+<p>
+下面的例子中的 RoleBinding 将 "pod-reader" Role 授予在 "default" 名字空间中的用户 "jane"。 这样，用户 "jane" 就具有了读取 "default" 名字空间中 pods 的权限。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+# 此角色绑定允许 "jane" 读取 "default" 名字空间中的 Pods
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+# 你可以指定不止一个“subject（主体）”
+- kind: User # 这里可以是User,Group,ServiceAccount
+  name: jane # "name" 是不区分大小写的
+  apiGroup: rbac.authorization.k8s.io # 可不写
+roleRef:
+  # "roleRef" 指定与某 Role 或 ClusterRole 的绑定关系
+  kind: Role # 此字段必须是 Role 或 ClusterRole
+  name: pod-reader     # 此字段必须与你要绑定的 Role 或 ClusterRole 的名称匹配
+  apiGroup: rbac.authorization.k8s.io # 可不写
+</pre>
+</div>
+
+<p>
+subject 主体推荐使用 serviceAccount，user 还要重启 apiserver<br>
+</p>
+</div>
+
+<ul class="org-ul">
+<li><a id="org01a25eb"></a>RoleBinding 引用 ClusterRole<br>
+<div class="outline-text-6" id="text-org01a25eb">
+<p>
+RoleBinding 也可以引用 ClusterRole，以将对应 ClusterRole 中定义的访问权限授予 RoleBinding 所在名字空间的资源。这种引用使得你可以跨整个集群定义一组通用的角色， 之后在多个名字空间中复用！<br>
+</p>
+
+<p>
+下面的例子中的 RoleBinding，将"secret-reader" ClusterRole授予在"development" namespace中的用户"dave"。这样，用户 "dave" 就具有了读取 "development" 名字空间中 pods 的权限。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+# 此角色绑定使得用户 "dave" 能够读取 "default" 名字空间中的 Secrets
+# 你需要一个名为 "secret-reader" 的 ClusterRole
+kind: RoleBinding
+metadata:
+  name: read-secrets
+  # RoleBinding 的名字空间决定了访问权限的授予范围。
+  # 这里仅授权在 "development" 名字空间内的访问权限。
+  namespace: development
+subjects:
+- kind: User
+  name: dave # 'name' 是不区分大小写的
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+
+<div id="outline-container-org053fd20" class="outline-5">
+<h5 id="org053fd20">ClusterRoleBinding 示例</h5>
+<div class="outline-text-5" id="text-org053fd20">
+<p>
+要跨整个集群完成访问权限的授予，你可以使用一个 ClusterRoleBinding。 下面的 ClusterRoleBinding 允许 "manager" 组内的所有用户访问任何名字空间中的 Secrets。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+# 此集群角色绑定允许 “manager” 组中的任何人访问任何名字空间中的 secrets
+kind: ClusterRoleBinding
+metadata:
+  name: read-secrets-global
+subjects:
+- kind: Group
+  name: manager # 'name' 是不区分大小写的
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+</pre>
+</div>
+
+<p>
+<b><b>注意：</b></b><br>
+</p>
+
+<p>
+创建了绑定之后，你不能再修改绑定对象所引用的 Role 或 ClusterRole。 试图改变绑定对象的 `roleRef` 将导致合法性检查错误。 如果你想要改变现有绑定对象中 `roleRef` 字段的内容，必须删除重新创建绑定对象。<br>
+</p>
+
+<p>
+<b><b>这种限制有两个主要原因：</b></b><br>
+</p>
+
+<ol class="org-ol">
+<li>针对不同角色的绑定是完全不一样的绑定。要求通过删除/重建绑定来更改 `roleRef`, 这样可以确保要赋予绑定的所有主体会被授予新的角色（而不是在允许修改 `roleRef` 的情况下导致所有现有主体胃镜验证即被授予新角色对应的权限）。<br></li>
+<li>将 `roleRef` 设置为不可以改变，这使得可以为用户授予对现有绑定对象的 `update` 权限， 这样可以让他们管理主体列表，同时不能更改被授予这些主体的角色。<br></li>
+</ol>
+
+<p>
+命令 `kubectl auth reconcile` 可以创建或者更新包含 RBAC 对象的清单文件， 并且在必要的情况下删除和重新创建绑定对象，以改变所引用的角色<br>
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2cede66" class="outline-4">
+<h4 id="org2cede66">聚合的 ClusterRole</h4>
+<div class="outline-text-4" id="text-org2cede66">
+<p>
+将若干 ClusterRole 聚合（Aggregate） 起来，形成一个复合的 ClusterRole。<br>
+</p>
+
+
+<p>
+下面是一个聚合 ClusterRole 的示例：<br>
+聚合符合标签的 clusterrole<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      rbac.example.com/aggregate-to-monitoring: "true"
+rules: [] # 控制面自动填充这里的规则
+
+-------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring-endpoints
+  labels:
+    rbac.example.com/aggregate-to-monitoring: "true"
+# 当你创建 "monitoring-endpoints" ClusterRole 时，
+# 下面的规则会被添加到 "monitoring" ClusterRole 中
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods"]
+  verbs: ["get", "list", "watch"]
+</pre>
+</div>
+
+<p>
+下面的 ClusterRoles 让默认角色 "admin" 和 "edit" 拥有管理自定义资源 "CronTabs" 的权限， "view" 角色对 CronTab 资源拥有读操作权限。 你可以假定 CronTab 对象在 API 服务器所看到的 URL 中被命名为 `"crontabs"`。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aggregate-cron-tabs-edit
+  labels:
+    # 添加以下权限到默认角色 "admin" 和 "edit" 中
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: ["stable.example.com"]
+  resources: ["crontabs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aggregate-cron-tabs-view
+  labels:
+    # 添加以下权限到 "view" 默认角色中
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups: ["stable.example.com"]
+  resources: ["crontabs"]
+  verbs: ["get", "list", "watch"]
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org67777c4" class="outline-4">
+<h4 id="org67777c4">RBAC 企业实战</h4>
+<div class="outline-text-4" id="text-org67777c4">
+</div>
+<div id="outline-container-orgeeeed10" class="outline-5">
+<h5 id="orgeeeed10">如何管理权限和用户</h5>
+<div class="outline-text-5" id="text-orgeeeed10">
+
+<figure id="org081884b">
+<img src="./images/Snipaste_2022-09-29_17-00-33.png" alt="Snipaste_2022-09-29_17-00-33.png"><br>
+
+</figure>
+
+<p>
+创建通用权限用 clusterrole 管理。<br>
+</p>
+
+<p>
+<img src="./images/Snipaste_2022-09-29_17-25-16.png" alt="Snipaste_2022-09-29_17-25-16.png"><br>
+如何进行用户管理？<br>
+</p>
+<ul class="org-ul">
+<li>专门有个名称空间存放 sa。<br></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgcea5640" class="outline-5">
+<h5 id="orgcea5640">不同用户不同权限</h5>
+<div class="outline-text-5" id="text-orgcea5640">
+<p>
+需求：<br>
+</p>
+<ol class="org-ol">
+<li>用户one可以查看default、kube-system下Pod的日志<br></li>
+<li>用户two可以在default下的Pod中执行命令，并且可以删除Pod<br></li>
+</ol>
+
+
+<p>
+分析：<br>
+</p>
+<ul class="org-ul">
+<li>查看 pod 日志、pod 执行命令、删除 pod 都是通用权限，分别创建 clusterrole 即可。<br></li>
+<li>切换名称空间的通用权限，创建一个 clusterrole。<br></li>
+</ul>
+</div>
+
+<ul class="org-ul">
+<li><a id="org98cb9a2"></a>创建通用权限<br>
+<div class="outline-text-6" id="text-org98cb9a2">
+<div class="org-src-container">
+<pre class="src src-yaml">---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: namespace-readonly
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+  - apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-delete
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-exec
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="org2907ff6"></a>创建用户<br>
+<div class="outline-text-6" id="text-org2907ff6">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create ns kube-users
+kubectl create sa one two -n kube-users
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="org08d857f"></a>绑定权限<br>
+<div class="outline-text-6" id="text-org08d857f">
+<p>
+绑定全局命名空间查看权限：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">kubectl create clusterrolebinding namespace-readonly \
+--clusterrole=namespace-readonly --serviceaccount=system:serviceaccounts:kube-users
+</pre>
+</div>
+
+
+<p>
+绑定权限：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create rolebinding one-pod-log <span style="color: #8b2252;">\</span>
+--clusterrole=pod-log --serviceaccount=kube-users:one --namespace=kube-system
+kubectl create rolebinding one-pod-log <span style="color: #8b2252;">\</span>
+--clusterrole=pod-log --serviceaccount=kube-users:one --namespace=default
+
+kubectl create rolebinding two-pod-exec <span style="color: #8b2252;">\</span>
+--clusterrole=pod-exec --serviceaccount=kube-users:two --namespace=default
+kubectl create rolebinding two-pod-delete <span style="color: #8b2252;">\</span>
+--clusterrole=pod-delete --serviceaccount=kube-users:two --namespace=default
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org167032c" class="outline-3">
+<h3 id="org167032c">Dashboard使用用户名密码形式登录</h3>
+<div class="outline-text-3" id="text-org167032c">
+</div>
+<div id="outline-container-org4f82ecd" class="outline-4">
+<h4 id="org4f82ecd"><b><b>1、基本说明</b></b></h4>
+<div class="outline-text-4" id="text-org4f82ecd">
+<p>
+在生产环境使用k8s以后，大部分应用都实现了高可用，不仅降低了维护成本，也简化了很多应用的部署成本，但是同时也带来了诸多问题。比如开发可能需要查看自己的应用状态、连接信息、日志、执行命令等。<br>
+</p>
+
+<p>
+使用k8s后，业务应用以Pod为单位，不像之前的以服务器为单位，可以直接通过登录服务器进行相关操作。当业务应用使用k8s部署后，k8s官方的dashboard虽然可以进行查看日志、执行命令等基本操作，但是作为运维人员，不想让开发操作或查看自己范围之外的Pod，此时就要使用RBAC进行相关的权限配置。<br>
+</p>
+
+<p>
+本文章主要讲解两方面的问题：<br>
+</p>
+<ul class="org-ul">
+<li>使用用户名密码登录Dashboard<br>
+<ul class="org-ul">
+<li>对已登录用户进行权限配置，实现只能操作自己Namespace的Pod，不能进入到未授权的其他Namespace<br></li>
+</ul></li>
+</ul>
+</div>
+</div>
+
+
+
+<div id="outline-container-orgf1dc140" class="outline-4">
+<h4 id="orgf1dc140"><b><b>2、更改Dashboard认证方式</b></b></h4>
+<div class="outline-text-4" id="text-orgf1dc140">
+<p>
+为了方便开发和运维人员登录Dashboard，需要将Dashboard登录方式用户名密码认证（用户名密码和Token可以同时开启）。<br>
+</p>
+
+<p>
+使用Ratel将kubernetes-dashboard的deployment的&#x2013;authentication-mode改成basic即可，未安装Ratel的可以使用kubectl edit进行更改，更改完成会自动重启。<br>
+</p>
+
+
+<figure id="orgb9debbc">
+<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203150941688-563425830.png" alt="1095387-20191203150941688-563425830.png"><br>
+
+</figure>
+
+
+
+<p>
+之后更改kube-apiserver配置添加<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim /usr/lib/systemd/system/kube-apiserver.service
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22686;&#21152;&#22914;&#19979;&#34892;</span>
+
+--basic-auth-file=/etc/kubernetes/basic_auth_file
+</pre>
+</div>
+
+<p>
+basic_auth_file为存储账号密码的文件，格式如下：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">xxx1_2019,xxx1,3,<span style="color: #8b2252;">"system:authentication"</span>
+xxx2_2019,xxx2,4,<span style="color: #8b2252;">"system:authentication"</span>
+xxx3_2019,xxx3,5,<span style="color: #8b2252;">"system:authentication"</span>
+xxx4_2019,xxx4,6,<span style="color: #8b2252;">"system:authentication"</span>
+
+</pre>
+</div>
+
+<p>
+依次是密码、用户名、ID号、用户组，因为下面会为已登录的用户进行授权，所以把组设置成了system:authentication，按需更改。<br>
+</p>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">systemctl daemon-reload
+systemctl restart kube-apiserver
+</pre>
+</div>
+</div>
+</div>
+
+
+
+<div id="outline-container-org757458e" class="outline-4">
+<h4 id="org757458e"><b><b>3、添加默认权限</b></b></h4>
+<div class="outline-text-4" id="text-org757458e">
+<p>
+首先配置一个system:authentication组允许查询namespace列表（因为进入到指定namespace，必须能list该集群的namespace）:<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /root/rbac &amp;&amp; <span style="color: #483d8b;">cd</span> /root/rbac
+vim namespaceReadonly.yaml
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: <span style="color: #8b2252;">"true"</span>
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+    rbac.authorization.k8s.io/aggregate-to-edit: <span style="color: #8b2252;">"true"</span>
+  name: ratel-namespace-readonly
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ratel-namespace-readonly
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ratel-namespace-readonly
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authentication
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f namespaceReadonly.yaml
+</pre>
+</div>
+
+<p>
+　　<br>
+</p>
+
+<p>
+创建查看namespace资源的权限<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim view-resource.yaml
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ratel-resource-readonly
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - configmaps
+  - endpoints
+  - persistentvolumeclaims
+  - pods
+  - replicationcontrollers
+  - replicationcontrollers/scale
+  - serviceaccounts
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - bindings
+  - events
+  - limitranges
+  - namespaces/status
+  - pods/log
+  - pods/status
+  - replicationcontrollers/status
+  - resourcequotas
+  - resourcequotas/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - controllerrevisions
+  - daemonsets
+  - deployments
+  - deployments/scale
+  - replicasets
+  - replicasets/scale
+  - statefulsets
+  - statefulsets/scale
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - deployments/scale
+  - ingresses
+  - networkpolicies
+  - replicasets
+  - replicasets/scale
+  - replicationcontrollers/scale
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f view-resource.yaml
+</pre>
+</div>
+
+<p>
+创建Pod执行权限<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim podExec.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ratel-pod-exec
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - pods/exec
+  verbs:
+  - create
+</pre>
+</div>
+
+<p>
+创建Pod删除权限<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim podDelete.yaml
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ratel-pod-delete
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - delete
+</pre>
+</div>
+
+
+
+<p>
+上述权限创建完成后，只需要将对应的用户绑定对应的权限即可实现不同的用户在不同的namespace实现不同的权限。<br>
+</p>
+
+<p>
+对RBAC不熟悉的可以参考<a href="https://www.cnblogs.com/dukuan/p/9948063.html">https://www.cnblogs.com/dukuan/p/9948063.html</a><br>
+</p>
+</div>
+</div>
+
+
+
+<div id="outline-container-orge42de2c" class="outline-4">
+<h4 id="orge42de2c"><b><b>4、配置权限</b></b></h4>
+<div class="outline-text-4" id="text-orge42de2c">
+<p>
+案例：假设有一个用户叫java7，需要访问default命名空间下的资源，可以在容器执行命令和查看日志<br>
+</p>
+
+<p>
+添加权限之前是不能查看任何信息的:<br>
+</p>
+
+
+<figure id="orgc2d6e48">
+<img src="./images/image-20210601142314086.png" alt="image-20210601142314086.png"><br>
+
+</figure>
+</div>
+
+
+
+
+
+<div id="outline-container-org708c868" class="outline-5">
+<h5 id="org708c868">方式1</h5>
+<div class="outline-text-5" id="text-org708c868">
+<p>
+方式一：使用Ratel一键配置，选择对应的集群、Namespace、用户名、勾选权限点击创建即可。　![img](<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203153400136-128916704.png" alt="1095387-20191203153400136-128916704.png">)<br>
+</p>
+
+
+<figure id="org9fd02db">
+<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203153738140-507518129.png" alt="1095387-20191203153738140-507518129.png"><br>
+
+</figure>
+
+
+
+<p>
+创建成功后再次登录，即可查看该Namespace的信息<br>
+</p>
+
+
+<figure id="org3555f4b">
+<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203153925786-1719087315.png" alt="1095387-20191203153925786-1719087315.png"><br>
+
+</figure>
+
+
+<p>
+查看日志：<br>
+<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203154012007-702443056.png" alt="1095387-20191203154012007-702443056.png"><br>
+</p>
+
+<p>
+执行命令：<br>
+<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203154233612-9033296.png" alt="1095387-20191203154233612-9033296.png"><br>
+</p>
+
+<p>
+同时也不能查看其他namespace的资源<br>
+<img src="https://img2018.cnblogs.com/blog/1095387/201912/1095387-20191203154332405-813229353.png" alt="1095387-20191203154332405-813229353.png"><br>
+</p>
+
+<p>
+　　　　<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6847b09" class="outline-5">
+<h5 id="org6847b09">方式2</h5>
+<div class="outline-text-5" id="text-org6847b09">
+<p>
+使用yaml文件配置<br>
+</p>
+
+<p>
+使用Ratel进行权限配置，在配置权限后在对应的namespace下创建对应的RoleBinding，如下：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl get rolebinding 
+NAME                            AGE
+gitlab                          112d
+ratel-pod-delete-java7          11m
+ratel-pod-exec-java7            11m
+ratel-resource-readonly-java7   11m
+</pre>
+</div>
+
+<p>
+内容如下：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">ource-readonly-java7 -o yaml
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: <span style="color: #8b2252;">"2019-12-03T07:34:24Z"</span>
+    name: ratel-pod-delete-java7
+    namespace: default
+    resourceVersion: <span style="color: #8b2252;">"35887290"</span>
+    selfLink: /apis/rbac.authorization.k8s.io/v1/namespaces/default/rolebindings/ratel-pod-delete-java7
+    uid: 547f5d42-159f-11ea-b1b5-001e674e3dd6
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ratel-pod-delete
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: java7
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: <span style="color: #8b2252;">"2019-12-03T07:34:24Z"</span>
+    name: ratel-pod-exec-java7
+    namespace: default
+    resourceVersion: <span style="color: #8b2252;">"35887289"</span>
+    selfLink: /apis/rbac.authorization.k8s.io/v1/namespaces/default/rolebindings/ratel-pod-exec-java7
+    uid: 547c5768-159f-11ea-b1b5-001e674e3dd6
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ratel-pod-exec
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: java7
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: <span style="color: #8b2252;">"2019-12-03T07:34:24Z"</span>
+    name: ratel-resource-readonly-java7
+    namespace: default
+    resourceVersion: <span style="color: #8b2252;">"35887288"</span>
+    selfLink: /apis/rbac.authorization.k8s.io/v1/namespaces/default/rolebindings/ratel-resource-readonly-java7
+    uid: 5476577f-159f-11ea-b1b5-001e674e3dd6
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ratel-resource-readonly
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: java7
+kind: List
+metadata:
+  resourceVersion: <span style="color: #8b2252;">""</span>
+  selfLink: <span style="color: #8b2252;">""</span>
+</pre>
+</div>
+
+
+
+<p>
+在没有安装Ratel的情况下，可以使用上述yaml内容直接创建至对应的namespace下即可完成权限配置。<br>
+</p>
+
+<p>
+上述只是实现了对常用资源的权限控制，其他权限控制类似。<br>
+</p>
+
+<p>
+Kubernetes多集群资源管理平台Ratel安装可以参考：<a href="https://github.com/dotbalo/ratel-doc">https://github.com/dotbalo/ratel-doc</a><br>
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org6c65ee9" class="outline-3">
+<h3 id="org6c65ee9">Ratel 工具图形化管理多 k8s 集群</h3>
+<div class="outline-text-3" id="text-org6c65ee9">
+</div>
+<div id="outline-container-org0cc7d3d" class="outline-4">
+<h4 id="org0cc7d3d">Ratel 介绍</h4>
+<div class="outline-text-4" id="text-org0cc7d3d">
+<p>
+个人开发项目，主要用来降低学习难度，适合集群管理员<br>
+<a href="https://github.com/dotbalo/ratel-doc">https://github.com/dotbalo/ratel-doc</a><br>
+</p>
+
+<p>
+<a href="https://www.cnblogs.com/dukuan/p/11883541.html">https://www.cnblogs.com/dukuan/p/11883541.html</a><br>
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-orgc079c8e" class="outline-4">
+<h4 id="orgc079c8e">安装Ratel</h4>
+<div class="outline-text-4" id="text-orgc079c8e">
+</div>
+<div id="outline-container-org0a8d36c" class="outline-5">
+<h5 id="org0a8d36c">安装说明</h5>
+<div class="outline-text-5" id="text-org0a8d36c">
+<p>
+集群安装配置需要两类文件: servers.yaml和集群管理的kubeconfig文件<br>
+</p>
+
+<p>
+servers.yaml是ratel的配置文件, 格式如下:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">- serverName: 'xxx'
+  serverAddress: 'https://1.1.1.1:8443'
+  #serverAdminUser: 'xxx'
+  #serverAdminPassword: 'xxx#'
+  serverAdminToken: 'null'
+  serverDashboardUrl: "https://k8s.xxx.com.cn/#"
+  production: 'false'
+  kubeConfigPath: "/mnt/xxx.config"
+  harborConfig: "HarborUrl, HarborUsername, HarborPassword, HarborEmail"
+</pre>
+</div>
+
+<p>
+其中管理的方式有两种(Token暂不支持): 账号密码和kubeconfig形式, 只需配置一种即可, kubeconfig优先级高<br>
+</p>
+
+<p>
+参数解析:<br>
+</p>
+<ul class="org-ul">
+<li>serverName: 集群别名<br></li>
+<li>serverAddress: Kubernetes APIServer地址<br></li>
+<li>serverAdminUser: Kubernetes管理员账号(需要配置basic auth)<br></li>
+<li>serverAdminPassword: Kubernetes管理员密码<br></li>
+<li>serverAdminToken: Kubernetes管理员Token // 暂不支持<br></li>
+<li>serverDashboardUrl: Kubernetes官方dashboard地址，1.x版本需要添加/#!，2.x需要添加/#<br></li>
+<li>kubeConfigPath: Kubernetes kube.config路径(绝对路径，这个路径不是宿主机的本地路径，而是1.2小节secret的挂载路径，一般可以不改/mnt)<br></li>
+<li>harborConfig: 对于多集群管理的情况下，可能会存在不同的harbor仓库，配置此参数可以在拷贝资源的时候自动替换harbor配置<br></li>
+<li>kubeConfigPath 通过secret挂载到容器的/mnt目录或者其他目录<br></li>
+</ul>
+
+<p>
+本文档是将Ratel安装在Kubernetes集群，如果没有Kubernetes集群，可以参考本人写的另一篇文章，CentOS 8二进制高可用安装Kubernetes集群: <a href="https://www.cnblogs.com/dukuan/p/11780729.html">https://www.cnblogs.com/dukuan/p/11780729.html</a><br>
+</p>
+
+<p>
+### 1.2 创建Secret<br>
+</p>
+
+<p>
+假设配置两个集群，对应的kubeconfig是test1.config和test2.config<br>
+ratel配置文件servers.yaml内容如下:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">- serverName: 'test1'
+  serverAddress: 'https://1.1.1.1:8443'
+  #serverAdminUser: 'xxx'
+  #serverAdminPassword: 'xxx#'
+  serverAdminToken: 'null'
+  serverDashboardUrl: "https://k8s.test1.com.cn/#"
+  production: 'false'
+  kubeConfigPath: "/mnt/test1.config"
+  harborConfig: "HarborUrl, HarborUsername, HarborPassword, HarborEmail"
+- serverName: 'test2'
+  serverAddress: 'https://1.1.1.2:8443'
+  #serverAdminUser: 'xxx'
+  #serverAdminPassword: 'xxx#'
+  serverAdminToken: 'null'
+  serverDashboardUrl: "https://k8s.test2.com.cn/#!"
+  production: 'false'
+  kubeConfigPath: "/mnt/test2.config"
+  harborConfig: "HarborUrl, HarborUsername, HarborPassword, HarborEmail"
+</pre>
+</div>
+
+<p>
+创建Secret:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create secret generic ratel-config  --from-file=test1.config --from-file=test2.config --from-file=servers.yaml -n kube-system
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org61836d5" class="outline-5">
+<h5 id="org61836d5">创建RBAC</h5>
+<div class="outline-text-5" id="text-org61836d5">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#26435;&#38480;&#31649;&#29702;namespace</span>
+kubectl create ns kube-users
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#28982;&#21518;&#28155;&#21152;&#22914;&#19979;&#30340;ClusterroleBinding</span>
+vim ratel-rbac.yaml
+
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: <span style="color: #8b2252;">"true"</span>
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+      rbac.authorization.k8s.io/aggregate-to-edit: <span style="color: #8b2252;">"true"</span>
+    name: ratel-namespace-readonly
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - metrics.k8s.io
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ratel-pod-delete
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - delete
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ratel-pod-exec
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - pods
+    - pods/log
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - pods/exec
+    verbs:
+    - create
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: <span style="color: #8b2252;">"true"</span>
+    name: ratel-resource-edit
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - configmaps
+    - persistentvolumeclaims
+    - services
+    - services/proxy
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - apps
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/rollback
+    - deployments/scale
+    - statefulsets
+    - statefulsets/scale
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - autoscaling
+    resources:
+    - horizontalpodautoscalers
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    - jobs
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - extensions
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/rollback
+    - deployments/scale
+    - ingresses
+    - networkpolicies
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - ingresses
+    - networkpolicies
+    verbs:
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ratel-resource-readonly
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - configmaps
+    - endpoints
+    - persistentvolumeclaims
+    - pods
+    - replicationcontrollers
+    - replicationcontrollers/scale
+    - serviceaccounts
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - bindings
+    - events
+    - limitranges
+    - namespaces/status
+    - pods/log
+    - pods/status
+    - replicationcontrollers/status
+    - resourcequotas
+    - resourcequotas/status
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    resources:
+    - controllerrevisions
+    - daemonsets
+    - deployments
+    - deployments/scale
+    - replicasets
+    - replicasets/scale
+    - statefulsets
+    - statefulsets/scale
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - autoscaling
+    resources:
+    - horizontalpodautoscalers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    - jobs
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - extensions
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/scale
+    - ingresses
+    - networkpolicies
+    - replicasets
+    - replicasets/scale
+    - replicationcontrollers/scale
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - networkpolicies
+    - ingresses
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - metrics.k8s.io
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+kind: List
+metadata:
+  resourceVersion: <span style="color: #8b2252;">""</span>
+  selfLink: <span style="color: #8b2252;">""</span>
+
+kubectl create -f ratel-rbac.yaml
+
+vim ratel-rbac-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ratel-namespace-readonly-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ratel-namespace-readonly
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:serviceaccounts:kube-users
+
+  kubectl create -f ratel-rbac-binding.yaml
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org9f8cc3b" class="outline-5">
+<h5 id="org9f8cc3b">部署ratel</h5>
+<div class="outline-text-5" id="text-org9f8cc3b">
+<p>
+ratel的部署文件内容如下:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ratel
+  name: ratel
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ratel
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    <span style="color: #483d8b;">type</span>: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ratel
+    spec:
+      containers:
+        - command:
+            - sh
+            - -c
+            - ./ratel -c /mnt/servers.yaml
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+            - name: LANG
+              value: C.UTF-8
+            - name: ProRunMode
+              value: prod
+            - name: ADMIN_USERNAME
+              value: admin
+            - name: ADMIN_PASSWORD
+              value: ratel_password
+          image: registry.cn-beijing.aliyuncs.com/dotbalo/ratel:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 2
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            tcpSocket:
+              port: 8888
+            timeoutSeconds: 2
+          name: ratel
+          ports:
+            - containerPort: 8888
+              name: web
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 2
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            tcpSocket:
+              port: 8888
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /mnt
+              name: ratel-config
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: myregistrykey
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: ratel-config
+          secret:
+            defaultMode: 420
+            secretName: ratel-config
+</pre>
+</div>
+
+<p>
+需要更改的内容如下:<br>
+</p>
+<ul class="org-ul">
+<li>ProRunMode: 区别在于dev模式打印的是debug日志, 其他模式是info级别的日志, 实际使用时应该配置为非dev<br></li>
+<li>ADMIN_USERNAME: ratel自己的管理员账号<br></li>
+<li>ADMIN_PASSWORD: ratel自己的管理员密码<br></li>
+</ul>
+<p>
+实际使用时账号密码应满足复杂性要求,因为ratel可以直接操作所有配置的资源。<br>
+其他无需配置, 端口配置暂不支持。<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga5aea1b" class="outline-5">
+<h5 id="orga5aea1b">Service和Ingress配置</h5>
+<div class="outline-text-5" id="text-orga5aea1b">
+<p>
+注意：如果没有安装ingress controller，需要把type: ClusterIP改成type: NodePort，然后通过主机IP+Port进行访问<br>
+</p>
+
+<p>
+创建ratel Service的文件如下:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ratel
+  name: ratel
+  namespace: kube-system
+spec:
+  ports:
+    - name: container-1-web-1
+      port: 8888
+      protocol: TCP
+      targetPort: 8888
+  selector:
+    app: ratel
+  type: ClusterIP
+</pre>
+</div>
+
+<p>
+创建ratel Ingress:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ratel
+  namespace: kube-system
+spec:
+  rules:
+  - host: krm.test.com
+    http:
+      paths:
+      - backend:
+	  serviceName: ratel
+	  servicePort: 8888
+	path: /
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org526ad5b" class="outline-5">
+<h5 id="org526ad5b">访问ratel</h5>
+<div class="outline-text-5" id="text-org526ad5b">
+<p>
+注意：如果没有安装ingress controller，需要把type: ClusterIP改成type: NodePort，然后通过主机IP+Port进行访问<br>
+</p>
+
+<p>
+通过Ingress配置的krm.test.com/ratel访问，ratel登录页如下:<br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/login.png">login</a><br>
+</p>
+
+
+<p>
+ratel首页如下:<br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/index.png">index</a><br>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/index2.png">index2</a><br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org422ecb0" class="outline-5">
+<h5 id="org422ecb0">资源列表</h5>
+<div class="outline-text-5" id="text-org422ecb0">
+<p>
+Node列表及配置<br>
+开启驱逐是配置了一个NoExecute的Taint，禁止调度室配置了一个NoSchedule的Taint，并非强制性的。<br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/nodelist.png">nodeList</a><br>
+</p>
+
+<p>
+Deployment StatefulSet DaemonSet列表<br>
+可以直接进行删除、更新(不更新任何内容触发更新)、编辑、添加Service，自动配置Service端口<br>
+点击副本数可以直接进行扩容<br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/stslist.png">stslist</a><br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/dslist.png">dslist</a><br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/dplist.png">dplist</a><br>
+</p>
+
+
+<p>
+Service列表，可以针对指定Service添加域名，自动配置端口<br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/svclist.png">svclist</a><br>
+</p>
+
+
+<p>
+Pod列表，如果状态不是Running，可以将鼠标放在状态上即可查看出错原因<br>
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc/blob/master/images/podslist.png">podslist</a><br>
+</p>
+</div>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-org7522fdf" class="outline-4">
+<h4 id="org7522fdf">图形化管理多租户权限</h4>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

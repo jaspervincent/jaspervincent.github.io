@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RDS迁移自建操作步骤</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">RDS迁移自建操作步骤</h1>
+</header><p>
+0、修改服务器时区<br>
+</p>
+
+<p>
+timedatectl statusmysql_replication_hostgroups<br>
+</p>
+
+
+
+<p>
+timedatectl set-timezone "Asia/Shanghai"<br>
+</p>
+
+
+<p>
+1、部署MySQL<br>
+</p>
+
+<p>
+配置文件修改<br>
+</p>
+
+<p>
+cd /usr/local/src<br>
+</p>
+
+<p>
+sudo wget <a href="https://downloads.mysql.com/archives/get/p/23/file/mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz">https://downloads.mysql.com/archives/get/p/23/file/mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz</a><br>
+</p>
+
+<p>
+sudo tar -zxvf mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz<br>
+</p>
+
+<p>
+sudo groupadd mysql<br>
+</p>
+
+<p>
+sudo useradd -r -g mysql -s /bin/false mysql<br>
+</p>
+
+<p>
+sudo mkdir -p /mysqldata/mysql /mysqldata/tmpdir /mysqldata/output  /mysqllog/binlog /mysqllog/relaylog<br>
+</p>
+
+<p>
+sudo chown -R mysql:mysql /mysqldata/mysql /mysqldata/tmpdir /mysqldata/output /mysqllog/binlog /mysqllog/relaylog<br>
+</p>
+
+<p>
+sudo mv mysql-5.7.34-linux-glibc2.12-x86_64 ../mysql<br>
+</p>
+
+<p>
+sudo chown -R mysql:mysql /usr/local/mysql<br>
+</p>
+
+<p>
+sudo /usr/local/mysql/bin/mysqld &#x2013;initialize &#x2013;user=mysql<br>
+</p>
+
+<p>
+sudo cp /usr/local/mysql/support-files/mysql.server /etc/init.d/mysqld<br>
+</p>
+
+<p>
+sudo systemctl enable mysqld<br>
+</p>
+
+<p>
+sudo chkconfig mysqld on<br>
+</p>
+
+<p>
+sudo systemctl start mysqld<br>
+</p>
+
+<p>
+sudo systemctl status mysqld<br>
+</p>
+
+<p>
+sudo vim /etc/profile<br>
+</p>
+
+<p>
+export PATH=$PATH:/usr/local/mysql/bin<br>
+</p>
+
+<p>
+source /etc/profile<br>
+</p>
+
+
+
+<p>
+create database meta;<br>
+</p>
+
+<p>
+CREATE TABLE `cluster` (<br>
+</p>
+
+<p>
+`anchor` tinyint(4) NOT NULL,<br>
+</p>
+
+<p>
+`cluster_name` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',<br>
+</p>
+
+<p>
+`cluster_domain` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',<br>
+</p>
+
+<p>
+PRIMARY KEY (`anchor`)<br>
+</p>
+
+<p>
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;<br>
+</p>
+
+<p>
+insert into meta.cluster (anchor,cluster_name)values (1,'xxxxxxx') ;<br>
+</p>
+
+
+
+<p>
+创建MySQL用户<br>
+</p>
+
+<p>
+orchestrator拓扑用户<br>
+</p>
+
+<p>
+GRANT SELECT ON `meta`.`cluster` TO `orchestrator`@`172.21.39.6`;<br>
+</p>
+
+<p>
+GRANT SELECT ON `mysql`.`slave_master_info` TO `orchestrator`@`172.21.39.6`;<br>
+</p>
+
+<p>
+GRANT RELOAD, PROCESS, SUPER, REPLICATION SLAVE, REPLICATION CLIENT ON <b>.</b> TO `orchestrator`@`172.21.39.6`;<br>
+</p>
+
+<p>
+proxysql的监控用户<br>
+</p>
+
+<p>
+GRANT PROCESS, REPLICATION SLAVE, REPLICATION CLIENT ON <b>.</b> TO `monitor`@`172.41.%`;<br>
+</p>
+
+<p>
+prometheus监控用户<br>
+</p>
+
+<p>
+GRANT SELECT, PROCESS, REPLICATION CLIENT ON <b>.</b> TO 'prometheus_exporter'@'127.0.0.1' ;<br>
+</p>
+
+
+
+
+
+
+
+<p>
+2、部署proxysql-cluster<br>
+</p>
+
+<p>
+sudo vim /etc/yum.repos.d/proxysql.repo<br>
+</p>
+
+<p>
+[proxysql_repo]<br>
+</p>
+
+<p>
+name= ProxySQL YUM repository<br>
+</p>
+
+<p>
+baseurl=<a href="https://repo.proxysql.com/ProxySQL/proxysql-2.1.x/centos/latest">https://repo.proxysql.com/ProxySQL/proxysql-2.1.x/centos/latest</a><br>
+</p>
+
+<p>
+gpgcheck=1<br>
+</p>
+
+<p>
+gpgkey=<a href="https://repo.proxysql.com/ProxySQL/repo_pub_key">https://repo.proxysql.com/ProxySQL/repo_pub_key</a><br>
+</p>
+
+<p>
+sudo yum -y install proxysql<br>
+</p>
+
+
+
+<p>
+在两台proxysql服务器的proxysql配置文件添加proxysql集群服务器信息<br>
+</p>
+
+<p>
+vim /etc/proxysql.cnf<br>
+</p>
+
+<p>
+admin_variables=<br>
+</p>
+
+<p>
+{<br>
+</p>
+
+<p>
+admin_credentials="admin:admin;cluster_user:pfg2021go"<br>
+</p>
+
+<p>
+cluster_username="cluster_user"<br>
+</p>
+
+<p>
+cluster_password="pfg2021go"<br>
+</p>
+
+<p>
+}<br>
+</p>
+
+
+
+<p>
+proxysql_servers=<br>
+</p>
+
+<p>
+(<br>
+{<br>
+hostname="172.21.xx.xx"<br>
+port=6032<br>
+weight=1<br>
+comment="xxx-proxysql-node1"<br>
+},<br>
+{<br>
+hostname="172.21.xx.xx"<br>
+port=6032<br>
+weight=1<br>
+comment="xxx-proxysql-node2"<br>
+}<br>
+)<br>
+</p>
+
+
+
+<p>
+修改参数<br>
+</p>
+
+<p>
+update global_variables set variable_value=262144 where variable_name='mysql-stacksize';<br>
+</p>
+
+<p>
+update global_variables set variable_value=1073741824 where variable_name='mysql-max_allowed_packet';<br>
+update global_variables set variable_value='false' where variable_name='mysql-log_unhealthy_connections';<br>
+</p>
+
+<p>
+update global_variables set variable_value=200 where variable_name='admin-cluster_check_interval_ms';<br>
+update global_variables set variable_value=100 where variable_name='admin-cluster_check_status_frequency';<br>
+</p>
+
+<p>
+update global_variables set variable_value='true' where variable_name='admin-cluster_mysql_query_rules_save_to_disk';<br>
+update global_variables set variable_value='true' where variable_name='admin-cluster_mysql_servers_save_to_disk';<br>
+update global_variables set variable_value='true' where variable_name='admin-cluster_mysql_users_save_to_disk';<br>
+update global_variables set variable_value='true' where variable_name='admin-cluster_proxysql_servers_save_to_disk';<br>
+</p>
+
+<p>
+update global_variables set variable_value=3 where variable_name='admin-cluster_mysql_query_rules_diffs_before_sync';<br>
+update global_variables set variable_value=3 where variable_name='admin-cluster_mysql_servers_diffs_before_sync';<br>
+update global_variables set variable_value=3 where variable_name='admin-cluster_mysql_users_diffs_before_sync';<br>
+update global_variables set variable_value=3 where variable_name='admin-cluster_proxysql_servers_diffs_before_sync';<br>
+</p>
+
+<p>
+load admin variables to RUNTIME;<br>
+save admin variables to disk;<br>
+</p>
+
+<p>
+load mysql variables to RUNTIME;<br>
+save mysql variables to disk;<br>
+</p>
+
+<p>
+添加MySQL读写组<br>
+</p>
+
+<p>
+INSERT INTO mysql_replication_hostgroups VALUES (1,2,'read_only','w r group');<br>
+</p>
+
+
+
+<p>
+添加MySQL servers<br>
+</p>
+
+<p>
+INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('172.41.52.74',1,3306,1);<br>
+INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('172.41.49.188',2,3306,1);<br>
+INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('172.41.56.75',2,3306,1);<br>
+</p>
+
+<p>
+load mysql servers to runtime;<br>
+</p>
+
+<p>
+save mysql servers to disk;<br>
+</p>
+
+
+
+<p>
+添加MySQL users<br>
+</p>
+
+<p>
+INSERT INTO mysql_users (username,password,active,default_hostgroup,default_schema) VALUES ('alibet','MLYNQG6j4^ODHJnv',1,1,'information_schema');<br>
+INSERT INTO mysql_users (username,password,active,default_hostgroup,default_schema) VALUES ('read_only','Agt@Fantasy#2021$readonly',1,2,'information_schema');<br>
+</p>
+
+<p>
+load mysql users to runtime;<br>
+</p>
+
+<p>
+save mysql users to memory;<br>
+</p>
+
+<p>
+save mysql users to disk;<br>
+</p>
+
+
+
+<p>
+3、添加到orchestrator<br>
+</p>
+
+<p>
+通过映射端口登陆orchestrator页面，填入ip获取集群<br>
+</p>
+
+<p>
+让只读库永远不升级为Master<br>
+</p>
+
+<p>
+继续往下添加/gamepind/devops/dba_script/orchestrator_must_not.sh<br>
+</p>
+
+<p>
+例如：<br>
+</p>
+
+<p>
+##fantasy日常<br>
+orchestrator-client -c register-candidate -i ip-172-41-49-188.ap-south-1.compute.internal &#x2013;promotion-rule prefer_not<br>
+</p>
+
+<p>
+4、 部署supervisor<br>
+</p>
+
+
+
+<p>
+sudo wget <a href="https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz">https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz</a><br>
+</p>
+
+<p>
+tar -zxvf supervisor-4.2.2.tar.gz<br>
+</p>
+
+<p>
+sudo mv supervisor-4.2.2  /usr/local/supervisor<br>
+</p>
+
+<p>
+cd <i>usr/local/supervisor</i><br>
+</p>
+
+<p>
+sudo python setup.py install<br>
+</p>
+
+<p>
+sudo -s<br>
+</p>
+
+<p>
+mkdir -p /etc/supervisor/conf.d<br>
+</p>
+
+<p>
+echo_supervisord_conf &gt; /etc/supervisor/supervisord.conf<br>
+</p>
+
+<p>
+sudo mkdir -p /gamepind/devops/nodexporter<br>
+</p>
+
+<p>
+sudo mkdir /gamepind/devops/mysqld_exporter<br>
+</p>
+
+
+
+
+
+<p>
+sudo vim /etc/supervisor/supervisord.conf<br>
+</p>
+
+<p>
+[unix_http_server]<br>
+</p>
+
+<p>
+file=/var/run/supervisor.sock<br>
+</p>
+
+<p>
+;chmod=0700<br>
+</p>
+
+<p>
+;chown=nobody:nobody<br>
+</p>
+
+
+
+<p>
+[supervisord]<br>
+</p>
+
+<p>
+logfile=/var/log/supervisord.log<br>
+</p>
+
+<p>
+logfile_maxbytes=50MB<br>
+</p>
+
+<p>
+logfile_backups=2<br>
+</p>
+
+<p>
+loglevel=info<br>
+</p>
+
+<p>
+pidfile=/var/run/supervisord.pid<br>
+</p>
+
+<p>
+nodaemon=false<br>
+</p>
+
+<p>
+minfds=65535<br>
+</p>
+
+<p>
+minprocs=200<br>
+</p>
+
+
+
+<p>
+; the below section must remain in the config file for RPC<br>
+</p>
+
+<p>
+; (supervisorctl/web interface) to work, additional interfaces may be<br>
+</p>
+
+<p>
+; added by defining them in separate rpcinterface: sections<br>
+</p>
+
+<p>
+[rpcinterface:supervisor]<br>
+</p>
+
+<p>
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface<br>
+</p>
+
+
+
+<p>
+[supervisorctl]<br>
+</p>
+
+<p>
+serverurl=unix:///var/run/supervisor.sock<br>
+</p>
+
+<p>
+#[inet_http_server]<br>
+</p>
+
+<p>
+#port=10.211.55.11:9001<br>
+</p>
+
+<p>
+#username=user<br>
+</p>
+
+<p>
+#password=123<br>
+</p>
+
+
+
+<p>
+[include]<br>
+</p>
+
+<p>
+files = /etc/supervisor/conf.d/*.conf<br>
+</p>
+
+
+
+
+
+<p>
+sudo vim /etc/supervisor/conf.d/mysqld_exporter.conf<br>
+</p>
+
+<p>
+[program:fantasy_daily_mysqld_master]<br>
+</p>
+
+<p>
+command =  /gamepind/devops/mysqld_exporter/mysqld_exporter &#x2013;collect.info_schema.query_response_time    &#x2013;collect.info_schema.tablestats &#x2013;collect.engine_innodb_status  &#x2013;collect.info_schema.schemastats &#x2013;collect.info_schema.processlist.processes_by_host<br>
+</p>
+
+<p>
+environment=DATA_SOURCE_NAME='prometheus_exporter:ascvf$$Wa#2Q4f@(127.0.0.1:3306)/'<br>
+</p>
+
+<p>
+user = root<br>
+</p>
+
+<p>
+autostart = true<br>
+</p>
+
+<p>
+autorestart = true<br>
+</p>
+
+<p>
+redirect_stderr=true<br>
+</p>
+
+<p>
+stdout_logfile_backups = 2<br>
+</p>
+
+<p>
+stdout_logfile = /gamepind/devops/mysqld_exporter/exporter.log<br>
+</p>
+
+
+
+
+
+<p>
+sudo vim /etc/supervisor/conf.d/node_exporter.conf<br>
+</p>
+
+
+
+<p>
+[program:node_exporter]<br>
+</p>
+
+<p>
+command = /gamepind/devops/nodexporter/node_exporter &#x2013;collector.tcpstat &#x2013;collector.filesystem.ignored-fs-types="^(autofs|cgroup2?|configfs|debugfs|devpts|tmpfs|fusectl|hugetlbfs|mqueue)$"<br>
+</p>
+
+<p>
+user = root<br>
+</p>
+
+<p>
+autostart = true<br>
+</p>
+
+<p>
+autorestart = true<br>
+</p>
+
+<p>
+redirect_stderr=true<br>
+</p>
+
+<p>
+stdout_logfile_backups = 2<br>
+</p>
+
+<p>
+stdout_logfile = /gamepind/devops/nodexporter/node_exporter.log<br>
+</p>
+
+
+
+
+
+
+
+<p>
+sudo supervisord -c /etc/supervisor/supervisord.conf<br>
+</p>
+
+<p>
+sudo supervisorctl  status all<br>
+</p>
+
+
+<p>
+[root@ip-172-21-39-187 nodexporter]# cat /usr/lib/systemd/system/supervisor.service<br>
+[Unit]<br>
+Description=Supervisor process control system for UNIX<br>
+Documentation=<a href="http://supervisord.org">http://supervisord.org</a><br>
+After=network.target<br>
+</p>
+
+<p>
+[Service]<br>
+ExecStart=/usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf<br>
+ExecStop=/usr/bin/supervisorctl $OPTIONS shutdown<br>
+ExecReload=/usr/bin/supervisorctl -c /etc/supervisor/supervisord.conf $OPTIONS reload<br>
+KillMode=process<br>
+Restart=on-failure<br>
+RestartSec=50s<br>
+</p>
+
+<p>
+[Install]<br>
+WantedBy=multi-user.target<br>
+</p>
+
+
+
+
+
+
+
+<p>
+5、部署mysqld_exporter<br>
+</p>
+
+<p>
+sudo mv mysqld_exporter <i>gamepind/devops/mysqld_exporter</i><br>
+</p>
+
+
+
+
+
+<p>
+6、部署node_exporter<br>
+</p>
+
+<p>
+sudo mv node_exporter <i>gamepind/devops/nodexporter</i><br>
+</p>
+
+
+
+
+
+<p>
+7、部署proxysql_exporter<br>
+</p>
+
+<p>
+sudo mkdir  /gamepind/devops/proxysqlexporter<br>
+</p>
+
+<p>
+sudo cp proxysql_exporter <i>gamepind/devops/proxysqlexporter</i><br>
+</p>
+
+
+
+<p>
+sudo vim /etc/supervisor/conf.d/proxysql_exporter.conf<br>
+</p>
+
+<p>
+[program:proxysql_exporter]<br>
+command = /gamepind/devops/proxysqlexporter/proxysql_exporter<br>
+user = root<br>
+autostart = true<br>
+autorestart = true<br>
+redirect_stderr=true<br>
+stdout_logfile_backups = 2<br>
+stdout_logfile = /gamepind/devops/proxysqlexporter/proxysql_exporter.log<br>
+</p>
+
+
+
+<p>
+sudo supervisorctl update<br>
+</p>
+
+
+
+<p>
+验证数据一致性<br>
+</p>
+
+<p>
+停服后 show full processlist;<br>
+</p>
+
+<p>
+show master status;观察binlog postition<br>
+</p>
+
+<p>
+select substring_index(host,':',1) IP,user,count(<b>) count from information_schema.PROCESSLIST GROUP BY substring_index(host,':',1),user ORDER BY count(</b>) DESC;<br>
+</p>
+
+
+
+<p>
+RDS<br>
+</p>
+
+<p>
+mysql -h agt-fantasy-prod-fantayslr-rds.co7izkdw11dl.ap-south-1.rds.amazonaws.com -u -p -Ne "select concat(table_schema,'.',table_name) from information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema','meta')" &gt; database.txt<br>
+</p>
+
+<p>
+bash  tablecount.sh &gt; tablecountrds.txt<br>
+</p>
+
+
+
+<p>
+自建<br>
+mysql -h172.41.9.163 -u -p -Ne "select concat(table_schema,'.',table_name) from information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema','meta')" &gt; database.txt<br>
+</p>
+
+<p>
+bash  tablecount.sh &gt; tablecount.txt<br>
+</p>
+
+
+
+<p>
+diff tablecountrds.txt tablecount.txt<br>
+</p>
+
+
+
+<p>
+回写验证<br>
+</p>
+
+<p>
+use testfordts<br>
+</p>
+
+<p>
+insert into student values (7,'zyx');<br>
+update student set name='super' where id=7;<br>
+delete from student where id=7;<br>
+</p>
+
+
+
+
+
+<p>
+tablecount.sh脚本<br>
+</p>
+
+<p>
+#!/bin/bash<br>
+</p>
+
+<p>
+for i in `cat ./database.txt`<br>
+</p>
+
+<p>
+do<br>
+</p>
+
+<p>
+##fantasylr<br>
+</p>
+
+<p>
+echo $i<br>
+</p>
+
+<p>
+mysql -hagt-fantasy-prod-fantayslr-rds.co7izkdw11dl.ap-south-1.rds.amazonaws.com -uxxxxxx -p'xxxxxx' -Ne"select count(*) from $i"<br>
+</p>
+
+
+
+<p>
+done<br>
+</p>
+
+
+
+<p>
+检查参数<br>
+</p>
+
+<p>
+select @@binlog_format,@@binlog_row_image,@@explicit_defaults_for_timestamp,@@innodb_file_format,@@innodb_large_prefix,@@lower_case_table_names,@@tx_isolation,@@time_zone,@@innodb_sync_array_size,@@max_connections,@@max_user_connections;<br>
+</p>
+
+
+
+<p>
+readonly服务器安装xtrabackup<br>
+</p>
+
+<p>
+yum -y install perl perl-devel libaio libaio-devel perl-Time-HiRes perl-DBD-MySQL perl-DBI perl-IO-Socket-SSL.noarch perl-TermReadKey perl-Digest-MD5 perl-ExtUtils-MakeMaker<br>
+</p>
+
+<p>
+percona-xtrabackup-2.4.16-Linux-x86_64.libgcrypt153.tar.gz<br>
+</p>
+
+
+
+<p>
+sudo wget <a href="https://repo.percona.com/yum/release/7/RPMS/x86_64/qpress-11-1.el7.x86_64.rpm">https://repo.percona.com/yum/release/7/RPMS/x86_64/qpress-11-1.el7.x86_64.rpm</a><br>
+</p>
+
+<p>
+sudo yum -y install qpress-11-1.el7.x86_64.rpm<br>
+</p>
+
+
+
+
+
+
+
+<p>
+备份<br>
+</p>
+
+<p>
+sudo mkdir /mysqlback/bakscript /mysqlback/checkpoint /mysqlback/mysql_backup<br>
+</p>
+
+<p>
+sudo chown -R centos:centos <i>mysqlback</i><br>
+</p>
+
+
+
+<p>
+30 03 * * * /bin/bash /mysqlback/bakscript/db_bak.sh 2&gt;&amp;1 &gt;/dev/null<br>
+</p>
+
+<p>
+#!/bin/bash<br>
+</p>
+
+<p>
+USER='xxxxxxxx'<br>
+</p>
+
+<p>
+HOST='xxxxxxxxx'<br>
+</p>
+
+<p>
+PORT=3306<br>
+</p>
+
+<p>
+TODAY=`date +%F`<br>
+</p>
+
+<p>
+WEEK=`date +%w`<br>
+</p>
+
+<p>
+YESTERDAY=`date -d '-1 day' +%F`<br>
+</p>
+
+<p>
+sudo <i>usr/local/src/percona-xtrabackup-2.4.16-Linux-x86_64/bin/innobackupex  &#x2013;defaults-file=/etc/my.cnf &#x2013;no-timestamp &#x2013;user=$USER &#x2013;password='xxxxxxx' &#x2013;host=$HOST &#x2013;port=$PORT  &#x2013;no-version-check &#x2013;ftwrl-wait-timeout=30 &#x2013;slave-info &#x2013;parallel=2 &#x2013;compress &#x2013;compress-threads=2  &#x2013;tmpdir=/mysqlback &#x2013;extra-lsndir=/mysqlback/checkpoint/$TODAY /mysqlback/mysql_backup</i> &#x2013;stream=xbstream 2&gt;/mysqlback/db_bak.log |cat - &gt; /mysqlback/mysql_backup/payment2full$TODAY.xbstream.gz<br>
+</p>
+
+
+
+
+
+<p>
+/usr/local/bin/aws s3 cp /mysqlback/mysql_backup/xxxxxxxfull$TODAY.xbstream.gz s3://agt-fantasy-prod-s3-mysql-self-log/mysqlbakup/fantasylr/xxxxxxxfull$TODAY.xbstream.gz</p>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

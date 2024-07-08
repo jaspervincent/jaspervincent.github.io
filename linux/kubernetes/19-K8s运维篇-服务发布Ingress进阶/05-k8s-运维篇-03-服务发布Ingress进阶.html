@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>k8s 运维篇-服务发布Ingress进阶</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        displayAlign: "center",
+        displayIndent: "0em",
+
+        "HTML-CSS": { scale: 100,
+                        linebreaks: { automatic: "false" },
+                        webFont: "TeX"
+                       },
+        SVG: {scale: 100,
+              linebreaks: { automatic: "false" },
+              font: "TeX"},
+        NativeMML: {scale: 100},
+        TeX: { equationNumbers: {autoNumber: "AMS"},
+               MultLineWidth: "85%",
+               TagSide: "right",
+               TagIndent: ".8em"
+             }
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">k8s 运维篇-服务发布Ingress进阶</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgd6c61af">k8s 运维篇-服务发布Ingress进阶</a>
+<ul>
+<li><a href="#org35c801c">ingress 服务发布架构</a>
+<ul>
+<li><a href="#org01bb1e6">Ingress 生产级高可用架构</a></li>
+<li><a href="#org0f61a65">Ingress-nginx和Nginx-ingress的区别</a></li>
+</ul>
+</li>
+<li><a href="#org6b5d8b5">Ingress 安装</a>
+<ul>
+<li><a href="#orgd542e14">Ingress v1 和 v1beta1 区别</a></li>
+</ul>
+</li>
+<li><a href="#org9da0d5e">Ingress Redirect 新旧域名替换</a></li>
+<li><a href="#org5d55147">Ingress Rewrite 实现前后端分离</a></li>
+<li><a href="#orgadd0967">Inggress 错误代码友好页面</a></li>
+<li><a href="#org83ed117">Ingress 实现 https 访问</a></li>
+<li><a href="#org4efd4ca">Ingress 区分手机端和 PC 端</a></li>
+<li><a href="#orgd1454fe">Ingress 基本认证</a></li>
+<li><a href="#orgd33873a">Ingress 实现黑白名单</a>
+<ul>
+<li><a href="#orgc5b7228">白名单配置（建议使用Annotations）</a></li>
+<li><a href="#org890450f">黑名单设置（建议使用ConfigMap）（这是全局生效的）</a></li>
+<li><a href="#org7f937a8">针对某个域名设置黑名单&#x2013;snippet</a></li>
+</ul>
+</li>
+<li><a href="#orgae1b15d">Ingress 访问速率限制</a></li>
+<li><a href="#orgbbceaf4">Ingress 实现灰度发布/金丝雀发布</a>
+<ul>
+<li>
+<ul>
+<li><a href="#org58dabf1">准备2个svc，用于演示</a></li>
+<li><a href="#org39337dd">开启基于ingress的灰度发布</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org1e2f720">Ingress Nginx 自定义错误页</a></li>
+<li><a href="#org4f4d8d9">Ingress Nginx 监控</a></li>
+<li><a href="#org2d78b23">演示</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a><br></li>
+</ul>
+
+<section id="outline-container-orgd6c61af" class="outline-2">
+<h2 id="orgd6c61af">k8s 运维篇-服务发布Ingress进阶</h2>
+<div class="outline-text-2" id="text-orgd6c61af">
+<p>
+最常用的配置<br>
+</p>
+<ul class="org-ul">
+<li>通过域名发布服务<br></li>
+<li>前后端分离<br></li>
+<li>区分手机端和 pc 端<br></li>
+</ul>
+</div>
+
+<div id="outline-container-org35c801c" class="outline-3">
+<h3 id="org35c801c">ingress 服务发布架构</h3>
+<div class="outline-text-3" id="text-org35c801c">
+<ul class="org-ul">
+<li>传统架构<br>
+<ul class="org-ul">
+<li>浏览器访问 baidu.com<br></li>
+<li>dns 解析：解析成1.1.1.1<br></li>
+<li>dmz: 入口网关<br></li>
+<li>内网负载均衡：内网负载均衡/nginx/SLB<br></li>
+<li>程序：web/java/go<br></li>
+</ul></li>
+
+<li>kubernetes<br>
+<ul class="org-ul">
+<li>浏览器访问 baidu.com<br></li>
+<li>dns 解析：解析成1.1.1.1<br></li>
+<li>dmz: 入口网关<br></li>
+<li>ingress controller: nginx/haproxy/treafik  相当于内网负载均衡<br></li>
+<li>Service<br></li>
+<li>Pod：web/java/go<br></li>
+</ul></li>
+</ul>
+
+<p>
+Ingress 组成<br>
+</p>
+
+<ul class="org-ul">
+<li>Kubernetes<br>
+<ul class="org-ul">
+<li>Kind: ingress  相当于传统架构 nginx.conf<br></li>
+<li>Ingress Controller  相当于传统架构 nginx<br></li>
+</ul></li>
+</ul>
+</div>
+
+<div id="outline-container-org01bb1e6" class="outline-4">
+<h4 id="org01bb1e6">Ingress 生产级高可用架构</h4>
+<div class="outline-text-4" id="text-org01bb1e6">
+
+<figure id="org28b6907">
+<img src="./images/Snipaste_2022-12-29_06-55-56.png" alt="Snipaste_2022-12-29_06-55-56.png"><br>
+
+</figure>
+
+<p>
+方式1 推荐<br>
+Pod 使用 HostNetwork 直接使用缩主机网络，不依赖云厂商<br>
+方式2：<br>
+Ingress Service loadbalancer 需要云厂商支持<br>
+访问3：<br>
+Alb 直接到业务 Pod  需要云厂商支持，不依赖 ingress<br>
+方式4：<br>
+Alb 到ingress controller pod  需要云厂商支持，可做内网 nginx<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0f61a65" class="outline-4">
+<h4 id="org0f61a65">Ingress-nginx和Nginx-ingress的区别</h4>
+<div class="outline-text-4" id="text-org0f61a65">
+<p>
+ingress-nginx  k8s 官方文档：<a href="https://kubernetes.github.io/ingress-nginx/deploy/">https://kubernetes.github.io/ingress-nginx/deploy/</a><br>
+nginx-ingress nginx 官方提供 <a href="https://github.com/nginxinc/kubernetes-ingress">https://github.com/nginxinc/kubernetes-ingress</a><br>
+</p>
+
+
+
+<p>
+部署建议：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">DaemonSet&#23433;&#35013;&#65292;&#25214;&#20960;&#21488;&#19987;&#38376;&#30340;&#26381;&#21153;&#22120;&#36827;&#34892;&#37197;&#32622;ingress (&#22914;&#26524;&#27809;&#26377;&#30340;&#36275;&#22815;&#30340;&#36164;&#28304;&#65292;&#23601;&#35774;&#32622;QoS&#65292;&#20445;&#35777;ingress&#26368;&#21518;&#21024;&#38500;&#30340;&#37027;&#20010;&#31574;&#30053;)
+hostNetwork: true  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#36825;&#20010;&#35774;&#32622;&#20026;true</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+
+
+<div id="outline-container-org6b5d8b5" class="outline-3">
+<h3 id="org6b5d8b5">Ingress 安装</h3>
+<div class="outline-text-3" id="text-org6b5d8b5">
+<p>
+按需修改<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.5.1/deploy/static/provider/cloud/deploy.yaml
+</pre>
+</div>
+
+<p>
+如果按方式1修改：<br>
+</p>
+<ul class="org-ul">
+<li>hostNetwork 为 true<br></li>
+<li>dnsPolicy 设置为 ClusterFirstWithHostNet<br></li>
+<li>NodeSelector 绑定指定标签节点<br></li>
+<li>类型更改为 kind: DaemonSet<br></li>
+<li>设置 ingressClass<br></li>
+</ul>
+</div>
+
+
+<div id="outline-container-orgd542e14" class="outline-4">
+<h4 id="orgd542e14">Ingress v1 和 v1beta1 区别</h4>
+<div class="outline-text-4" id="text-orgd542e14">
+<p>
+创建一个简单的ingress实例<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 500M
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/server-snippet: |
+	location ~* /api/actuator {
+	    deny all;
+	}
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+	add_header Strict-Transport-Security 'max-age=31536000; includeSubDomains;' always;
+  name: taskcenter-cms-nginx
+  namespace: taskcenter
+spec:
+  rules:
+  - host: xxl-job-prod.xx.com
+    http:
+      paths:
+      - path: /
+	#pathType: ImplementationSpecific
+	pathType: Prefix
+	backend:
+	  service:
+	    name: xxl-job
+	    port:
+	      number: 8080
+</pre>
+</div>
+
+<p>
+1.12版本前<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: extensions/v1
+kind: Ingress
+metadata:
+  name: ingress-test
+  namespace: ratel-test1
+spec:
+  rules:
+  - host: ingress.test.com
+    http:
+      paths:
+      - backend:
+          serviceName: ingress-test   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20195;&#29702;&#21517;&#23383;&#20026;ingress-test</span>
+          servicePort: 80             <span style="color: #b22222;"># </span><span style="color: #b22222;">port&#20026;80&#30340;svc</span>
+        path: /
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;ingress</span>
+kubectl create -f ingress-demo.yaml
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org9da0d5e" class="outline-3">
+<h3 id="org9da0d5e">Ingress Redirect 新旧域名替换</h3>
+<div class="outline-text-3" id="text-org9da0d5e">
+<p>
+ingress 配置说明：<a href="https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/">https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/</a><br>
+</p>
+<ul class="org-ul">
+<li>configmap 全局生效<br></li>
+<li>ingress 中的 annotations 对当前的 ingress 生产，可覆盖 configmap 配置。<br></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+items:
+- apiVersion: extensions/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      nginx.ingress.kubernetes.io/permanent-redirect: https://www.baidu.com   <span style="color: #b22222;"># </span><span style="color: #b22222;">301&#37325;&#23450;&#21521;&#21040;&#24819;&#21435;&#30340;url</span>
+    name: ingress-test
+    namespace: ratel-test1
+  spec:
+    rules:
+    - host: ingress.test.com
+      http:
+        paths:
+        - backend:
+            serviceName: ingress-test
+            servicePort: 80
+          path: /
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;ingress</span>
+kubectl edit ingress-demo.yaml
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">entry &#23481;&#22120;&#26597;&#30475;</span>
+kubectl get po -n ingress-nginx
+kubectl exec -it nginx-ingress-controller-b2442 -n ingress-nginx -- bash
+cat /etc/nginx/nginx.conf
+</pre>
+</div>
+
+<p>
+修改状态码使用 `nginx.ingress.kubernetes.io/permanent-redirect-code: '308'`<br>
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-org5d55147" class="outline-3">
+<h3 id="org5d55147">Ingress Rewrite 实现前后端分离</h3>
+<div class="outline-text-3" id="text-org5d55147">
+<p>
+使用场景：<br>
+www.baidu.com<br>
+</p>
+<ul class="org-ul">
+<li>/ 能访问到 web 访问路径: /<br></li>
+<li>/api-a 报404 因为 backend-a 访问路径：/api<br></li>
+<li>/api-b 报404 因为 backend-b 访问路径：/api<br></li>
+</ul>
+
+
+<p>
+将/something 重写为/:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ echo <span style="color: #8b2252;">'</span>
+<span style="color: #8b2252;">apiVersion: networking.k8s.io/v1</span>
+<span style="color: #8b2252;">kind: Ingress</span>
+<span style="color: #8b2252;">metadata:</span>
+<span style="color: #8b2252;">  annotations:</span>
+<span style="color: #8b2252;">    nginx.ingress.kubernetes.io/rewrite-target: /$2</span>
+<span style="color: #8b2252;">  name: rewrite</span>
+<span style="color: #8b2252;">  namespace: default</span>
+<span style="color: #8b2252;">spec:</span>
+<span style="color: #8b2252;">  ingressClassName: nginx</span>
+<span style="color: #8b2252;">  rules:</span>
+<span style="color: #8b2252;">  - host: rewrite.bar.com</span>
+<span style="color: #8b2252;">    http:</span>
+<span style="color: #8b2252;">      paths:</span>
+<span style="color: #8b2252;">      - path: /something(/|$)(.*)</span>
+<span style="color: #8b2252;">        pathType: Prefix</span>
+<span style="color: #8b2252;">        backend:</span>
+<span style="color: #8b2252;">          service:</span>
+<span style="color: #8b2252;">            name: http-svc</span>
+<span style="color: #8b2252;">            port: </span>
+<span style="color: #8b2252;">              number: 80</span>
+<span style="color: #8b2252;">'</span> | kubectl create -f -
+</pre>
+</div>
+
+
+<p>
+浏览器访问<br>
+<a href="http://rewrite.bar.com/something">http://rewrite.bar.com/something</a>  跳转到/<br>
+</p>
+
+<p>
+注意：多个域名都需要 rewrite 可以写在同一个 ingress 文件中，反之有不需要 rewrite 的域名单独一个 ingress<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgadd0967" class="outline-3">
+<h3 id="orgadd0967">Inggress 错误代码友好页面</h3>
+<div class="outline-text-3" id="text-orgadd0967">
+<p>
+`nginx.ingress.kubernetes.io/custom-http-errors: "404,415"`<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org83ed117" class="outline-3">
+<h3 id="org83ed117">Ingress 实现 https 访问</h3>
+<div class="outline-text-3" id="text-org83ed117">
+<p>
+生产环境中，证书一般放在访问环节中的最外层 DMZ 网关，如 F5/slb/lvs/haproxy。<br>
+</p>
+
+<p>
+官网：<a href="https://kubernetes.github.io/ingress-nginx/user-guide/tls/">https://kubernetes.github.io/ingress-nginx/user-guide/tls/</a><br>
+</p>
+
+<p>
+生成本地证书,生产环境，用购买的。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ${<span style="color: #a0522d;">KEY_FILE</span>} -out ${<span style="color: #a0522d;">CERT_FILE</span>} -subj <span style="color: #8b2252;">"/CN=${HOST}/O=${HOST}"</span>
+
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls-key -out tls.cert -subj <span style="color: #8b2252;">"/CN=test-tls.test.com/O=test-tls.test.com"</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">create the secret in the cluster via</span>
+kubectl create secret tls ca-cert --key tls.key --cert tls.cert -n ratel-test1
+</pre>
+</div>
+
+<p>
+禁用https强制跳转<br>
+</p>
+
+<p>
+`nginx.ingress.kubernetes.io/ssl-redirect: "false"`<br>
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">'</span>
+<span style="color: #8b2252;">apiVersion: networking.k8s.io/v1</span>
+<span style="color: #8b2252;">kind: Ingress</span>
+<span style="color: #8b2252;">metadata:</span>
+<span style="color: #8b2252;">  annotations:</span>
+<span style="color: #8b2252;">    #kubernetes.io/ingress.class: nginx-example</span>
+<span style="color: #8b2252;">    nginx.ingress.kubernetes.io/ssl-redirect: "false"   # &#31105;&#29992;https&#24378;&#21046;&#36339;&#36716;</span>
+<span style="color: #8b2252;">  name: tls-example-ingress</span>
+<span style="color: #8b2252;">spec:</span>
+<span style="color: #8b2252;">  ingressClassName: nginx-example</span>
+<span style="color: #8b2252;">  tls:</span>
+<span style="color: #8b2252;">  - hosts:</span>
+<span style="color: #8b2252;">      - https-example.foo.com</span>
+<span style="color: #8b2252;">    secretName: testsecret-tls</span>
+<span style="color: #8b2252;">  rules:</span>
+<span style="color: #8b2252;">  - host: https-example.foo.com</span>
+<span style="color: #8b2252;">    http:</span>
+<span style="color: #8b2252;">      paths:</span>
+<span style="color: #8b2252;">      - path: /</span>
+<span style="color: #8b2252;">        pathType: Prefix</span>
+<span style="color: #8b2252;">        backend:</span>
+<span style="color: #8b2252;">          service:</span>
+<span style="color: #8b2252;">            name: service1</span>
+<span style="color: #8b2252;">            port:</span>
+<span style="color: #8b2252;">              number: 80</span>
+<span style="color: #8b2252;">'</span> | kubectl create -f -
+</pre>
+</div>
+
+<p>
+1.22 版本以上有 secretName  需要加 ingressClassName ，没有则使用默认的<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+  name: nginx-example
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: extensions/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: <span style="color: #8b2252;">"false"</span>   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#31105;&#29992;https&#24378;&#21046;&#36339;&#36716;</span>
+  generation: 1
+  name: test-tls
+  namespace: ratel-test1
+spec:
+  rules:
+  - host: test-tls.test.com
+    http:
+      paths:
+      - backend:
+          serviceName: ingress-test
+          servicePort: 80
+        path: /
+  tls:
+  - hosts:
+    - test-tls.test.com
+    secretName: ca-cert
+
+</pre>
+</div>
+
+<p>
+设置默认证书：&#x2013;default-ssl-certificate=default/foo-tls<br>
+更改的ingress-controller的启动参数<br>
+</p>
+
+
+
+<p>
+Dashboard自定义证书<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">containers:
+- args:
+  - --auto-generate-certificates=false
+  - --tls-key-file=server.key
+  - --tls-cert-file=server.pem
+  - --token-ttl=21600
+  - --authentication-mode=basic,token
+  - --namespace=kubernetes-dashboard
+  image: kubernetesui/dashboard:v2.0.0-rc5
+  imagePullPolicy: Always
+
+  volumeMounts:
+  - mountPath: /certs
+    name: kubernetes-dashboard-new
+  - mountPath: /tmp
+    name: tmp-volume
+
+volumes:
+- name: kubernetes-dashboard-new
+  secret:
+    defaultMode: 420
+    secretName: kubernetes-dashboard-new
+- emptyDir: {}
+  name: tmp-volume
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org4efd4ca" class="outline-3">
+<h3 id="org4efd4ca">Ingress 区分手机端和 PC 端</h3>
+<div class="outline-text-3" id="text-org4efd4ca">
+<div class="org-src-container">
+<pre class="src src-yaml">nginx.ingress.kubernetes.io/server-snippet: |
+  set $agentflag 0;
+  if ($http_user_agent ~* "(Android|iPhone|Windows|Phone|UC|Kindel)"){
+    set $agentflag 1;
+  }
+  if ($agentflab = 1){
+    return 301 http://m.test.com;
+  }
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd1454fe" class="outline-3">
+<h3 id="orgd1454fe">Ingress 基本认证</h3>
+<div class="outline-text-3" id="text-orgd1454fe">
+<p>
+文档：<a href="https://kubernetes.github.io/ingress-nginx/examples/auth/basic/">https://kubernetes.github.io/ingress-nginx/examples/auth/basic/</a><br>
+</p>
+
+<p>
+同样我们还可以在 Ingress Controller 上面配置一些基本的 Auth 认证，比如 Basic Auth，可以用 htpasswd 生成一个密码文件来验证身份验证。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# htpasswd -c auth foo   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#36134;&#21495;foo   &#23494;&#30721; 123456   </span>
+New password:              <span style="color: #b22222;"># </span><span style="color: #b22222;">123456</span>
+Re-type new password:      <span style="color: #b22222;"># </span><span style="color: #b22222;">123456</span>
+Adding password for user foo
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#19968;&#20010;auth&#25991;&#20214;</span>
+[root@k8s-master01 ~]# ls auth
+auth
+</pre>
+</div>
+
+<p>
+然后根据上面的 auth 文件创建一个 secret 对象：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl create secret generic basic-auth --from-file=auth
+secret/basic-auth created
+[root@k8s-master01 ~]# kubectl get secret basic-auth -o yaml
+apiVersion: v1
+data:
+  auth: Zm9vOiRhcHIxJGZzREw0b0xmJHNuUUNDTFkxbTE2N1BkNUdEMHIwcC8K
+kind: Secret
+metadata:
+  name: basic-auth
+  namespace: default
+<span style="color: #483d8b;">type</span>: Opaque
+</pre>
+</div>
+
+<p>
+然后对上面的 my-nginx 应用创建一个具有 Basic Auth 的 Ingress 对象：<br>
+</p>
+
+<p>
+#+end_srcyaml<br>
+apiVersion: extensions/v1beta1<br>
+kind: Ingress<br>
+metadata:<br>
+  name: ingress-with-auth<br>
+  annotations:<br>
+</p>
+
+<p>
+nginx.ingress.kubernetes.io/auth-type: basic<br>
+</p>
+
+<p>
+nginx.ingress.kubernetes.io/auth-secret: basic-auth<br>
+</p>
+
+<p>
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - foo'<br>
+spec:<br>
+  rules:<br>
+</p>
+<ul class="org-ul">
+<li>host: foo.bar.com<br>
+http:<br>
+  paths:<br>
+<ul class="org-ul">
+<li>path: /<br>
+backend:<br>
+  serviceName: my-nginx<br>
+  servicePort: 80<br></li>
+</ul></li>
+</ul>
+<p>
+#+end_src<br>
+</p>
+
+<p>
+直接创建上面的资源对象，然后通过下面的命令或者在浏览器中直接打开配置的域名：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">&#10140; curl -v http://k8s.qikqiak.com -H <span style="color: #8b2252;">'Host: foo.bar.com'</span>
+<span style="color: #8b2252;">'* Rebuilt URL to: http://k8s.qikqiak.com/</span>
+<span style="color: #8b2252;">'</span>*   Trying 123.59.188.12...
+<span style="color: #8b2252;">'* TCP_NODELAY set</span>
+<span style="color: #8b2252;">'</span>* Connected to k8s.qikqiak.com (123.59.188.12) port 80 (<span style="color: #b22222;">#</span><span style="color: #b22222;">0)</span>
+&gt; GET / HTTP/1.1
+&gt; Host: foo.bar.com
+&gt; User-Agent: curl/7.54.0
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 401 Unauthorized
+&lt; Server: openresty/1.15.8.2
+&lt; Date: Sun, 08 Dec 2019 06:44:35 GMT
+&lt; Content-Type: text/html
+&lt; Content-Length: 185
+&lt; Connection: keep-alive
+&lt; WWW-Authenticate: Basic <span style="color: #a0522d;">realm</span>=<span style="color: #8b2252;">"Authentication Required - foo"</span>
+&lt;
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;401 Authorization Required&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;center&gt;&lt;h1&gt;401 Authorization Required&lt;/h1&gt;&lt;/center&gt;
+&lt;hr&gt;&lt;center&gt;openresty/1.15.8.2&lt;/center&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<p>
+我们可以看到出现了 401 认证失败错误，然后带上我们配置的用户名和密码进行认证：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">&#10140; curl -v http://k8s.qikqiak.com -H <span style="color: #8b2252;">'Host: foo.bar.com'</span> -u <span style="color: #8b2252;">'foo:foo'</span>
+<span style="color: #8b2252;">'* Rebuilt URL to: http://k8s.qikqiak.com/</span>
+<span style="color: #8b2252;">'</span>*   Trying 123.59.188.12...
+<span style="color: #8b2252;">'* TCP_NODELAY set</span>
+<span style="color: #8b2252;">'</span>* Connected to k8s.qikqiak.com (123.59.188.12) port 80 (<span style="color: #b22222;">#</span><span style="color: #b22222;">0)</span>
+<span style="color: #8b2252;">'* Server auth using Basic with user '</span>foo<span style="color: #8b2252;">'</span>
+<span style="color: #8b2252;">&gt; GET / HTTP/1.1</span>
+<span style="color: #8b2252;">&gt; Host: foo.bar.com</span>
+<span style="color: #8b2252;">&gt; Authorization: Basic Zm9vOmZvbw==</span>
+<span style="color: #8b2252;">&gt; User-Agent: curl/7.54.0</span>
+<span style="color: #8b2252;">&gt; Accept: */*</span>
+<span style="color: #8b2252;">&gt;</span>
+<span style="color: #8b2252;">&lt; HTTP/1.1 200 OK</span>
+<span style="color: #8b2252;">&lt; Server: openresty/1.15.8.2</span>
+<span style="color: #8b2252;">&lt; Date: Sun, 08 Dec 2019 06:46:27 GMT</span>
+<span style="color: #8b2252;">&lt; Content-Type: text/html</span>
+<span style="color: #8b2252;">&lt; Content-Length: 612</span>
+<span style="color: #8b2252;">&lt; Connection: keep-alive</span>
+<span style="color: #8b2252;">&lt; Vary: Accept-Encoding</span>
+<span style="color: #8b2252;">&lt; Last-Modified: Tue, 19 Nov 2019 12:50:08 GMT</span>
+<span style="color: #8b2252;">&lt; ETag: "5dd3e500-264"</span>
+<span style="color: #8b2252;">&lt; Accept-Ranges: bytes</span>
+<span style="color: #8b2252;">&lt;</span>
+<span style="color: #8b2252;">&lt;!DOCTYPE html&gt;</span>
+<span style="color: #8b2252;">&lt;html&gt;</span>
+<span style="color: #8b2252;">&lt;head&gt;</span>
+<span style="color: #8b2252;">&lt;title&gt;Welcome to nginx!&lt;/title&gt;</span>
+<span style="color: #8b2252;">&lt;style&gt;</span>
+<span style="color: #8b2252;">    body {</span>
+<span style="color: #8b2252;">        width: 35em;</span>
+<span style="color: #8b2252;">        margin: 0 auto;</span>
+<span style="color: #8b2252;">        font-family: Tahoma, Verdana, Arial, sans-serif;</span>
+<span style="color: #8b2252;">    }</span>
+<span style="color: #8b2252;">&lt;/style&gt;</span>
+<span style="color: #8b2252;">&lt;/head&gt;</span>
+<span style="color: #8b2252;">&lt;body&gt;</span>
+<span style="color: #8b2252;">&lt;h1&gt;Welcome to nginx!&lt;/h1&gt;</span>
+<span style="color: #8b2252;">&lt;p&gt;If you see this page, the nginx web server is successfully installed and</span>
+<span style="color: #8b2252;">working. Further configuration is required.&lt;/p&gt;</span>
+
+<span style="color: #8b2252;">&lt;p&gt;For online documentation and support please refer to</span>
+<span style="color: #8b2252;">&lt;a href="http://nginx.org/"&gt;nginx.org&lt;/a&gt;.&lt;br/&gt;</span>
+<span style="color: #8b2252;">Commercial support is available at</span>
+<span style="color: #8b2252;">&lt;a href="http://nginx.com/"&gt;nginx.com&lt;/a&gt;.&lt;/p&gt;</span>
+
+<span style="color: #8b2252;">&lt;p&gt;&lt;em&gt;Thank you for using nginx.&lt;/em&gt;&lt;/p&gt;</span>
+<span style="color: #8b2252;">&lt;/body&gt;</span>
+<span style="color: #8b2252;">&lt;/html&gt;</span>
+</pre>
+</div>
+
+<p>
+可以看到已经认证成功了。当然出来 Basic Auth 这一种简单的认证方式之外，NGINX Ingress Controller 还支持一些其他高级的认证，比如 OAUTH 认证之类的。<br>
+</p>
+</div>
+</div>
+
+
+
+<div id="outline-container-orgd33873a" class="outline-3">
+<h3 id="orgd33873a">Ingress 实现黑白名单</h3>
+<div class="outline-text-3" id="text-orgd33873a">
+<ul class="org-ul">
+<li>黑名单：拒绝某段IP访问<br></li>
+<li>白名单：只允许某段IP访问<br></li>
+<li>Annotations：只对指定的ingress生效<br></li>
+<li>ConfigMap：全局生效<br></li>
+</ul>
+
+<p>
+<b>黑名单可以使用ConfigMap去配置，白名单建议使用Annotations去配置</b><br>
+</p>
+</div>
+
+
+
+<div id="outline-container-orgc5b7228" class="outline-4">
+<h4 id="orgc5b7228">白名单配置（建议使用Annotations）</h4>
+<div class="outline-text-4" id="text-orgc5b7228">
+<p>
+#+end_srcyaml<br>
+</p>
+
+<p>
+annotations:<br>
+  nginx.ingress.kubernetes.io/whitelist-source-range 10.0.0.0/24,172.10.0.1  # 后面可以跟一个或者多个IP<br>
+#+end_src<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org890450f" class="outline-4">
+<h4 id="org890450f">黑名单设置（建议使用ConfigMap）（这是全局生效的）</h4>
+<div class="outline-text-4" id="text-org890450f">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#22240;&#20026;&#40657;&#21517;&#21333;&#21487;&#33021;&#20250;&#19981;&#23450;&#26102;&#21152;&#19978;&#21435;&#65292;&#38450;&#27490;&#24694;&#24847;&#25915;&#20987;&#30340;&#12290;&#25152;&#20197;&#29992;ConfigMap&#65288;&#28909;&#26356;&#26032;&#65289;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#26356;&#25913;ingress-nginx&#30340;cm</span>
+[root@k8s-master01 ~]#  kubectl edit  cm -n ingress-nginx ingress-nginx-controller -oyaml
+apiVersion: v1
+data:                          <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21152;&#19978;data</span>
+  block-cidrs: 192.168.1.201   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21152;&#19978;block-cidrs&#65292;&#21518;&#38754;&#20063;&#21487;&#20197;&#36319;&#22810;&#20010;IP&#65292;&#38548;&#24320;</span>
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: ingress-nginx
+    meta.helm.sh/release-namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/version: 0.43.0
+    helm.sh/chart: ingress-nginx-3.20.1
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#21024;&#38500;ingress-nginx&#30340;pod&#65292;&#37325;&#26032;&#21152;&#36733;&#37197;&#32622;</span>
+[root@k8s-master01 ~]# kubectl get po -n ingress-nginx
+[root@k8s-master01 ~]# kubectl delete po -n ingress-nginx --all  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#20135;&#19968;&#20010;&#19968;&#20010;&#21024;&#65292;&#38450;&#27490;&#37197;&#32622;&#38169;&#35823;&#37117;&#25346;&#20102;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#22312;192.168.1.201&#33410;&#28857;&#19978;&#65292;&#35775;&#38382;ingress&#20195;&#29702;&#30340;&#22495;&#21517;&#65292;&#28982;&#21518;403&#34920;&#31034;&#37197;&#32622;&#25104;&#21151;</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org7f937a8" class="outline-4">
+<h4 id="org7f937a8">针对某个域名设置黑名单&#x2013;snippet</h4>
+<div class="outline-text-4" id="text-org7f937a8">
+<div class="org-src-container">
+<pre class="src src-shell">&#23448;&#32593;&#21442;&#32771;&#65306;https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/nginx-configuration/annotations.md#canary
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#27604;&#22914;ingress&#20195;&#29702;&#20102;www.test.com&#36825;&#20010;&#22495;&#21517;&#65292;&#37027;&#20040;&#24819;&#38024;&#23545;&#36825;&#20010;&#22495;&#21517;&#65288;www.test.com&#65289;&#35774;&#32622;&#35775;&#38382;&#40657;&#21517;&#21333;&#65292;&#23601;&#32534;&#36753;&#36825;&#20010;ingress&#21363;&#21487;</span>
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#22312;annotations&#19979;&#38754;&#21152;&#19978;&#36825;&#20960;&#34892;&#37197;&#32622;&#65292;&#26377;&#22810;&#20010;IP&#21487;&#20197;deny&#22810;&#20010;</span>
+  annotations:
+    nginx.ingress.kubernetes.io/server-snippet: |-    
+      deny 192.168.1.101;
+      deny 192.168.1.102;
+      allow all;
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#28982;&#21518;&#22312;deny&#30340;&#20027;&#26426;&#19978;&#35775;&#38382; www.test.com &#23601;403</span>
+[root@k8s-master02 ~]# curl ngdemo.qikqiak.com
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;403 Forbidden&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;center&gt;&lt;h1&gt;403 Forbidden&lt;/h1&gt;&lt;/center&gt;
+&lt;hr&gt;&lt;center&gt;nginx&lt;/center&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+
+
+<div id="outline-container-orgae1b15d" class="outline-3">
+<h3 id="orgae1b15d">Ingress 访问速率限制</h3>
+<div class="outline-text-3" id="text-orgae1b15d">
+<div class="org-src-container">
+<pre class="src src-shell">&#23448;&#32593;&#21442;&#32771;&#65306;https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/nginx-configuration/annotations.md#canary
+https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#rate-limiting
+</pre>
+</div>
+
+<p>
+#+end_src<br>
+nginx.ingress.kubernetes.io/limit-connections 1 # 连接数只有一个<br>
+</p>
+
+<p>
+nginx.ingress.kubernetes.io/limit-rps 1	# 每秒请求数<br>
+#+end_src<br>
+</p>
+</div>
+</div>
+
+
+
+<div id="outline-container-orgbbceaf4" class="outline-3">
+<h3 id="orgbbceaf4">Ingress 实现灰度发布/金丝雀发布</h3>
+<div class="outline-text-3" id="text-orgbbceaf4">
+</div>
+<div id="outline-container-org58dabf1" class="outline-5">
+<h5 id="org58dabf1">准备2个svc，用于演示</h5>
+<div class="outline-text-5" id="text-org58dabf1">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl expose deploy my-nginx1 --port 80
+kubectl expose deploy my-nginx2 --port 8
+[root@k8s-master01 app]# kubectl get svc
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+my-nginx     ClusterIP   10.104.87.14    &lt;none&gt;        80/TCP    91m
+my-nginx1    ClusterIP   10.103.175.67   &lt;none&gt;        80/TCP    2m12s
+[root@k8s-master01 app]# curl 10.104.87.14
+Canary v1
+[root@k8s-master01 app]# curl 10.103.175.67 
+Canary v2
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org39337dd" class="outline-5">
+<h5 id="org39337dd">开启基于ingress的灰度发布</h5>
+<div class="outline-text-5" id="text-org39337dd">
+<div class="org-src-container">
+<pre class="src src-shell">&#23448;&#32593;&#21442;&#32771;&#65306;https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/nginx-configuration/annotations.md#canary
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#24320;&#21551;&#20102;&#28784;&#24230;&#21457;&#24067;&#65292;&#25165;&#33021;&#22312;&#21516;&#19968;&#20010;ns&#19979;&#21019;&#24314;2&#20010;&#21516;&#26679;&#22495;&#21517;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20808;&#21019;&#24314;&#19968;&#20010;&#26222;&#36890;&#30340;ingress&#65292;&#36890;&#36807;canary.test.com&#23601;&#21487;&#20197;&#35775;&#38382;&#21040;svc my-nginx&#65292;&#29256;&#26412;&#26159;v1</span>
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: my-nginx
+  annotations:
+    kubernetes.io/ingress.class: <span style="color: #8b2252;">"nginx"</span>
+spec:
+  rules:
+  - host: canary.test.com  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#23558;&#22495;&#21517;&#26144;&#23556;&#21040; my-nginx &#26381;&#21153;</span>
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: my-nginx  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#23558;&#25152;&#26377;&#35831;&#27714;&#21457;&#36865;&#21040; my-nginx &#26381;&#21153;&#30340; 80 &#31471;&#21475;</span>
+          servicePort: 80     
+</pre>
+</div>
+</div>
+
+<ul class="org-ul">
+<li><a id="org1439e3f"></a>基于权重的流量调度<br>
+<div class="outline-text-6" id="text-org1439e3f">
+<p>
+**基于权重**：基于权重的流量切分的典型应用场景就是蓝绿部署，可通过将权重设置为 0 或 100 来实现。例如，可将 Green 版本设置为主要部分，并将 Blue 版本的入口配置为 Canary。最初，将权重设置为 0，因此不会将流量代理到 Blue 版本。一旦新版本测试和验证都成功后，即可将 Blue 版本的权重设置为 100，即所有流量从 Green 版本转向 Blue。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: my-nginx1
+  annotations:
+    kubernetes.io/ingress.class: <span style="color: #8b2252;">"nginx"</span>
+spec:
+  rules:
+  - host: canary.test.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: my-nginx1
+          servicePort: 80     
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#36825;&#20010;&#26159;&#20195;&#29702;V2&#30340;ingress&#65292;&#22914;&#26524;&#20351;&#29992;&#30456;&#21516;&#22495;&#21517;&#65292;&#21019;&#24314;&#20250;&#25253;&#38169;</span>
+[root@k8s-master01 app]# kubectl apply -f  bbb.yaml 
+Error from server (BadRequest): error when creating <span style="color: #8b2252;">"bbb.yaml"</span>: admission webhook <span style="color: #8b2252;">"validate.nginx.ingress.kubernetes.io"</span> denied the request: host <span style="color: #8b2252;">"canary.test.com"</span> and path <span style="color: #8b2252;">"/"</span> is already defined<span style="color: #a020f0;"> in</span> ingress default/my-nginx
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22522;&#20110;&#26435;&#37325;</span>
+annotations:
+  nginx.ingress.kubernetes.io/canary: <span style="color: #8b2252;">"true"</span>        <span style="color: #b22222;"># </span><span style="color: #b22222;">&#35201;&#24320;&#21551;&#28784;&#24230;&#21457;&#24067;&#26426;&#21046;&#65292;&#39318;&#20808;&#38656;&#35201;&#21551;&#29992; Canary</span>
+  nginx.ingress.kubernetes.io/canary-weight: <span style="color: #8b2252;">"30"</span>   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20999;30%&#30340;&#27969;&#37327;&#21040;v2&#21435;&#65292;&#35774;&#32622;100&#23601;&#20840;&#37096;&#20999;&#36807;&#21435;&#20102;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#21518;&#26597;&#30475;ingress&#65292;&#21487;&#20197;&#30475;&#21040;&#21019;&#24314;&#20102;2&#20010;&#20195;&#29702;&#30456;&#21516;&#22495;&#21517;&#30340;ingress</span>
+[root@k8s-master01 app]# kubectl get ingress
+NAME        CLASS    HOSTS             ADDRESS         PORTS   AGE
+my-nginx    &lt;none&gt;   canary.test.com   10.101.29.125   80      20m
+my-nginx1   &lt;none&gt;   canary.test.com   10.101.29.125   80      3m6s
+</pre>
+</div>
+
+<p>
+验证是否配置成功：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master02 ~]# for i<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">seq 1 3</span>); <span style="color: #a020f0;">do</span> curl -s -H canary.test.com; <span style="color: #a020f0;">done</span>
+Canary v1
+Canary v2
+Canary v1
+</pre>
+</div>
+</div>
+
+<ul class="org-ul">
+<li><a id="org50f61a4"></a>安装 ruby 测试<br>
+<div class="outline-text-7" id="text-org50f61a4">
+<p>
+脚本<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">vim test.rb
+counts = Hash.new(0)
+
+100.times do
+  output = <span style="color: #ff00ff;">`curl -s canary.test.com | grep 'Canary'| awk '{print $2}'| awk -F"&lt;" '{print $1}'`</span>
+  counts[output.strip.split.last += 1
+end
+
+puts counts
+</pre>
+</div>
+
+<p>
+测试<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">yum install ruby -y
+ruby test.rb
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</li>
+
+<li><a id="org4a06369"></a>基于Request Header（还有个never、always不进行演示）<br>
+<div class="outline-text-6" id="text-org4a06369">
+<p>
+<b><b>基于 Request Header:</b></b> 基于 Request Header 进行流量切分的典型应用场景即灰度发布或 A/B 测试场景<br>
+</p>
+
+<p>
+**注意：**当 Request Header **设置为 never 或 always 时，请求将不会或一直被发送到 Canary 版本**，对于任何其他 Header 值，将忽略 Header，并通过优先级将请求与其他 Canary 规则进行优先级的比较。<br>
+</p>
+
+<p>
+#+end_srcyaml<br>
+</p>
+
+<p>
+annotations:<br>
+  kubernetes.io/ingress.class: nginx<br>
+  nginx.ingress.kubernetes.io/canary: "true"                  # 要开启灰度发布机制，首先需要启用 Canary<br>
+  nginx.ingress.kubernetes.io/canary-by-header-value: canary  # 基于header的流量切分 value<br>
+  nginx.ingress.kubernetes.io/canary-by-header: user          # 基于header的流量切分  key<br>
+  nginx.ingress.kubernetes.io/canary-weight: "30"             # 会被忽略，因为配置了 canary-by-headerCanary版本<br>
+#+end_src<br>
+</p>
+
+<p>
+验证：<br>
+</p>
+
+<p>
+#+end_srcyaml<br>
+➜ for i in $(seq 1 10); do curl -s -H "canary: never" echo.qikqiak.com | grep "Hostname"; done<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+Hostname: production-856d5fb99-d6bds<br>
+</p>
+
+<p>
+[root@k8s-master02 ~]# for i in $(seq 1 5); do curl -s -H "user: canary" canary.test.com; done<br>
+v2<br>
+v2<br>
+v2<br>
+v2<br>
+v2<br>
+#+end_src<br>
+</p>
+</div>
+</li>
+
+<li><a id="orge30e5c2"></a>基于 Cookie<br>
+<div class="outline-text-6" id="text-orge30e5c2">
+<p>
+**基于 Cookie**：与基于 Request Header 的 annotation 用法规则类似。例如在 A/B 测试场景下，需要让地域为北京的用户访问 Canary 版本。那么当 cookie 的 annotation 设置为 `nginx.ingress.kubernetes.io/canary-by-cookie: "users_from_Beijing"`，此时后台可对登录的用户请求进行检查，如果该用户访问源来自北京则设置 cookie `users_from_Beijing` 的值为 `always`，这样就可以确保北京的用户仅访问 Canary 版本。<br>
+</p>
+
+<p>
+#+end_srcyaml<br>
+annotations:<br>
+  kubernetes.io/ingress.class: nginx<br>
+  nginx.ingress.kubernetes.io/canary: "true"   # 要开启灰度发布机制，首先需要启用 Canary<br>
+  nginx.ingress.kubernetes.io/canary-by-cookie: "users_from_Beijing"  # 基于 cookie<br>
+  nginx.ingress.kubernetes.io/canary-weight: "30"  # 会被忽略，因为配置了 canary-by-cookie<br>
+➜ for i in $(seq 1 10); do curl -s -b "users_from_Beijing=always" echo.qikqiak.com | grep "Hostname"; done<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+Hostname: canary-66cb497b7f-48zx4<br>
+#+end_src<br>
+</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org1e2f720" class="outline-3">
+<h3 id="org1e2f720">Ingress Nginx 自定义错误页</h3>
+<div class="outline-text-3" id="text-org1e2f720">
+<p>
+#+end_src<br>
+nginx.ingress.kubernetes.io/server-snippet:<br>
+  error_page 404 <a href="https://www.baidu.com">https://www.baidu.com</a> # 如果访问不存在，跳转到baidu<br>
+</p>
+
+<p>
+#+end_src<br>
+</p>
+
+<p>
+官方错误页面<br>
+</p>
+
+<p>
+<a href="https://github.com/kubernetes/ingress-nginx/blob/master/docs/examples/customization/custom-errors/custom-default-backend.yaml">https://github.com/kubernetes/ingress-nginx/blob/master/docs/examples/customization/custom-errors/custom-default-backend.yaml</a><br>
+</p>
+</div>
+</div>
+
+
+
+<div id="outline-container-org4f4d8d9" class="outline-3">
+<h3 id="org4f4d8d9">Ingress Nginx 监控</h3>
+<div class="outline-text-3" id="text-org4f4d8d9">
+<p>
+#+end_src<br>
+步骤：<a href="https://kubernetes.github.io/ingress-nginx/user-guide/monitoring/">https://kubernetes.github.io/ingress-nginx/user-guide/monitoring/</a><br>
+源码地址：<a href="https://github.com/kubernetes/ingress-nginx/tree/master/deploy">https://github.com/kubernetes/ingress-nginx/tree/master/deploy</a><br>
+配置grafana: <a href="https://github.com/kubernetes/ingress-nginx/tree/master/deploy/grafana/dashboards">https://github.com/kubernetes/ingress-nginx/tree/master/deploy/grafana/dashboards</a><br>
+#+end_src<br>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2d78b23" class="outline-3">
+<h3 id="org2d78b23">演示</h3>
+<div class="outline-text-3" id="text-org2d78b23">
+<p>
+1、背景和环境概述<br>
+</p>
+
+<p>
+本文中涉及到的环境中、`prometheus`监控和`grafana`基本环境已部署好。 在`nginx ingress controller`的官方文档中对监控有相应描述 <a href="https://kubernetes.github.io/ingress-nginx/user-guide/monitoring/">https://kubernetes.github.io/ingress-nginx/user-guide/monitoring/</a><br>
+</p>
+
+<p>
+2、修改prometheus配置<br>
+</p>
+
+<p>
+修改`prometheus`的配置，增加对`ingress nginx`的监控配置，可按照[官方yaml](<a href="https://github.com/kubernetes/ingress-nginx/blob/master/deploy/prometheus/prometheus.yaml">https://github.com/kubernetes/ingress-nginx/blob/master/deploy/prometheus/prometheus.yaml</a>) 进行修改：<br>
+</p>
+
+<p>
+#+end_srcjavascript<br>
+vim prometheus-configmap.yaml<br>
+</p>
+<ul class="org-ul">
+<li><p>
+job_name: 'ingress-nginx-endpoints'<br>
+kubernetes_sd_configs:<br>
+</p>
+<ul class="org-ul">
+<li>role: pod<br>
+namespaces:<br>
+  names:<br>
+<ul class="org-ul">
+<li>ingress-nginx<br></li>
+</ul></li>
+</ul>
+<p>
+relabel_configs:<br>
+</p>
+<ul class="org-ul">
+<li>source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]<br>
+action: keep<br>
+regex: true<br></li>
+<li>source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]<br>
+action: replace<br>
+target_label: <span class="underline"><span class="underline">scheme</span></span><br>
+regex: (https?)<br></li>
+<li>source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]<br>
+action: replace<br>
+target_label: <span class="underline"><span class="underline">metrics_path</span></span><br>
+regex: (.+)<br></li>
+<li>source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]<br>
+action: replace<br>
+target_label: <span class="underline"><span class="underline">address</span></span><br>
+regex: ([^:]+)(?::\d+)?;(\d+)<br>
+replacement: $1:$2<br></li>
+<li>source_labels: [__meta_kubernetes_service_name]<br>
+regex: prometheus-server<br>
+action: drop<br></li>
+</ul></li>
+</ul>
+<p>
+#+end_src<br>
+</p>
+
+<p>
+重新apply一下configmap<br>
+</p>
+
+<p>
+#+end_srcjavascript<br>
+kubectl apply -f prometheus-configmap.yaml<br>
+#+end_src<br>
+</p>
+
+<p>
+3、检查是否生效<br>
+</p>
+
+<p>
+打开`prometheus`界面，查看`target`中是否有`ingress nginx`的相关记录<br>
+检查查询取值<br>
+</p>
+
+<p>
+4、配置grafana图形<br>
+</p>
+
+<p>
+在grafana图形中导入模板，模板可以按照官方给出的[json文件](<a href="https://github.com/kubernetes/ingress-nginx/blob/master/deploy/grafana/dashboards/nginx.json">https://github.com/kubernetes/ingress-nginx/blob/master/deploy/grafana/dashboards/nginx.json</a>)操作，下载此`json`文件，在`grafana`中导入即可<br>
+</p>
+
+<p>
+查看图形<br>
+</p>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

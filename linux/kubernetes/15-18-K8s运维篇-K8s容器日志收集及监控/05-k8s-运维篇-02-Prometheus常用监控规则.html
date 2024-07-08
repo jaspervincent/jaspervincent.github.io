@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>k8s 运维篇-Prometheus  常用监控规则</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">k8s 运维篇-Prometheus  常用监控规则</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orge70135e">k8s- Prometheus</a>
+<ul>
+<li><a href="#org7465cfe">监控项目</a></li>
+<li><a href="#orgfbbceb3">Pod</a>
+<ul>
+<li><a href="#org7d0d237">OOMEvents</a></li>
+<li><a href="#org36f1c14">low-capacity alerts</a></li>
+<li><a href="#org1c87c0d">Pod container restart rate too high</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a><br></li>
+</ul>
+
+
+<section id="outline-container-orge70135e" class="outline-2">
+<h2 id="orge70135e">k8s- Prometheus</h2>
+<div class="outline-text-2" id="text-orge70135e">
+</div>
+<div id="outline-container-org7465cfe" class="outline-3">
+<h3 id="org7465cfe">监控项目</h3>
+<div class="outline-text-3" id="text-org7465cfe">
+<p>
+服务优先级：<br>
+</p>
+<ul class="org-ul">
+<li>1<br></li>
+</ul>
+
+<p>
+梳理目标：<br>
+</p>
+<ul class="org-ul">
+<li>各个应用的监控入口，便于值班人员进行分析查看<br></li>
+<li>核心告警是否具备：<br>
+<ul class="org-ul">
+<li>系统告警<br></li>
+<li>业务告警<br></li>
+</ul></li>
+</ul>
+
+<p>
+应用系统<br>
+</p>
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Category</th>
+<th scope="col" class="org-left">Application</th>
+<th scope="col" class="org-left">Incoming API TPS/RT/ErrorRate</th>
+<th scope="col" class="org-left">Outgoing API TPS/RT/ErrorRate</th>
+<th scope="col" class="org-left">Pod CPU/MEM/JVM</th>
+<th scope="col" class="org-left">MySQL  Metrics</th>
+<th scope="col" class="org-left">Redis  Metrics</th>
+<th scope="col" class="org-left">RocketMQ  Metrics</th>
+<th scope="col" class="org-left">Kafka Metric</th>
+<th scope="col" class="org-left">Business Metric</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+中间件、基础设施<br>
+</p>
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Service</th>
+<th scope="col" class="org-left">应用对象</th>
+<th scope="col" class="org-left">监控入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orgfbbceb3" class="outline-3">
+<h3 id="orgfbbceb3">Pod</h3>
+<div class="outline-text-3" id="text-orgfbbceb3">
+</div>
+<div id="outline-container-org7d0d237" class="outline-4">
+<h4 id="org7d0d237">OOMEvents</h4>
+<div class="outline-text-4" id="text-org7d0d237">
+<p>
+<a href="https://songrgg.github.io/operation/how-to-alert-for-Pod-Restart-OOMKilled-in-Kubernetes/">https://songrgg.github.io/operation/how-to-alert-for-Pod-Restart-OOMKilled-in-Kubernetes/</a><br>
+</p>
+
+<p>
+当容器因为 OOMKilled 而被杀死时，容器的退出原因将填充为 OOMKilled，同时它会发出一个 gauge：<br>
+kube_pod_container_status_last_terminated_reason → Gauge<br>
+Describes the last reason the container was in the terminated state.<br>
+</p>
+
+<p>
+当 OOMKill 来自子进程而不是主进程时，不会发出此指标，因此更可靠的方法是侦听 Kubernetes OOMKill 事件并基于此构建指标。<br>
+</p>
+
+<p>
+kubernetes 1.24 版本新增标指 container_oom_events_total<br>
+container_oom_events_total → counter<br>
+Describes the container’s OOM events.<br>
+</p>
+
+<pre class="example">
+# prometheus, fetch the counter of the containers OOM events.
+container_oom_events_total{name="&lt;some-container&gt;"}
+
+# OR if your cadvisor is below v3.9.1
+# prometheus, fetch the gauge of the containers terminated by OOMKilled in the specific namespace.
+kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="$PROJECT"}
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org36f1c14" class="outline-4">
+<h4 id="org36f1c14">low-capacity alerts</h4>
+<div class="outline-text-4" id="text-org36f1c14">
+<p>
+如果一个应用程序有 10 个 pod，其中 8 个可以承载正常流量，则 80% 可以是一个合适的阈值。在另一种情况下，如果 pod 总数很低，警报可以是有多少 pod 应该存活。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">Use Prometheus as data source</span>
+kube_deployment_status_replicas_available{<span style="color: #a0522d;">namespace</span>=<span style="color: #8b2252;">"$PROJECT"</span>} / kube_deployment_spec_replicas{<span style="color: #a0522d;">namespace</span>=<span style="color: #8b2252;">"$PROJECT"</span>}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1c87c0d" class="outline-4">
+<h4 id="org1c87c0d">Pod container restart rate too high</h4>
+<div class="outline-text-4" id="text-org1c87c0d">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">prometheus</span>
+<span style="color: #0000ff;">increase</span>(kube_pod_container_status_restarts_total{<span style="color: #a0522d;">namespace</span>=<span style="color: #8b2252;">"$PROJECT"</span>, <span style="color: #a0522d;">pod</span>=~<span style="color: #8b2252;">".*$APP.*"</span>}[1h])
+
+sum by(pod, namespace, container) (changes(kube_pod_container_status_restarts_total{container!=<span style="color: #8b2252;">"filebeat-sidecar"</span>,<span style="color: #a0522d;">namespace</span>=~<span style="color: #8b2252;">"poker"</span>}[2m])) &gt;= 1
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

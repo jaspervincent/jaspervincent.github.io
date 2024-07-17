@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>解决方案-通用</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">解决方案-通用</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgec6952c">httpDNS</a></li>
+<li><a href="#orgef0d243">DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">解决方案</a></li>
+</ul>
+
+
+<section id="outline-container-orgec6952c" class="outline-2">
+<h2 id="orgec6952c">httpDNS</h2>
+<div class="outline-text-2" id="text-orgec6952c">
+<p>
+背景
+</p>
+
+<p>
+用户出口IP和LocalDNS供应商不一致，导致通过local dns解析的cdn域名返回的cdn节点为非就近或相同供应商的节点，进而导致用户访问资源质量下降、甚至不可用。
+</p>
+
+
+<p>
+解决方案
+</p>
+
+<p>
+采用httpdns，httpdns能直接获取客户端IP，基于客户端IP获得最精准的解析结果，让客户端更好的接入就近的业务节点。
+</p>
+
+
+<p>
+项目收益
+</p>
+
+<ol class="org-ol">
+<li>增加域名解析准确度，防止域名解析劫持。</li>
+<li>降低解析延迟，提高用户体验。</li>
+<li>更多可参见httpdsn优势。
+注：目前因无更多数据支持，可简单通过服务上线后，此类客诉问题是否减少来评估项目收益。</li>
+</ol>
+
+
+<p>
+httpdns的优势
+</p>
+
+<ol class="org-ol">
+<li>绕过了运营商的local dns，可以防止域名劫持。</li>
+<li>使用用户出口的真实IP地址做解析，使解析结果更加精准。</li>
+<li>可做热点域名预热、缓存dns解析结果、解析结果懒更新等方式，有效的降低解析延迟，甚至可达到 0ms 解析延迟。</li>
+<li>绕过了local dns，避免了local dns不遵循权威ttl的问题，可以使修改解析结果更快速的生效。</li>
+</ol>
+
+
+
+<p>
+方案实施原则
+</p>
+
+<ol class="org-ol">
+<li>不自行开发httpdns 服务，CDN域名使用CDN厂商的httpdns服务。</li>
+<li>一期 API类域名暂不考虑使用httpdns。【API类域名防止DNS解析也需要使用httpdns，在二期再考虑加入。直接使用阿里云或腾讯云的httpdns服务】</li>
+<li>客户端使用的 httpdns 服务地址：
+<ol class="org-ol">
+<li>客户端必须预置阿里云(或腾讯云)提供的httpdns服务的IP地址【即默认的httpdns api接口】【防止第一跳因dns劫持导致无法访问，从而导致后续的httpdns服务地址无法下发】。</li>
+<li>必须支持httpdns服务地址由服务端下发。</li>
+</ol></li>
+</ol>
+
+
+
+<p>
+服务端
+</p>
+
+<ol class="org-ol">
+<li>需要开发httpdns api 下发接口。</li>
+<li>接口下发粒度为【用户】级别，即自动切换用户的cdn供应商，比如从阿里切到腾讯或网宿等。</li>
+<li>接口支持全部用户切换和批量用户切换cdn供应上。</li>
+<li>待定或二期：支持根据区域切换cdn供应商。</li>
+<li>需要做些IP储备，增加对cdn节点调度的支持，比如下发给用户的httpdns api 接口中包含请求的出口IP，让客户端请求的时候传给httpdns api 来源IP地址，进而对该用户强制调度到此IP的就近节点。</li>
+</ol>
+
+
+
+<p>
+客户端
+</p>
+
+<ol class="org-ol">
+<li>预置默认httpdns api接口地址【默认供应商需要确认】</li>
+<li>做正常的业务请求</li>
+<li>异步热点域名预热</li>
+<li>异步请求【httpdns api 下发服务】API 获取新的httpdns api，并做结果缓存，如果下发了新的httpdns api，则使用新httpdns api 进行解析。</li>
+<li>httpdns api 接口调用鉴权，防止恶意刷量，导致不必要的成本。
+注：① 异步请求的时效性需要再讨论 ② 异步请求避免对齐</li>
+</ol>
+
+
+
+<p>
+具体技术细节和接口
+</p>
+
+<p>
+需要客户端和服务端研发协商指定
+</p>
+
+
+
+<p>
+阿里云HttpDNS
+</p>
+
+<p>
+<a href="https://help.aliyun.com/product/30100.html?spm=a2c4g.11186623.6.540.6c136e96CHjOh8">https://help.aliyun.com/product/30100.html?spm=a2c4g.11186623.6.540.6c136e96CHjOh8</a>
+</p>
+
+
+
+<p>
+注意事项
+</p>
+
+<p>
+参考阿里云httpdns最佳实践
+</p>
+
+<ol class="org-ol">
+<li><a href="https://help.aliyun.com/document_detail/30144.html?spm=a2c4g.11186623.6.567.c256463eAtSG7g">HttpDNS降低dns解析开销</a></li>
+<li><a href="https://help.aliyun.com/document_detail/30143.html?spm=a2c4g.11186623.2.11.5c275b23ltj5OP">HTTPS(含SNI) 业务场景IP直连</a></li>
+<li><a href="https://yq.aliyun.com/articles/64356?spm=a2c4g.11186623.2.11.63be7f15odjGz0">HttpDNS场景下cookie使用</a></li>
+</ol>
+
+<p>
+更多httpdns最佳实践：<a href="https://help.aliyun.com/document_detail/30143.html?spm=a2c4g.11186623.3.2.63be7f15odjGz0">https://help.aliyun.com/document_detail/30143.html?spm=a2c4g.11186623.3.2.63be7f15odjGz0</a>
+</p>
+</div>
+</section>
+
+
+
+<section id="outline-container-orgef0d243" class="outline-2">
+<h2 id="orgef0d243">DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</h2>
+<div class="outline-text-2" id="text-orgef0d243">
+<p>
+官方文档：<a href="https://help.aliyun.com/zh/vpn/sub-product-ipsec-vpn/use-cases/dts-implements-data-synchronization-between-alibaba-cloud-rds-and-aws-vpc-based-on-vpn-gateway?spm=a2c4g.11186623.0.0.3a867d783Sfkn6">https://help.aliyun.com/zh/vpn/sub-product-ipsec-vpn/use-cases/dts-implements-data-synchronization-between-alibaba-cloud-rds-and-aws-vpc-based-on-vpn-gateway?spm=a2c4g.11186623.0.0.3a867d783Sfkn6</a>
+</p>
+
+<p>
+DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步
+</p>
+
+<p>
+背景：DTS 阿里云polarDB与AWS RDS双向同步调研
+</p>
+
+<p>
+主要操作：阿里云与AWS内网互通，DTS配置，以下是针对文档的操作记录点
+</p>
+
+<p>
+阿里云VPC  10.2.0.0/16
+</p>
+
+<p>
+AWS VPC 10.0.0.0/16
+</p>
+
+<p>
+步骤一：在阿里云创建VPN网关实例
+</p>
+
+<p>
+IPsec地址1：8.219.102.177
+</p>
+
+<p>
+IPsec地址2：8.222.171.136
+</p>
+
+<p>
+步骤二：在AWS平台部署VPN
+</p>
+
+<p>
+1.创建客户网关。
+</p>
+
+<p>
+您需要在AWS侧创建2个客户网关，将阿里云VPN网关实例的2个IP地址作为客户网关的IP地址。
+</p>
+
+<p>
+2.创建虚拟私有网关。
+</p>
+
+<p>
+您需要在AWS侧创建虚拟私有网关，并将虚拟私有网关绑定到需要和阿里云互通的VPC实例上。
+</p>
+
+<p>
+3.创建站点到站点VPN连接。
+</p>
+
+<p>
+为站点到站点VPN连接配置路由时，您除了要指定阿里云VPC网段外，还需要指定100.104.0.0/16网段，DTS服务将使用该网段下的地址同步数据。
+</p>
+
+<p>
+2个站点到站点VPN连接的配置，连接不同的客户网关
+</p>
+
+<p>
+预共享密钥 12345678
+</p>
+
+<p>
+aliyun1隧道状态
+</p>
+
+<p>
+Tunnel 1    35.166.53.23    169.254.68.60/30 关联客户网关IPsec地址1
+</p>
+
+<p>
+aliyun2隧道状态
+</p>
+
+<p>
+Tunnel 1    34.208.190.223  169.254.250.112/30 关联客户网关IPsec地址2
+</p>
+
+<p>
+4.配置路由传播。
+</p>
+
+<p>
+您需要在虚拟私有网关关联的VPC实例的路由表下开启路由传播，以确保站点到站点VPN连接下的路由可以自动传播到VPC实例的路由表中。
+</p>
+
+<p>
+步骤三：在阿里云部署VPN网关
+</p>
+
+<p>
+1.创建用户网关。
+</p>
+
+<p>
+用户网关1 对应aws站点连接随着tunnel1的外网地址
+</p>
+
+<p>
+用户网关2 对应aws站点连接随着tunnel2的外网地址
+</p>
+
+<p>
+2.创建IPsec连接。
+</p>
+
+<p>
+路由模式：感兴趣流模式
+</p>
+
+<p>
+本端网段
+</p>
+
+<p>
+VPC网段：10.2.0.0/16
+</p>
+
+<p>
+DTS网段：100.104.0.0/16
+</p>
+
+<p>
+对端网段aws： 10.0.0.0/16
+</p>
+
+<p>
+Tunnel-2:
+</p>
+<ul class="org-ul">
+<li>预共享密钥: 12345678</li>
+<li>用户网关: 用户网关1 用户网关2</li>
+</ul>
+
+<p>
+3.配置VPN网关路由
+</p>
+
+<p>
+策略路由表页签，找到目标路由条目，在操作列单击发布
+</p>
+
+<p>
+步骤四：测试网络连通性
+</p>
+
+<p>
+略。 验证两边可互通即可
+</p>
+
+<p>
+步骤五：创建DTS数据同步任务
+略
+</p>
+
+<p>
+同步方案概览：<a href="https://help.aliyun.com/zh/dts/user-guide/data-synchronization-scenarios">https://help.aliyun.com/zh/dts/user-guide/data-synchronization-scenarios</a>
+</p>
+
+<p>
+DTS：
+</p>
+<ul class="org-ul">
+<li>阿里云PolarDB &lt;&#x2013;&gt; AWS RDS 双向同步，支持。  注意AWS RDS不要开放外网</li>
+<li>阿里云MongoDB &lt;&#x2013;&gt; AWS DocumentDB 双向同步，不支持。
+<ul class="org-ul">
+<li>解决方案：</li>
+</ul></li>
+</ul>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

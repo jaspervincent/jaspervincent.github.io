@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canal 数据库日志订阅</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Canal 数据库日志订阅</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgdfeb91c">mysql 要求</a></li>
+<li><a href="#orgb4bb6f3">部署</a>
+<ul>
+<li><a href="#orgebd0a42">canal-admin</a>
+<ul>
+<li><a href="#org066bf14">部署zookeeper</a></li>
+<li><a href="#org0d4136f">添加canal.properties配置</a></li>
+</ul>
+</li>
+<li><a href="#orgcbd99ab">canal-server</a>
+<ul>
+<li><a href="#org3af7002">instance.properties配置</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a></li>
+</ul>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li>官方文档： <a href="https://github.com/alibaba/canal/wiki/AdminGuide">https://github.com/alibaba/canal/wiki/AdminGuide</a></li>
+<li><a href="https://www.cnblogs.com/throwable/p/12483983.html">https://www.cnblogs.com/throwable/p/12483983.html</a></li>
+</ul>
+
+<section id="outline-container-orgdfeb91c" class="outline-2">
+<h2 id="orgdfeb91c">mysql 要求</h2>
+<div class="outline-text-2" id="text-orgdfeb91c">
+<p>
+canal的原理是基于mysql binlog技术，所以这里一定需要开启mysql的binlog写入功能，并且配置binlog模式为row.
+</p>
+
+<pre class="example" id="orgba8c9b6">
+[mysqld]  
+log-bin=mysql-bin #添加这一行就ok  
+binlog-format=ROW #选择row模式  
+server_id=1 #配置mysql replaction需要定义，不能和canal的slaveId重复  
+</pre>
+
+<p>
+检查
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">mysql&gt; show variables like <span style="color: #8b2252;">'binlog_format'</span>;
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| binlog_format | ROW   |
++---------------+-------+
+
+
+mysql&gt; show variables like <span style="color: #8b2252;">'log_bin'</span>;
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| log_bin       | ON    |
++---------------+-------+
+</pre>
+</div>
+
+<p>
+canal的原理是模拟自己为mysql slave，所以这里一定需要做为mysql slave的相关权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">CREATE USER canal IDENTIFIED BY <span style="color: #8b2252;">'Canal!123'</span>;
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO <span style="color: #8b2252;">'canal'</span>@<span style="color: #8b2252;">'%'</span>;  
+-- GRANT ALL PRIVILEGES ON *.* TO <span style="color: #8b2252;">'canal'</span>@<span style="color: #8b2252;">'%'</span> ;  
+FLUSH PRIVILEGES;
+</pre>
+</div>
+
+<p>
+检查权限
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">show grants for <span style="color: #8b2252;">'canal'</span> 
+</pre>
+</div>
+</div>
+</section>
+
+
+<section id="outline-container-orgb4bb6f3" class="outline-2">
+<h2 id="orgb4bb6f3">部署</h2>
+<div class="outline-text-2" id="text-orgb4bb6f3">
+<ul class="org-ul">
+<li>canal-admin 相当于管理角色，统一canal.properties/instance.properties配置</li>
+<li>canal-server(自动加入)
+<ul class="org-ul">
+<li>加载canal.properties就绪服务</li>
+<li>加载instance.properties配置，定义从哪个mysql订单日志，并推送到哪里如kafka,rocketmq等</li>
+</ul></li>
+</ul>
+</div>
+
+
+<div id="outline-container-orgebd0a42" class="outline-3">
+<h3 id="orgebd0a42">canal-admin</h3>
+<div class="outline-text-3" id="text-orgebd0a42">
+<p>
+需要一个canal-admin管里的库
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">CREATE USER canal IDENTIFIED BY <span style="color: #8b2252;">'Canal!123'</span>;  
+GRANT ALL ON *.* TO <span style="color: #8b2252;">'canal'</span>@<span style="color: #8b2252;">'%'</span> ;  
+FLUSH PRIVILEGES;
+</pre>
+</div>
+
+<p>
+部署文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy canal-admin]# cat deployment.yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: canal-admin
+  name: canal-admin
+  namespace: dev1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+  app: canal-admin
+  template:
+    metadata:
+  labels:
+        app: canal-admin
+    spec:
+  containers:
+        - env:
+            - name: JAVA_OPTS
+          value: &gt;-
+                -Dspring.datasource.address=canal-manager-mysql.com
+                -Dspring.datasource.database=canal_manager
+                -Dspring.datasource.username=canal
+                -Dspring.datasource.password=Canal!123
+                -Dcanal.adminPasswd=ZaIjVvX5q8F7LyKu <span style="color: #b22222;">#</span><span style="color: #b22222;">ui&#30331;&#24405;&#23494;&#30721;</span>
+          image: <span style="color: #8b2252;">'canal/canal-admin:v1.1.7'</span>
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+          port: 8089
+            timeoutSeconds: 1
+          name: canal-admin
+          resources:
+            requests:
+          cpu: 250m
+          memory: 512Mi
+          startupProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+          port: 8089
+            timeoutSeconds: 1
+  restartPolicy: Always
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy canal-admin]# cat service.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  name: canal-admin
+  namespace: dev1
+spec:
+  ports:
+    - port: 8089
+  name: http
+  protocol: TCP
+  targetPort: 8089
+  selector:
+    app: canal-admin
+  <span style="color: #483d8b;">type</span>: ClusterIP
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy dev1]# cat ingress/ingress-cms-dev.yaml 
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-cms-dev
+  namespace: dev1
+spec:
+  ingressClassName: nginx-dev
+  rules:
+    - host: canal-admin.xxx.com
+  http:
+        paths:
+          - backend:
+          service:
+                name: canal-admin
+                port:
+                  number: 8089
+            path: /
+            pathType: ImplementationSpecific
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org066bf14" class="outline-4">
+<h4 id="org066bf14">部署zookeeper</h4>
+<div class="outline-text-4" id="text-org066bf14">
+<p>
+用于管理canale-server集群。如创建集群名 cluster-kafka，指定zookeeper地址
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0d4136f" class="outline-4">
+<h4 id="org0d4136f">添加canal.properties配置</h4>
+<div class="outline-text-4" id="text-org0d4136f">
+<p>
+点击集群操作，修改主配置。可载入模板再其上修改。
+</p>
+
+<p>
+如
+</p>
+<pre class="example" id="org2c9f195">
+#################################################
+######### 		common argument		#############
+#################################################
+# tcp bind ip
+#canal.ip =
+# register ip to zookeeper
+canal.register.ip =
+canal.port = 11111
+canal.metrics.pull.port = 11112
+# canal instance user/passwd
+# canal.user = canal
+# canal.passwd = E3619321C1A937C46A0D8BD1DAC39F93B27D4458
+
+# canal admin config
+#canal.admin.manager = 127.0.0.1:8089
+canal.admin.port = 11110
+canal.admin.user = admin
+canal.admin.passwd = FB85C3E706468CAEA8E37E43BA5AC422991C78E7
+# admin auto register
+#canal.admin.register.auto = true
+#canal.admin.register.cluster =
+#canal.admin.register.name =
+
+#canal.zkServers =
+# flush data to zk
+canal.zookeeper.flush.period = 1000
+canal.withoutNetty = false
+# tcp, kafka, rocketMQ, rabbitMQ, pulsarMQ
+canal.serverMode = kafka
+# flush meta cursor/parse position to file
+canal.file.data.dir = ${canal.conf.dir}
+canal.file.flush.period = 1000
+## memory store RingBuffer size, should be Math.pow(2,n)
+canal.instance.memory.buffer.size = 16384
+## memory store RingBuffer used memory unit size , default 1kb
+canal.instance.memory.buffer.memunit = 1024 
+## meory store gets mode used MEMSIZE or ITEMSIZE
+canal.instance.memory.batch.mode = MEMSIZE
+canal.instance.memory.rawEntry = true
+
+## detecing config
+canal.instance.detecting.enable = false
+#canal.instance.detecting.sql = insert into retl.xdual values(1,now()) on duplicate key update x=now()
+canal.instance.detecting.sql = select 1
+canal.instance.detecting.interval.time = 3
+canal.instance.detecting.retry.threshold = 3
+canal.instance.detecting.heartbeatHaEnable = false
+
+# support maximum transaction size, more than the size of the transaction will be cut into multiple transactions delivery
+canal.instance.transaction.size =  1024
+# mysql fallback connected to new master should fallback times
+canal.instance.fallbackIntervalInSeconds = 60
+
+# network config
+canal.instance.network.receiveBufferSize = 16384
+canal.instance.network.sendBufferSize = 16384
+canal.instance.network.soTimeout = 30
+
+# binlog filter config
+canal.instance.filter.druid.ddl = true
+canal.instance.filter.query.dcl = false
+canal.instance.filter.query.dml = false
+canal.instance.filter.query.ddl = false
+canal.instance.filter.table.error = false
+canal.instance.filter.rows = false
+canal.instance.filter.transaction.entry = false
+canal.instance.filter.dml.insert = false
+canal.instance.filter.dml.update = false
+canal.instance.filter.dml.delete = false
+
+# binlog format/image check
+canal.instance.binlog.format = ROW,STATEMENT,MIXED 
+canal.instance.binlog.image = FULL,MINIMAL,NOBLOB
+
+# binlog ddl isolation
+canal.instance.get.ddl.isolation = false
+
+# parallel parser config
+canal.instance.parser.parallel = true
+## concurrent thread number, default 60% available processors, suggest not to exceed Runtime.getRuntime().availableProcessors()
+#canal.instance.parser.parallelThreadSize = 16
+## disruptor ringbuffer size, must be power of 2
+canal.instance.parser.parallelBufferSize = 256
+
+# table meta tsdb info
+canal.instance.tsdb.enable = false
+canal.instance.tsdb.dir = ${canal.file.data.dir:../conf}/${canal.instance.destination:}
+canal.instance.tsdb.url = jdbc:h2:${canal.instance.tsdb.dir}/h2;CACHE_SIZE=1000;MODE=MYSQL;
+canal.instance.tsdb.dbUsername = canal
+canal.instance.tsdb.dbPassword = Canal!123
+# dump snapshot interval, default 24 hour
+canal.instance.tsdb.snapshot.interval = 24
+# purge snapshot expire , default 360 hour(15 days)
+canal.instance.tsdb.snapshot.expire = 360
+
+#################################################
+######### 		destinations		#############
+#################################################
+canal.destinations =
+# conf root dir
+canal.conf.dir = ../conf
+# auto scan instance dir add/remove and start/stop instance
+canal.auto.scan = true
+canal.auto.scan.interval = 5
+# set this value to 'true' means that when binlog pos not found, skip to latest.
+# WARN: pls keep 'false' in production env, or if you know what you want.
+canal.auto.reset.latest.pos.mode = false
+
+canal.instance.tsdb.spring.xml = classpath:spring/tsdb/h2-tsdb.xml
+#canal.instance.tsdb.spring.xml = classpath:spring/tsdb/mysql-tsdb.xml
+
+canal.instance.global.mode = manager
+canal.instance.global.lazy = false
+canal.instance.global.manager.address = ${canal.admin.manager}
+#canal.instance.global.spring.xml = classpath:spring/memory-instance.xml
+canal.instance.global.spring.xml = classpath:spring/file-instance.xml
+#canal.instance.global.spring.xml = classpath:spring/default-instance.xml
+
+##################################################
+######### 	      MQ Properties      #############
+##################################################
+# aliyun ak/sk , support rds/mq
+#canal.aliyun.accessKey =
+#canal.aliyun.secretKey =
+#canal.aliyun.uid=
+
+canal.mq.flatMessage = true
+canal.mq.canalBatchSize = 50
+canal.mq.canalGetTimeout = 100
+# Set this value to "cloud", if you want open message trace feature in aliyun.
+canal.mq.accessChannel = local
+
+canal.mq.database.hash = true
+canal.mq.send.thread.size = 30
+canal.mq.build.thread.size = 8
+
+##################################################
+######### 		     Kafka 		     #############
+##################################################
+kafka.bootstrap.servers = b-2.logtest.2g3di3.c7.kafka.us-west-2.amazonaws.com:9092
+kafka.acks = all
+kafka.compression.type = none
+kafka.batch.size = 16384
+kafka.linger.ms = 1
+kafka.max.request.size = 1048576
+kafka.buffer.memory = 33554432
+kafka.max.in.flight.requests.per.connection = 1
+kafka.retries = 0
+
+kafka.kerberos.enable = false
+kafka.kerberos.krb5.file = ../conf/kerberos/krb5.conf
+kafka.kerberos.jaas.file = ../conf/kerberos/jaas.conf
+
+# sasl demo
+# kafka.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required \\n username=\"alice\" \\npassword="alice-secret\";
+# kafka.sasl.mechanism = SCRAM-SHA-512
+# kafka.security.protocol = SASL_PLAINTEXT
+</pre>
+
+<p>
+canal.admin.passwd = FB85C3E706468CAEA8E37E43BA5AC422991C78E7
+</p>
+
+<p>
+参考：<a href="https://github.com/alibaba/canal/wiki/Canal-Admin-ServerGuide">https://github.com/alibaba/canal/wiki/Canal-Admin-ServerGuide</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a020f0;">select</span> password(<span style="color: #8b2252;">'ZaIjVvX5q8F7LyKu'</span>)
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22914;&#26524;&#36935;&#21040;mysql8.0&#65292;&#21487;&#20197;&#20351;&#29992;select upper(sha1(unhex(sha1('ZaIjVvX5q8F7LyKu'))))</span>
+</pre>
+</div>
+
+<p>
+空间指针报错时，禁用了
+</p>
+
+<p>
+canal.instance.tsdb.enable = false
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgcbd99ab" class="outline-3">
+<h3 id="orgcbd99ab">canal-server</h3>
+<div class="outline-text-3" id="text-orgcbd99ab">
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy canal-server]# cat configmap.yaml 
+apiVersion: v1
+data:
+  start_canal_server.sh: &gt;-
+    cat &gt; /home/admin/canal-server/conf/canal.properties &lt;&lt;- EOF
+
+<span style="color: #ffa54f;">    # register ip</span>
+
+<span style="color: #ffa54f;">    # ${HOSTNAME} &#20026;podname&#65292;canal-server-discovery-svc-stable&#20026;svc&#21517;&#31216;</span>
+
+<span style="color: #ffa54f;">    # StatefulSet&#31867;&#22411;pod&#21517;&#31216;&#26159;&#22266;&#23450;&#30340;&#65292;k8s&#38598;&#32676;&#20869;pod&#22495;&#21517;&#35268;&#21017;&#20026;pod_name.svc_name.namespace.svc.cluster.local</span>
+
+<span style="color: #ffa54f;">    canal.register.ip = ${POD_IP}</span>
+
+<span style="color: #ffa54f;">    # canal admin config</span>
+
+<span style="color: #ffa54f;">    canal.admin.manager = canal-admin:8089</span>
+
+<span style="color: #ffa54f;">    canal.admin.port = 11110</span>
+
+<span style="color: #ffa54f;">    canal.admin.user = admin</span>
+
+<span style="color: #ffa54f;">    canal.admin.passwd = FB85C3E706468CAEA8E37E43BA5AC422991C78E7</span>
+
+<span style="color: #ffa54f;">    # admin auto register</span>
+
+<span style="color: #ffa54f;">    canal.admin.register.auto = true</span>
+
+<span style="color: #ffa54f;">    canal.admin.register.cluster = cluster-kafka</span>
+
+<span style="color: #ffa54f;">    EOF</span>
+
+    bash /home/admin/app.sh
+kind: ConfigMap
+metadata:
+  name: canal-config
+  namespace: dev1
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy canal-server]# cat deployment.yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canal-server
+  namespace: dev1
+  labels:
+    app: canal-server
+    version: v1
+spec:
+  selector:
+    matchLabels:
+  app: canal-server
+  version: v1
+  template:
+    metadata:
+  labels:
+        app: canal-server
+        version: v1
+    spec:
+  affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+          matchExpressions:
+          - key: app
+                operator: In
+                values:
+                - canal-server
+            namespaces:
+            - dev1
+            topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+          labelSelector:
+                matchLabels:
+                  app: canal-admin
+          namespaces:
+          - dev1
+          topologyKey: kubernetes.io/hostname
+            weight: 10
+  imagePullSecrets:
+  - name: aliyun-singapore-repo
+  containers:
+  - name: canal-server
+        image: canal/canal-server:v1.1.7
+        imagePullPolicy: Always 
+        <span style="color: #483d8b;">command</span>: [<span style="color: #8b2252;">"/bin/sh"</span>,<span style="color: #8b2252;">"-c"</span>,<span style="color: #8b2252;">"/start_canal_server.sh"</span>]
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">command: ['cat']</span>
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">tty: true</span>
+        ports:
+          - containerPort: 11111
+            name: http
+          - containerPort: 11112
+            name: metrics
+        env:
+          - name: POD_IP
+            valueFrom:
+          fieldRef:
+                fieldPath: status.podIP
+        livenessProbe:
+          failureThreshold: 8
+          tcpSocket:
+            port: 11110
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 3
+<span style="color: #b22222;">#        </span><span style="color: #b22222;">livenessProbe:</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">httpGet:</span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">path: /health</span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">port: 11112 </span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">scheme: HTTP</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">initialDelaySeconds: 60 </span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">periodSeconds: 5</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">failureThreshold: 3</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">successThreshold: 1</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">timeoutSeconds: 5</span>
+<span style="color: #b22222;">#        </span><span style="color: #b22222;">readinessProbe:</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">httpGet:</span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">path: /health </span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">port: 11112 </span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">scheme: HTTP</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">initialDelaySeconds: 60 </span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">periodSeconds: 5</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">failureThreshold: 3</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">successThreshold: 1</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">timeoutSeconds: 5</span>
+        resources:
+          limits:
+            cpu: <span style="color: #8b2252;">"1"</span>
+            memory: 2Gi 
+          requests:
+            cpu: 250m
+            memory: 512Mi 
+        volumeMounts:
+          - mountPath: /etc/localtime
+            name: time
+          - mountPath: /start_canal_server.sh
+            name: canal-config
+            subPath: start_canal_server.sh
+          - name: logs
+            mountPath: /home/admin/canal-server/logs
+  volumes:
+  - name: time
+        hostPath:
+          path: /etc/localtime
+  - configMap:
+         defaultMode: 511
+         name: canal-config
+        name: canal-config
+  - emptyDir: {}
+        name: logs
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org3af7002" class="outline-4">
+<h4 id="org3af7002">instance.properties配置</h4>
+<div class="outline-text-4" id="text-org3af7002">
+<p>
+admin 管理界面添加Instance管理
+</p>
+<pre class="example" id="org8fa3f10">
+#################################################
+## mysql serverId , v1.0.26+ will autoGen
+#canal.instance.mysql.slaveId=1037
+
+# enable gtid use true/false
+canal.instance.gtidon=false
+
+# position info
+canal.instance.master.address=test.cp0.rds.amazonaws.com:3306
+#canal.instance.master.journal.name=
+#canal.instance.master.position=
+#canal.instance.master.timestamp=
+#canal.instance.master.gtid=
+
+# rds oss binlog
+#canal.instance.rds.accesskey=
+#canal.instance.rds.secretkey=
+#canal.instance.rds.instanceId=
+
+# table meta tsdb info
+canal.instance.tsdb.enable=false
+
+# username/password
+canal.instance.dbUsername=canal
+canal.instance.dbPassword=Canal!123
+canal.instance.connectionCharset = UTF-8
+# enable druid Decrypt database password
+canal.instance.enableDruid=false
+#canal.instance.pwdPublicKey=MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALK4BUxdDltRRE5/zXpVEVPUgunvscYFtEip3pmLlhrWpacX7y7GCMo2/JM6LeHmiiNdH1FWgGCpUfircSwlWKUCAwEAAQ==
+
+#canal.instance.defaultDatabaseName = wealth_management
+
+# table regex
+#canal.instance.filter.regex=test\\..*
+canal.instance.filter.regex=wealth_management\\.pay_order_request_extend,wealth_management\\.pay_order
+canal.instance.filter.black.regex=
+
+
+# mq config
+canal.mq.topic=canal-db-wealth_management
+canal.mq.partition=0
+</pre>
+
+<p>
+配置工作做好之后，可以启动Canal服务：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#26381;&#21153;&#26085;&#24535;</span>
+tail -100f /data/canal/logs/canal/canal
+</pre>
+</div>
+
+<p>
+在test数据库创建一个订单表，并且执行几个简单的DML
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">use <span style="color: #ff00ff;">`test`</span>;
+
+CREATE TABLE <span style="color: #ff00ff;">`order`</span>
+(
+    id          BIGINT UNIQUE PRIMARY KEY AUTO_INCREMENT COMMENT <span style="color: #8b2252;">'&#20027;&#38190;'</span>,
+    order_id    VARCHAR(64)    NOT NULL COMMENT <span style="color: #8b2252;">'&#35746;&#21333;ID'</span>,
+    amount      DECIMAL(10, 2) NOT NULL DEFAULT 0 COMMENT <span style="color: #8b2252;">'&#35746;&#21333;&#37329;&#39069;'</span>,
+    create_time DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT <span style="color: #8b2252;">'&#21019;&#24314;&#26102;&#38388;'</span>,
+    UNIQUE uniq_order_id (<span style="color: #ff00ff;">`order_id`</span>)
+) COMMENT <span style="color: #8b2252;">'&#35746;&#21333;&#34920;'</span>;
+
+INSERT INTO <span style="color: #ff00ff;">`order`</span>(order_id, amount) VALUES (<span style="color: #8b2252;">'10086'</span>, 999);
+UPDATE <span style="color: #ff00ff;">`order`</span> SET amount = 10087 WHERE order_id = <span style="color: #8b2252;">'10086'</span>;
+DELETE  FROM <span style="color: #ff00ff;">`order`</span> WHERE order_id = <span style="color: #8b2252;">'10086'</span>;
+</pre>
+</div>
+
+<p>
+这个时候，可以利用Kafka的kafka-console-consumer或者Kafka Tools查看test这个topic的数据
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">bin/kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --from-beginning --topic test
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">{<span style="color: #8b2252;">"data"</span>:[{<span style="color: #8b2252;">"id"</span>:<span style="color: #8b2252;">"1"</span>,<span style="color: #8b2252;">"order_id"</span>:<span style="color: #8b2252;">"10086"</span>,<span style="color: #8b2252;">"amount"</span>:<span style="color: #8b2252;">"999.0"</span>,<span style="color: #8b2252;">"create_time"</span>:<span style="color: #8b2252;">"2020-03-02 05:12:49"</span>}],<span style="color: #8b2252;">"database"</span>:<span style="color: #8b2252;">"test"</span>,<span style="color: #8b2252;">"es"</span>:1583143969000,<span style="color: #8b2252;">"id"</span>:3,<span style="color: #8b2252;">"isDdl"</span>:false,<span style="color: #8b2252;">"mysqlType"</span>:{<span style="color: #8b2252;">"id"</span>:<span style="color: #8b2252;">"BIGINT"</span>,<span style="color: #8b2252;">"order_id"</span>:<span style="color: #8b2252;">"VARCHAR(64)"</span>,<span style="color: #8b2252;">"amount"</span>:<span style="color: #8b2252;">"DECIMAL(10,2)"</span>,<span style="color: #8b2252;">"create_time"</span>:<span style="color: #8b2252;">"DATETIME"</span>},<span style="color: #8b2252;">"old"</span>:null,<span style="color: #8b2252;">"pkNames"</span>:[<span style="color: #8b2252;">"id"</span>],<span style="color: #8b2252;">"sql"</span>:<span style="color: #8b2252;">""</span>,<span style="color: #8b2252;">"sqlType"</span>:{<span style="color: #8b2252;">"id"</span>:-5,<span style="color: #8b2252;">"order_id"</span>:12,<span style="color: #8b2252;">"amount"</span>:3,<span style="color: #8b2252;">"create_time"</span>:93},<span style="color: #8b2252;">"table"</span>:<span style="color: #8b2252;">"order"</span>,<span style="color: #8b2252;">"ts"</span>:1583143969460,<span style="color: #8b2252;">"type"</span>:<span style="color: #8b2252;">"INSERT"</span>}
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>kafka的json结构，各字段含义，如sqlType  <a href="https://github.com/alibaba/canal/issues/3331">https://github.com/alibaba/canal/issues/3331</a></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

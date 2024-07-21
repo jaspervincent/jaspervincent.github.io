@@ -63,8 +63,9 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orgec6952c">httpDNS</a></li>
-<li><a href="#orgef0d243">DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</a></li>
+<li><a href="#orgee49578">httpDNS</a></li>
+<li><a href="#org2a25240">Aliyun DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</a></li>
+<li><a href="#org6c9180f">AWS CluoudFront-使用鉴权-URL</a></li>
 </ul>
 </div>
 </nav>
@@ -73,9 +74,9 @@
 </ul>
 
 
-<section id="outline-container-orgec6952c" class="outline-2">
-<h2 id="orgec6952c">httpDNS</h2>
-<div class="outline-text-2" id="text-orgec6952c">
+<section id="outline-container-orgee49578" class="outline-2">
+<h2 id="orgee49578">httpDNS</h2>
+<div class="outline-text-2" id="text-orgee49578">
 <p>
 背景
 </p>
@@ -206,9 +207,9 @@ httpdns的优势
 
 
 
-<section id="outline-container-orgef0d243" class="outline-2">
-<h2 id="orgef0d243">DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</h2>
-<div class="outline-text-2" id="text-orgef0d243">
+<section id="outline-container-org2a25240" class="outline-2">
+<h2 id="org2a25240">Aliyun DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</h2>
+<div class="outline-text-2" id="text-org2a25240">
 <p>
 官方文档：<a href="https://help.aliyun.com/zh/vpn/sub-product-ipsec-vpn/use-cases/dts-implements-data-synchronization-between-alibaba-cloud-rds-and-aws-vpc-based-on-vpn-gateway?spm=a2c4g.11186623.0.0.3a867d783Sfkn6">https://help.aliyun.com/zh/vpn/sub-product-ipsec-vpn/use-cases/dts-implements-data-synchronization-between-alibaba-cloud-rds-and-aws-vpc-based-on-vpn-gateway?spm=a2c4g.11186623.0.0.3a867d783Sfkn6</a>
 </p>
@@ -388,6 +389,159 @@ DTS：
 <li>解决方案：</li>
 </ul></li>
 </ul>
+</div>
+</section>
+
+
+<section id="outline-container-org6c9180f" class="outline-2">
+<h2 id="org6c9180f">AWS CluoudFront-使用鉴权-URL</h2>
+<div class="outline-text-2" id="text-org6c9180f">
+<p>
+参考
+</p>
+<ul class="org-ul">
+<li>使用签名 URL - Amazon CloudFront <a href="https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-urls.html">https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-urls.html</a></li>
+<li>使用 Java 创建 URL 签名 - Amazon CloudFront <a href="https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/CFPrivateDistJavaDevelopment.html">https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/CFPrivateDistJavaDevelopment.html</a></li>
+</ul>
+
+<p>
+1.使用 OpenSSL 生成长度为 2048 位的 RSA 密钥对
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">openssl genrsa -out private_key.pem 2048
+</pre>
+</div>
+
+<p>
+2.提取公有密钥
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">openssl rsa -pubout -in private_key.pem -out public_key.pem
+</pre>
+</div>
+
+<p>
+3.将公有密钥上传到 CloudFront <a href="https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html#private-content-creating-cloudfront-key-pairs">https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html#private-content-creating-cloudfront-key-pairs</a>
+</p>
+
+<p>
+4.重新设置私有密钥的格式 java 用
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">openssl pkcs8 -topk8 -nocrypt -in cloudfront_private_key.pem -inform PEM -out private_key.der -outform DER
+</pre>
+</div>
+
+<p>
+<a href="https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/CFPrivateDistJavaDevelopment.html">https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/CFPrivateDistJavaDevelopment.html</a>
+</p>
+
+<p>
+5.cloudfront 控制台域名设置限制查看器访问，绑定密钥组
+</p>
+
+<p>
+<a href="https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html#private-content-reformatting-private-key">https://docs.aws.amazon.com/zh_cn/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html#private-content-reformatting-private-key</a>
+</p>
+
+<p>
+6.手动测试
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt; \EOF &gt;policy 
+<span style="color: #ffa54f;">{</span>
+<span style="color: #ffa54f;">    "Statement": [</span>
+<span style="color: #ffa54f;">       {</span>
+<span style="color: #ffa54f;">            "Resource": "https://*",</span>
+<span style="color: #ffa54f;">            "Condition": {</span>
+<span style="color: #ffa54f;">                "DateLessThan": {</span>
+<span style="color: #ffa54f;">                    "AWS:EpochTime": 1721471130</span>
+<span style="color: #ffa54f;">                }</span>
+<span style="color: #ffa54f;">            }</span>
+<span style="color: #ffa54f;">        }</span>
+<span style="color: #ffa54f;">    ]</span>
+<span style="color: #ffa54f;">}</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#29983;&#25104;Policy=&#31574;&#30053;&#22768;&#26126;&#30340; Base64 &#32534;&#30721;&#29256;&#26412;</span>
+cat policy | tr -d <span style="color: #8b2252;">"\n"</span> | tr -d <span style="color: #8b2252;">" \t\n\r"</span> |openssl base64 -A | tr -- <span style="color: #8b2252;">'+=/'</span> <span style="color: #8b2252;">'-_~'</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#29983;&#25104;Signature=&#31574;&#30053;&#22768;&#26126;&#32463;&#36807;&#21704;&#24076;&#22788;&#29702;&#21644;&#31614;&#32626;&#21518;&#30340;&#29256;&#26412;</span>
+cat policy | tr -d <span style="color: #8b2252;">"\n"</span> | tr -d <span style="color: #8b2252;">" \t\n\r"</span> | openssl sha1 -sign private_key.pem | openssl base64 -A | tr -- <span style="color: #8b2252;">'+=/'</span> <span style="color: #8b2252;">'-_~'</span>
+</pre>
+</div>
+
+<p>
+样例:  xx.com/{{ resource }}?Policy={{ policy-base64 }}&amp;Signature={{ signature-base64 }}&amp;Key-Pair-Id={{ keyid }}
+</p>
+
+<p>
+<a href="https://awsvideo.xxx.online/102484ad37a371efbfff87c7371d0102/1331493f784b468c9edb7e1fdeb725f3-017411445de7b70fecf4b3b951960080-hd.m3u8?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly8qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzIxNDcxMTMwfX19XX0_&amp;Signature=OAbMTqCZ9ifwuphR1zvajv9lcZj7MZPehSy-yCMy4nrJ5Nk3rwPNhCHjqUWpFtwq9ECSSidEC46NJHbey9uEr0GATbSTi27Udl4GvjfLe5mzrwELTkG-OooXuqz7CRKLoG9-FLxYEU~RlK6JpoX1p7k~JJf4OJ2ZWnlhM3qZBH1un6HK0qNYb~A1iPoIUXkXvD6bvMATsr6zhex02Sgf9CcOKuOHHp3op-ZJ8H1bPpXLV92KimogJr4g84PjkrOm0bEzMbA1bzYgkUrzSVOulZrGff29I4yr5~dXyguS0x9-SPjV-rgooVT73NS3LZe6mC1fyprLdIpdD73LAww5Mg__&amp;Key-Pair-Id=K2xxxxxx">https://awsvideo.xxx.online/102484ad37a371efbfff87c7371d0102/1331493f784b468c9edb7e1fdeb725f3-017411445de7b70fecf4b3b951960080-hd.m3u8?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly8qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzIxNDcxMTMwfX19XX0_&amp;Signature=OAbMTqCZ9ifwuphR1zvajv9lcZj7MZPehSy-yCMy4nrJ5Nk3rwPNhCHjqUWpFtwq9ECSSidEC46NJHbey9uEr0GATbSTi27Udl4GvjfLe5mzrwELTkG-OooXuqz7CRKLoG9-FLxYEU~RlK6JpoX1p7k~JJf4OJ2ZWnlhM3qZBH1un6HK0qNYb~A1iPoIUXkXvD6bvMATsr6zhex02Sgf9CcOKuOHHp3op-ZJ8H1bPpXLV92KimogJr4g84PjkrOm0bEzMbA1bzYgkUrzSVOulZrGff29I4yr5~dXyguS0x9-SPjV-rgooVT73NS3LZe6mC1fyprLdIpdD73LAww5Mg__&amp;Key-Pair-Id=K2xxxxxx</a>
+</p>
+
+<p>
+难点：流式传输视频点播限制，无法自动添加请求资源鉴权
+</p>
+
+<p>
+解决方案：
+</p>
+
+<p>
+方案1： 利用lambda改写，流量走api gateway <a href="https://aws.amazon.com/cn/blogs/networking-and-content-delivery/secure-and-cost-effective-video-streaming-using-cloudfront-signed-urls/">https://aws.amazon.com/cn/blogs/networking-and-content-delivery/secure-and-cost-effective-video-streaming-using-cloudfront-signed-urls/</a>
+</p>
+
+<p>
+方案2：CDN边缘节点实现(自带lambda js脚本)
+</p>
+
+<p>
+<a href="https://github.com/aws-samples/amazon-cloudfront-protecting-hls-manifest-with-signed-url?tab=readme-ov-file">https://github.com/aws-samples/amazon-cloudfront-protecting-hls-manifest-with-signed-url?tab=readme-ov-file</a>
+</p>
+
+<p>
+注意：模板中nodejs14.x 改为nodejs16.x。 Origin 处改成自己的s3源地址，替换自己的证书信息。如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">...
+Parameters:
+  Origin:
+    Description: Domain name of content origin
+    Type: String
+    Default: s3-video-storage-test.s3.us-west-2.amazonaws.com
+...
+      Runtime: nodejs16.x
+...
+                <span style="color: #483d8b;">let</span> duration = 900; //ts&#25991;&#20214;&#37492;&#26435;&#36807;&#26399;&#26102;&#38388;
+...
+    <span style="color: #483d8b;">let</span> policy = JSON.stringify({
+        Statement: [{
+            //Resource: <span style="color: #8b2252;">'http*://'</span>+ domain+path.posix.join(dir,file), &#22914;&#26524;&#26377;&#22791;&#29992;&#22495;&#21517;&#65292;&#20462;&#25913;&#27492;&#22788;
+            Resource: <span style="color: #8b2252;">'http*://awsvideo.cici.online'</span>+ path.posix.join(dir,file),
+            Condition: {
+...
+      Runtime: nodejs16.x
+</pre>
+</div>
+
+
+<p>
+测试环境-java代码对应信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">...
+        String resourceUrl = <span style="color: #8b2252;">"https://d2xxxxu.cloudfront.net"</span>;
+        String keyPairId = <span style="color: #8b2252;">"K9xxxxxV"</span>;
+...
+                .privateKey(new java.io.File(<span style="color: #8b2252;">"/path/to/private_key.der"</span>).toPath())
+...
+</pre>
+</div>
 </div>
 </section>
 </main class="container">

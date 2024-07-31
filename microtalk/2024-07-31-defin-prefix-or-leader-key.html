@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lisp 定义前缀/前导键</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<!--<link rel="stylesheet" type="text/css" href="/static/orgcss-style.css"/>-->
+<link rel="stylesheet" type="text/css" href="/static/prot-style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/prot-style-print.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624"
+     crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<div class="infobar">
+  <div class="infobar-inner">
+    <a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+    <div class="infobar-header">
+      <a href="https://xuchangwei.com">Jasper Hsu</a>
+      <br>
+      <small></small>
+    </div>
+    <div class="infobar-menu">
+      <nav id="infobar-main-menu" class="infobar-navigation" aria-label="Main menu">
+        <ul>
+          <li>
+            <a href="/about.html">About</a>
+          </li>
+          <li>
+            <a href="/index.html">Home</a>
+          </li>
+          <li>
+            <a href="/talk.html">Talk</a>
+          </li>
+          <li>
+            <a href="/rss.xml">
+              <img src='/rss.png' style='height: 1em;'> RSS Feeds </a>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+<p class="info">
+          🏆 欢迎来到本站：
+          <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+          <strong>希望这里有你感兴趣的内容</strong>。
+        </p>
+</div>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Lisp 定义前缀/前导键</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgbe51bc5">定义一个前缀键</a></li>
+<li><a href="#orgd424957">嵌套键映射</a>
+<ul>
+<li><a href="#org764a952">解决嵌套键时，which-key展示问题</a></li>
+</ul>
+</li>
+<li><a href="#org8502c1e">use-package 的绑定键</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAG: <a href="../microtalk.html">微说</a></li>
+</ul>
+
+<div class="PREVIEW" id="orgd3ccda5">
+<p>
+本文介绍在Emacs中，如何定义前缀键、如何设置嵌套键映射。它将为你提供更多键的访问权限。
+</p>
+
+</div>
+
+<p>
+如果安装了 <code>which-key</code> 软件包，请打开 <code>which-key-mode</code>, 它会帮助你展示
+有哪些前缀键。如果没有安装可以使用所绑定的键前缀后 <code>C-h</code> (<code>&lt;keymap&gt; C-h</code>) 来显示。
+</p>
+
+<p>
+我们要实现如下键绑定：
+</p>
+
+<pre class="example" id="orgad8aa99">
+C-t
+   t &lt;Command&gt;
+   f find-file
+   d dired
+   b "Buffer"
+     m buffer-menu
+     s switch-to-buffer
+</pre>
+
+<p>
+以下是在emacs 29之后的版本实现，29之前的版本可能有些函数名不一样。
+</p>
+<section id="outline-container-orgbe51bc5" class="outline-2">
+<h2 id="orgbe51bc5">定义一个前缀键</h2>
+<div class="outline-text-2" id="text-orgbe51bc5">
+<p>
+<code>keymap-set</code> 接收3个参数，
+</p>
+
+<pre class="example" id="orgf540f69">
+(keymap-set KEYMAP KEY DEFINITION)
+</pre>
+
+<pre class="example" id="org80f9924">
+;; Emacs 29  `keymap-set', `defvar-keymap'
+
+;;;; 定义全局键映射 C-t， 动作为nil，不做任何事
+
+(keymap-set global-map "C-t" nil)
+
+;;;; 定义全局键映射C-t，执行test-command函数
+
+;;; 定义交互式函数，回显一条消息This is a test!
+(defun test-command ()
+  (interactive) ; 这使用函数成为一个命令
+  (message "This is a test!"))
+
+(keymap-set global-map "C-t"  'test-command)
+
+;;;; keymap-set的变体及在包管理(`use-package')中的使用
+
+;;; 在旧版本中会使用 keymap-set 变体 define-key
+
+(define-key global-map (kbd "C-t") 'test-command)
+
+;;; use-package 中的键映射, 29版本后为内置包
+
+(use-package xxx
+  :bind ("C-t" . test-command))
+</pre>
+</div>
+</section>
+<section id="outline-container-orgd424957" class="outline-2">
+<h2 id="orgd424957">嵌套键映射</h2>
+<div class="outline-text-2" id="text-orgd424957">
+<p>
+当我们想要定义前缀键映射时，不想使用命令，而是绑定键映射。键映射是一个变量，像字符串一样保存键。
+</p>
+
+<pre class="example" id="org9af0479">
+(defun test-command ()
+  (interactive) ; 这使用函数成为一个命令
+  (message "This is a test!"))
+
+;;;; 使用defvar-keymap定义键映射
+
+;;; C-t t 执行test-command函数
+(defvar-keymap my-test-prefix-map
+  :doc "My prefix map."
+  "t" 'test-command)
+
+(keymap-set global-map "C-t"  my-test-prefix-map)
+
+;;; C-t 多个键映射 f d t
+(defvar-keymap my-test-prefix-map
+  :doc "My prefix map."
+  "f" 'find-file
+  "d" 'dired
+  "t" 'test-command)
+
+(keymap-set global-map "C-t"  my-test-prefix-map)
+
+;;;; 使用defvar-keymap定义键映射，更友好写法
+;;; 更友好的写法
+;; #'井号加单引号写法和上面‘单引号的功能是相同的，只语义上有些不同。
+;; #'告诉阅读此内容的人或编译器接下来是一个函数，不是任何形式的
+;; 符号，而是一个特定的函数
+(defvar-keymap my-test-prefix-buffer-map
+  :doc "My prefix map for buffers."
+  "s" #'switch-to-buffer
+  "m" #'buffer-menu)
+</pre>
+
+<p>
+现在我希望能够从我的前缀映射内部访问 <code>my-test-prefix-buffer-map</code>
+</p>
+
+<pre class="example" id="org43f1672">
+(defvar-keymap my-test-prefix-map
+  :doc "My prefix map."
+  "f" 'find-file
+  "b" my-test-prefix-buffer-map
+  "d" 'dired
+  "h" help-map
+  "t" 'test-command)
+</pre>
+
+<p>
+<code>C-t</code> 时which-key  b 显示 <code>+prefix</code> , 而没展示b的作用。
+</p>
+
+
+<figure id="org02108e7">
+<img src="https://cdn.jsdelivr.net/gh/jaspervincent/pic/microtalk/img_20240731_224534.png" alt="img_20240731_224534.png" width="90%">
+
+</figure>
+
+
+<figure id="orga7902a3">
+<img src="https://cdn.jsdelivr.net/gh/jaspervincent/pic/microtalk/img_20240731_224649.png" alt="img_20240731_224649.png">
+
+</figure>
+</div>
+<div id="outline-container-org764a952" class="outline-3">
+<h3 id="org764a952">解决嵌套键时，which-key展示问题</h3>
+<div class="outline-text-3" id="text-org764a952">
+<pre class="example" id="orge4fa44a">
+(which-key-add-keymap-based-replacements my-test-prefix-map
+  "b" `("Buffer" .  ,my-test-prefix-buffer-map))
+</pre>
+
+
+<figure id="orgba06742">
+<img src="https://cdn.jsdelivr.net/gh/jaspervincent/pic/microtalk/img_20240731_231128.png" alt="img_20240731_231128.png">
+
+</figure>
+
+
+<p>
+<code>`( ,&lt;var/function&gt;)</code> 是动态展示来的用法
+</p>
+
+<pre class="example" id="orgcc6ef3b">
+(setq test-hello "Hello!")
+
+test-hello
+"Hello!"
+
+(message "The value is: %s" '(one two test-hello))
+"The value is: (one two test-hello)"
+
+(message "The value is: %s" `(one two ,test-hello))
+"The value is: (one two Hello!)"
+</pre>
+
+<p>
+<b>添加帮助信息</b>
+</p>
+
+<pre class="example" id="org4dd9240">
+(defvar-keymap my-test-prefix-map
+  :doc "My prefix map."
+  "f" 'find-file
+  "b" my-test-prefix-buffer-map
+  "d" 'dired
+  "h" help-map
+  "t" 'test-command)
+
+(keymap-set global-map "C-t"  my-test-prefix-map)
+
+;;; which-key中显示嵌套键的注释
+(which-key-add-keymap-based-replacements my-test-prefix-map
+  "b" `("Buffer" .  ,my-test-prefix-buffer-map)
+  "h" `("Help" .  ,help-map))
+</pre>
+
+<p>
+which-key 适合做演示。一般我们忘记快捷前缀有哪些嵌套键，可以在后面追加 <code>C-h</code> .
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-org8502c1e" class="outline-2">
+<h2 id="org8502c1e">use-package 的绑定键</h2>
+<div class="outline-text-2" id="text-org8502c1e">
+<pre class="example" id="orgf9c4efe">
+(use-package xxx
+  :bind ("C-t" . test-command)) ; 相当于全局映射 global-map
+
+(use-package xxx
+  :bind
+  ( :map global-map
+    ("C-t" . test-command)
+    ("C-c l" . org-store-link)
+    :map org-mode-map
+    ("C-c C-M-l" . org-toggle-link-display)
+    ))
+</pre>
+
+
+<p>
+<b>完整内容</b>
+</p>
+
+<pre class="example" id="orgeefa59e">
+;; This buffer is for text that is not saved, and for Lisp evaluation.
+;; To create a file, visit it with ‘C-x C-f’ and enter text in its buffer.
+
+;; Emacs 29  `keymap-set', `defvar-keymap'
+
+;;;; 定义全局键映射 C-t， 动作为nil，不做任何事
+
+(keymap-set global-map "C-t" nil)
+
+;;;; 定义全局键映射C-t，执行test-command函数
+
+;;; 定义交互式函数，回显一条消息This is a test!
+(defun test-command ()
+  (interactive) ; 这使用函数成为一个命令
+  (message "This is a test!"))
+
+(keymap-set global-map "C-t"  'test-command)
+
+;;;; keymap-set的变体及在包管理(`use-package')中的使用
+
+;;; 在旧版本中会使用 keymap-set 变体 define-key
+
+(define-key global-map (kbd "C-t") 'test-command)
+
+;;; use-package 中的键映射, 29版本后为内置包
+
+(use-package xxx
+  :bind ("C-t" . test-command)) ; 相当于全局映射 global-map
+
+(use-package xxx
+  :bind
+  ( :map global-map
+    ("C-t" . test-command)
+    ("C-c l" . org-store-link)
+    :map org-mode-map
+    ("C-c C-M-l" . org-toggle-link-display)
+    ))
+
+(defun test-command ()
+  (interactive) ; 这使用函数成为一个命令
+  (message "This is a test!"))
+
+;;;; 使用defvar-keymap定义键映射
+
+;;; C-t t 执行test-command函数
+(defvar-keymap my-test-prefix-map
+  :doc "My prefix map."
+  "t" 'test-command)
+
+(keymap-set global-map "C-t"  my-test-prefix-map)
+
+
+;;;; 使用defvar-keymap定义键映射，更友好写法
+;;; 更友好的写法
+;; #'井号加单引号写法和上面‘单引号的功能是相同的，只语义上有些不同。
+;; #'告诉阅读此内容的人或编译器接下来是一个函数，不是任何形式的
+;; 符号，而是一个特定的函数
+(defvar-keymap my-test-prefix-buffer-map
+  :doc "My prefix map for buffers."
+  "s" #'switch-to-buffer
+  "m" #'buffer-menu)
+
+;;; C-t 多个键映射 f d t
+(defvar-keymap my-test-prefix-map
+  :doc "My prefix map."
+  "f" 'find-file
+  "b" my-test-prefix-buffer-map
+  "d" 'dired
+  "h" help-map
+  "t" 'test-command)
+
+(keymap-set global-map "C-t"  my-test-prefix-map)
+
+;;; which-key中显示嵌套键的注释
+(which-key-add-keymap-based-replacements my-test-prefix-map
+  "b" `("Buffer" .  ,my-test-prefix-buffer-map)
+  "h" `("Help" .  ,help-map))
+
+(setq test-hello "Hello!")
+
+test-hello
+"Hello!"
+
+(message "The value is: %s" '(one two test-hello))
+"The value is: (one two test-hello)"
+
+(message "The value is: %s" `(one two ,test-hello))
+"The value is: (one two Hello!)"
+</pre>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<!--
+<footer class="footer">
+
+  <div class="footer-block">
+
+    <p style="font-family: \"Noto Sans\",sans-serif;">Copyright (c) © 2023-2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+      
+      Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+      <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+    </p>
+
+  </div>
+
+</footer>
+-->
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">
+          Copyright © 2024 Jasper Hsu. All original content is licensed under a free/libre <em>copyleft license</em> (CC BY-SA 4.0).
+
+          Read the notice about the <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">license and resources</a>.
+
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a> 
+          <span style="padding:0 8px">|</span>
+          <a rel="nofollow" target="_blank" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=13108202001084" data-v-1d178813="">
+          冀公网安备13108202001084号
+            <img src="/static/images/icon-beian.png" style="display:inline-block;width:14px;height:12px;position:relative;top:1px;left:3px" data-v-1d178813="">
+          </a>
+-->
+
+          <a href="https://orgmode.org" alt="Made with Emacs Org-Mode" style="float:left; margin 20px 0px 20px 20px;"><img width="150px" height="44px" src="/static/images/made-with-emacs.webp"></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

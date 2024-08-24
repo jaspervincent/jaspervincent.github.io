@@ -63,8 +63,9 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org0bb913b">jenkins1</a></li>
-<li><a href="#org3e8f746">jenkins2</a></li>
+<li><a href="#orgeb04629">jenkins1</a></li>
+<li><a href="#org79cd94c">jenkins2</a></li>
+<li><a href="#orgaa41e09">服务发布更新减少耗时方案</a></li>
 </ul>
 </div>
 </nav>
@@ -75,9 +76,9 @@
 <p>
 jenkins 页面构建通过 helm 发布到 k8s 集群中
 </p>
-<section id="outline-container-org0bb913b" class="outline-2">
-<h2 id="org0bb913b">jenkins1</h2>
-<div class="outline-text-2" id="text-org0bb913b">
+<section id="outline-container-orgeb04629" class="outline-2">
+<h2 id="orgeb04629">jenkins1</h2>
+<div class="outline-text-2" id="text-orgeb04629">
 <p>
 <b>jenkins job 选项参数</b>
 </p>
@@ -344,9 +345,9 @@ spec:
 </div>
 </div>
 </section>
-<section id="outline-container-org3e8f746" class="outline-2">
-<h2 id="org3e8f746">jenkins2</h2>
-<div class="outline-text-2" id="text-org3e8f746">
+<section id="outline-container-org79cd94c" class="outline-2">
+<h2 id="org79cd94c">jenkins2</h2>
+<div class="outline-text-2" id="text-org79cd94c">
 <p>
 jenkins 页面构建通过 <a href="https://plugins.jenkins.io/kubernetes/">kubernetes插件</a> 发布到 k8s 集群中
 </p>
@@ -626,6 +627,172 @@ node{
         sh <span style="color: #8b2252;">'k8s_log_aws_uswest2_dev ${JOB_BASE_NAME}'</span>
     }
 }
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-orgaa41e09" class="outline-2">
+<h2 id="orgaa41e09">服务发布更新减少耗时方案</h2>
+<div class="outline-text-2" id="text-orgaa41e09">
+<p>
+maven构建速度： <a href="https://springdoc.cn/maven-fast-build/#google_vignette">https://springdoc.cn/maven-fast-build/#google_vignette</a>
+</p>
+
+
+<p>
+构建工具优化-maven
+</p>
+
+<p>
+0.构建耗时
+</p>
+
+<p>
+pom.xml
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;build&gt;
+    &lt;plugins&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-profiler-plugin&lt;/artifactId&gt;
+            &lt;version&gt;1.7&lt;/version&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;
+</pre>
+</div>
+
+<p>
+执行
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">cdp-server</span>
+mvn -B -Dmaven.test.skip=true -Dprofile -P &lt;env&gt; clean package -f pom.xml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">cat profiler</span>
+cat .profiler/xxx.html
+</pre>
+</div>
+
+<p>
+构建耗时：1m09s
+</p>
+
+<p>
+1.参数优化(无效果)
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">export MAVEN_OPTS=-Xms4096m -Xmx4096m</span>
+<span style="color: #483d8b;">export</span> <span style="color: #a0522d;">MAVEN_OPTS</span>=<span style="color: #8b2252;">'-XX:-TieredCompilation -XX:TieredStopAtLevel=1'</span>
+mvn -T 2C -B -Dmaven.test.skip=true -P &lt;xxx&gt; clean package -f pom.xml
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>export MAVEN_OPTS='-XX:-TieredCompilation -XX:TieredStopAtLevel=1' 禁用默认分层编译</li>
+<li>-B 以批处理(batch)模式运行</li>
+<li>-T 2C 每一个CPU核使用2个线程，逻辑CPU核数. 模块化编译效果更佳 -pl module1,module2 -am</li>
+<li>-Dmaven.test.skip = true 跳过单元测试。使用 -DskipTests 选项跳过测试执行，但仍会编译 test 文件夹</li>
+<li>-Dmaven.compile.fork=true 指明多线程进行编译</li>
+<li>clean 通常情况下，我们建议用户在构建时使用 clean 参数保证构建的正确性。clean 可以删除旧的构建产物，但其实我们大多数时间可能不需要这个参数，只有在某些情况下（比如，更改了类名，或者删除了一些类）才必须使用这个参数，所以，如果某次变更只是修改了一些方法，或者增加了一些类，那么就不需要强制执行 clean 了</li>
+</ul>
+
+<p>
+参数选项参考：
+</p>
+<ul class="org-ul">
+<li>官方 <a href="https://maven.apache.org/ref/3.9.8/maven-embedder/cli.html">https://maven.apache.org/ref/3.9.8/maven-embedder/cli.html</a></li>
+<li>中文 <a href="https://maven.org.cn/ref/3.6.2/maven-embedder/cli.html">https://maven.org.cn/ref/3.6.2/maven-embedder/cli.html</a></li>
+</ul>
+
+<p>
+2.maven子项目mvnd构建（无效果）
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">wget https://downloads.apache.org/maven/mvnd/1.0.1/maven-mvnd-1.0.1-linux-amd64.tar.gz
+
+<span style="color: #483d8b;">export</span> <span style="color: #a0522d;">PATH</span>=/home/jenkins/agent/maven-mvnd-1.0.1-linux-amd64/bin:$<span style="color: #a0522d;">PATH</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#26500;&#24314;</span>
+mvnd -T 2C -B -Dmaven.test.skip=true -P &lt;xxx&gt; clean package -f pom.xml
+</pre>
+</div>
+
+<p>
+3.增量编译(无效果)
+</p>
+
+<p>
+参考：<a href="https://stackoverflow.com/questions/8918165/does-maven-support-incremental-builds">https://stackoverflow.com/questions/8918165/does-maven-support-incremental-builds</a>
+</p>
+
+<p>
+4.缩小jar包体积
+</p>
+
+<p>
+结论：不推荐。 不好实时跟进各组件依赖关系，维护成本高
+</p>
+
+<p>
+参考文档：
+</p>
+<ul class="org-ul">
+<li><a href="https://www.yeeyi.com/news/details/1830689/">https://www.yeeyi.com/news/details/1830689/</a></li>
+<li><a href="https://www.cnblogs.com/achengmu/p/15160859.html">https://www.cnblogs.com/achengmu/p/15160859.html</a></li>
+</ul>
+
+
+<p>
+deployment 滚动更新
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">shrink</span>=<span style="color: #8b2252;">'</span>
+<span style="color: #8b2252;">spec:</span>
+<span style="color: #8b2252;">  strategy:</span>
+<span style="color: #8b2252;">    rollingUpdate:</span>
+<span style="color: #8b2252;">      maxSurge: 20%</span>
+<span style="color: #8b2252;">      maxUnavailable: 0</span>
+<span style="color: #8b2252;">    type: RollingUpdate</span>
+<span style="color: #8b2252;">  template:</span>
+<span style="color: #8b2252;">    spec:</span>
+<span style="color: #8b2252;">      affinity:</span>
+<span style="color: #8b2252;">        nodeAffinity:</span>
+<span style="color: #8b2252;">          requiredDuringSchedulingIgnoredDuringExecution:</span>
+<span style="color: #8b2252;">            nodeSelectorTerms:</span>
+<span style="color: #8b2252;">              - matchExpressions:</span>
+<span style="color: #8b2252;">                  - key: type</span>
+<span style="color: #8b2252;">                    operator: NotIn</span>
+<span style="color: #8b2252;">                    values:</span>
+<span style="color: #8b2252;">                      - virtual-kubelet</span>
+<span style="color: #8b2252;">'</span>
+
+<span style="color: #a0522d;">expand</span>=<span style="color: #8b2252;">'</span>
+<span style="color: #8b2252;">spec:</span>
+<span style="color: #8b2252;">  strategy:</span>
+<span style="color: #8b2252;">    rollingUpdate:</span>
+<span style="color: #8b2252;">      maxSurge: 100%</span>
+<span style="color: #8b2252;">      maxUnavailable: 0</span>
+<span style="color: #8b2252;">    type: RollingUpdate</span>
+<span style="color: #8b2252;">  template:</span>
+<span style="color: #8b2252;">    spec:</span>
+<span style="color: #8b2252;">      affinity:</span>
+<span style="color: #8b2252;">        nodeAffinity:</span>
+<span style="color: #8b2252;">          requiredDuringSchedulingIgnoredDuringExecution:</span>
+<span style="color: #8b2252;">            nodeSelectorTerms:</span>
+<span style="color: #8b2252;">              - matchExpressions:</span>
+<span style="color: #8b2252;">                  - key: type</span>
+<span style="color: #8b2252;">                    operator: In</span>
+<span style="color: #8b2252;">                    values:</span>
+<span style="color: #8b2252;">                      - virtual-kubelet</span>
+<span style="color: #8b2252;">'</span>
+
+kubectl patch  deploy server-tmp-eci -o yaml --dry-run=<span style="color: #8b2252;">'client'</span> --type merge --patch-file &lt;(<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"$expand"</span>)
+
+
+kubectl patch  deploy server-tmp-eci --type merge --patch-file &lt;(<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"$expand"</span>)
+
+kubectl patch  deploy server-tmp-eci --type merge --patch-file &lt;(<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"$shrink"</span>)
 </pre>
 </div>
 </div>

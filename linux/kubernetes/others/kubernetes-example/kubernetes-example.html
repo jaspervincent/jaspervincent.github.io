@@ -91,7 +91,7 @@
 自定义客户端kube-login-cli
 </p>
 
-<pre class="example" id="org1d01d9a">
+<pre class="example" id="org0ca2de8">
 #1.下载自定义客户端
 wget https://devops-1254024480.cos.ap-beijing.myqcloud.com/kube-login-cli/mac/kube-login-cli --no-check-certificate -O /usr/local/bin/kube-login-cli &amp;&amp; chmod +x /usr/local/bin/kube-login-cli
 或者
@@ -185,7 +185,7 @@ kubectl config use-context xiaoming-bedin-context
 安装指定集群版本的kubectl客户端
 </p>
 
-<pre class="example" id="org00fd090">
+<pre class="example" id="orgd20bc5c">
 curl -LO "https://dl.k8s.io/release/v1.18.8/bin/darwin/amd64/kubectl"
 chmod +x ./kubectl
 sudo mv ./kubectl /usr/local/bin/kubectl
@@ -816,7 +816,7 @@ awk eks 支持 action
 则添加到 EC2 实例或ENI 安全组，以允许访问流量和健康检查端口。
 </p>
 
-<pre class="example" id="orgad0251f">
+<pre class="example" id="org7233628">
 service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules : "false"
 </pre>
 
@@ -896,6 +896,20 @@ kind: ServiceAccount
 metadata:
   name: cluster-readonly
   namespace: kube-system
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#32769;&#26041;&#27861;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">secrets:</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">- name: cluster-readonly</span>
+---
+<span style="color: #b22222;">#</span><span style="color: #b22222;">v1.29 &#25163;&#21160;&#20026; ServiceAccount &#21019;&#24314;&#38271;&#26399;&#26377;&#25928;&#30340; API &#20196;&#29260;</span>
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-readonly
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: <span style="color: #8b2252;">"cluster-readonly"</span>
+<span style="color: #483d8b;">type</span>: kubernetes.io/service-account-token
+
 [jasper.xu@ip-10-204-9-241 dashboard]$ cat readonly.yaml
 <span style="color: #b22222;">#</span><span style="color: #b22222;">apiVersion: v1</span>
 <span style="color: #b22222;">#</span><span style="color: #b22222;">kind: ServiceAccount</span>
@@ -1009,6 +1023,15 @@ rules:
 - apiGroups: [<span style="color: #8b2252;">""</span>]
   resources: [<span style="color: #8b2252;">"nodes"</span>]
   verbs: [<span style="color: #8b2252;">"get"</span>, <span style="color: #8b2252;">"list"</span>, <span style="color: #8b2252;">"watch"</span>]
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  - ingressclasses
+  verbs:
+  - list
+  - watch
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -1034,14 +1057,16 @@ subjects:
 
 <div class="org-src-container">
 <pre class="src src-sh">kubectl config set-context $(<span style="color: #ff00ff;">kubectl config current-context</span>) --namespace  kube-system
-<span style="color: #a0522d;">secret</span>=$(<span style="color: #ff00ff;">kubectl get sa cluster-readonly -o json | jq -r .secrets[].name</span>)
+<span style="color: #b22222;">#</span><span style="color: #b22222;">secret=$(</span><span style="color: #ff00ff;">kubectl get sa cluster-readonly -o json | jq -r .secrets[].name</span><span style="color: #b22222;">)  #v1.29&#20043;&#21069;</span>
+<span style="color: #a0522d;">secret</span>=cluster-readonly
 
 <span style="color: #b22222;"># </span><span style="color: #b22222;">&#33719;&#21462;ca</span>
 kubectl get secrets $<span style="color: #a0522d;">secret</span>  -o <span style="color: #8b2252;">"jsonpath={.data['ca\.crt']}"</span>
 <span style="color: #b22222;">#</span><span style="color: #b22222;">kubectl get secret $secret -o json | jq -r '.data["ca.crt"]' | base64 -d &gt; ca.crt</span>
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#33719;&#21462;token</span>
-kubectl get secret $<span style="color: #a0522d;">secret</span> -o json | jq -r <span style="color: #8b2252;">'.data["token"]'</span> | base64 -d
+<span style="color: #b22222;">#</span><span style="color: #b22222;">kubectl get secret $secret -o json | jq -r '.data["token"]' | base64 -d</span>
+kubectl get secret $<span style="color: #a0522d;">secret</span> -n kubernetes-dashboard -o <span style="color: #a0522d;">jsonpath</span>={<span style="color: #8b2252;">".data.token"</span>} | base64 -d
 </pre>
 </div>
 
@@ -1051,10 +1076,11 @@ kubectl get secret $<span style="color: #a0522d;">secret</span> -o json | jq -r 
 
 <div class="org-src-container">
 <pre class="src src-sh">kubectl config set-context $(<span style="color: #ff00ff;">kubectl config current-context</span>) --namespace  kube-system
-<span style="color: #a0522d;">secret</span>=$(<span style="color: #ff00ff;">kubectl get sa cluster-readonly -o json | jq -r .secrets[].name</span>)
+<span style="color: #b22222;">#</span><span style="color: #b22222;">secret=$(</span><span style="color: #ff00ff;">kubectl get sa cluster-readonly -o json | jq -r .secrets[].name</span><span style="color: #b22222;">)  #v1.29&#20043;&#21069;</span>
+<span style="color: #a0522d;">secret</span>=cluster-readonly
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#33719;&#21462;token</span>
-<span style="color: #a0522d;">user_token</span>=$(<span style="color: #ff00ff;">kubectl get secret $secret -o json | jq -r '.data["token"]' | base64 -d</span>)
+<span style="color: #a0522d;">user_token</span>=$(<span style="color: #ff00ff;">kubectl get secret $secret -o jsonpath={".data.token"} | base64 -d</span>)
 <span style="color: #a0522d;">server</span>=<span style="color: #8b2252;">"https://66F42A859F2A1D83394D56B7F7018F92.sk1.ap-south-1.eks.amazonaws.com"</span>
 
 <span style="color: #b22222;"># </span><span style="color: #b22222;">set-cluster&#65306;&#35774;&#32622;&#19968;&#20010;&#38598;&#32676;&#39033;&#65292;</span>

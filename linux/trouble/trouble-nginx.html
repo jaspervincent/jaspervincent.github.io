@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>trouble-aws-eks</title>
+<title>trouble-nginx</title>
 <meta name="generator" content="Org Mode" />
 <link rel="stylesheet" type="text/css" href="/static/font.css"/>
 <link rel="stylesheet" type="text/css" href="/static/systemcrafters-style.css"/>
@@ -42,65 +42,66 @@
 </header>
 <main class="container" id="content" class="content">
 <header>
-<h1 class="title">trouble-aws-eks</h1>
+<h1 class="title">trouble-nginx</h1>
 </header><nav id="table-of-contents" role="doc-toc">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orge77c50c">EKS-k8s托管集群</a>
+<li><a href="#org5d8a77a">nginx</a></li>
+<li><a href="#org08fde6e">ingress-nginx</a>
 <ul>
-<li><a href="#org9d5c980">EKS 节点组升级失败</a></li>
+<li><a href="#org38afcd3">tls: failed to verify certificate: x509</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </nav>
-<section id="outline-container-orge77c50c" class="outline-2">
-<h2 id="orge77c50c">EKS-k8s托管集群</h2>
-<div class="outline-text-2" id="text-orge77c50c">
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Trouble</a></li>
+</ul>
+<section id="outline-container-org5d8a77a" class="outline-2">
+<h2 id="org5d8a77a">nginx</h2>
+</section>
+
+<section id="outline-container-org08fde6e" class="outline-2">
+<h2 id="org08fde6e">ingress-nginx</h2>
+<div class="outline-text-2" id="text-org08fde6e">
 </div>
-<div id="outline-container-org9d5c980" class="outline-3">
-<h3 id="org9d5c980">EKS 节点组升级失败</h3>
-<div class="outline-text-3" id="text-org9d5c980">
+<div id="outline-container-org38afcd3" class="outline-3">
+<h3 id="org38afcd3">tls: failed to verify certificate: x509</h3>
+<div class="outline-text-3" id="text-org38afcd3">
 <p>
-目前的节点更新逻辑是：当没有特别指定模板版本时，将会使用默认（default）的启动模板，而这部分的逻辑均适用于使用 UI 介面和 CLI 命令来呼叫背后的 UpdateNodegroupVersion[1] API。因此，针对升级节点组的流程如下：<br>
+遇到问题：
+[root@proxy ingress]# k apply -f monitoring-ingress-2.yaml 
+Error from server (InternalError): error when creating "monitoring-ingress-2.yaml": Internal error occurred: failed calling webhook "validate.nginx.ingress.kubernetes.io": failed to call webhook: Post "<a href="https://ingress-nginx-controller-admission.ingress-nginx.svc/networking/v1/ingresses?timeout=10s">https://ingress-nginx-controller-admission.ingress-nginx.svc/networking/v1/ingresses?timeout=10s</a>": tls: failed to verify certificate: x509: certificate signed by unknown authority (possibly because of "x509: ECDSA verification failure" while trying to verify candidate authority certificate "nil1")
 </p>
 
 <p>
-<b>如果使用 AWS Console(UI)</b><br>
+检查：
+kubectl -n ingress-nginx get validatingwebhookconfigurations ingress-nginx-admission -ojsonpath='{.webhooks[0].clientConfig.caBundle}'| md5sum
+kubectl -n ingress-nginx get secret ingress-nginx-admission -ojsonpath='{.data.ca}'| md5sum
+</p>
+
+
+<p>
+kubectl -n ingress-nginx-dev get validatingwebhookconfigurations ingress-nginx-admission-dev -ojsonpath='{.webhooks[0].clientConfig.caBundle}'| md5sum
+kubectl -n ingress-nginx-dev get secret ingress-nginx-admission -ojsonpath='{.data.ca}'| md5sum
 </p>
 
 <p>
-步骤 1. 首先将所需的 LT 版本设置为默认值<br>
-步骤 2. 然后再从 Console 触发节点组升级<br>
+解决：
+CA=$(kubectl -n ingress-nginx-dev get secret ingress-nginx-admission -ojsonpath='{.data.ca}')
+kubectl patch validatingwebhookconfigurations ingress-nginx-admission-dev &#x2013;type='json' -p='[{"op": "add", "path": "/webhooks/0/clientConfig/caBundle", "value":"'$CA'"}]'
 </p>
 
 <p>
-<b>如果使用 AWS CLI (Command Line Interface)</b><br>
+CA=$(kubectl -n ingress-nginx get secret ingress-nginx-admission -ojsonpath='{.data.ca}')
+kubectl patch validatingwebhookconfigurations ingress-nginx-admission &#x2013;type='json' -p='[{"op": "add", "path": "/webhooks/0/clientConfig/caBundle", "value":"'$CA'"}]'
 </p>
 
 <p>
-方法 1. 如同先前给您的范例（上个范例中并未加上 "&#x2013;kubernetes-version"，因此节点没有升级版本。这是我的疏失，非常抱歉），我们需要指定模板版本进行升级[2]，范例命令如下：<br>
+参考：<a href="https://github.com/kubernetes/ingress-nginx/issues/5968">https://github.com/kubernetes/ingress-nginx/issues/5968</a>
 </p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ aws eks update-nodegroup-version <span style="color: #8b2252;">\</span>
-    --cluster-name eks-prod <span style="color: #8b2252;">\</span>
-    --nodegroup-name EKS-App <span style="color: #8b2252;">\</span>
-    --launch-template <span style="color: #8b2252;">"name=EKS-Template20210204,version=&lt;&#30446;&#26631;&#29256;&#26412;&#21495;&gt;"</span> <span style="color: #8b2252;">\</span>
-    --kubernetes-version 1.23
-</pre>
-</div>
-
-<p>
-方法 2. 或是您也可以先将所需的启动模板版本设置为默认值，在透过命令升级，此时就不需要带上模板版本，范例命令如下：<br>
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ aws ec2 modify-launch-template --launch-template-id lt-047a6812a5650c92b --default-version &lt;&#30446;&#26631;&#29256;&#26412;&#21495;&gt;
-$ aws eks update-nodegroup-version --cluster-name eks-prod --nodegroup-name EKS-App  --kubernetes-version 1.23
-</pre>
-</div>
 </div>
 </div>
 </section>

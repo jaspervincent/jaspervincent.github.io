@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CICD-简单例子</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/systemcrafters-style.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="site-header">
+  <div class="container">
+    <div class="site-title">
+      <img class="logo" src="/static/images/sc_logo.png" alt="Jasper Hsu">
+    </div>
+  </div>
+
+  <div class="site-masthead">
+    <div class="container">
+      <nav class="nav">
+        <a class="nav-link" href="/publications.html">Publications</a>
+        <a class="nav-link" href="/donations.html">Donations</a>
+        <a class="nav-link" href="/about.html">About</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container">
+    <p class="info">
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">CICD-简单例子</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org85711ac">CICD-k8s</a>
+<ul>
+<li><a href="#org4792763">CI</a></li>
+<li><a href="#org0d8043f">CICD</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../cicd.html">cicd</a></li>
+</ul>
+<section id="outline-container-org85711ac" class="outline-2">
+<h2 id="org85711ac">CICD-k8s</h2>
+<div class="outline-text-2" id="text-org85711ac">
+</div>
+<div id="outline-container-org4792763" class="outline-3">
+<h3 id="org4792763">CI</h3>
+<div class="outline-text-3" id="text-org4792763">
+<ul class="org-ul">
+<li>EKS: 1.30</li>
+<li>ECR: 私有镜像仓库</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">tree  business-server</span>
+<span style="color: #483d8b;">.</span>
+&#9500;&#9472;&#9472; dockerfile
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; Dockerfile
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; build.sh
+&#9492;&#9472;&#9472; kubernetes
+    &#9500;&#9472;&#9472; deployment.yaml
+    &#9492;&#9472;&#9472; service.yaml
+</pre>
+</div>
+
+<p>
+Dockerfile
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; dockerfile/Dockerfile 
+<span style="color: #ffa54f;">FROM node:20.11-alpine</span>
+
+<span style="color: #ffa54f;">LABEL maintainer ci@</span>
+
+<span style="color: #ffa54f;">ENV SERVICE_NAME=slots-game \</span>
+<span style="color: #ffa54f;">    SERVICE_PATH=/app</span>
+
+<span style="color: #ffa54f;">RUN ln -sf /usr/share/zoneinfo/Africa/Lagos /etc/localtime \</span>
+<span style="color: #ffa54f;">    &amp;&amp; echo 'Africa/Lagos' &gt; /etc/timezone</span>
+
+<span style="color: #ffa54f;">RUN apk add tzdata</span>
+
+<span style="color: #ffa54f;">COPY slots_server/server /app/server</span>
+<span style="color: #ffa54f;">COPY slots_server/node_modules /app/node_modules</span>
+<span style="color: #ffa54f;">COPY slots_server/util /app/util </span>
+<span style="color: #ffa54f;">COPY slots_server/CClass /app/CClass</span>
+
+<span style="color: #ffa54f;">WORKDIR ${SERVICE_PATH}/server</span>
+<span style="color: #ffa54f;">EXPOSE  13000</span>
+<span style="color: #ffa54f;">CMD [ "node","app" ]</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+打镜像脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; dockerfile/build.sh 
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;"># CI</span>
+<span style="color: #ffa54f;"># Loading========================</span>
+<span style="color: #ffa54f;">set -eu</span>
+
+<span style="color: #ffa54f;">tmpfile=$(</span><span style="color: #ff00ff;">mktemp -u ci.XXXX</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">tmp_path=/tmp/.${tmpfile}</span>
+<span style="color: #ffa54f;">[ ! -e  $tmp_path ] &amp;&amp; mkdir -p $tmp_path</span>
+<span style="color: #ffa54f;">cp -a * $tmp_path</span>
+
+<span style="color: #ffa54f;">echo DIR: $tmp_path</span>
+<span style="color: #ffa54f;">cd $tmp_path</span>
+
+<span style="color: #ffa54f;">Name='slots-game-server'</span>
+<span style="color: #ffa54f;">ECR_URL='87654321.dkr.ecr.af-south-1.amazonaws.com'</span>
+<span style="color: #ffa54f;">TAG=`date +%Y%m%d%H%M`</span>
+<span style="color: #ffa54f;">image_url=${ECR_URL}/slots/${Name}:${TAG}</span>
+
+
+<span style="color: #ffa54f;">if [ ! -d "my-server" ] ; then</span>
+<span style="color: #ffa54f;">   git clone --depth=1 git@gitlab.com:sa-slots/backend/my-server.git</span>
+<span style="color: #ffa54f;">fi</span>
+
+<span style="color: #ffa54f;"># Compiling========================</span>
+<span style="color: #ffa54f;">cd my-server/slots_server</span>
+<span style="color: #ffa54f;">npm install</span>
+<span style="color: #ffa54f;">cd $tmp_path</span>
+
+<span style="color: #ffa54f;">mv my-server/slots_server ./slots_server</span>
+
+<span style="color: #ffa54f;"># Build image========================</span>
+<span style="color: #ffa54f;">if ! aws ecr describe-repositories --repository-names slots/$Name &amp;&gt;/dev/null; then</span>
+<span style="color: #ffa54f;">    echo Create repository</span>
+<span style="color: #ffa54f;">    aws ecr create-repository --repository-name slots/$Name</span>
+<span style="color: #ffa54f;">fi</span>
+
+<span style="color: #ffa54f;">aws ecr get-login-password --region af-south-1 | docker login --username AWS --password-stdin $ECR_URL</span>
+<span style="color: #ffa54f;">docker buildx build -t $image_url --platform=linux/arm64,linux/amd64 --push .</span>
+
+<span style="color: #ffa54f;"># Clean up========================</span>
+<span style="color: #ffa54f;">cd; rm -fr $tmp_path</span>
+<span style="color: #ffa54f;">echo -e "\nIMAGE: $image_url"</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org0d8043f" class="outline-3">
+<h3 id="org0d8043f">CICD</h3>
+<div class="outline-text-3" id="text-org0d8043f">
+<p>
+kubernetes 中切换镜像脚本、服务状态脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"> cat &lt;&lt;\EOF&gt; /usr/bin/k8s_set_tag_af-south-1 
+<span style="color: #ffa54f;">job_name=$1</span>
+<span style="color: #ffa54f;">#build_num=$2</span>
+<span style="color: #ffa54f;">repo_url=87654321.dkr.ecr.af-south-1.amazonaws.com/slots/</span>
+<span style="color: #ffa54f;">#img_url=$repo_url$job_name</span>
+<span style="color: #ffa54f;">img_url=$2</span>
+<span style="color: #ffa54f;">kubectl --kubeconfig /root/.kube/config_af-south-1 -n slots-prod set image deploy ${job_name} ${job_name}=$img_url</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; /usr/bin/k8s_log_af-south-1 
+<span style="color: #ffa54f;">job_name=$1</span>
+<span style="color: #ffa54f;">config="--kubeconfig /root/.kube/config_af-south-1 -n slots-prod"</span>
+<span style="color: #ffa54f;">pod_name=$(</span><span style="color: #ff00ff;">kubectl ${config}  get pod --sort-by=.metadata.creationTimestamp -l app=${job_name}|tail -1|awk '{print $1}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;"># &#26816;&#27979;pod&#21551;&#21160;&#21518;&#20877;&#33719;&#21462;log</span>
+<span style="color: #ffa54f;">while true; do</span>
+<span style="color: #ffa54f;">kubectl ${config} -n slots-prod get pod $pod_name |grep -q Running </span>
+<span style="color: #ffa54f;">  if [ $? -eq 0 ];then</span>
+<span style="color: #ffa54f;">      echo $pod_name "is running"</span>
+<span style="color: #ffa54f;">      break </span>
+<span style="color: #ffa54f;">  fi</span>
+<span style="color: #ffa54f;">  echo $pod_name "waiting to running"</span>
+<span style="color: #ffa54f;">  sleep 1</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">kubectl ${config} logs -f $pod_name &amp;</span>
+<span style="color: #ffa54f;">#jenkins&#26080;&#38656;&#33258;&#24049;&#35299;&#20915;&#23376;&#36827;&#31243;&#38382;&#39064;</span>
+<span style="color: #ffa54f;">#pid=$!</span>
+<span style="color: #ffa54f;">while true; do</span>
+<span style="color: #ffa54f;">  restarts=$(</span><span style="color: #ff00ff;">kubectl $config get pod $pod_name|grep -v NAME|awk '{print $4}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">  if [ $restarts -gt 0 ];then</span>
+<span style="color: #ffa54f;">      #kill $pid</span>
+<span style="color: #ffa54f;">      exit 1</span>
+<span style="color: #ffa54f;">  fi</span>
+<span style="color: #ffa54f;">  kubectl $config rollout status deployment $job_name --watch=false|grep -q successfully</span>
+<span style="color: #ffa54f;">  if [ $? -eq 0 ];then</span>
+<span style="color: #ffa54f;">      #kill $pid</span>
+<span style="color: #ffa54f;">      exit 0</span>
+<span style="color: #ffa54f;">  fi</span>
+<span style="color: #ffa54f;">  sleep 1</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+部署脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat  &lt;&lt;\EOF&gt; ~/bin/rc-deploy 
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">#</span>
+<span style="color: #ffa54f;">set -eu</span>
+
+<span style="color: #ffa54f;">server_list=(</span>
+<span style="color: #ffa54f;">slots-web</span>
+<span style="color: #ffa54f;">slots-game-server</span>
+<span style="color: #ffa54f;">)</span>
+
+<span style="color: #ffa54f;">if [ $# -eq 0 ];then</span>
+<span style="color: #ffa54f;">  echo "Usage: `basename $0` one of [ $(</span><span style="color: #ff00ff;">echo -e "${server_list[*]}" |tr ' ' '\n'</span><span style="color: #ffa54f;">) ]"</span>
+<span style="color: #ffa54f;">  exit</span>
+<span style="color: #ffa54f;">fi</span>
+
+<span style="color: #ffa54f;">out_arg=0</span>
+<span style="color: #ffa54f;">if [ $# -ge 2 ];then</span>
+<span style="color: #ffa54f;">  out_arg=1</span>
+<span style="color: #ffa54f;">fi</span>
+
+<span style="color: #ffa54f;">JOB_BASE_NAME=$1</span>
+
+<span style="color: #ffa54f;">flag=0</span>
+<span style="color: #ffa54f;">for i in $(</span><span style="color: #ff00ff;">seq 0 $[${#server_list[*]}-1]</span><span style="color: #ffa54f;">); do</span>
+<span style="color: #ffa54f;">  if [ "${server_list[$i]}" == "${JOB_BASE_NAME}" ];then</span>
+<span style="color: #ffa54f;">     flag=1</span>
+<span style="color: #ffa54f;">     break</span>
+<span style="color: #ffa54f;">  fi</span>
+<span style="color: #ffa54f;">done</span>
+
+<span style="color: #ffa54f;">[ $flag -eq 0 ] &amp;&amp; { echo "Please use: $(</span><span style="color: #ff00ff;">echo -e "${server_list[*]}" |tr ' ' '\n'</span><span style="color: #ffa54f;">)" ; exit 1; } || :</span>
+
+
+<span style="color: #ffa54f;">base_dir=/root/.jasper/</span>
+<span style="color: #ffa54f;">build_dir=${base_dir}/eks-yaml/slots/slots-prod/${JOB_BASE_NAME}/dockerfile</span>
+
+<span style="color: #ffa54f;">echo "Build Image"</span>
+<span style="color: #ffa54f;">cd $build_dir</span>
+<span style="color: #ffa54f;">[ ${out_arg} -eq 0 ] &amp;&amp; { </span>
+<span style="color: #ffa54f;">  img_url=$(</span><span style="color: #ff00ff;">bash build.sh 2&gt;/dev/null |awk '/IMAGE: /{print $2}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">} || {</span>
+<span style="color: #ffa54f;">  img_url=$(</span><span style="color: #ff00ff;">bash build.sh  |awk '/IMAGE: /{print $2}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">}</span>
+<span style="color: #ffa54f;">echo "IMAGE: $img_url"</span>
+
+
+<span style="color: #ffa54f;">echo 'Deploy Trigger'</span>
+<span style="color: #ffa54f;">k8s_set_tag_af-south-1 ${JOB_BASE_NAME} "${img_url}"</span>
+
+
+<span style="color: #ffa54f;">#echo "Deploy Status"</span>
+<span style="color: #ffa54f;">#k8s_log_af-south-1 ${JOB_BASE_NAME}</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p>
+          <a href="/index.html">JasperHsu</a> · 
+          <a href="/publications.html">Publications</a> · 
+          <a href="/rss.xml">RSS Feeds</a> · 
+          <a rel="me" href="https://creativecommons.org/licenses/by-sa/4.0/">(CC BY-SA 4.0)</a>
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a>
+-->
+        </p>
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">© 2024 Jasper Hsu</p>
+      </div>
+      <div class="column align-right">
+        <p>
+          <a href="https://orgmode.org" style="float:right; margin 20px 0px 20px 20px;">
+            <img src="/static/images/made-with-emacs.webp" style="width: 120px" alt="Made with Emacs Org-Mode">
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

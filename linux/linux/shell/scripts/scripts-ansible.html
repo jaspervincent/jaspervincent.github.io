@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-ansible</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/systemcrafters-style.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="site-header">
+  <div class="container">
+    <div class="site-title">
+      <img class="logo" src="/static/images/sc_logo.png" alt="Jasper Hsu">
+    </div>
+  </div>
+
+  <div class="site-masthead">
+    <div class="container">
+      <nav class="nav">
+        <a class="nav-link" href="/publications.html">Publications</a>
+        <a class="nav-link" href="/donations.html">Donations</a>
+        <a class="nav-link" href="/about.html">About</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container">
+    <p class="info">
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">scripts-ansible</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:117c063b-b908-4bb2-a816-92a5dcc8ba5d">ansible批量更换resolv.conf</a></li>
+<li><a href="#h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b">批量添加sudo权限</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-h:117c063b-b908-4bb2-a816-92a5dcc8ba5d" class="outline-2">
+<h2 id="h:117c063b-b908-4bb2-a816-92a5dcc8ba5d">ansible批量更换resolv.conf</h2>
+<div class="outline-text-2" id="text-h:117c063b-b908-4bb2-a816-92a5dcc8ba5d">
+<div class="org-src-container">
+<pre class="src src-sh">dns_schd2]$ tree ./
+./
+&#9500;&#9472;&#9472; ansible.cfg
+&#9500;&#9472;&#9472; exec01.retry
+&#9500;&#9472;&#9472; exec01.yml
+&#9500;&#9472;&#9472; files
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; resolv.conf
+&#9500;&#9472;&#9472; hosts
+&#9492;&#9472;&#9472; logs
+    &#9492;&#9472;&#9472; ansible.log
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &gt;ansible.cfg&lt;&lt;EOF
+<span style="color: #ffa54f;">[defaults]</span>
+<span style="color: #ffa54f;">inventory = ./hosts</span>
+<span style="color: #ffa54f;">forks          = 5</span>
+<span style="color: #ffa54f;">remote_port    = 22</span>
+<span style="color: #ffa54f;">roles_path    = ./roles</span>
+<span style="color: #ffa54f;">host_key_checking = False</span>
+<span style="color: #ffa54f;">timeout = 30</span>
+<span style="color: #ffa54f;">log_path = ./logs/ansible.log</span>
+<span style="color: #ffa54f;">private_key_file = /home/oap/.ssh/id_rsa</span>
+<span style="color: #ffa54f;">[inventory]</span>
+<span style="color: #ffa54f;">[privilege_escalation]</span>
+<span style="color: #ffa54f;">become=True</span>
+<span style="color: #ffa54f;">become_method=sudo</span>
+<span style="color: #ffa54f;">become_user=root</span>
+<span style="color: #ffa54f;">become_ask_pass=False</span>
+<span style="color: #ffa54f;">[paramiko_connection]</span>
+<span style="color: #ffa54f;">record_host_keys=False</span>
+<span style="color: #ffa54f;">[ssh_connection]</span>
+<span style="color: #ffa54f;">[persistent_connection]</span>
+<span style="color: #ffa54f;">[accelerate]</span>
+<span style="color: #ffa54f;">[selinux]</span>
+<span style="color: #ffa54f;">[colors]</span>
+<span style="color: #ffa54f;">[diff]</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &gt;exec01.yml&lt;&lt;EOF 
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- hosts: schd2</span>
+<span style="color: #ffa54f;">  tasks:</span>
+<span style="color: #ffa54f;">  - name: Copy resolv.conf to</span>
+<span style="color: #ffa54f;">    copy: src={{ item.src }} dest={{ item.dest }}</span>
+<span style="color: #ffa54f;">    with_items:</span>
+<span style="color: #ffa54f;">      - { src: '/data/sw-edge/tools/dns_schd2/files/resolv.conf', dest: '/tmp/resolv.conf' }</span>
+
+<span style="color: #ffa54f;">  - name: Cat /etc/resolv.conf</span>
+<span style="color: #ffa54f;">    shell: cat /etc/resolv.conf</span>
+<span style="color: #ffa54f;">    register: cat_resolv_conf</span>
+<span style="color: #ffa54f;">    tags: dig_dns01</span>
+
+<span style="color: #ffa54f;">  - name: Cat /etc/resolv.conf</span>
+<span style="color: #ffa54f;">    debug: msg="{{ cat_resolv_conf.stdout_lines }}"</span>
+<span style="color: #ffa54f;">    tags: dig_dns01</span>
+
+<span style="color: #ffa54f;">  - name: Simple A record (IPV4 address) lookup for xxx01.com</span>
+<span style="color: #ffa54f;">    debug: msg="{{ lookup('dig', 'redis-sentinel-1.yunzong')}}"</span>
+<span style="color: #ffa54f;">    tags: dig_dns01</span>
+<span style="color: #ffa54f;">    ignore_errors: True</span>
+
+<span style="color: #ffa54f;">  - name: Simple A record (IPV4 address) lookup for xxx02.com</span>
+<span style="color: #ffa54f;">    debug: msg="{{ lookup('dig', 'oplatformgateway.xiyun')}}"</span>
+<span style="color: #ffa54f;">    tags: dig_dns01</span>
+<span style="color: #ffa54f;">    ignore_errors: True</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+role ssl
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25191;&#34892;&#21629;&#20196;</span>
+ansible-playbook change_ssl.yml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#22522;&#30784;&#29615;&#22659;</span>
+mkdir ansible/
+<span style="color: #483d8b;">cd</span> ansible
+
+cat &gt;ansible.cfg&lt;&lt;EOF
+<span style="color: #ffa54f;">[defaults]</span>
+<span style="color: #ffa54f;">inventory = ./hosts</span>
+<span style="color: #ffa54f;">forks          = 5</span>
+<span style="color: #ffa54f;">remote_port    = 22</span>
+<span style="color: #ffa54f;">roles_path    = ./roles</span>
+<span style="color: #ffa54f;">host_key_checking = False</span>
+<span style="color: #ffa54f;">timeout = 30</span>
+<span style="color: #ffa54f;">log_path = ./logs/ansible.log</span>
+<span style="color: #ffa54f;">private_key_file = /home/oap/.ssh/id_rsa</span>
+<span style="color: #ffa54f;">[inventory]</span>
+<span style="color: #ffa54f;">[privilege_escalation]</span>
+<span style="color: #ffa54f;">become=True</span>
+<span style="color: #ffa54f;">become_method=sudo</span>
+<span style="color: #ffa54f;">become_user=root</span>
+<span style="color: #ffa54f;">become_ask_pass=False</span>
+<span style="color: #ffa54f;">[paramiko_connection]</span>
+<span style="color: #ffa54f;">record_host_keys=False</span>
+<span style="color: #ffa54f;">[ssh_connection]</span>
+<span style="color: #ffa54f;">[persistent_connection]</span>
+<span style="color: #ffa54f;">[accelerate]</span>
+<span style="color: #ffa54f;">[selinux]</span>
+<span style="color: #ffa54f;">[colors]</span>
+<span style="color: #ffa54f;">[diff]</span>
+<span style="color: #ffa54f;">EOF</span>
+
+mkdir {logs,roles}
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#35777;&#20070;role&#29615;&#22659;</span>
+mkdir  -pv roles/cron_ssl/{defaults,files,handlers,tasks,templates}
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#25191;&#34892;yml</span>
+cat &gt;change_ssl.yml&lt;&lt; \EOF
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- name: Change cron for ssl manage</span>
+<span style="color: #ffa54f;">  hosts: ssl</span>
+<span style="color: #ffa54f;">  vars:</span>
+<span style="color: #ffa54f;">    - script_name: "ssl_monitor.sh"</span>
+<span style="color: #ffa54f;">    - script_dest_path: "/home/sh"</span>
+<span style="color: #ffa54f;">    - script_type: "sh"</span>
+<span style="color: #ffa54f;">    #- state: "absent"</span>
+<span style="color: #ffa54f;">    - state: "present"</span>
+<span style="color: #ffa54f;">    - {minute: "5", hour: "0", day: "*", month: "*", weekday: "*"}</span>
+
+<span style="color: #ffa54f;">  roles:</span>
+<span style="color: #ffa54f;">    - cron_ssl</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#35777;&#20070;&#29615;&#22659;&#21464;&#37327;</span>
+cat &gt;roles/cron_ssl/defaults/main.yml&lt;&lt;\EOF
+<span style="color: #ffa54f;">ssl_script: "ssl_monitor.sh"</span>
+<span style="color: #ffa54f;">script_name: ""</span>
+<span style="color: #ffa54f;">script_source_path: ""</span>
+<span style="color: #ffa54f;">script_dest_path: "/home/sh"</span>
+<span style="color: #ffa54f;">script_type: "sh"</span>
+<span style="color: #ffa54f;">state: "present"</span>
+
+<span style="color: #ffa54f;">user: "root"</span>
+<span style="color: #ffa54f;">minute: "*"</span>
+<span style="color: #ffa54f;">hour: "*"</span>
+<span style="color: #ffa54f;">day: "*"</span>
+<span style="color: #ffa54f;">month: "*"</span>
+<span style="color: #ffa54f;">weekday: "*"</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#35777;&#20070;&#20219;&#21153;</span>
+cat &gt;roles/cron_ssl/tasks/main.yml&lt;&lt; EOF
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- include: cron.yml</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &gt;roles/cron_ssl/tasks/cron.yml&lt;&lt; \EOF
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- name: Backup cron</span>
+<span style="color: #ffa54f;">  shell: "cp /var/spool/cron/root /data/backup/cronroot.$(</span><span style="color: #ff00ff;">date +%F</span><span style="color: #ffa54f;">)"</span>
+<span style="color: #ffa54f;">  ignore_errors: yes</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  shell: crontab -l</span>
+<span style="color: #ffa54f;">  register: cat_cron</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  debug: msg="{{ cat_cron.stdout_lines }}"</span>
+
+<span style="color: #ffa54f;">- name: Del cron that which is "{{ script_name }}"</span>
+<span style="color: #ffa54f;">  cron: name={{ script_name }} state="absent"</span>
+<span style="color: #ffa54f;">  when: state  == "absent"</span>
+
+<span style="color: #ffa54f;">- name: Del notcron that which is "{{ script_name }}"</span>
+<span style="color: #ffa54f;">  shell: "[ $(</span><span style="color: #ff00ff;">crontab -l |grep {{ script_name }}|wc -l</span><span style="color: #ffa54f;">) != $(</span><span style="color: #ff00ff;">crontab -l |grep -A 2 Ansible| grep {{ script_name }}|wc -l</span><span style="color: #ffa54f;">) ] &amp;&amp; sed -ri '/ssl_monitor.sh/d' /var/spool/cron/root"</span>
+<span style="color: #ffa54f;">  ignore_errors: yes</span>
+<span style="color: #ffa54f;">  when: state  == "present"</span>
+
+<span style="color: #ffa54f;">- name: Cron bash "{{ script_name }}" to "{{ state }}"</span>
+<span style="color: #ffa54f;">  cron: name={{ script_name }} minute={{ minute }} hour={{ hour }} day={{ day }} month={{ month }} weekday={{ weekday }} job='/bin/bash {{ script_dest_path }}/{{ script_name }} &amp;&gt;/dev/null'</span>
+<span style="color: #ffa54f;">  when: script_type == "sh" and state == "present"</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  shell: crontab -l</span>
+<span style="color: #ffa54f;">  register: cat_cron</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  debug: msg="{{ cat_cron.stdout_lines }}"</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b" class="outline-2">
+<h2 id="h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b">批量添加sudo权限</h2>
+<div class="outline-text-2" id="text-h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b">
+<div class="org-src-container">
+<pre class="src src-sh">
+<span style="color: #b22222;"># </span><span style="color: #b22222;">1. &#20027;&#26426;&#21015;&#34920;</span>
+cat &gt;hosts&lt;&lt;\EOF
+<span style="color: #ffa54f;">mycat-a03       192.168.100.62</span>
+<span style="color: #ffa54f;">mycat-a02       192.168.100.63</span>
+<span style="color: #ffa54f;">mycat-a01       192.168.100.64</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2. &#36828;&#31243;&#25191;&#34892;&#33050;&#26412; </span>
+cat &gt;/tmp/check.sh&lt;&lt;\EOF
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">name="yongkui.zhang fuzhi.cao"</span>
+<span style="color: #ffa54f;">file_name="/etc/sudoers"</span>
+
+<span style="color: #ffa54f;">for n in $name; do</span>
+
+<span style="color: #ffa54f;">    if ! grep $n $file_name &amp;&gt;/etc/null; then</span>
+<span style="color: #ffa54f;">        echo "$n ALL=(ALL) NOPASSWD: ALL" &gt;&gt;$file_name</span>
+<span style="color: #ffa54f;">    fi</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3. ansible&#33050;&#26412;</span>
+cat &gt;ansible_sudo.sh&lt;&lt;\EOF
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">host_file="./hosts"</span>
+<span style="color: #ffa54f;">ansible_host=/home/oap/hosts</span>
+<span style="color: #ffa54f;">ansible_script="/tmp/check.sh"</span>
+
+<span style="color: #ffa54f;">echo "##########$(</span><span style="color: #ff00ff;">date +%Y%m%d%H%M</span><span style="color: #ffa54f;">)"</span>
+
+<span style="color: #ffa54f;">if [ -f "$host_file" ];then</span>
+<span style="color: #ffa54f;">  echo '[chang_host]' &gt;&gt;$ansible_host</span>
+<span style="color: #ffa54f;">  cat $host_file|</span>
+<span style="color: #ffa54f;">  while read line; do</span>
+<span style="color: #ffa54f;">  if [ -n "$line" ];then</span>
+<span style="color: #ffa54f;">    ip=`echo $line|awk -F "[\t ]+" '{print $2}'`</span>
+<span style="color: #ffa54f;">    echo "$ip"  &gt;&gt;$ansible_host</span>
+<span style="color: #ffa54f;">  fi</span>
+<span style="color: #ffa54f;">  done</span>
+<span style="color: #ffa54f;">  su - oap -c "ansible chang_host -s -i  $ansible_host -m script -a '$ansible_script'"</span>
+
+
+<span style="color: #ffa54f;">  rm -f  $ansible_host</span>
+<span style="color: #ffa54f;">fi</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">4. &#25191;&#34892;&#21629;&#20196;</span>
+sh ansible_sudo.sh
+</pre>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p>
+          <a href="/index.html">JasperHsu</a> · 
+          <a href="/publications.html">Publications</a> · 
+          <a href="/rss.xml">RSS Feeds</a> · 
+          <a rel="me" href="https://creativecommons.org/licenses/by-sa/4.0/">(CC BY-SA 4.0)</a>
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a>
+-->
+        </p>
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">© 2024 Jasper Hsu</p>
+      </div>
+      <div class="column align-right">
+        <p>
+          <a href="https://orgmode.org" style="float:right; margin 20px 0px 20px 20px;">
+            <img src="/static/images/made-with-emacs.webp" style="width: 120px" alt="Made with Emacs Org-Mode">
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

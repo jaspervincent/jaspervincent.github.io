@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-docker</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/systemcrafters-style.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="site-header">
+  <div class="container">
+    <div class="site-title">
+      <img class="logo" src="/static/images/sc_logo.png" alt="Jasper Hsu">
+    </div>
+  </div>
+
+  <div class="site-masthead">
+    <div class="container">
+      <nav class="nav">
+        <a class="nav-link" href="/publications.html">Publications</a>
+        <a class="nav-link" href="/donations.html">Donations</a>
+        <a class="nav-link" href="/about.html">About</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container">
+    <p class="info">
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">scripts-docker</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org6bb3245">docker-jvm-check</a></li>
+<li><a href="#org26d4c7a">docker镜像清理</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-org6bb3245" class="outline-2">
+<h2 id="org6bb3245">docker-jvm-check</h2>
+<div class="outline-text-2" id="text-org6bb3245">
+<div class="org-src-container">
+<pre class="src src-sh">[root@mesos-capacity-9 sh]# cat  docker_jvm_check.sh
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">check xypayget jvm</span>
+<span style="color: #a020f0;">function</span> <span style="color: #0000ff;">check_jvm</span>() {
+  <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">docker_id</span>=$<span style="color: #a0522d;">1</span>
+  <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">docker_jname</span>=$<span style="color: #a0522d;">2</span>
+  <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">docker_jpid</span>=$(<span style="color: #ff00ff;">docker exec ${docker_id} ps -ef|grep ${docker_jname}|awk '{print $2}'</span>)
+  <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">jlog_dir</span>=${<span style="color: #a0522d;">docker_jvm_log</span>}/${<span style="color: #a0522d;">docker_id</span>}
+  mkdir -pv $<span style="color: #a0522d;">jlog_dir</span>
+  <span style="color: #a020f0;">if</span>  [[ $(<span style="color: #ff00ff;">docker exec ${docker_id} ps -ef|grep $docker_jpid|grep jstat |wc -l</span>) != 1 ]] ; <span style="color: #a020f0;">then</span>
+      docker exec ${<span style="color: #a0522d;">docker_id</span>} killall jstat
+      nohup docker exec ${<span style="color: #a0522d;">docker_id</span>} /usr/java/jdk1.8.0_181/bin/jstat -gc -h 20 -t  ${<span style="color: #a0522d;">docker_jpid</span>} 1000 &gt;&gt; $<span style="color: #a0522d;">jlog_dir</span>/jvm_${<span style="color: #a0522d;">docker_jname</span>}.log &amp;
+  <span style="color: #a020f0;">fi</span>
+}
+
+<span style="color: #a0522d;">docker_name</span>=xypaygate
+<span style="color: #a0522d;">jname</span>=gc_xypaygate_yzprod
+<span style="color: #a0522d;">docker_jvm_log</span>=/data/check_docker_jvm
+
+<span style="color: #a020f0;">for</span> did<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">docker ps |grep $docker_name |awk '{print $1}'</span>); <span style="color: #a020f0;">do</span>
+  check_jvm $<span style="color: #a0522d;">did</span> $<span style="color: #a0522d;">jname</span>
+<span style="color: #a020f0;">done</span>
+
+
+[root@mesos-capacity-9 sh]# tail  /data/check_docker_jvm/700679dc04c3/jvm_gc_xypaygate_yzprod.log
+       419284.6 32768.0 32768.0 1901.9  0.0   196608.0 92652.1  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419285.6 32768.0 32768.0 1901.9  0.0   196608.0 95269.8  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419286.6 32768.0 32768.0 1901.9  0.0   196608.0 96592.1  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419287.6 32768.0 32768.0 1901.9  0.0   196608.0 96932.8  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419288.6 32768.0 32768.0 1901.9  0.0   196608.0 97033.6  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419289.6 32768.0 32768.0 1901.9  0.0   196608.0 97602.1  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419290.6 32768.0 32768.0 1901.9  0.0   196608.0 97962.2  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419291.6 32768.0 32768.0 1901.9  0.0   196608.0 98063.4  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+Timestamp        S0C    S1C    S0U    S1U      EC       EU        OC         OU       MC     MU    CCSC   CCSU   YGC     YGCT    FGC    FGCT     GCT
+       419292.4 32768.0 32768.0 1901.9  0.0   196608.0 98130.9  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-org26d4c7a" class="outline-2">
+<h2 id="org26d4c7a">docker镜像清理</h2>
+<div class="outline-text-2" id="text-org26d4c7a">
+<p>
+自动清理命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">docker system prune -a
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>该指令默认会清除所有如下资源：
+<ul class="org-ul">
+<li>已停止的容器（container）</li>
+<li>未被任何容器所使用的卷（volume）</li>
+<li>未被任何容器所关联的网络（network）</li>
+<li>所有悬空镜像（image）。</li>
+</ul></li>
+<li>该指令默认只会清除悬空镜像，未被使用的镜像不会被删除。</li>
+<li>添加  -a 或 &#x2013;all  参数后，可以一并清除所有未使用的镜像和悬空镜像。</li>
+<li>可以添加  -f 或 &#x2013;force  参数用以忽略相关告警确认信息。</li>
+<li>指令结尾处会显示总计清理释放的空间大小。</li>
+</ul>
+
+<p>
+清理脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt;&gt;/var/spool/cron/root
+<span style="color: #ffa54f;"># &#28165;&#29702;&#26412;&#22320;&#23481;&#22120;&#38236;&#20687;</span>
+<span style="color: #ffa54f;">0 2 * * * bash /data/ops/clean_docker_img.sh</span>
+<span style="color: #ffa54f;">EOF</span>
+
+mkdir /data/ops -p
+cat   &lt;&lt;\EOF&gt; /data/ops/clean_docker_img.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;"># &#21024;&#38500;&#25152;&#26377;&#24748;&#31354;&#38236;&#20687;</span>
+<span style="color: #ffa54f;">images=$(</span><span style="color: #ff00ff;">docker images -f "dangling=true" -q</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">[ -z "$images" ] || docker rmi -f $images</span>
+<span style="color: #ffa54f;"># &#21024;&#38500;&#25152;&#26377;&#26410;&#34987;&#20219;&#20309;&#23481;&#22120;&#20851;&#32852;&#24341;&#29992;&#30340;&#21367;&#65306;</span>
+<span style="color: #ffa54f;">images=$(</span><span style="color: #ff00ff;">docker volume ls -qf dangling=true</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">[ -z "$images" ] || docker volume rm $images</span>
+<span style="color: #ffa54f;"># &#21024;&#38500;&#25152;&#26377;&#24050;&#36864;&#20986;&#30340;&#23481;&#22120;</span>
+<span style="color: #ffa54f;">images=$(</span><span style="color: #ff00ff;">docker ps -aq -f status=exited</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">[ -z "$images" ] || docker rm -v $images</span>
+<span style="color: #ffa54f;"># &#21024;&#38500;&#25152;&#26377;&#29366;&#24577;&#20026; dead &#30340;&#23481;&#22120;</span>
+<span style="color: #ffa54f;">images=$(</span><span style="color: #ff00ff;">docker ps -aq -f status=dead</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">[ -z "$images" ] || docker rm -v $images</span>
+<span style="color: #ffa54f;"># &#21024;&#38500;&#25351;&#23450;&#38236;&#20687;</span>
+<span style="color: #ffa54f;">images=`docker images | egrep "10.0.1.84|english-qa|chinese-qa|chinese-new-qa" | awk '{print $3}'`</span>
+<span style="color: #ffa54f;">echo $images</span>
+<span style="color: #ffa54f;">[ -z "$images" ] || docker rmi -f $images</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+脚本2
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker_image_rm.sh
+
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;"># this script requires bash version 4</span>
+
+<span style="color: #ffa54f;">#delete all stopped containers</span>
+<span style="color: #ffa54f;">docker rm $(</span><span style="color: #ff00ff;">docker ps -f status=exited -q</span><span style="color: #ffa54f;">)</span>
+
+
+<span style="color: #ffa54f;"># get list of (tagged) images that are used by running containers</span>
+<span style="color: #ffa54f;">declare -A usedimages</span>
+<span style="color: #ffa54f;">for i in $(</span><span style="color: #ff00ff;">docker ps | awk '{ print $2; }' | grep -v "^ID$"</span><span style="color: #ffa54f;">) ; do ID=$(</span><span style="color: #ff00ff;">docker inspect  --format="{{.Id}}" $i</span><span style="color: #ffa54f;">) ; usedimages[$ID]=$i ; done</span>
+
+<span style="color: #ffa54f;">for i in "${!usedimages[@]}"</span>
+<span style="color: #ffa54f;">do</span>
+<span style="color: #ffa54f;">  echo "key  : $i"</span>
+<span style="color: #ffa54f;">  echo "value: ${usedimages[$i]}"</span>
+<span style="color: #ffa54f;">done</span>
+
+
+<span style="color: #ffa54f;"># delete all unused (tagged) images</span>
+<span style="color: #ffa54f;">for i in $(</span><span style="color: #ff00ff;">docker images --no-trunc -q | sort -u</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">  do    </span>
+<span style="color: #ffa54f;">  if [[ ${usedimages[$i]}x != "x" ]] ; then</span>
+<span style="color: #ffa54f;">    echo "image is used: $i"</span>
+<span style="color: #ffa54f;">    echo "by ${usedimages[$i]}"</span>
+<span style="color: #ffa54f;">  else</span>
+<span style="color: #ffa54f;">    if [[ $(</span><span style="color: #ff00ff;">docker ps -a | grep "registrator"| grep -v grep | awk '{print $1}'</span><span style="color: #ffa54f;">)X == $i"X" ]] ; then</span>
+<span style="color: #ffa54f;">       continue</span>
+<span style="color: #ffa54f;">    fi</span>
+<span style="color: #ffa54f;">    echo "image is not used: $i"</span>
+<span style="color: #ffa54f;">  #  docker rmi $i</span>
+<span style="color: #ffa54f;">    spark=$(</span><span style="color: #ff00ff;">echo $i | grep spark</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">    if [[ "$spark" != "" ]]; then</span>
+<span style="color: #ffa54f;">      echo "spark iamges: $1"</span>
+<span style="color: #ffa54f;">    else</span>
+<span style="color: #ffa54f;">      docker rmi $i</span>
+<span style="color: #ffa54f;">    fi</span>
+<span style="color: #ffa54f;">  fi</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p>
+          <a href="/index.html">JasperHsu</a> · 
+          <a href="/publications.html">Publications</a> · 
+          <a href="/rss.xml">RSS Feeds</a> · 
+          <a rel="me" href="https://creativecommons.org/licenses/by-sa/4.0/">(CC BY-SA 4.0)</a>
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a>
+-->
+        </p>
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">© 2024 Jasper Hsu</p>
+      </div>
+      <div class="column align-right">
+        <p>
+          <a href="https://orgmode.org" style="float:right; margin 20px 0px 20px 20px;">
+            <img src="/static/images/made-with-emacs.webp" style="width: 120px" alt="Made with Emacs Org-Mode">
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

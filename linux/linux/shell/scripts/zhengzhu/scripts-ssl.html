@@ -560,50 +560,42 @@ ssl证书自动申请
 <li>如果发现一个证书事件，则重载nginx配置文件。</li>
 </ol>
 
-<p>
+<pre class="example" id="orgceb3944">
 ```mermaid
 graph TD
-A(第一次检查)&#x2013;&gt;|内部|B(循环并发执行)
-B&#x2013;&gt;|内部|C(删除临时证书目录)
-C&#x2013;&gt;D(删除老的证书备份文件)
-D&#x2013;&gt;|删除30天前备份|E(第二次检查)
-E&#x2013;&gt;|内部|F(nginx重启)
-</p>
+A(第一次检查)--&gt;|内部|B(循环并发执行)
+B--&gt;|内部|C(删除临时证书目录)
+C--&gt;D(删除老的证书备份文件)
+D--&gt;|删除30天前备份|E(第二次检查)
+E--&gt;|内部|F(nginx重启)
 
-<p>
-A&#x2013;&gt;AA{证书更新记录是否存在}
-AA&#x2013;&gt;|存在|AA1{本地证书文件是否存在}
-AA1&#x2013;&gt;|存在|AA2{本地证书是否更新过-比对在1天以内误差}
-AA2&#x2013;&gt;|没更新|AA3(创建nginx重启触发文件)
-AA3&#x2013;&gt;F
-</p>
+A--&gt;AA{证书更新记录是否存在}
+AA--&gt;|存在|AA1{本地证书文件是否存在}
+AA1--&gt;|存在|AA2{本地证书是否更新过-比对在1天以内误差}
+AA2--&gt;|没更新|AA3(创建nginx重启触发文件)
+AA3--&gt;F
 
-<p>
-B&#x2013;&gt;BB[从rsync服务端拉取证书]
-BB&#x2013;&gt;|放到临时证书目录/tmp/zhengshuXXX下|BB1[备份证书]
-BB1&#x2013;&gt;|备份原证书到/data/backup/zhengshu_bak目录下|BB2[循环域名检查]
-BB2&#x2013;&gt;|内部|C
-</p>
+B--&gt;BB[从rsync服务端拉取证书]
+BB--&gt;|放到临时证书目录/tmp/zhengshuXXX下|BB1[备份证书]
+BB1--&gt;|备份原证书到/data/backup/zhengshu_bak目录下|BB2[循环域名检查]
+BB2--&gt;|内部|C
 
-<p>
-BB2&#x2013;&gt;|并发执行|BBB{证书目录及文件是否存在}
-BBB&#x2013;&gt;|不存在|OO[替换此证书到本地证书目录]
-BBB&#x2013;&gt;|存在|BBB1{判断本地证书是否有效}
-BBB1&#x2013;&gt;|无效|BBB2[备份无效证书]
-BBB2&#x2013;&gt;OO
-BBB&#x2013;&gt;|存在|BBB11{判断证书剩余时间}
-BBB11&#x2013;&gt;|小于等于26天|OO
-OO&#x2013;&gt;OOO[更新证书记录-证书要大于26天]
-OOO&#x2013;&gt;C
-</p>
+BB2--&gt;|并发执行|BBB{证书目录及文件是否存在}
+BBB--&gt;|不存在|OO[替换此证书到本地证书目录]
+BBB--&gt;|存在|BBB1{判断本地证书是否有效}
+BBB1--&gt;|无效|BBB2[备份无效证书]
+BBB2--&gt;OO
+BBB--&gt;|存在|BBB11{判断证书剩余时间}
+BBB11--&gt;|小于等于26天|OO
+OO--&gt;OOO[更新证书记录-证书要大于26天]
+OOO--&gt;C
 
-<p>
-E&#x2013;&gt;EE[访问本地证书]
-EE&#x2013;&gt;EE1{判断本地curl_name是否能访问}
-EE1&#x2013;&gt;|能访问|EE2{判断证书剩余时间}
-EE2&#x2013;&gt;|判断证书剩余时间与证书更新记录文件中不相等|AA3
+E--&gt;EE[访问本地证书]
+EE--&gt;EE1{判断本地curl_name是否能访问}
+EE1--&gt;|能访问|EE2{判断证书剩余时间}
+EE2--&gt;|判断证书剩余时间与证书更新记录文件中不相等|AA3
 ```
-</p>
+</pre>
 </div>
 <div id="outline-container-h:1d2b637b-f6fd-4d8f-a1bd-df2f9586a9b6" class="outline-4">
 <h4 id="h:1d2b637b-f6fd-4d8f-a1bd-df2f9586a9b6">免交互式</h4>
@@ -1137,26 +1129,940 @@ days)
 <div id="outline-container-h:e008414f-3b5b-4edc-9c0e-c620fc0b9862" class="outline-3">
 <h3 id="h:e008414f-3b5b-4edc-9c0e-c620fc0b9862">04-使用Python检查域名证书剩余时间</h3>
 <div class="outline-text-3" id="text-h:e008414f-3b5b-4edc-9c0e-c620fc0b9862">
+<p>
+通过Python检查设定好的域名，通过域名的访问去检查证书的剩余时间，并且发送邮件通知
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #b22222;"># </span><span style="color: #b22222;">!/usr/bin/env python</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">-*- coding:utf-8 -*-</span>
+<span style="color: #b22222;">#</span>
+
+<span style="color: #a020f0;">import</span> commands
+
+<span style="color: #a020f0;">import</span> smtplib
+<span style="color: #a020f0;">from</span> email.mime.image <span style="color: #a020f0;">import</span> MIMEImage
+<span style="color: #a020f0;">from</span> email.mime.multipart <span style="color: #a020f0;">import</span> MIMEMultipart
+<span style="color: #a020f0;">from</span> email.mime.text <span style="color: #a020f0;">import</span> MIMEText
+<span style="color: #a020f0;">from</span> email.header <span style="color: #a020f0;">import</span> Header
+
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">send_email</span>(to_addr, cc_addr, subject, content):
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">to_addr = ['xcwhxxe@xxx.com']  # &#25509;&#25910;&#37038;&#20214;&#65292;&#21487;&#35774;&#32622;&#20026;&#20320;&#30340;QQ&#37038;&#31665;&#25110;&#32773;&#20854;&#20182;&#37038;&#31665;</span>
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">cc_addr = ['xcwhxxe'] # &#25220;&#36865;</span>
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">subject = 'Python SMTP &#37038;&#20214;&#27979;&#35797;' # &#20027;&#39064;</span>
+
+    <span style="color: #a0522d;">mail_host</span> = <span style="color: #8b2252;">"smtp.cici.com"</span>  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#35774;&#32622;&#26381;&#21153;&#22120;</span>
+    <span style="color: #a0522d;">mail_user</span> = <span style="color: #8b2252;">"scans@cici.com"</span>  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#29992;&#25143;&#21517;</span>
+    <span style="color: #a0522d;">mail_pass</span> = <span style="color: #8b2252;">"LZ"</span>  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21475;&#20196;</span>
+    <span style="color: #a0522d;">sender</span> = <span style="color: #8b2252;">'scans'</span>
+
+    <span style="color: #a0522d;">msgRoot</span> = MIMEMultipart(<span style="color: #8b2252;">'related'</span>)
+    <span style="color: #a0522d;">msgRoot</span>[<span style="color: #8b2252;">'From'</span>] = Header(mail_user, <span style="color: #8b2252;">'utf-8'</span>)
+    <span style="color: #a0522d;">msgRoot</span>[<span style="color: #8b2252;">'To'</span>] = Header(<span style="color: #8b2252;">","</span>.join(to_addr), <span style="color: #8b2252;">'utf-8'</span>)
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">msgRoot['Cc'] = Header(",".join(cc_addr)) # &#25220;&#36865;</span>
+    <span style="color: #a0522d;">msgRoot</span>[<span style="color: #8b2252;">'Subject'</span>] = Header(subject, <span style="color: #8b2252;">'utf-8'</span>)
+
+    <span style="color: #a020f0;">if</span> is_html:
+        <span style="color: #a0522d;">msgAlternative</span> = MIMEMultipart(<span style="color: #8b2252;">'alternative'</span>)
+        msgRoot.attach(msgAlternative)
+
+        <span style="color: #a0522d;">mail_msg</span> =<span style="color: #8b2252;">'&lt;h2&gt;&#22270;&#31034;&#65306;&lt;/h2&gt;'</span>
+        msgAlternative.attach(MIMEText(content+mail_msg, <span style="color: #8b2252;">'html'</span>, <span style="color: #8b2252;">'utf-8'</span>))
+    <span style="color: #a020f0;">else</span>:
+        <span style="color: #a0522d;">msg_content</span> = MIMEText(content, <span style="color: #8b2252;">'plain'</span>, <span style="color: #8b2252;">'utf-8'</span>)
+        msgRoot.attach(msg_content)
+
+    <span style="color: #a020f0;">try</span>:
+        <span style="color: #a0522d;">smtpObj</span> = smtplib.SMTP_SSL()
+        smtpObj.connect(mail_host, 994)  <span style="color: #b22222;"># </span><span style="color: #b22222;">25 &#20026; SMTP &#31471;&#21475;&#21495;</span>
+        smtpObj.login(mail_user, mail_pass)
+        smtpObj.sendmail(mail_user, to_addr, msgRoot.as_string())
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">smtpObj.sendmail(mail_user, to_addr+cc_addr, msgRoot.as_string())</span>
+        <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"&#37038;&#20214;&#21457;&#36865;&#25104;&#21151;"</span>)
+    <span style="color: #a020f0;">except</span> smtplib.SMTPException:
+        <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"Error: &#26080;&#27861;&#21457;&#36865;&#37038;&#20214;"</span>)
+
+
+<span style="color: #483d8b;">dict</span> = {<span style="color: #8b2252;">'xy_hd1'</span>:[<span style="color: #8b2252;">'emc.cici.net'</span>], \
+        <span style="color: #8b2252;">'xy_hd2'</span>:[<span style="color: #8b2252;">'hd2-1.btrade.cici.com'</span>], \
+        <span style="color: #8b2252;">'zhiyunshan'</span>:[<span style="color: #8b2252;">'hd2-1.zysmul.zizi.com'</span>,<span style="color: #8b2252;">'hb2-1.zysmul.zizi.com'</span>]
+        }
+
+<span style="color: #a0522d;">f</span> = <span style="color: #483d8b;">open</span>(<span style="color: #8b2252;">'~/python/domain_info.txt'</span>, <span style="color: #8b2252;">'w'</span>)
+
+<span style="color: #a020f0;">for</span> machine_room <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">dict</span>.keys():
+    <span style="color: #a020f0;">for</span> domain <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">dict</span>[machine_room]:
+        <span style="color: #483d8b;">print</span> <span style="color: #8b2252;">"========%s"</span>%domain
+        <span style="color: #a0522d;">cmd</span> = <span style="color: #8b2252;">"echo | openssl s_client -connect %s:443 2&gt;/dev/null | openssl x509 -noout -dates | awk -F= '{print $2}'|tail -n 1"</span> %domain
+        <span style="color: #a0522d;">cer_time</span> = commands.getoutput(cmd)
+        <span style="color: #483d8b;">print</span> cer_time
+        <span style="color: #a0522d;">cmd1</span> = <span style="color: #8b2252;">"date -d '%s' +%%s"</span> %cer_time
+        <span style="color: #a0522d;">end_time</span> = commands.getoutput(cmd1)
+        <span style="color: #483d8b;">print</span> end_time
+        <span style="color: #a0522d;">now_time</span> = commands.getoutput(<span style="color: #8b2252;">'date +%s'</span>)
+        <span style="color: #a0522d;">time</span> = (<span style="color: #483d8b;">int</span>(end_time) - <span style="color: #483d8b;">int</span>(now_time))/24/3600
+        <span style="color: #483d8b;">print</span> <span style="color: #8b2252;">"time = %s"</span>%time
+        <span style="color: #a0522d;">info</span> = <span style="color: #8b2252;">"&#26426;&#25151;:%s &#22495;&#21517;:%s &#21097;&#20313;&#22825;&#25968;%s</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">"</span> %(machine_room,domain,time)
+        f.write(info)
+f.close()
+
+<span style="color: #a0522d;">send_cmd</span> = <span style="color: #8b2252;">"mail -s '&#22495;&#21517;&#35777;&#20070;&#26816;&#26597;&#25253;&#21578;' sa@cici.com &lt; domain_info.txt"</span>
+<span style="color: #a0522d;">send_mail</span> = commands.getoutput(send_cmd)
+
+<span style="color: #a0522d;">f1</span> = <span style="color: #483d8b;">open</span>(<span style="color: #8b2252;">"domain_info.txt"</span>,<span style="color: #8b2252;">"r"</span>)
+<span style="color: #a0522d;">content</span> = <span style="color: #8b2252;">""</span>.join(f1.readlines())
+f1.close()
+<span style="color: #a0522d;">to_addr</span> = [<span style="color: #8b2252;">'sa@zizi.cn'</span>]
+<span style="color: #a0522d;">cc_addr</span> = [<span style="color: #8b2252;">'sa@cici.com'</span>]
+<span style="color: #a0522d;">subject</span> = <span style="color: #8b2252;">'&#22495;&#21517;&#35777;&#20070;&#26816;&#26597;&#25253;&#21578;'</span>  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20027;&#39064;</span>
+<span style="color: #a0522d;">is_html</span> = <span style="color: #008b8b;">False</span>
+send_email(to_addr,cc_addr,subject,content)
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:9f941296-afee-4127-aa9a-39d9137bd8ff" class="outline-3">
 <h3 id="h:9f941296-afee-4127-aa9a-39d9137bd8ff">05-自动扫描自动监控</h3>
 <div class="outline-text-3" id="text-h:9f941296-afee-4127-aa9a-39d9137bd8ff">
+<p>
+邮件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#35777;&#20070;&#30446;&#24405;</span>
+mkdir -p /root/.certs/
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#33719;&#21462;&#35777;&#20070;&#20869;&#23481;&#65288;&#21487;&#20998;&#24320;&#25191;&#34892;&#26597;&#30475;&#36807;&#31243;&#65289;</span>
+<span style="color: #483d8b;">echo</span> -n | openssl s_client -connect smtp.exmail.qq.com:465 | sed -ne <span style="color: #8b2252;">'/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p'</span> &gt; ~/.certs/qq.crt
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#28155;&#21152;&#19968;&#20010;&#35777;&#20070;&#21040;&#35777;&#20070;&#25968;&#25454;&#24211;&#20013;</span>
+certutil -A -n <span style="color: #8b2252;">"GeoTrust SSL CA"</span> -t <span style="color: #8b2252;">"C,,"</span> -d ~/.certs -i ~/.certs/qq.crt 
+certutil -A -n <span style="color: #8b2252;">"GeoTrust Global CA"</span> -t <span style="color: #8b2252;">"C,,"</span> -d ~/.certs -i ~/.certs/qq.crt 
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21015;&#20986;&#30446;&#24405;&#19979;&#35777;&#20070;</span>
+certutil -L -d /root/.certs
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25351;&#26126;&#21463;&#26032;&#20154;&#35777;&#20070;&#12289;&#38450;&#25253;&#38169;</span>
+<span style="color: #483d8b;">cd</span> /root/.certs/
+certutil -A -n <span style="color: #8b2252;">"GeoTrust SSL CA - G3"</span> -t <span style="color: #8b2252;">"Pu,Pu,Pu"</span> -d ./ -i qq.crt
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#32534;&#36753;mail&#30340;&#37197;&#32622;&#25991;&#20214;</span>
+cat &gt;&gt;/etc/mail.rc&lt;&lt; \EOF
+<span style="color: #ffa54f;">set bsdcompat</span>
+<span style="color: #ffa54f;">set from=ops-alarm@cici.cn</span>
+<span style="color: #ffa54f;">set smtp=smtps://smtp.exmail.qq.com:465</span>
+<span style="color: #ffa54f;">set smtp-auth-user=ops-alarm@cici.cn</span>
+<span style="color: #ffa54f;">set smtp-auth-password='NHFNpVxQrshes'</span>
+<span style="color: #ffa54f;">set smtp-auth=login</span>
+<span style="color: #ffa54f;">set ssl-verify=ignore</span>
+<span style="color: #ffa54f;">set nss-config-dir=/root/.certs</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"aaa"</span> |mail -s <span style="color: #8b2252;">"title"</span> -a  /etc/fstab xuchangwei@cici.cn
+</pre>
+</div>
+
+<p>
+依赖
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#23433;&#35013;py3</span>
+yum -y install python36 python36-devel
+python3.6 -m venv /opt/py3 
+<span style="color: #483d8b;">source</span> /opt/py3/bin/activate
+
+cat &lt;&lt; EOF &gt;/data/ops/requirements.txt 
+<span style="color: #ffa54f;">requests == 2.24.0</span>
+<span style="color: #ffa54f;">aliyun-python-sdk-alidns == 2.6.18</span>
+<span style="color: #ffa54f;">aliyun-python-sdk-core  == 2.13.25</span>
+<span style="color: #ffa54f;">EOF</span>
+
+pip install -r /data/ops/requirements.txt
+</pre>
+</div>
+
+<p>
+配置文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;EOF &gt; /data/ops/qsdnskeyconfig.conf 
+<span style="color: #ffa54f;"># login aliyun rest api info</span>
+<span style="color: #ffa54f;"># slb type: nginx/none(dubbo)/slb</span>
+<span style="color: #ffa54f;"># if slb_type = slb which be need</span>
+<span style="color: #ffa54f;">[aliyun_u_p]</span>
+<span style="color: #ffa54f;">aki = LTAIF</span>
+<span style="color: #ffa54f;">aks = GRlA0T</span>
+<span style="color: #ffa54f;">domains = cici.com</span>
+<span style="color: #ffa54f;">#mail config</span>
+<span style="color: #ffa54f;">mail_host = </span>
+<span style="color: #ffa54f;">mail_user = </span>
+<span style="color: #ffa54f;">user = 'scans'</span>
+<span style="color: #ffa54f;">mail_pass = </span>
+<span style="color: #ffa54f;">#config more mail, plsae use ',' split</span>
+<span style="color: #ffa54f;">to_addr=xuchangwei@cici.cn</span>
+<span style="color: #ffa54f;">cc_addr=xuchangwei@cici.cn</span>
+<span style="color: #ffa54f;">#dingdingconfig</span>
+<span style="color: #ffa54f;">dindin_token=14896a600456c3c661bcc69</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+执行文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF &gt;start_check_ssl.sh 
+<span style="color: #ffa54f;">#!/usr/bin/env bash</span>
+<span style="color: #ffa54f;">tokens="14896a600bcc69"</span>
+<span style="color: #ffa54f;">#--------------------</span>
+<span style="color: #ffa54f;">#dingding push</span>
+<span style="color: #ffa54f;">function dingding() {</span>
+<span style="color: #ffa54f;">local access_tokens=$1</span>
+<span style="color: #ffa54f;">local ding_url='https://oapi.dingtalk.com/robot/send'</span>
+<span style="color: #ffa54f;">local ding_header='Content-Type: application/json'</span>
+<span style="color: #ffa54f;">local msg=$2</span>
+<span style="color: #ffa54f;">for key in $access_tokens; do</span>
+<span style="color: #ffa54f;">curl -s -connect-timeout 40 -XPOST -H "$ding_header" "$ding_url?access_token=$key" \</span>
+<span style="color: #ffa54f;">-d '{"msgtype": "text",</span>
+<span style="color: #ffa54f;">    "text": {</span>
+<span style="color: #ffa54f;">        "content": "&#12304;k8s&#25253;&#35686;&#12305; \n'"$msg"'"</span>
+<span style="color: #ffa54f;">    },</span>
+<span style="color: #ffa54f;">"at": {</span>
+<span style="color: #ffa54f;">      "atMobiles": [],</span>
+<span style="color: #ffa54f;">      "isAtAll": true</span>
+<span style="color: #ffa54f;">  }</span>
+<span style="color: #ffa54f;">}'</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">}</span>
+<span style="color: #ffa54f;">/opt/py3/bin/python /data/ops/check_ssl.py</span>
+<span style="color: #ffa54f;">if [ `wc -l dns.log |awk '{print $1}'` -gt 0 ] ; then</span>
+<span style="color: #ffa54f;">    conect=`cat dns.log|sed '1d'|awk '{print $1}' | grep -v 'CNAME'|sort -t '|' -nr -k1,1`</span>
+<span style="color: #ffa54f;">    conect="${conect}\\n `cat dns.log|sed '1d'|awk '{print $1}' | grep  'CNAME'|sort -t '|' -nr -k1,1`"</span>
+<span style="color: #ffa54f;">    dingding "$tokens" "$(</span><span style="color: #ff00ff;">echo -e "&#22495;&#21517;&#35777;&#20070;&#23567;&#20110;28&#22825;&#26377;&#25928;&#26399;&#22914;&#19979;&#65306;\\n ${conect}"</span><span style="color: #ffa54f;">)\\n"</span>
+<span style="color: #ffa54f;">    echo -e "&#22495;&#21517;&#35777;&#20070;&#23567;&#20110;28&#22825;&#26377;&#25928;&#26399;&#22914;&#19979;&#65306;\\n ${conect}"  |mail -s "&#35777;&#20070;&#26816;&#27979;" -a /data/ops/dns.log  system@cici.cn</span>
+<span style="color: #ffa54f;">fi </span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+脚本内容
+</p>
+<div class="org-src-container">
+<pre class="src src-python">cat &lt;&lt;\EOF &gt; check_ssl.py 
+<span style="color: #b22222;">#</span><span style="color: #b22222;">coding=utf-8</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/usr/bin/env python</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22522;&#30784;&#20869;&#32622;&#27169;&#22359;</span>
+<span style="color: #a020f0;">import</span> json
+<span style="color: #a020f0;">import</span> ssl
+<span style="color: #a020f0;">import</span> sys
+<span style="color: #a020f0;">import</span> configparser
+<span style="color: #a020f0;">import</span> telnetlib
+<span style="color: #a020f0;">import</span> time
+<span style="color: #a020f0;">import</span> datetime
+<span style="color: #a020f0;">import</span> os
+<span style="color: #a020f0;">import</span> math
+<span style="color: #a020f0;">import</span> requests
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37038;&#31665;&#27169;&#22359;</span>
+<span style="color: #a020f0;">from</span> email.mime.text <span style="color: #a020f0;">import</span> MIMEText
+<span style="color: #a020f0;">from</span> email.utils <span style="color: #a020f0;">import</span> formatdate
+<span style="color: #a020f0;">from</span> email.header <span style="color: #a020f0;">import</span> Header
+<span style="color: #a020f0;">import</span> smtplib
+<span style="color: #a020f0;">from</span> email.mime.multipart <span style="color: #a020f0;">import</span> MIMEMultipart
+<span style="color: #a020f0;">from</span> email.mime.base <span style="color: #a020f0;">import</span> MIMEBase
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23548;&#20837;&#38463;&#37324;&#27169;&#22359;</span>
+<span style="color: #a020f0;">from</span> aliyunsdkcore.client <span style="color: #a020f0;">import</span> AcsClient
+<span style="color: #a020f0;">from</span> aliyunsdkalidns.request.v20150109.DescribeDomainRecordsRequest <span style="color: #a020f0;">import</span> DescribeDomainRecordsRequest
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#35774;&#32622;&#20840;&#23616;&#27599;&#27425;&#35831;&#27714;&#38463;&#37324;&#20113;&#19981;&#20351;&#29992;&#35777;&#20070;</span>
+ssl.<span style="color: #a0522d;">_create_default_https_context</span> = ssl._create_unverified_context
+<span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">&#37197;&#32622;&#25991;&#20214;&#20013;&#35835;&#21462;&#38463;&#37324;&#39564;&#35777;&#38656;&#35201;&#30340;key&#20449;&#24687;</span>
+<span style="color: #8b2252;">'''</span>
+<span style="color: #a020f0;">class</span> <span style="color: #228b22;">ali_operation</span>():
+    <span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">    &#37197;&#32622;&#25991;&#20214;&#20013;&#35835;&#21462;&#38463;&#37324;&#39564;&#35777;&#38656;&#35201;&#30340;key&#20449;&#24687;</span>
+<span style="color: #8b2252;">    '''</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dnsconfig</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">cf</span> = configparser.ConfigParser()
+        cf.read(<span style="color: #8b2252;">"qsdnskeyconfig.conf"</span>)
+        <span style="color: #a0522d;">secs</span> = cf.sections()
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">print(secs)</span>
+        <span style="color: #a020f0;">if</span> secs.count(<span style="color: #8b2252;">'aliyun_u_p'</span>) != 1:
+           sys.<span style="color: #008b8b;">exit</span>(<span style="color: #8b2252;">' Error: need a aliyun_u_p config'</span>)
+        <span style="color: #a0522d;">ali_auth</span>={<span style="color: #8b2252;">'aki'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'aki'</span>),<span style="color: #8b2252;">'aks'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'aks'</span>),
+                  <span style="color: #8b2252;">'domains'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'domains'</span>),
+                  <span style="color: #8b2252;">'mail_host'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'mail_host'</span>),
+                  <span style="color: #8b2252;">'mail_user'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'mail_user'</span>),
+                  <span style="color: #8b2252;">'user'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'user'</span>),
+                  <span style="color: #8b2252;">'mail_pass'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'mail_pass'</span>),
+                  <span style="color: #8b2252;">'to_addr'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'to_addr'</span>),
+                  <span style="color: #8b2252;">'cc_addr'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'cc_addr'</span>),
+                  <span style="color: #8b2252;">'dindin_token'</span>:cf.get(<span style="color: #8b2252;">'aliyun_u_p'</span>,<span style="color: #8b2252;">'dindin_token'</span>),
+                  }
+        <span style="color: #a020f0;">return</span> ali_auth
+    <span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">    &#23545;&#38463;&#37324;&#25509;&#21475;&#21457;&#36215;&#35831;&#27714;</span>
+<span style="color: #8b2252;">    '''</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">connect_retry</span>(<span style="color: #a020f0;">self</span>,aki,aks,request, print_def):
+        <span style="color: #a0522d;">client</span> =  AcsClient(aki,aks)
+        <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">range</span>(3):
+            <span style="color: #a020f0;">try</span>:
+                <span style="color: #a0522d;">responese</span> = client.do_action_with_exception(request)
+            <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> e:
+                <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">'--Error '</span> + print_def + <span style="color: #8b2252;">' error, error info: </span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>+<span style="color: #8b2252;">' '</span>*8+<span style="color: #8b2252;">'%s'</span>%(e))
+                <span style="color: #a020f0;">if</span> i == 2:
+                    <span style="color: #a020f0;">return</span>(1)
+                <span style="color: #a020f0;">else</span>:
+                    <span style="color: #a020f0;">continue</span>
+            <span style="color: #a020f0;">return</span> responese
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#22495;&#21517;&#26597;&#35810;&#25509;&#21475;&#21442;&#25968;&#37197;&#32622;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dns_query</span>(<span style="color: #a020f0;">self</span>,domainname,pagenum):
+        <span style="color: #a0522d;">request</span> = DescribeDomainRecordsRequest()
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">request.set_action_name('DescribeDomainRecords')</span>
+        request.set_DomainName(domainname)
+        <span style="color: #a020f0;">if</span> pagenum &gt;= 1:
+           request.set_PageNumber(pagenum)
+        <span style="color: #a020f0;">return</span>  request
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20998;&#39029;&#33719;&#21462;&#20108;&#32423;&#22495;&#21517;</span>
+    <span style="color: #a020f0;">def</span>  <span style="color: #0000ff;">dnslist</span>(<span style="color: #a020f0;">self</span>,pagenum,domainnames):
+        <span style="color: #a0522d;">ali_key</span> = <span style="color: #a020f0;">self</span>.dnsconfig()
+        <span style="color: #a020f0;">if</span> pagenum &gt;= 1:
+            <span style="color: #a0522d;">dnslists</span> = <span style="color: #a020f0;">self</span>.dns_query(domainnames,pagenum=pagenum)
+        <span style="color: #a020f0;">else</span>:
+            <span style="color: #a0522d;">dnslists</span> = <span style="color: #a020f0;">self</span>.dns_query(domainnames,pagenum=0)
+
+        <span style="color: #a0522d;">info</span> = <span style="color: #a020f0;">self</span>.connect_retry(ali_key[<span style="color: #8b2252;">'aki'</span>],ali_key[<span style="color: #8b2252;">'aks'</span>],dnslists,<span style="color: #8b2252;">'dns'</span>)
+        <span style="color: #a020f0;">return</span> info
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#22495;&#21517;&#25968;&#25454;&#22788;&#29702;&#65292;&#40664;&#35748;&#26159;bite&#25968;&#25454;&#38656;&#35201;&#36716;&#25442;&#20026;unicode</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dataprocess</span>(<span style="color: #a020f0;">self</span>,pagenum,domainname):
+        <span style="color: #a0522d;">dnsdata</span> = json.loads(<span style="color: #a020f0;">self</span>.dnslist(pagenum,domainname).decode(<span style="color: #8b2252;">'utf-8'</span>))
+        <span style="color: #a020f0;">return</span>  dnsdata
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#22495;&#21517;&#20570;&#21028;&#26029;&#65292;&#36807;&#28388;&#35843;'@'&#21644;'*'&#30340;&#20108;&#32423;&#22495;&#21517;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dnsifprocess</span>(<span style="color: #a020f0;">self</span>,dnsdata):
+        <span style="color: #a0522d;">subdomainnames</span>=[]
+        <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> dnsdata[<span style="color: #8b2252;">'DomainRecords'</span>][<span style="color: #8b2252;">'Record'</span>]:
+            <span style="color: #a020f0;">if</span> i[<span style="color: #8b2252;">'RR'</span>] == <span style="color: #8b2252;">"@"</span>:
+                <span style="color: #a020f0;">continue</span>
+                <span style="color: #a0522d;">subdomainname</span>=i[<span style="color: #8b2252;">'Value'</span>]+<span style="color: #8b2252;">'|'</span>+i[<span style="color: #8b2252;">'DomainName'</span>]+<span style="color: #8b2252;">'|'</span>+i[<span style="color: #8b2252;">'Type'</span>]
+            <span style="color: #a020f0;">elif</span> <span style="color: #8b2252;">'*'</span> <span style="color: #a020f0;">in</span> i[<span style="color: #8b2252;">'RR'</span>]:
+                <span style="color: #a020f0;">continue</span>
+            <span style="color: #a020f0;">elif</span> <span style="color: #8b2252;">'TXT'</span> <span style="color: #a020f0;">in</span> i[<span style="color: #8b2252;">'Type'</span>]:
+                <span style="color: #a020f0;">continue</span>
+            <span style="color: #a020f0;">else</span>:
+                <span style="color: #a0522d;">subdomainname</span>=i[<span style="color: #8b2252;">'Value'</span>]+<span style="color: #8b2252;">'|'</span>+i[<span style="color: #8b2252;">'RR'</span>]+<span style="color: #8b2252;">'.'</span>+i[<span style="color: #8b2252;">'DomainName'</span>]+<span style="color: #8b2252;">'|'</span>+i[<span style="color: #8b2252;">'Type'</span>]
+            subdomainnames.append(subdomainname)
+        <span style="color: #a020f0;">return</span>  subdomainnames
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#27719;&#24635;&#25152;&#26377;&#20108;&#32423;&#22495;&#21517;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dnslists</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">domains</span> = <span style="color: #a020f0;">self</span>.dnsconfig()[<span style="color: #8b2252;">'domains'</span>]
+        <span style="color: #a0522d;">allsubdomainnames</span>=[]
+        <span style="color: #a020f0;">for</span> domainname <span style="color: #a020f0;">in</span> domains.split(<span style="color: #8b2252;">','</span>):
+            <span style="color: #483d8b;">print</span>(domainname)
+            <span style="color: #a0522d;">domainname</span> = domainname
+            <span style="color: #a0522d;">pagenum</span>=1
+            <span style="color: #a0522d;">dnsdata</span> = <span style="color: #a020f0;">self</span>.dataprocess(pagenum,domainname)
+            <span style="color: #a0522d;">pagenum</span>=math.ceil(dnsdata[<span style="color: #8b2252;">'TotalCount'</span>]/dnsdata[<span style="color: #8b2252;">'PageSize'</span>])
+            <span style="color: #a020f0;">if</span> pagenum &gt;= 1:
+                <span style="color: #a020f0;">for</span> c <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">range</span>(pagenum):
+                    <span style="color: #a0522d;">c</span> += 1
+                    <span style="color: #a0522d;">dnsdata</span> =  <span style="color: #a020f0;">self</span>.dataprocess(c,domainname)
+                    allsubdomainnames.append(<span style="color: #a020f0;">self</span>.dnsifprocess(dnsdata))
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">print(allsubdomainnames)</span>
+        <span style="color: #a020f0;">return</span>  allsubdomainnames
+
+<span style="color: #a020f0;">class</span> <span style="color: #228b22;">TelnetClient</span>():
+    <span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">        telnet &#27169;&#22359;</span>
+<span style="color: #8b2252;">    '''</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">__init__</span>(<span style="color: #a020f0;">self</span>,):
+        <span style="color: #a020f0;">self</span>.<span style="color: #a0522d;">tn</span> = telnetlib.Telnet()
+
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">&#27492;&#20989;&#25968;&#23454;&#29616;telnet&#30331;&#24405;&#20027;&#26426;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">login_host</span>(<span style="color: #a020f0;">self</span>,host_ip):
+        <span style="color: #a020f0;">try</span>:
+            <span style="color: #b22222;"># </span><span style="color: #b22222;">self.tn = telnetlib.Telnet(host_ip,port=23)</span>
+            <span style="color: #a020f0;">self</span>.tn.<span style="color: #483d8b;">open</span>(host_ip,port=443,timeout=3)
+            <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">True</span>
+        <span style="color: #a020f0;">except</span>:
+            <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">False</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">logout_host</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a020f0;">self</span>.tn.write(b<span style="color: #8b2252;">"exit</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">"</span>)
+
+<span style="color: #a020f0;">class</span> <span style="color: #228b22;">https_certificate_verification</span>():
+
+    <span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">    &#33719;&#21462;&#27599;&#20010;&#22495;&#21517;&#30340;&#35777;&#20070;&#26102;&#38388;</span>
+<span style="color: #8b2252;">    '''</span>
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25191;&#34892;shell&#21629;&#20196;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">commd</span>(<span style="color: #a020f0;">self</span>,commnd):
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">data=subprocess.Popen(commnd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.readlines()</span>
+        <span style="color: #a0522d;">data</span>=os.popen(commnd).readlines()
+        <span style="color: #a020f0;">return</span> data
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19979;&#36733;&#35777;&#20070;&#65292;&#24182;&#19988;&#33719;&#21462;&#35777;&#20070;&#26102;&#38388;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">https_download</span>(<span style="color: #a020f0;">self</span>,domain):
+        <span style="color: #b22222;"># </span><span style="color: #b22222;">commd =  "echo | openssl s_client -connect %s:443 2&gt;/dev/null | openssl x509 -noout -dates | awk -F= '{print $2}'|tail -n 1" %domain</span>
+        <span style="color: #a0522d;">commd</span> =  <span style="color: #8b2252;">"curl -I -v -m 1  'https://%s/' 2&gt;&amp;1 |sed -nr 's@.*expire date: @@p'"</span> %domain
+        <span style="color: #a020f0;">return</span>  <span style="color: #a020f0;">self</span>.commd(commd)
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#23558;&#35777;&#20070;&#30340;GMT&#26102;&#38388;&#23383;&#31526;&#20018;&#36716;&#25442;&#20026;&#26102;&#38388;&#26684;&#24335;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">string_toDatetime</span>(<span style="color: #a020f0;">self</span>,st):
+        <span style="color: #a020f0;">return</span>  datetime.datetime.strptime(st, <span style="color: #8b2252;">"%b %d  %H:%M:%S %Y GMT"</span>)
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#33719;&#21462;&#35777;&#20070;&#26377;&#25928;&#26399;&#21097;&#20313;&#22825;&#25968;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">https_ca_verification</span>(<span style="color: #a020f0;">self</span>,domain):
+        <span style="color: #a0522d;">dm</span>=domain.split(<span style="color: #8b2252;">'|'</span>)[1]
+        <span style="color: #a0522d;">cur_time</span> = <span style="color: #a020f0;">self</span>.https_download(dm)
+        <span style="color: #a020f0;">if</span> cur_time:
+            <span style="color: #a0522d;">cur_time</span>=<span style="color: #8b2252;">"%s"</span> % (cur_time[0].strip(<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>))
+            <span style="color: #a0522d;">cur_time</span>=<span style="color: #a020f0;">self</span>.string_toDatetime(cur_time)
+            <span style="color: #a0522d;">ca_time</span>=time.mktime(cur_time.timetuple())
+            <span style="color: #a0522d;">nowtime</span>=time.time()
+            <span style="color: #a0522d;">time1</span> = (<span style="color: #483d8b;">int</span>(ca_time+28800) - <span style="color: #483d8b;">int</span>(nowtime))/24/3600
+            <span style="color: #a020f0;">return</span> <span style="color: #8b2252;">"%s,%s,%d"</span> % (domain,<span style="color: #008b8b;">True</span>,math.floor(time1))
+        <span style="color: #a020f0;">else</span>:
+            <span style="color: #a020f0;">return</span>  <span style="color: #8b2252;">"%s,%s"</span> % (domain,<span style="color: #008b8b;">False</span>)
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#22495;&#21517;&#25286;&#20998;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">domanin_split</span>(<span style="color: #a020f0;">self</span>,domain):
+        <span style="color: #a0522d;">domain_split</span>=domain.split(<span style="color: #8b2252;">'.'</span>)
+        <span style="color: #a020f0;">if</span> <span style="color: #483d8b;">len</span>(domain_split) &gt; 2:
+            <span style="color: #a020f0;">return</span> <span style="color: #8b2252;">'.'</span>.join(domain_split[1:])
+        <span style="color: #a020f0;">else</span>:
+            <span style="color: #a020f0;">return</span> domain
+
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#30830;&#35748;&#35777;&#20070;&#26159;&#21542;&#21644;&#22495;&#21517;&#30456;&#21305;&#37197;</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">ca_is_match</span>(<span style="color: #a020f0;">self</span>,domain):
+        <span style="color: #a0522d;">commd</span> = <span style="color: #8b2252;">"echo | openssl s_client -connect  %s:443  2&gt;/dev/null | openssl x509 -noout   -text | grep -i 'DNS' | sed 's/[ ]*//g'"</span> % domain
+        <span style="color: #a0522d;">ca_support_domain</span>=<span style="color: #a020f0;">self</span>.commd(commd)
+        <span style="color: #a0522d;">ca_support_domain</span> = ca_support_domain[0].replace(<span style="color: #8b2252;">'DNS:'</span>,<span style="color: #8b2252;">''</span>).replace(<span style="color: #8b2252;">'*.'</span>,<span style="color: #8b2252;">''</span>).strip(<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>)
+        <span style="color: #a0522d;">domain_split</span>=<span style="color: #a020f0;">self</span>.domanin_split(domain)
+        <span style="color: #a020f0;">if</span> domain_split <span style="color: #a020f0;">in</span> ca_support_domain.split(<span style="color: #8b2252;">','</span>):
+            <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">True</span>
+        <span style="color: #a020f0;">else</span>:
+            <span style="color: #a020f0;">return</span>  <span style="color: #008b8b;">False</span>
+
+
+<span style="color: #a020f0;">class</span> <span style="color: #228b22;">call</span>():
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">__init__</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a020f0;">self</span>.<span style="color: #a0522d;">confg</span> = ali_operation().dnsconfig()
+    <span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">        &#36890;&#30693;&#27169;&#22359;&#12289;&#37038;&#31665;&#12289;&#38025;&#38025;</span>
+<span style="color: #8b2252;">    '''</span>
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dindin</span>(<span style="color: #a020f0;">self</span>,msg):
+       <span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">        &#21482;&#26159;&#25226;&#38025;&#38025;&#30340;&#25509;&#21475;&#23553;&#35013;&#20102;&#19979;&#65292;&#30446;&#30340;&#22823;&#23478;&#21035;&#37325;&#22797;&#36896;&#36718;&#23376;</span>
+<span style="color: #8b2252;">        url&#35831;&#27714;&#30340;&#27169;&#22359;&#26159;requests</span>
+<span style="color: #8b2252;">        &#35843;&#29992;&#20989;&#25968;&#26041;&#24335; dindin(token=token,msg=msg)</span>
+<span style="color: #8b2252;">        token&#26159;&#38025;&#38025;&#26426;&#22120;&#20154;&#30340;token</span>
+<span style="color: #8b2252;">        msg&#26159;&#35201;&#25253;&#35686;&#30340;&#20869;&#23481;</span>
+<span style="color: #8b2252;">        &#21442;&#32771;&#25991;&#26723;&#65306;</span>
+<span style="color: #8b2252;">        https://open-doc.dingtalk.com/docs/doc.htm?spm=a219a.7629140.0.0.43964a97im55WS&amp;treeId=257&amp;articleId=105735&amp;docType=1</span>
+<span style="color: #8b2252;">       '''</span>
+       <span style="color: #a0522d;">token</span>=<span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">'dindin_token'</span>]
+       <span style="color: #a0522d;">dindinapi</span> = <span style="color: #8b2252;">'https://oapi.dingtalk.com/robot/send?access_token=%s'</span> % token <span style="color: #b22222;">#</span><span style="color: #b22222;">token&#38025;&#38025;&#26426;&#22120;&#20154;&#35748;&#35777;&#30340;token</span>
+       <span style="color: #a0522d;">headers</span> = {<span style="color: #8b2252;">'content-type'</span>: <span style="color: #8b2252;">'application/json'</span>,<span style="color: #8b2252;">'charset'</span>:<span style="color: #8b2252;">'utf-8'</span>} <span style="color: #b22222;">#</span><span style="color: #b22222;">http&#22836;&#20869;&#23384;&#65292;&#38025;&#38025;&#24517;&#22635;&#39033;</span>
+       <span style="color: #a0522d;">data</span>  = {
+         <span style="color: #8b2252;">"msgtype"</span>: <span style="color: #8b2252;">"text"</span>,
+         <span style="color: #8b2252;">"text"</span>: {
+             <span style="color: #8b2252;">"content"</span>: msg
+         },
+         <span style="color: #8b2252;">"at"</span>: {
+             <span style="color: #8b2252;">"atMobiles"</span>: [
+             ],
+             <span style="color: #8b2252;">"isAtAll"</span>: <span style="color: #008b8b;">True</span>
+         }
+       }
+       <span style="color: #a020f0;">try</span>:
+        <span style="color: #a0522d;">req</span>=requests.post(dindinapi,json=data,headers=headers)
+       <span style="color: #a020f0;">except</span>:
+           <span style="color: #a020f0;">return</span>  0
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">send_email</span>(<span style="color: #a020f0;">self</span>,subject,content):
+      <span style="color: #a0522d;">mail_host</span>=<span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">'mail_host'</span>]
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">mail_host='smtp.yunzongnet.com'</span>
+      <span style="color: #a0522d;">mail_user</span> = <span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">"mail_user"</span>]
+      <span style="color: #a0522d;">user</span> = <span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">'user'</span>]
+      <span style="color: #a0522d;">mail_pass</span> = <span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">"mail_pass"</span>]
+      <span style="color: #a0522d;">to_addr</span>=<span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">'to_addr'</span>].split(<span style="color: #8b2252;">','</span>)
+      <span style="color: #a0522d;">cc_addr</span>=<span style="color: #a020f0;">self</span>.confg[<span style="color: #8b2252;">'cc_addr'</span>].split(<span style="color: #8b2252;">','</span>)
+      <span style="color: #483d8b;">print</span> (to_addr,cc_addr)
+      <span style="color: #a0522d;">msg</span> = MIMEMultipart()
+      <span style="color: #a0522d;">msg</span>[<span style="color: #8b2252;">'From'</span>] = mail_user
+      <span style="color: #a0522d;">msg</span>[<span style="color: #8b2252;">'To'</span>] = <span style="color: #8b2252;">','</span>.join(to_addr)
+      <span style="color: #a020f0;">if</span> cc_addr:
+        <span style="color: #a0522d;">msg</span>[<span style="color: #8b2252;">'Cc'</span>] = <span style="color: #8b2252;">','</span>.join(cc_addr)
+      <span style="color: #a0522d;">msg</span>[<span style="color: #8b2252;">'Subject'</span>] = subject
+      msg.attach(MIMEText(content, <span style="color: #8b2252;">'plain'</span>))
+      <span style="color: #a0522d;">smtp</span> = smtplib.SMTP_SSL(mail_host, 994)
+      smtp.ehlo()
+      smtp.login(mail_user, mail_pass)
+      smtp.sendmail(mail_user,to_addr+cc_addr,msg.as_string())
+
+<span style="color: #a020f0;">if</span> <span style="color: #483d8b;">__name__</span> == <span style="color: #8b2252;">'__main__'</span>:
+    <span style="color: #a0522d;">cm</span>=<span style="color: #8b2252;">'&gt;dns.log'</span>
+    <span style="color: #a0522d;">i</span>=os.popen(cm)
+    <span style="color: #a0522d;">validlist</span>=[]
+    <span style="color: #a0522d;">normal_list</span>=[]
+    <span style="color: #a0522d;">d_err_list</span>=[]
+    <span style="color: #a0522d;">domainlist</span> = ali_operation().dnslists()
+    <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> domainlist:
+        <span style="color: #a020f0;">for</span> j <span style="color: #a020f0;">in</span> i:
+            <span style="color: #a020f0;">if</span> TelnetClient().login_host(j.split(<span style="color: #8b2252;">'|'</span>)[1]):
+                <span style="color: #b22222;">#</span><span style="color: #b22222;">TelnetClient().logout_host()</span>
+                <span style="color: #a0522d;">j</span>=<span style="color: #8b2252;">'%s'</span> % j
+                <span style="color: #a0522d;">f</span> = https_certificate_verification().https_ca_verification(j)
+                <span style="color: #a020f0;">if</span> <span style="color: #8b2252;">"False"</span> <span style="color: #a020f0;">in</span> f:
+                    validlist.append(f)
+                <span style="color: #a020f0;">elif</span> <span style="color: #8b2252;">"True"</span> <span style="color: #a020f0;">in</span> f:
+                    normal_list.append(f)
+            <span style="color: #a020f0;">else</span>:
+                d_err_list.append(j)
+                <span style="color: #a020f0;">continue</span>
+    <span style="color: #a0522d;">ca_normalmsg</span>=<span style="color: #8b2252;">''</span>
+    <span style="color: #a0522d;">ca_warmsg</span>=<span style="color: #8b2252;">''</span>
+    <span style="color: #a0522d;">ca_crimsg</span>=<span style="color: #8b2252;">''</span>
+    <span style="color: #a0522d;">no_camsg</span>=<span style="color: #8b2252;">''</span>
+    <span style="color: #a0522d;">not_is_match_ca</span>=<span style="color: #8b2252;">''</span>
+    <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> normal_list:
+        <span style="color: #a020f0;">if</span> i:
+            <span style="color: #a0522d;">domain</span>=i.split(<span style="color: #8b2252;">','</span>)[0]
+            <span style="color: #a0522d;">ca_time</span>=<span style="color: #483d8b;">int</span>(i.split(<span style="color: #8b2252;">','</span>)[2])
+            <span style="color: #b22222;"># </span><span style="color: #b22222;">if https_certificate_verification().ca_is_match(domain):</span>
+            <span style="color: #b22222;">#     </span><span style="color: #b22222;">pass</span>
+            <span style="color: #b22222;"># </span><span style="color: #b22222;">else:</span>
+            <span style="color: #b22222;">#    </span><span style="color: #b22222;">not_is_match_ca += '%s' % domain +'\n'</span>
+            <span style="color: #a020f0;">if</span> ca_time &gt; 29:
+                <span style="color: #a0522d;">ca_normalmsg</span>+=<span style="color: #8b2252;">'%s %d &#22825;'</span> % (domain,ca_time) +<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>
+            <span style="color: #a020f0;">elif</span> ca_time &lt;= 28 <span style="color: #a020f0;">and</span> ca_time&gt;=1 :
+                <span style="color: #a0522d;">ca_warmsg</span>+=<span style="color: #8b2252;">'%s %d &#22825;'</span> % (domain,ca_time) +<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>
+            <span style="color: #a020f0;">elif</span> ca_time &lt; 1 :
+                <span style="color: #a0522d;">ca_crimsg</span>+=<span style="color: #8b2252;">'%s %d &#22825;'</span> % (domain,ca_time) +<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>
+    <span style="color: #a020f0;">if</span> validlist:
+        <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> validlist:
+            <span style="color: #a0522d;">no_camsg</span>+=<span style="color: #8b2252;">'%s'</span> % i.split(<span style="color: #8b2252;">','</span>)[0] +<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>
+        <span style="color: #a0522d;">no_camsg</span>=<span style="color: #8b2252;">'&#26410;&#33719;&#21462;&#21040;&#35777;&#20070;&#22495;&#21517;&#22914;&#19979;&#65306;'</span>+<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>+<span style="color: #8b2252;">'%s'</span>  %  no_camsg
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">call().dindin(no_camsg)</span>
+    <span style="color: #a020f0;">if</span> ca_normalmsg:
+        <span style="color: #a0522d;">ca_normalmsg</span>=<span style="color: #8b2252;">'&#22495;&#21517;&#35777;&#20070;&#27491;&#24120;&#26377;&#25928;&#26399;&#22914;&#19979;&#65306;'</span>+<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>+<span style="color: #8b2252;">'%s'</span>%  ca_normalmsg
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">call().dindin(ca_normalmsg)</span>
+        <span style="color: #b22222;"># </span><span style="color: #b22222;">call().send_email('&#22495;&#21517;&#35777;&#20070;&#26377;&#25928;&#26399;&#25253;&#35686;',ca_normalmsg)</span>
+    <span style="color: #a020f0;">if</span> ca_warmsg:
+        <span style="color: #a0522d;">ca_warmsg</span>=<span style="color: #8b2252;">'&#22495;&#21517;&#35777;&#20070;&#23567;&#20110;28&#22825;&#26377;&#25928;&#26399;&#22914;&#19979;&#65306;'</span>+<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>+<span style="color: #8b2252;">'%s'</span>  %  ca_warmsg
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">call().dindin(ca_warmsg)</span>
+        <span style="color: #a020f0;">with</span> <span style="color: #483d8b;">open</span>(<span style="color: #8b2252;">'dns.log'</span>, mode=<span style="color: #8b2252;">'w+'</span>,encoding=<span style="color: #8b2252;">'utf-8'</span>) <span style="color: #a020f0;">as</span> f:
+            f.seek(0)
+            f.writelines(ca_warmsg)
+        <span style="color: #b22222;"># </span><span style="color: #b22222;">call().send_email('&#35777;&#20070;&#23567;&#20110;28&#22825;&#26377;&#25928;&#26399;&#22495;&#21517;',ca_normalmsg)</span>
+    <span style="color: #a020f0;">if</span> ca_crimsg:
+        <span style="color: #a0522d;">ca_crimsg</span>=<span style="color: #8b2252;">'&#35777;&#20070;&#24050;&#36807;&#26399;&#22495;&#21517;&#22914;&#19979;&#65306;'</span>+<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">'</span>+<span style="color: #8b2252;">'%s'</span> %  ca_crimsg
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">call().dindin(ca_crimsg)</span>
+        <span style="color: #b22222;"># </span><span style="color: #b22222;">call().send_email('&#35777;&#20070;&#24050;&#36807;&#26399;&#22495;&#21517;',ca_normalmsg)</span>
+EOF
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:afaeb348-a3db-49f3-835d-1ca1fb74d4b0" class="outline-3">
 <h3 id="h:afaeb348-a3db-49f3-835d-1ca1fb74d4b0">06-云厂商产品证书自动更新</h3>
 <div class="outline-text-3" id="text-h:afaeb348-a3db-49f3-835d-1ca1fb74d4b0">
+<p>
+<b>SLB证书自动更新</b>
+</p>
+
+<p>
+环境 python3  pip包
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &gt;request.txt&lt;&lt;EOF
+<span style="color: #ffa54f;">aliyun-python-sdk-core-v3==2.13.11</span>
+<span style="color: #ffa54f;">aliyun-python-sdk-slb==3.2.16</span>
+<span style="color: #ffa54f;">requests==2.22.0</span>
+<span style="color: #ffa54f;">EOF</span>
+pip install -r request.txt
+</pre>
+</div>
+
+
+<p>
+计划任务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">update xiaoqian ssl</span>
+0 0 * * * /root/.pyenv/versions/py367/bin/python  /home/scripts/py/xiaoqian-slb.py &amp;&gt;/dev/null
+</pre>
+</div>
+
+
+<p>
+脚本内容
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #b22222;">#</span><span style="color: #b22222;">!/usr/bin/env python</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">coding=utf-8</span>
+<span style="color: #a020f0;">import</span> json
+<span style="color: #a020f0;">import</span> requests
+<span style="color: #a020f0;">import</span> datetime
+<span style="color: #a020f0;">import</span> subprocess
+<span style="color: #a020f0;">import</span> sys
+<span style="color: #a020f0;">from</span> aliyunsdkcore.client <span style="color: #a020f0;">import</span> AcsClient
+<span style="color: #a020f0;">from</span> aliyunsdkcore.acs_exception.exceptions <span style="color: #a020f0;">import</span> ClientException
+<span style="color: #a020f0;">from</span> aliyunsdkcore.acs_exception.exceptions <span style="color: #a020f0;">import</span> ServerException
+<span style="color: #a020f0;">from</span> aliyunsdkslb.request.v20140515.UploadServerCertificateRequest <span style="color: #a020f0;">import</span> UploadServerCertificateRequest
+<span style="color: #a020f0;">from</span> aliyunsdkslb.request.v20140515.SetLoadBalancerHTTPSListenerAttributeRequest <span style="color: #a020f0;">import</span> SetLoadBalancerHTTPSListenerAttributeRequest
+<span style="color: #a020f0;">from</span> aliyunsdkslb.request.v20140515.DescribeLoadBalancerHTTPSListenerAttributeRequest <span style="color: #a020f0;">import</span> DescribeLoadBalancerHTTPSListenerAttributeRequest
+<span style="color: #a020f0;">from</span> aliyunsdkslb.request.v20140515.DeleteServerCertificateRequest <span style="color: #a020f0;">import</span> DeleteServerCertificateRequest
+
+<span style="color: #8b2252;">'''Judge the validity of the certificate'''</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">CheckDomain</span>(domain):
+    <span style="color: #a0522d;">cmd</span> = <span style="color: #8b2252;">"echo | openssl s_client -connect %s:443 2&gt;/dev/null | openssl x509 -noout -dates | awk -F= '{print $2}'|tail -n 1"</span> %domain
+    <span style="color: #a0522d;">cer_time</span> = subprocess.getoutput(cmd)
+    <span style="color: #a0522d;">cmd1</span> = <span style="color: #8b2252;">"date -d '%s' +%%s"</span> %cer_time
+    <span style="color: #a0522d;">end_time</span>, <span style="color: #a0522d;">now_time</span> = subprocess.getoutput(cmd1), subprocess.getoutput(<span style="color: #8b2252;">'date +%s'</span>)
+    <span style="color: #a0522d;">time</span> = <span style="color: #483d8b;">int</span>((<span style="color: #483d8b;">int</span>(end_time) - <span style="color: #483d8b;">int</span>(now_time))/24/3600)
+    <span style="color: #a0522d;">info</span> = <span style="color: #8b2252;">"&#26426;&#25151;:%s &#22495;&#21517;:%s &#21097;&#20313;&#22825;&#25968;%s</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">"</span> %(<span style="color: #8b2252;">'&#31038;&#39184;&#21326;&#19996;1'</span>,domain,time)
+    <span style="color: #483d8b;">print</span>(info)
+    <span style="color: #a020f0;">return</span> time
+
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">GetNewCertInfo</span>(domain):
+    <span style="color: #a0522d;">cmd</span> =r<span style="color: #8b2252;">'''</span>
+<span style="color: #8b2252;">    cat &gt;tmp.sh &lt;&lt;\EOF</span>
+<span style="color: #8b2252;">#!/usr/bin/env bash</span>
+<span style="color: #8b2252;">export LANG=en_US.UTF8</span>
+<span style="color: #8b2252;">[ -z "$(which rsync)" ] &amp;&amp; yum install -y rsync</span>
+<span style="color: #8b2252;">[ -z "$(which jq)" ] &amp;&amp; wget -O /etc/yum.repos.d/epel.repo http://mirrors.aliyun.com/repo/epel-7.repo &amp;&amp; yum install -y jq</span>
+<span style="color: #8b2252;">export RSYNC_PASSWORD=wowonetwork</span>
+<span style="color: #8b2252;">tmpfile=$(mktemp -u zhengshu.XXXX)</span>
+<span style="color: #8b2252;">tmp_path=/tmp/.${tmpfile}</span>
+<span style="color: #8b2252;">now_seconds=$(date '+%s')</span>
+<span style="color: #8b2252;">ssl_pem=fullchain.cer</span>
+
+<span style="color: #8b2252;">domain=$1</span>
+<span style="color: #8b2252;">[ -z "$domain" ] &amp;&amp; echo "err, please: .sh domain" &amp;&amp; exit 1</span>
+<span style="color: #8b2252;">[ ! -e  $tmp_path ] &amp;&amp; mkdir -p $tmp_path</span>
+<span style="color: #8b2252;">rsync -r sa@124.127.109.95::zhengshu/$domain/ $tmp_path/$domain</span>
+<span style="color: #8b2252;">cert_info=$(cat $tmp_path/$domain/${ssl_pem}|grep -vE '^$'|sed ':a;N;$!ba;s/\n/\\n/g')</span>
+<span style="color: #8b2252;">key_info=$(cat $tmp_path/$domain/${domain}.key|grep -vE '^$'|sed ':a;N;$!ba;s/\n/\\n/g')</span>
+
+<span style="color: #8b2252;">end_date=$(openssl x509 -noout -dates -in $tmp_path/$domain/${ssl_pem} | sed -n 's@notAfter=@@p')</span>
+<span style="color: #8b2252;">last_time=$((($(date '+%s' --date "$end_date") - $now_seconds)/24/3600))</span>
+<span style="color: #8b2252;">rm -fr $tmp_path</span>
+<span style="color: #8b2252;">[ $last_time -lt 30 ] &amp;&amp; echo "" &amp;&amp; exit 0</span>
+<span style="color: #8b2252;">echo  '{"cert_info":"'$cert_info'","key_info":"'$key_info'"}'</span>
+<span style="color: #8b2252;">EOF</span>
+<span style="color: #8b2252;">    '''</span>
+    subprocess.getoutput(cmd)
+    <span style="color: #a0522d;">cmd1</span>=r<span style="color: #8b2252;">'bash tmp.sh %s|jq .cert_info'</span> %(domain)
+    <span style="color: #a0522d;">cmd2</span>=r<span style="color: #8b2252;">'bash tmp.sh %s|jq .key_info &amp;&amp; rm -f tmp.sh'</span> %(domain)
+    <span style="color: #a0522d;">cert_info</span>, <span style="color: #a0522d;">key_info</span> =subprocess.getoutput(cmd1), subprocess.getoutput(cmd2)
+    <span style="color: #a020f0;">return</span> {<span style="color: #8b2252;">"cert_info"</span>:cert_info, <span style="color: #8b2252;">"key_info"</span>:key_info}
+
+<span style="color: #8b2252;">'''upload a new certificate'''</span> 
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">UpLoadCert</span>(cert_info,key_info,now=<span style="color: #008b8b;">None</span>):
+    <span style="color: #a0522d;">request</span> = UploadServerCertificateRequest()
+    request.set_accept_format(<span style="color: #8b2252;">'json'</span>)
+    request.set_ServerCertificate(cert_info)
+    request.set_PrivateKey(key_info)
+    request.set_ServerCertificateName(<span style="color: #8b2252;">"xq"</span>+now)
+
+    <span style="color: #a0522d;">response</span> = client.do_action_with_exception(request)
+    <span style="color: #483d8b;">print</span>(<span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>))
+    <span style="color: #a020f0;">return</span> <span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>)
+
+<span style="color: #8b2252;">'''delete  certificate'''</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">DelCert</span>(<span style="color: #483d8b;">id</span>):
+    <span style="color: #a0522d;">request</span> = DeleteServerCertificateRequest()
+    request.set_accept_format(<span style="color: #8b2252;">'json'</span>)
+    <span style="color: #483d8b;">print</span>(<span style="color: #483d8b;">id</span>)
+    request.set_ServerCertificateId(<span style="color: #483d8b;">id</span>)
+
+    <span style="color: #a0522d;">response</span> = client.do_action_with_exception(request)
+    <span style="color: #483d8b;">print</span>(<span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>))
+    <span style="color: #a020f0;">return</span> <span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>)
+
+<span style="color: #8b2252;">'''get an old certificate id'''</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">DesSlbhttps</span>(slb_id):
+    <span style="color: #a0522d;">request</span> = DescribeLoadBalancerHTTPSListenerAttributeRequest()
+    request.set_accept_format(<span style="color: #8b2252;">'json'</span>)
+
+    request.set_ListenerPort(443)
+    request.set_LoadBalancerId(slb_id)
+
+    <span style="color: #a0522d;">response</span> = client.do_action_with_exception(request)
+    <span style="color: #483d8b;">print</span>(<span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>))
+    <span style="color: #a020f0;">return</span> <span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>)
+
+<span style="color: #8b2252;">'''replace slb certificate'''</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">SetSlbHttps</span>(slb_id,cert_id):
+    <span style="color: #a0522d;">request</span> = SetLoadBalancerHTTPSListenerAttributeRequest()
+    request.set_accept_format(<span style="color: #8b2252;">'json'</span>)
+
+    request.set_ListenerPort(443)
+    request.set_LoadBalancerId(slb_id)
+    request.set_ServerCertificateId(cert_id)
+
+    <span style="color: #a0522d;">response</span> = client.do_action_with_exception(request)
+    <span style="color: #483d8b;">print</span>(<span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>))
+    <span style="color: #a020f0;">return</span> <span style="color: #483d8b;">str</span>(response, encoding=<span style="color: #8b2252;">'utf-8'</span>)
+
+<span style="color: #8b2252;">'''get aliyun RAM key'''</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">GetAliRamKey</span>():
+    <span style="color: #a0522d;">sw_url</span> = <span style="color: #8b2252;">"http://10.200.41.37:10435/api/v1/sw_decode_passwd"</span>
+    <span style="color: #a0522d;">headers</span> = {<span style="color: #8b2252;">'content-type'</span>: <span style="color: #8b2252;">'application/json'</span>}
+    <span style="color: #a0522d;">data</span> = {<span style="color: #8b2252;">"pass_key"</span>:<span style="color: #8b2252;">"bbf79631a4de0836c1b2b97887359a50"</span>}
+    <span style="color: #a0522d;">parameters</span> = {<span style="color: #8b2252;">"url"</span>: sw_url,<span style="color: #8b2252;">"headers"</span>: headers,<span style="color: #8b2252;">"timeout"</span>:10,<span style="color: #8b2252;">"data"</span>: json.dumps(data)}
+    <span style="color: #a0522d;">res_discache</span> = requests.post(**parameters)
+    <span style="color: #a0522d;">res_discache</span> = json.loads(res_discache.text)
+    <span style="color: #a020f0;">return</span> res_discache[<span style="color: #8b2252;">"username"</span>], res_discache[<span style="color: #8b2252;">"passwd"</span>],
+
+<span style="color: #8b2252;">'''push dingding'''</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">dingding</span>(token,msg):
+    <span style="color: #a020f0;">try</span>:
+        <span style="color: #a0522d;">dindinapi</span> = <span style="color: #8b2252;">'https://oapi.dingtalk.com/robot/send?access_token=%s'</span> % token
+        <span style="color: #a0522d;">headers</span> = {<span style="color: #8b2252;">'content-type'</span>: <span style="color: #8b2252;">'application/json'</span>,<span style="color: #8b2252;">'charset'</span>:<span style="color: #8b2252;">'utf-8'</span>}
+        <span style="color: #a0522d;">data</span>  = {
+         <span style="color: #8b2252;">"msgtype"</span>: <span style="color: #8b2252;">"text"</span>,
+         <span style="color: #8b2252;">"text"</span>: {
+         <span style="color: #8b2252;">"content"</span>: msg
+         },
+         <span style="color: #8b2252;">"at"</span>: {
+         <span style="color: #8b2252;">"atMobiles"</span>: [
+         ],
+         <span style="color: #8b2252;">"isAtAll"</span>: <span style="color: #008b8b;">True</span>
+         }
+        }
+        <span style="color: #a0522d;">req</span>=requests.post(dindinapi,json=data,headers=headers)
+    <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> e:
+        <span style="color: #483d8b;">print</span>(<span style="color: #483d8b;">str</span>(e))
+
+<span style="color: #a020f0;">if</span> <span style="color: #483d8b;">__name__</span> == <span style="color: #8b2252;">'__main__'</span>:
+    <span style="color: #a0522d;">now</span> = datetime.datetime.now().strftime(<span style="color: #8b2252;">"%Y%m%d-%H%M%S"</span>)
+    <span style="color: #a0522d;">username</span>,<span style="color: #a0522d;">passwd</span> = GetAliRamKey()
+    <span style="color: #a0522d;">client</span> = AcsClient(username, passwd, <span style="color: #8b2252;">'cn-hangzhou'</span>)
+    <span style="color: #a0522d;">slb_id</span> =<span style="color: #8b2252;">'lb-bp10x2hqas6pv5cfliiab'</span>
+    <span style="color: #a0522d;">domain</span> =<span style="color: #8b2252;">'xqapic.zizi.com'</span>
+    <span style="color: #a0522d;">domain1</span> = <span style="color: #8b2252;">'cici..com'</span>
+    <span style="color: #a0522d;">token</span> = <span style="color: #8b2252;">'a6184389010ffc418aa13057c'</span>
+
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">1. Judge the validity of the certificate, 27day remaining</span>
+    <span style="color: #a0522d;">days</span>=CheckDomain(domain)
+    <span style="color: #a020f0;">if</span> days &lt; 28:
+        <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"the certificate will be expired, continue..."</span>)
+    <span style="color: #a020f0;">else</span>:
+        <span style="color: #a020f0;">try</span>:  
+            sys.<span style="color: #008b8b;">exit</span>(0)  
+        <span style="color: #a020f0;">except</span>:  
+            <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">'the certificate is not expired'</span>) 
+            sys.<span style="color: #008b8b;">exit</span>(0)
+
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">2. upload a new certificate</span>
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">2.1 get a new certificate</span>
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">cert_info,key_info = GetNewCertInfo(domain1)</span>
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">&#27492;&#22788;&#20026;&#20102;&#35299;&#20915;&#23383;&#31526;&#20018;&#21152;r&#38382;&#39064;&#12290;&#22914;r"a\n" &#21464;&#25104;"a\n"&#65292;&#20351;&#29992;"%s"%r"a\n".replace('\\n',"\n")</span>
+    <span style="color: #a0522d;">cert_info</span> = <span style="color: #8b2252;">"%s"</span>% GetNewCertInfo(domain1)[<span style="color: #8b2252;">"cert_info"</span>].replace(<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\\</span><span style="color: #8b2252;">n'</span>,<span style="color: #8b2252;">"</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">"</span>).replace(<span style="color: #8b2252;">'"'</span>,<span style="color: #8b2252;">""</span>)
+    <span style="color: #a0522d;">key_info</span> =  <span style="color: #8b2252;">"%s"</span>% GetNewCertInfo(domain1)[<span style="color: #8b2252;">"key_info"</span>].replace(<span style="color: #8b2252;">'</span><span style="color: #008b8b;">\\</span><span style="color: #8b2252;">n'</span>,<span style="color: #8b2252;">"</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">"</span>).replace(<span style="color: #8b2252;">'"'</span>,<span style="color: #8b2252;">""</span>)
+    <span style="color: #483d8b;">print</span>(cert_info)
+    <span style="color: #483d8b;">print</span>(key_info)
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">cert_info_origin="&lt;CERTIFICATE&gt;" </span>
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">key_info_origin="&lt;PRIVATE KEY&gt;"</span>
+
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">2.2 upload a new certificate</span>
+    <span style="color: #a0522d;">upload_cert_info</span>=json.loads(UpLoadCert(cert_info,key_info,now))
+    <span style="color: #a0522d;">cert_name</span>,<span style="color: #a0522d;">cert_id</span>=upload_cert_info[<span style="color: #8b2252;">'ServerCertificateName'</span>],upload_cert_info[<span style="color: #8b2252;">'ServerCertificateId'</span>]
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">print(cert_name,cert_id)</span>
+
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">3. replace slb certificate</span>
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">3.1 get an old certificate id</span>
+    <span style="color: #a0522d;">old_cert_id</span>=json.loads(DesSlbhttps(slb_id))[<span style="color: #8b2252;">'ServerCertificateId'</span>]
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">print(old_cert_id)</span>
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">3.2 replace slb certificate</span>
+    SetSlbHttps(slb_id,cert_id)
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">3.3 delete old certificate</span>
+    DelCert(old_cert_id)
+
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">4. dingding</span>
+    <span style="color: #a0522d;">newdays</span>=CheckDomain(domain)
+    <span style="color: #a0522d;">msg</span> = <span style="color: #8b2252;">'&#35777;&#20070;&#26356;&#26032;&#36890;&#30693;:</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">&#26426;&#25151;&#65306;%s, &#23567;&#21315;SLB: %s &#22495;&#21517;&#65306;%s,  &#26032;&#35777;&#20070;&#26377;&#25928;&#26399;&#65306;%s&#22825;, &#35777;&#20070;&#21517;:%s'</span> % (<span style="color: #8b2252;">'1'</span>,slb_id, domain, newdays, cert_name)
+    <span style="color: #483d8b;">print</span>(msg)
+    dingding(token,msg)
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:144c1f4d-b0d5-4543-a875-9fce4ee32c42" class="outline-3">
 <h3 id="h:144c1f4d-b0d5-4543-a875-9fce4ee32c42">07-检查-nginx有哪些443域名</h3>
 <div class="outline-text-3" id="text-h:144c1f4d-b0d5-4543-a875-9fce4ee32c42">
+<p>
+需求：
+统计所有证书情况，区分域名不在116.213.103段的证书。
+</p>
+
+<p>
+统计结果格式：配置文件位置，域名，证书名
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat  &gt;check_ssl.sh &lt;&lt; \EOF
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">ng_p=$(</span><span style="color: #ff00ff;">ps -ef|grep nginx|grep master |awk '{print $2}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">[  -z "$ng_p" ] &amp;&amp; exit 1</span>
+<span style="color: #ffa54f;">ng_dir=$(</span><span style="color: #ff00ff;">ls -l /proc/${ng_p}/exe| awk '{print $11}' | awk -F'/sbin/nginx' '{print $1}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">#/usr/local/nginx/sbin/nginx -V 2&gt;&amp;1 |sed -rn '/conf-path/s@.*conf-path=([[:graph:]]{1,}).*@\1@gp'</span>
+<span style="color: #ffa54f;">#&#22914;&#26524;&#27809;&#26377;&#65292;&#21017;&#32534;&#35793;&#29992;&#25163;&#40664;&#35748;--prefix&#30446;&#24405;&#19979;&#30340;conf</span>
+<span style="color: #ffa54f;">ng_main_conf=$(</span><span style="color: #ff00ff;">echo ${ng_dir}/conf/nginx.conf</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">ng_main_path=$(</span><span style="color: #ff00ff;">echo ${ng_main_conf%/nginx.conf*}</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">ng_conf=$(</span><span style="color: #ff00ff;">grep '^[^#][[:space:]\t]\+include' ${ng_main_conf}|grep -v mime.types|awk -F'[\t ;]+' '{print $3}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">ng_conf_dir=$(</span><span style="color: #ff00ff;">echo ${ng_conf%/*}</span><span style="color: #ffa54f;">)</span>
+
+<span style="color: #ffa54f;">cd ${ng_main_path}/${ng_conf_dir}</span>
+<span style="color: #ffa54f;">for f in *.conf; do</span>
+<span style="color: #ffa54f;">        if grep -A 11 '[^#]listen.*443' $f &amp;&gt;/dev/null; then</span>
+<span style="color: #ffa54f;">        for server_name in $(</span><span style="color: #ff00ff;">grep -A 11 -w '[^#]listen.*443' $f  | grep -EA 11 '^[^#][[:space:]\t]+listen.*443' | grep -E '^[^#][[:space:]\t]+server_name' | awk -F'server_name[ ]+' '{print $2}' |awk -F';' '{print $1}'</span><span style="color: #ffa54f;">); do</span>
+<span style="color: #ffa54f;">                #server_name=$(</span><span style="color: #ff00ff;">grep -A 4 '[^#]listen.*443' $f | grep -E 'server_name' | awk -F'[ ;]+' '{print $3}'</span><span style="color: #ffa54f;">)</span>
+<span style="color: #ffa54f;">                pc_ip=$(</span><span style="color: #ff00ff;">ping  -c1 -W 1 $server_name | grep -o '\([0-9]\{1,3\}\.\</span><span style="color: #ffa54f;">)\{3\}' 2&gt;/dev/null)</span>
+
+<span style="color: #ffa54f;">                if [ "210.14.157." == "$pc_ip" ]; then</span>
+<span style="color: #ffa54f;">                    key=$(</span><span style="color: #ff00ff;">grep -A 11 '^[^#][[:space:]\t]\+listen.*443' $f|grep -A 11 -E '^[^#][[:space:]\t]+server_name'| grep -A 9   -E "${server_name}" | grep -E "^[^#][[:space:]\t]+ssl_certificate_key"| awk -F'[ ;]+' /ssl/'{print "key="$(NF-1</span><span style="color: #ffa54f;">)}')</span>
+<span style="color: #ffa54f;">                    echo  "HLGconf=$f,server_name=${server_name},$key"</span>
+<span style="color: #ffa54f;">                else</span>
+<span style="color: #ffa54f;">                    key=$(</span><span style="color: #ff00ff;">grep -A 11 '^[^#][[:space:]\t]\+listen.*443' $f| grep -A 11 -E '^[^#][[:space:]\t]+server_name'|grep -A 9  -E "${server_name}" | grep -E "^[^#][[:space:]\t]+ssl_certificate_key" | awk -F'[ ;]+' /ssl/'{print "key="$(NF-1</span><span style="color: #ffa54f;">)}')</span>
+<span style="color: #ffa54f;">                    echo  "otherconf=$f,server_name=${server_name},$key"</span>
+
+<span style="color: #ffa54f;">                fi</span>
+<span style="color: #ffa54f;">        done</span>
+<span style="color: #ffa54f;">        fi</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
+
+sh   check_ssl.sh  | sort |grep -v  <span style="color: #8b2252;">'^key'</span> &gt;sc-$(<span style="color: #ff00ff;">hostname</span>).csv
+sed -nr <span style="color: #8b2252;">'s@.*server_name=(.*),.*@\1@gp'</span> sc-$(<span style="color: #ff00ff;">hostname</span>).csv
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:aec1e819-9ae6-40b5-a517-843c2f1af3af" class="outline-3">
 <h3 id="h:aec1e819-9ae6-40b5-a517-843c2f1af3af">08-ansible批量修改</h3>
 <div class="outline-text-3" id="text-h:aec1e819-9ae6-40b5-a517-843c2f1af3af">
+<p>
+role ssl
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25191;&#34892;&#21629;&#20196;</span>
+ansible-playbook change_ssl.yml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#22522;&#30784;&#29615;&#22659;</span>
+mkdir ansible/
+<span style="color: #483d8b;">cd</span> ansible
+
+cat &gt;ansible.cfg&lt;&lt;EOF
+<span style="color: #ffa54f;">[defaults]</span>
+<span style="color: #ffa54f;">inventory = ./hosts</span>
+<span style="color: #ffa54f;">forks          = 5</span>
+<span style="color: #ffa54f;">remote_port    = 22</span>
+<span style="color: #ffa54f;">roles_path    = ./roles</span>
+<span style="color: #ffa54f;">host_key_checking = False</span>
+<span style="color: #ffa54f;">timeout = 30</span>
+<span style="color: #ffa54f;">log_path = ./logs/ansible.log</span>
+<span style="color: #ffa54f;">private_key_file = /home/oap/.ssh/id_rsa</span>
+<span style="color: #ffa54f;">[inventory]</span>
+<span style="color: #ffa54f;">[privilege_escalation]</span>
+<span style="color: #ffa54f;">become=True</span>
+<span style="color: #ffa54f;">become_method=sudo</span>
+<span style="color: #ffa54f;">become_user=root</span>
+<span style="color: #ffa54f;">become_ask_pass=False</span>
+<span style="color: #ffa54f;">[paramiko_connection]</span>
+<span style="color: #ffa54f;">record_host_keys=False</span>
+<span style="color: #ffa54f;">[ssh_connection]</span>
+<span style="color: #ffa54f;">[persistent_connection]</span>
+<span style="color: #ffa54f;">[accelerate]</span>
+<span style="color: #ffa54f;">[selinux]</span>
+<span style="color: #ffa54f;">[colors]</span>
+<span style="color: #ffa54f;">[diff]</span>
+<span style="color: #ffa54f;">EOF</span>
+
+mkdir {logs,roles,files}
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#35777;&#20070;role&#29615;&#22659;</span>
+mkdir  -pv roles/cron_ssl/{defaults,files,handlers,tasks,templates}
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#25191;&#34892;yml</span>
+cat &gt;change_ssl.yml&lt;&lt; \EOF
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- name: Change cron for ssl manage</span>
+<span style="color: #ffa54f;">  hosts: ssl</span>
+<span style="color: #ffa54f;">  vars:</span>
+<span style="color: #ffa54f;">    - script_name: "ssl_monitor.sh"</span>
+<span style="color: #ffa54f;">    - script_dest_path: "/home/sh"</span>
+<span style="color: #ffa54f;">    - script_type: "sh"</span>
+<span style="color: #ffa54f;">    - parameters: "--days 26"</span>
+<span style="color: #ffa54f;">    #- state: "absent"</span>
+<span style="color: #ffa54f;">    - state: "present"</span>
+<span style="color: #ffa54f;">    - {minute: "0", hour: "23", day: "*", month: "*", weekday: "*"}</span>
+
+<span style="color: #ffa54f;">  roles:</span>
+<span style="color: #ffa54f;">    - cron_ssl</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#35777;&#20070;&#29615;&#22659;&#21464;&#37327;</span>
+cat &gt;roles/cron_ssl/defaults/main.yml&lt;&lt;\EOF
+<span style="color: #ffa54f;">ssl_script: "ssl_monitor.sh"</span>
+<span style="color: #ffa54f;">script_name: ""</span>
+<span style="color: #ffa54f;">script_source_path: ""</span>
+<span style="color: #ffa54f;">script_dest_path: "/home/sh"</span>
+<span style="color: #ffa54f;">script_type: "sh"</span>
+<span style="color: #ffa54f;">state: "present"</span>
+
+<span style="color: #ffa54f;">user: "root"</span>
+<span style="color: #ffa54f;">minute: "*"</span>
+<span style="color: #ffa54f;">hour: "*"</span>
+<span style="color: #ffa54f;">day: "*"</span>
+<span style="color: #ffa54f;">month: "*"</span>
+<span style="color: #ffa54f;">weekday: "*"</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;&#35777;&#20070;&#20219;&#21153;</span>
+cat &gt;roles/cron_ssl/tasks/main.yml&lt;&lt; EOF
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- include: cron.yml</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &gt;roles/cron_ssl/tasks/cron.yml&lt;&lt; \EOF
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">- name: Copy {{ script_name }} to</span>
+<span style="color: #ffa54f;">  copy: src={{ item.src }} dest={{ item.dest }}</span>
+<span style="color: #ffa54f;">  with_items:</span>
+<span style="color: #ffa54f;">    - { src: "./files/{{ script_name  }}", dest: "{{ script_dest_path }}/{{ script_name }}" }</span>
+
+<span style="color: #ffa54f;">- name: Backup {{ script_name  }}</span>
+<span style="color: #ffa54f;">  shell: "cp {{ script_dest_path }}/{{ script_name }} /data/backup/{{ script_name }}.$(</span><span style="color: #ff00ff;">date +'%F-%H'</span><span style="color: #ffa54f;">)"</span>
+<span style="color: #ffa54f;">  ignore_errors: yes</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  shell: crontab -l</span>
+<span style="color: #ffa54f;">  register: cat_cron</span>
+<span style="color: #ffa54f;">  ignore_errors: yes</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  debug: msg="{{ cat_cron.stdout_lines }}"</span>
+
+<span style="color: #ffa54f;">- name: Del cron that which is "{{ script_name }}"</span>
+<span style="color: #ffa54f;">  cron: name={{ script_name }} state="absent"</span>
+<span style="color: #ffa54f;">  when: state  == "absent"</span>
+
+<span style="color: #ffa54f;">- name: Del notcron that which is "{{ script_name }}"</span>
+<span style="color: #ffa54f;">  shell: "[ $(</span><span style="color: #ff00ff;">crontab -l |grep {{ script_name }}|wc -l</span><span style="color: #ffa54f;">) != $(</span><span style="color: #ff00ff;">crontab -l |grep -A 2 Ansible| grep {{ script_name }}|wc -l</span><span style="color: #ffa54f;">) ] &amp;&amp; sed -ri '/ssl_monitor.sh/d' /var/spool/cron/root"</span>
+<span style="color: #ffa54f;">  ignore_errors: yes</span>
+<span style="color: #ffa54f;">  when: state  == "present"</span>
+
+<span style="color: #ffa54f;">- name: Cron bash "{{ script_name }}" to "{{ state }}"</span>
+<span style="color: #ffa54f;">  cron: name={{ script_name }} minute={{ minute }} hour={{ hour }} day={{ day }} month={{ month }} weekday={{ weekday }} job='/bin/bash {{ script_dest_path }}/{{ script_name }} {{ parameters }} &amp;&gt;/dev/null'</span>
+<span style="color: #ffa54f;">  when: script_type == "sh" and state == "present"</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  shell: crontab -l</span>
+<span style="color: #ffa54f;">  register: cat_cron</span>
+
+<span style="color: #ffa54f;">- name: Cat cron</span>
+<span style="color: #ffa54f;">  debug: msg="{{ cat_cron.stdout_lines }}"</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:0b78299d-8821-41c4-a602-e2f6f9f6fc79" class="outline-3">
@@ -1274,8 +2180,114 @@ openssl x509 -in /root/.acme.sh/qxhcloud.com/fullchain.cer  -noout -text
 </p>
 
 <p>
+脚本update_cer.sh上传到/home/script/目录下。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mkdir /home/script/
+cat &gt;/home/script/update_cer.sh &lt;&lt;\EOF 
+<span style="color: #ffa54f;">#!/bin/sh</span>
+<span style="color: #ffa54f;">###############################</span>
+<span style="color: #ffa54f;">#system variable</span>
+<span style="color: #ffa54f;">timestamp=`date +%s`</span>
+<span style="color: #ffa54f;">cer_dir="/root/.acme.sh/"</span>
+<span style="color: #ffa54f;">domain_name="</span>
+<span style="color: #ffa54f;">cici.com</span>
+<span style="color: #ffa54f;">"</span>
+<span style="color: #ffa54f;">renew_flag=1</span>
+
+<span style="color: #ffa54f;">###############################</span>
+<span style="color: #ffa54f;">#qxhcloud domain name info</span>
+<span style="color: #ffa54f;">Qxhcloud_Key () {</span>
+<span style="color: #ffa54f;">    export Ali_Key="LTAI3Wcxb" </span>
+<span style="color: #ffa54f;">    export Ali_Secret="wmhiEjg"</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">#application certificate</span>
+<span style="color: #ffa54f;">App_Cer () {</span>
+<span style="color: #ffa54f;">    ~/.acme.sh/acme.sh --force --renew-all --dnssleep 10</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">#copy certificate to directory</span>
+<span style="color: #ffa54f;">Copy_Cer () {</span>
+<span style="color: #ffa54f;">    mkdir -p /data/zhengshu/</span>
+<span style="color: #ffa54f;">    /bin/cp -dR /root/.acme.sh/qxhcloud.com /data/zhengshu</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">#check certificate endtime</span>
+<span style="color: #ffa54f;">declare -A apply_certs</span>
+<span style="color: #ffa54f;">declare -A certs_days</span>
+<span style="color: #ffa54f;">Check_Cer () {</span>
+<span style="color: #ffa54f;">    for domain in ${domain_name}; do</span>
+<span style="color: #ffa54f;">    cd ${cer_dir}${domain}</span>
+<span style="color: #ffa54f;">    check_key=`/bin/openssl x509 -in fullchain.cer -noout -dates|head -n 2|awk -F= '{print $2}'|tail -n 1`</span>
+<span style="color: #ffa54f;">    key_time=$[(`date -d "${check_key}" +%s`-${timestamp})/24/3600]</span>
+<span style="color: #ffa54f;">    if [ ${key_time} -le 28 ];then</span>
+<span style="color: #ffa54f;">            apply_certs[${#apply_certs[*]}]="`pwd` Certificate time remaining ${key_time} day,this applying\n"</span>
+<span style="color: #ffa54f;">            renew_flag=0</span>
+<span style="color: #ffa54f;">    else</span>
+<span style="color: #ffa54f;">            certs_days[${#certs_days[*]}]="`pwd` ${key_time} day \n"</span>
+<span style="color: #ffa54f;">    fi</span>
+<span style="color: #ffa54f;">    done</span>
+
+<span style="color: #ffa54f;">    if [ $renew_flag -eq 0 ]; then</span>
+<span style="color: #ffa54f;">        Qxhcloud_Key</span>
+<span style="color: #ffa54f;">        App_Cer</span>
+<span style="color: #ffa54f;">        Copy_Cer</span>
+<span style="color: #ffa54f;">    fi</span>
+<span style="color: #ffa54f;">}</span>
+
+
+<span style="color: #ffa54f;">main (){</span>
+<span style="color: #ffa54f;">    Check_Cer</span>
+<span style="color: #ffa54f;">    #[ ${#apply_certs[@]} -gt 0 ] &amp;&amp; echo -e "${apply_certs[@]}" | mail -s 'Ali Certificate Details' 12345@163.COM</span>
+<span style="color: #ffa54f;">    #echo -e "${certs_days[@]}" | mail  -s 'Ali Certificate Details' 12345@163.COM</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">main</span>
+<span style="color: #ffa54f;">EOF</span>
+<span style="color: #ff00ff;">```</span>
+<span style="color: #ff00ff;">```</span>bash
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#37197;&#32622;&#23450;&#26102;&#20219;&#21153;</span>
+<span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"# update certificate\n30 09 * * * /bin/sh /home/script/update_cer.sh &gt; /dev/null"</span> &gt;&gt;/var/spool/cron/root 
+</pre>
+</div>
+
+<p>
 2 上传证书自动更新脚本并配置定时任务
 </p>
+
+<p>
+2.1 上传证书自动更新脚本
+</p>
+
+<p>
+脚本ssl_monitor.sh上传到/home/script/目录下，目录没有刚创建
+</p>
+
+<p>
+注意：
+</p>
+<ol class="org-ol">
+<li>脚本配置在nginx主机上。</li>
+<li>nginx配置证书目录必须为/usr/local/zhengshu</li>
+</ol>
+
+<p>
+2.2 配置定时任务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#37197;&#32622;&#23450;&#26102;&#20219;&#21153;</span>
+<span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"# ssl_monitor &#21097;&#20313;28&#22825;&#26356;&#26032;\n0 23 * * * /bin/bash /home/script/ssl_monitor.sh -days 28 &amp;&gt;/dev/null"</span> &gt;&gt;/var/spool/cron/root 
+</pre>
+</div>
+
+<p>
+注意：
+</p>
+<ol class="org-ol">
+<li>修改脚本中rsync服务端地址</li>
+</ol>
 
 <p>
 3 nginx ssl配置

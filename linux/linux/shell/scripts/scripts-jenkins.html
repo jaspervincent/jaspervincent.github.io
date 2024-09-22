@@ -49,6 +49,7 @@
 <ul>
 <li><a href="#h:fc8cc3a0-b935-4d8c-acdf-29fd81c8dd0c">jenkins + shell 定时开关机</a></li>
 <li><a href="#h:c8a3a2c9-0e69-4674-967e-7cc6a37cdf56">jenkins + k8s 定时 HPA</a></li>
+<li><a href="#org4fdee59">配置文重复行修改</a></li>
 </ul>
 </div>
 </nav>
@@ -305,6 +306,78 @@ def auto_scaling(s) {
    kubectl -n taskcenter patch hpa task-center-web -p <span style="color: #8b2252;">'{"spec":{"maxReplicas":8,"minReplicas":4}}'</span>
    send_msg <span style="color: #8b2252;">'shrink\ntask-center-job min:4 max:6\ntask-center-web min:4 max:8'</span>
 <span style="color: #a020f0;">fi</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-org4fdee59" class="outline-2">
+<h2 id="org4fdee59">配置文重复行修改</h2>
+<div class="outline-text-2" id="text-org4fdee59">
+<p>
+将重复行的最后一行后追加内容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@qa-k8s-jenkins.bj /data/ops] eth0 = 172.28.30.56
+<span style="color: #b22222;"># </span><span style="color: #b22222;">cat  &lt;&lt;\EOF &gt;check_job.sh</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+
+<span style="color: #a0522d;">JOBS_DIR</span>=/data/jenkins/jobs
+<span style="color: #483d8b;">cd</span> $<span style="color: #a0522d;">JOBS_DIR</span>
+<span style="color: #a0522d;">list</span>=()
+<span style="color: #a0522d;">j</span>=0
+<span style="color: #a020f0;">for</span> i<span style="color: #a020f0;"> in</span> <span style="color: #ff00ff;">`ls -d *`</span>
+<span style="color: #a020f0;">do</span>
+        <span style="color: #a0522d;">list</span>[$<span style="color: #a0522d;">j</span>]=$<span style="color: #a0522d;">i</span>
+        <span style="color: #a0522d;">j</span>=<span style="color: #ff00ff;">`expr $j + 1`</span>
+<span style="color: #a020f0;">done</span>
+
+<span style="color: #a020f0;">for</span> a<span style="color: #a020f0;"> in</span> ${<span style="color: #a0522d;">list</span>[@]}
+<span style="color: #a020f0;">do</span>
+        <span style="color: #a0522d;">number</span>=<span style="color: #ff00ff;">`sed -rn  '/\/hudson.tasks.Shell/{=;}' ${a}/config.xml |tail -1`</span>
+        sed -i <span style="color: #8b2252;">"${number}r /tmp/a.txt"</span> $<span style="color: #a0522d;">a</span>/config.xml
+
+<span style="color: #a020f0;">done</span>
+EOF
+
+[root@qa-k8s-jenkins.bj /data/ops] eth0 = 172.28.30.56
+<span style="color: #b22222;"># </span><span style="color: #b22222;">cat /tmp/a.txt</span>
+    &lt;hudson.tasks.Shell&gt;
+      &lt;command&gt;<span style="color: #b22222;"># </span><span style="color: #b22222;">git master&#20998;&#25903;&#25171;tag</span>
+bash /data/ops/git_tag.sh&lt;/command&gt;
+    &lt;/hudson.tasks.Shell&gt;
+</pre>
+</div>
+
+<p>
+删除追加的内容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF &gt;check_job.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+
+<span style="color: #ffa54f;">JOBS_DIR=/data/jenkins/jobs</span>
+<span style="color: #ffa54f;">cd $JOBS_DIR</span>
+<span style="color: #ffa54f;">list=()</span>
+<span style="color: #ffa54f;">j=0</span>
+<span style="color: #ffa54f;">for i in `ls -d *`</span>
+<span style="color: #ffa54f;">do</span>
+<span style="color: #ffa54f;">        list[$j]=$i</span>
+<span style="color: #ffa54f;">        j=`expr $j + 1`</span>
+<span style="color: #ffa54f;">done</span>
+
+<span style="color: #ffa54f;">for a in ${list[@]}</span>
+<span style="color: #ffa54f;">do</span>
+<span style="color: #ffa54f;">        number=`sed -rn  '/git master&#20998;&#25903;&#25171;tag/{=;}' ${a}/config.xml |tail -1`</span>
+<span style="color: #ffa54f;">        [ -z "$number" ] &amp;&amp; continue</span>
+<span style="color: #ffa54f;">        #echo $a</span>
+<span style="color: #ffa54f;">        n_start=$[$number - 1]</span>
+<span style="color: #ffa54f;">        n_end=$[$number + 2]</span>
+<span style="color: #ffa54f;">        sed -i "$n_start, $n_end d" $a/config.xml</span>
+
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
 </pre>
 </div>
 </div>

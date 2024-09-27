@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>实时错误监控-Sentry</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/systemcrafters-style.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="site-header">
+  <div class="container">
+    <div class="site-title">
+      <img class="logo" src="/static/images/sc_logo.png" alt="Jasper Hsu">
+    </div>
+  </div>
+
+  <div class="site-masthead">
+    <div class="container">
+      <nav class="nav">
+        <a class="nav-link" href="/publications.html">Publications</a>
+        <a class="nav-link" href="/donations.html">Donations</a>
+        <a class="nav-link" href="/about.html">About</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container">
+    <p class="info">
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">实时错误监控-Sentry</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org5bd0d15">简介</a></li>
+<li><a href="#orgbb16c86">安装</a></li>
+<li><a href="#orgfbe05cf">使用</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-org5bd0d15" class="outline-2">
+<h2 id="org5bd0d15">简介</h2>
+<div class="outline-text-2" id="text-org5bd0d15">
+<p>
+sentry就扮演着一个错误收集的角色，将你的项目和sentry结合起来，无论谁在
+项目使用中报错，sentry都会第一次时间通知开发者，出现了什么错误，错误出
+现在哪，帮你记录错误，便于你解决问题，这就是sentry。
+</p>
+
+<ul class="org-ul">
+<li><p>
+什么是DSN
+</p>
+
+<p>
+DSN是连接客户端(项目)与sentry服务端,让两者能够通信的钥匙；每当我们在
+sentry服务端创建一个新的项目，都会得到一个独一无二的DSN，也就是密钥。
+在客户端初始化时会用到这个密钥，这样客户端报错，服务端就能抓到你对应
+项目的错误了。
+</p></li>
+</ul>
+
+<p>
+架构：<a href="https://develop.sentry.dev/application/architecture/">https://develop.sentry.dev/application/architecture/</a>
+</p>
+
+
+
+<figure id="orgaade7ed">
+<img src="./images/img_20240926_203205.png" alt="img_20240926_203205.png" width="90%">
+
+</figure>
+</div>
+</section>
+<section id="outline-container-orgbb16c86" class="outline-2">
+<h2 id="orgbb16c86">安装</h2>
+<div class="outline-text-2" id="text-orgbb16c86">
+<p>
+<a href="https://github.com/sentry-kubernetes/charts/blob/develop/charts/sentry/README.md">https://github.com/sentry-kubernetes/charts/blob/develop/charts/sentry/README.md</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">helm pull sentry/sentry
+tar xf sentry-25.10.0.tgz
+<span style="color: #483d8b;">cd</span> sentry
+</pre>
+</div>
+
+<p>
+创建sentry名称空间及自定义账号：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl  create ns sentry
+
+cat &lt;&lt;\EOF&gt; sentry-custom-account.yaml
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Secret</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: sentry-custom-account</span>
+<span style="color: #ffa54f;">  namespace: sentry</span>
+<span style="color: #ffa54f;">type: Opaque</span>
+<span style="color: #ffa54f;">stringData:</span>
+<span style="color: #ffa54f;">  admin-password: 74mJ4Z0xxx</span>
+<span style="color: #ffa54f;">  s3-access-key-id: AKIAU6xxx</span>
+<span style="color: #ffa54f;">  s3-secret-access-key: Cr4BHYkxxx</span>
+<span style="color: #ffa54f;">  mail-password: nAKTIxxx</span>
+<span style="color: #ffa54f;">EOF</span>
+
+kubectl  apply -f sentry-custom-account.yaml 
+</pre>
+</div>
+
+<p>
+value.yaml 修改
+</p>
+<pre class="example" id="org1d091df">
+#管理员用户
+user:
+  create: true
+  email: this@gmail.com
+  #password: aa
+
+  ## set this value to an existingSecret name to create the admin user with the password in the secret
+  existingSecret: sentry-admin-password
+
+
+asHook: true #首次安装为true来初始化，之后更新时改为false
+
+#sentry-worker和sentry-web之间共享数据，使用云对象存存储s3或者efs文件存储。这里使用s3存储
+filestore:
+  backend: s3 
+  s3:                                                                                                                                                        
+    existingSecret: sentry-custom-account
+    bucketName: sentry-filestore-data
+  #  endpointUrl:
+  #  signature_version:
+    region_name: af-south-1
+  #  default_acl:
+
+
+#將 activeDeadlineSeconds 設定為 1000 以免 pods 還未完成工作就被以為是Error 直接將整個安裝中斷掉。
+hooks:
+  activeDeadlineSeconds: 1000
+
+#邮箱
+mail:
+  backend: smtp
+  useTls: true
+  useSsl: false
+  username: this@gmail.com
+  #password: ""
+  existingSecret: sentry-custom-account
+  existingSecretKey: mail-password                                                                                                                           
+  port: 587
+  host: smtp.gmail.com
+  from: this@gmail.com
+
+
+symbolicator:
+  enabled: true   
+
+#URL, DSN 客户端回调地址
+system:
+  url: "https://kubesentry.&lt;your-domain&gt;"
+
+#域名
+ingress:
+  enabled: true                                                                                       
+  regexPathStyle: nginx
+  ingressClassName: nginx-prod
+  alb:
+    httpRedirect: false
+  hostname: kubesentry.cici.com
+
+#目前镜像不支持arm架构，创建amd节点组，nodeSelecor指定node
+  nodeSelector: {type: adm-ops}
+#vim   :%s@nodeSelector:.*@nodeSelector: {type: adm-ops}@g
+</pre>
+
+<p>
+amd镜像服务： clickhouse
+</p>
+<pre class="example" id="orge3a97a2">
+clickhouse:
+  enabled: true
+  clickhouse:
+    nodeSelector: {type: adm-ops} 
+</pre>
+
+<p>
+安装
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm install sentry sentry/sentry -n sentry -f ./values-new.yaml --dry-run
+helm upgrade --install sentry sentry/sentry -n sentry -f ./values-new.yaml  --debug --wait
+</pre>
+</div>
+
+
+<p>
+初始化数据库\创建用户
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">kubectl  exec -it -n sentry $(<span style="color: #ff00ff;">kubectl get pods  -n sentry  |grep sentry-web |awk '{print $1}'</span>) bash  
+sentry upgrade
+sentry createuser --force-update
+</pre>
+</div>
+
+<p>
+卸载
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm uninstall sentry -n sentry
+kubectl delete pods -n sentry --all
+kubectl delete job -n sentry --all
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21024;&#38500; pvc</span>
+kubectl delete pvc --all -n sentry
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-orgfbe05cf" class="outline-2">
+<h2 id="orgfbe05cf">使用</h2>
+<div class="outline-text-2" id="text-orgfbe05cf">
+<ul class="org-ul">
+<li>创建团队： setting&#x2013;&gt;team</li>
+<li>增加成员：</li>
+<li>创建项目：new project</li>
+<li>项目告警：Alert</li>
+</ul>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://medium.com/@hank93513/deploy-your-own-sentry-in-kubernetes-fc255e0e31e6">https://medium.com/@hank93513/deploy-your-own-sentry-in-kubernetes-fc255e0e31e6</a></li>
+<li><a href="https://www.cnblogs.com/echolun/p/10187245.html">https://www.cnblogs.com/echolun/p/10187245.html</a></li>
+</ul>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p>
+          <a href="/index.html">JasperHsu</a> · 
+          <a href="/publications.html">Publications</a> · 
+          <a href="/rss.xml">RSS Feeds</a> · 
+          <a rel="me" href="https://creativecommons.org/licenses/by-sa/4.0/">(CC BY-SA 4.0)</a>
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a>
+-->
+        </p>
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">© 2024 Jasper Hsu</p>
+      </div>
+      <div class="column align-right">
+        <p>
+          <a href="https://orgmode.org" style="float:right; margin 20px 0px 20px 20px;">
+            <img src="/static/images/made-with-emacs.webp" style="width: 120px" alt="Made with Emacs Org-Mode">
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

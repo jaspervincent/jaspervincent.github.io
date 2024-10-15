@@ -67,6 +67,12 @@
 </li>
 <li><a href="#h:a8ff63f8-aebc-42bf-b190-090163e073df">redis</a>
 <ul>
+<li><a href="#h:4f33f073-db3e-448a-bc43-a088044b5764">redis</a>
+<ul>
+<li><a href="#h:4fc53f63-3237-42b3-86a6-a16a6c348060">单机</a></li>
+<li><a href="#h:ba24a2ff-0c90-4e1c-ae16-4f15d8eb24e7">集群</a></li>
+</ul>
+</li>
 <li><a href="#h:33ac8d98-9f5c-4cfe-9a22-73056229db86">redis docker compose</a></li>
 <li><a href="#h:a87d74cf-2d65-430a-b1a7-c011ca099b0d">redis compose ARM</a></li>
 </ul>
@@ -747,6 +753,14 @@ cat &lt;&lt;\EOF&gt; ~/data/mysql-8-slots/conf.d/my-8-slots.cnf
 <section id="outline-container-h:a8ff63f8-aebc-42bf-b190-090163e073df" class="outline-2">
 <h2 id="h:a8ff63f8-aebc-42bf-b190-090163e073df">redis</h2>
 <div class="outline-text-2" id="text-h:a8ff63f8-aebc-42bf-b190-090163e073df">
+</div>
+<div id="outline-container-h:4f33f073-db3e-448a-bc43-a088044b5764" class="outline-3">
+<h3 id="h:4f33f073-db3e-448a-bc43-a088044b5764">redis</h3>
+<div class="outline-text-3" id="text-h:4f33f073-db3e-448a-bc43-a088044b5764">
+</div>
+<div id="outline-container-h:4fc53f63-3237-42b3-86a6-a16a6c348060" class="outline-4">
+<h4 id="h:4fc53f63-3237-42b3-86a6-a16a6c348060">单机</h4>
+<div class="outline-text-4" id="text-h:4fc53f63-3237-42b3-86a6-a16a6c348060">
 <div class="org-src-container">
 <pre class="src src-shell">mkdir -p /data/redis/{data,conf}
 
@@ -812,6 +826,91 @@ docker run -d -p 6379:6379 --restart always -v /data/redis/conf:/usr/local/etc/r
 <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#21160;</span>
 bash /data/redis/start.sh
 </pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ba24a2ff-0c90-4e1c-ae16-4f15d8eb24e7" class="outline-4">
+<h4 id="h:ba24a2ff-0c90-4e1c-ae16-4f15d8eb24e7">集群</h4>
+<div class="outline-text-4" id="text-h:ba24a2ff-0c90-4e1c-ae16-4f15d8eb24e7">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir /data/redis/{data/{7000..7002},conf}
+<span style="color: #483d8b;">cd</span> /data/redis
+
+cat &lt;&lt;\eof &gt;start_7000.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">docker run -d --restart always -v /data/redis/conf/7000:/usr/local/etc/redis -v /data/redis/data/7000:/data/redis --name redis-7000 --net host redis:5.0.8 /usr/local/etc/redis/7000.conf</span>
+<span style="color: #ffa54f;">eof</span>
+
+cat &lt;&lt;\eof &gt;start_7001.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">docker run -d --restart always -v /data/redis/conf/7001:/usr/local/etc/redis -v /data/redis/data/7001:/data/redis --name redis-7001 --net host redis:5.0.8 /usr/local/etc/redis/7001.conf</span>
+<span style="color: #ffa54f;">eof</span>
+
+cat &lt;&lt;\eof &gt;start_7002.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">docker run -d --restart always -v /data/redis/conf/7002:/usr/local/etc/redis -v /data/redis/data/7002:/data/redis --name redis-7002 --net host redis:5.0.8 /usr/local/etc/redis/7002.conf</span>
+
+<span style="color: #ffa54f;">cat &lt;&lt;\eof &gt;clusteradd.sh</span>
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">docker exec -it redis-7000 redis-cli --cluster create --cluster-replicas 1 172.17.16.30:7000 172.17.16.30:7001 172.17.16.30:7002 172.17.16.31:7003 172.17.16.31:7004 172.17.16.31:7005</span>
+<span style="color: #ffa54f;">eof</span>
+
+cat  &lt;&lt;\EOF&gt; 7001/7001.conf  <span style="color: #b22222;"># </span><span style="color: #b22222;">port &#26377;&#21306;</span><span style="color: #b22222;">&#21035;</span>
+<span style="color: #ffa54f;">bind 0.0.0.0</span>
+<span style="color: #ffa54f;">protected-mode no</span>
+<span style="color: #ffa54f;">port 7001</span>
+<span style="color: #ffa54f;">tcp-backlog 511</span>
+<span style="color: #ffa54f;">timeout 0</span>
+<span style="color: #ffa54f;">tcp-keepalive 300</span>
+<span style="color: #ffa54f;">daemonize no</span>
+<span style="color: #ffa54f;">supervised no</span>
+<span style="color: #ffa54f;">pidfile /var/run/redis_7001.pid</span>
+<span style="color: #ffa54f;">loglevel notice</span>
+<span style="color: #ffa54f;">databases 16</span>
+<span style="color: #ffa54f;">save ""</span>
+<span style="color: #ffa54f;">stop-writes-on-bgsave-error yes</span>
+<span style="color: #ffa54f;">rdbcompression yes</span>
+<span style="color: #ffa54f;">rdbchecksum yes</span>
+<span style="color: #ffa54f;">dir /data/redis</span>
+<span style="color: #ffa54f;">slave-serve-stale-data yes</span>
+<span style="color: #ffa54f;">slave-read-only yes</span>
+<span style="color: #ffa54f;">repl-diskless-sync no</span>
+<span style="color: #ffa54f;">repl-diskless-sync-delay 5</span>
+<span style="color: #ffa54f;">repl-disable-tcp-nodelay no</span>
+<span style="color: #ffa54f;">slave-priority 100</span>
+<span style="color: #ffa54f;">appendonly yes</span>
+<span style="color: #ffa54f;">appendfilename "appendonly.aof"</span>
+<span style="color: #ffa54f;">appendfsync everysec</span>
+<span style="color: #ffa54f;">no-appendfsync-on-rewrite no</span>
+<span style="color: #ffa54f;">auto-aof-rewrite-percentage 100</span>
+<span style="color: #ffa54f;">auto-aof-rewrite-min-size 64mb</span>
+<span style="color: #ffa54f;">aof-load-truncated yes</span>
+<span style="color: #ffa54f;">lua-time-limit 5000</span>
+<span style="color: #ffa54f;">cluster-enabled yes</span>
+<span style="color: #ffa54f;">cluster-config-file nodes-7001.conf</span>
+<span style="color: #ffa54f;">cluster-node-timeout 5000</span>
+<span style="color: #ffa54f;">slowlog-log-slower-than 10000</span>
+<span style="color: #ffa54f;">slowlog-max-len 128</span>
+<span style="color: #ffa54f;">latency-monitor-threshold 0</span>
+<span style="color: #ffa54f;">notify-keyspace-events ""</span>
+<span style="color: #ffa54f;">hash-max-ziplist-entries 512</span>
+<span style="color: #ffa54f;">hash-max-ziplist-value 64</span>
+<span style="color: #ffa54f;">list-max-ziplist-size -2</span>
+<span style="color: #ffa54f;">list-compress-depth 0</span>
+<span style="color: #ffa54f;">set-max-intset-entries 512</span>
+<span style="color: #ffa54f;">zset-max-ziplist-entries 128</span>
+<span style="color: #ffa54f;">zset-max-ziplist-value 64</span>
+<span style="color: #ffa54f;">hll-sparse-max-bytes 3000</span>
+<span style="color: #ffa54f;">activerehashing yes</span>
+<span style="color: #ffa54f;">client-output-buffer-limit normal 0 0 0</span>
+<span style="color: #ffa54f;">client-output-buffer-limit slave 256mb 64mb 60</span>
+<span style="color: #ffa54f;">client-output-buffer-limit pubsub 32mb 8mb 60</span>
+<span style="color: #ffa54f;">hz 10</span>
+<span style="color: #ffa54f;">aof-rewrite-incremental-fsync yes</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
 </div>
 </div>
 <div id="outline-container-h:33ac8d98-9f5c-4cfe-9a22-73056229db86" class="outline-3">
@@ -3134,7 +3233,7 @@ storageclass.yaml
 <p>
 vaules.yaml
 </p>
-<pre class="example" id="orgb5afadf">
+<pre class="example" id="org35f8d4b">
 prometheus:
   prometheusSpec:
     enableAdminAPI: true
@@ -3693,7 +3792,7 @@ kubectl get deployment -n kube-system aws-load-balancer-controller
 <p>
 node 自动扩所容标签配置：
 </p>
-<pre class="example" id="orgc45e53b">
+<pre class="example" id="org0f12204">
 k8s.io/cluster-autoscaler/pfgc-ops-eks  owned
 k8s.io/cluster-autoscaler/enabled   TRUE
 </pre>

@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>jvm 调优</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/systemcrafters-style.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<script async src="https://fundingchoicesmessages.google.com/i/pub-1741779893655624?ers=1" nonce="aWltPXZVZvi-6A1KsMKTHA"></script><script nonce="aWltPXZVZvi-6A1KsMKTHA">(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="site-header">
+  <div class="container">
+    <div class="site-title">
+      <img class="logo" src="/static/images/sc_logo.png" alt="Jasper Hsu">
+    </div>
+  </div>
+
+  <div class="site-masthead">
+    <div class="container">
+      <nav class="nav">
+        <a class="nav-link" href="/publications.html">Publications</a>
+        <a class="nav-link" href="/donations.html">Donations</a>
+        <a class="nav-link" href="/about.html">About</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container">
+    <p class="info">
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">jvm 调优</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:ff54a2f5-08fb-47ee-8c2b-67230c87bc6e">jvm 调优</a>
+<ul>
+<li><a href="#h:a577d8da-c047-442e-92ae-d4f07155f543">JVM原理</a>
+<ul>
+<li><a href="#h:91d3160b-d1e8-41b3-9767-90e7b91f1ca2">什么是jvm</a></li>
+<li><a href="#h:dc1b9e22-54cc-46fc-a374-0d206b6c2900">jvm运行时数据区</a></li>
+<li><a href="#h:678f1a58-5161-4706-8238-cc39c8a5b31a">JVM内在分配</a></li>
+<li><a href="#h:ec2fca83-439e-4f71-b1d5-d7818c8460da">JVM 堆结构</a></li>
+<li><a href="#h:8edc6099-898b-4035-b2ac-6971563bbd18">java堆结构和垃圾回收</a></li>
+<li><a href="#h:ee1200d3-0de0-4b37-8a48-c23e3a248fd7">JVM堆配置参数</a>
+<ul>
+<li><a href="#h:903cd6b9-10e9-4f50-8ab4-0a2a51de41e2">jvm新生代（yong generation)</a></li>
+<li><a href="#h:8932c070-31f6-4b5f-ab9f-e1d2fd574698">java老年代（tenured generation)</a></li>
+<li><a href="#h:403771c6-df64-42aa-aa80-0adc9bab9ca1">java持久代(perm generation)</a></li>
+</ul>
+</li>
+<li><a href="#h:79b1974a-6f3f-43a6-bda7-34e640f0e23c">jvm内存垃圾回收</a>
+<ul>
+<li><a href="#h:eb738549-8247-4a2a-b1c1-08cc4d6a0972">jvm垃圾收集算法</a></li>
+<li><a href="#h:791171a0-1ddd-4c82-bce0-db1e4a3e10a3">jvm垃圾回收算法</a></li>
+<li><a href="#h:b953f9ef-8d64-488e-8e27-5ce396bb29d6">回收方法区</a></li>
+</ul>
+</li>
+<li><a href="#h:529680c8-43cf-47ad-b877-84aefe2b5e49">JVM常见垃圾回收器</a></li>
+<li><a href="#h:16195014-f940-4ddc-b5c3-270e7be5b882">GC性能指标</a></li>
+<li><a href="#h:3abdcb09-2439-48fb-b265-ea058affd253">内存容量配置原则</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:61468918-e1ea-4f2a-8ee5-35f3b18bac1b">jvm 支持容器</a></li>
+<li><a href="#h:b4c1fd4a-55d4-4d93-b0f0-7fe674be842c">oom 排查</a>
+<ul>
+<li><a href="#h:e2cb6e21-324e-4251-8fcd-721d7bcdcdfa">oom 原因</a></li>
+<li><a href="#h:54928ce3-d30a-4425-9285-87767e1dacdd">定位oom</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-h:ff54a2f5-08fb-47ee-8c2b-67230c87bc6e" class="outline-2">
+<h2 id="h:ff54a2f5-08fb-47ee-8c2b-67230c87bc6e">jvm 调优</h2>
+<div class="outline-text-2" id="text-h:ff54a2f5-08fb-47ee-8c2b-67230c87bc6e">
+</div>
+<div id="outline-container-h:a577d8da-c047-442e-92ae-d4f07155f543" class="outline-3">
+<h3 id="h:a577d8da-c047-442e-92ae-d4f07155f543">JVM原理</h3>
+<div class="outline-text-3" id="text-h:a577d8da-c047-442e-92ae-d4f07155f543">
+<p>
+官方：<a href="https://docs.oracle.com/javase/8/docs/technotes/guides/vm/gctuning/index.html">https://docs.oracle.com/javase/8/docs/technotes/guides/vm/gctuning/index.html</a>
+</p>
+</div>
+<div id="outline-container-h:91d3160b-d1e8-41b3-9767-90e7b91f1ca2" class="outline-4">
+<h4 id="h:91d3160b-d1e8-41b3-9767-90e7b91f1ca2">什么是jvm</h4>
+<div class="outline-text-4" id="text-h:91d3160b-d1e8-41b3-9767-90e7b91f1ca2">
+
+<figure id="org31f5686">
+<img src="./images/jvm内在结构.png" alt="jvm内在结构.png" width="80%">
+
+<figcaption><span class="figure-number">Figure 1: </span>jvm内在结构</figcaption>
+</figure>
+
+<p>
+JVM是按照运行时数据的存储结构来划分内存结构，JVM在运行java程序时，将它们划分成几种不同格式的
+数据，分别存储在不同的区域，这些数据统一称为运行时数据。运行时数据包括java程序本身的数据信息和
+JVM运行java需要的额外数据信息
+</p>
+
+<p>
+运行区：如上图，类加载器子系统下都是属性运行区
+</p>
+
+<p>
+<b>JMM java的内存模型</b>
+</p>
+
+<p>
+JMM会造成线程安全问题，预料结果和运行结果不一样。它会把内存为2个区域
+</p>
+
+<p>
+主内存：
+</p>
+
+<p>
+工作内存：每个java栈私有的，把主内存的东西放到工作内存中做计算，再把计算的结果回写过去。
+</p>
+
+
+<figure id="org9dd50e4">
+<img src="./images/java工作内存.png" alt="java工作内存.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:dc1b9e22-54cc-46fc-a374-0d206b6c2900" class="outline-4">
+<h4 id="h:dc1b9e22-54cc-46fc-a374-0d206b6c2900">jvm运行时数据区</h4>
+<div class="outline-text-4" id="text-h:dc1b9e22-54cc-46fc-a374-0d206b6c2900">
+<p>
+线程私有，即每个线程都会有一个，线程之间互不影响，独立存储。
+</p>
+
+<p>
+线程公用
+</p>
+
+<dl class="org-dl">
+<dt>程序计数器&#x2014;线程私有</dt><dd>程序执行的位置计数，当前线程所执行字节码的行号</dd>
+
+<dt>java虚拟机栈&#x2014;线程私有</dt><dd><p>
+首先应该想到数据结构
+</p>
+
+<p>
+描述的是java方法执行的内存模型：每个方法在执行的同时多会创建一个栈帧
+用于存储局部变量表、操作数栈、动态链表、方法出口等信息。  每个方法从
+调用直至完成过程，就对应着一个栈帧在虚拟机中入栈到出栈的过程。局部变
+量表存放了编译期可知的各种基本数据和对象引用，所需内存空间在编译期确
+定。
+</p>
+
+<p>
+-Xoss参数设置本地方法栈大小（对于HotSpot无效）
+</p>
+
+<p>
+-Xss参数设置栈容量 例： -Xss128k
+</p></dd>
+
+<dt>本地方法栈&#x2014;线程私有</dt><dd><p>
+操作系统本身 的 操作系统，同虚拟机栈，只不过本地方法 栈位虚拟机使用到的native方法服务。
+</p>
+
+<p>
+Sun HotSpot虚拟机把本地方法栈和虚拟机栈合二为一。
+</p></dd>
+
+<dt>java堆&#x2014;线程公用</dt><dd>平时说的java调优就是这块</dd>
+
+<dt>方法区&#x2014;线程公用</dt><dd><p>
+java的一些代码元素符等
+</p>
+
+<p>
+用于存储已被虚拟机加载的类信息、常量、静态变量、即使编译后的代码等数据。
+</p>
+
+<p>
+别名永久代（Permanent Generation）
+</p>
+
+<p>
+-XX:MaxPermSize设置上限
+</p>
+
+<p>
+-XX:PermSize设置最小值 例：VM Args:-XX:PermSize=10M -XX:MaxPermSize=10M
+</p>
+
+<p>
+运行时常量池(Runtime Constant Pool)是方法区的一部分。
+</p>
+
+<p>
+Class文件中除了有类的版本、字段、方法、接口等信息外，还有一项是常量
+池（Constant Pool Table）,用于存放编译期生成的各种字面量和符号引用，
+这部分内容将在类加载后进入方法区的运行时常量池中存放。运行时常量池相
+对于Class文件常量池的一个重要特征是具备动态性：即除了Class文件中常量
+池的内容能被放到运行时常量池外，运行期间也可能将新的常量放入池中，比
+如String类的intern（）方法
+</p></dd>
+
+<dt>直接内存</dt><dd><p>
+直接内存并不是虚拟机运行时数据区的一部分。
+</p>
+
+<p>
+在NIO中，引入了一种基于通道和缓冲区的I/O方式，它可以使用native函数直接分配堆外内存，然后通过一个存储
+</p>
+
+<p>
+在java堆中的DirectByteBuffer对象作为这块内存的引用进行操作。
+</p>
+
+<p>
+-XX:MaxDirectMemorySize设置最大值，默认与java堆最大值一样。
+</p>
+
+<p>
+例：-XX:MaxDirectMemorySize=10M -Xmx20M
+</p></dd>
+</dl>
+
+<p>
+对于32位操作系统来说，系统最大内存为4G。
+</p>
+
+<p>
+系统给每个进程的内存是有限制的，譬如32位的windows 限制为2G
+</p>
+</div>
+</div>
+<div id="outline-container-h:678f1a58-5161-4706-8238-cc39c8a5b31a" class="outline-4">
+<h4 id="h:678f1a58-5161-4706-8238-cc39c8a5b31a">JVM内在分配</h4>
+<div class="outline-text-4" id="text-h:678f1a58-5161-4706-8238-cc39c8a5b31a">
+<p>
+栈内在分配， 堆内在分配， 初始化时内存分配
+</p>
+
+<p>
+<b>栈内存分配：</b>
+</p>
+
+<p>
+保存参数、局部变量、中间计算过程和其他数据。退出方法的时候，修改栈顶指针就可以把栈帧中的内容销毁。
+</p>
+
+<p>
+-Xss 默认1MB，
+</p>
+
+<p>
+栈的优点：存取速度比堆快，仅次于寄存器，栈数据可以共享。
+</p>
+
+<p>
+栈的缺点：存在栈中的数据大小、生存期是在编译时就确定的，导致其缺乏灵活性。
+</p>
+
+<p>
+<b>堆内存分配：(大部分调整这个参数)</b>
+</p>
+
+<p>
+堆里有保存的一些对象，对象中保存了一些值。
+</p>
+
+<p>
+堆的优点：动态地分配内存大小，生存期不必事先告诉编译器，它是在运行期动态分配的，垃圾回收器会自动收走不再使用的空间区域。
+</p>
+
+<p>
+堆的缺点：运行时动态分配内存，在分配和销毁时都要占用时间，因此堆的效率较低。
+</p>
+</div>
+</div>
+<div id="outline-container-h:ec2fca83-439e-4f71-b1d5-d7818c8460da" class="outline-4">
+<h4 id="h:ec2fca83-439e-4f71-b1d5-d7818c8460da">JVM 堆结构</h4>
+<div class="outline-text-4" id="text-h:ec2fca83-439e-4f71-b1d5-d7818c8460da">
+
+<figure id="org7d8abd9">
+<img src="./images/jvm堆结构.png" alt="jvm堆结构.png">
+
+</figure>
+
+<p>
+why划分几个代？： IBM统计80%的对象用完就丢了，但有一些对象的引用从生到死都回收不了的，所以给划分了几个代，针对不同区域进行优化
+</p>
+
+<p>
+yong新生代：E区(Eden)，初创对象。存活区(Survivor)： s0 s1指from to 中的任何一个区域。
+</p>
+
+<p>
+old老年代：
+</p>
+
+<p>
+permanent持久代：存放了一些class类，字节码
+</p>
+
+
+<figure id="org1a8d1f3">
+<img src="./images/jvm堆结构2.png" alt="jvm堆结构2.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:8edc6099-898b-4035-b2ac-6971563bbd18" class="outline-4">
+<h4 id="h:8edc6099-898b-4035-b2ac-6971563bbd18">java堆结构和垃圾回收</h4>
+<div class="outline-text-4" id="text-h:8edc6099-898b-4035-b2ac-6971563bbd18">
+
+<figure id="org872a193">
+<img src="./images/jvm垃圾回收区域.png" alt="jvm垃圾回收区域.png">
+
+</figure>
+
+<p>
+如图： Non-Heap 非堆区域，Heap堆区域，JVM GC管理 垃圾回收区域
+</p>
+
+<p>
+Heap有
+</p>
+<pre class="example" id="orgbaeaf50">
+Eden Space 新生代
+Survivor Space 存活区
+Tenured Generation 老年代
+</pre>
+
+<p>
+Non-Heap有
+</p>
+<pre class="example" id="org6ba4022">
+CodeCache   存放字节码，比如类的信息
+Permanent Generation space  方法区(持久代)  Direct Momery直接内存
+</pre>
+
+<p>
+JVM GC管理有
+</p>
+<pre class="example" id="orgab38c20">
+Minor GC： 新生代垃圾回
+FULL GC： 整个回收 需要避免
+注意：GC 只要一工作别的应该就暂停，用户直面的反应就是  "卡了"，暂停的时间长短有所不同
+</pre>
+</div>
+</div>
+<div id="outline-container-h:ee1200d3-0de0-4b37-8a48-c23e3a248fd7" class="outline-4">
+<h4 id="h:ee1200d3-0de0-4b37-8a48-c23e3a248fd7">JVM堆配置参数</h4>
+<div class="outline-text-4" id="text-h:ee1200d3-0de0-4b37-8a48-c23e3a248fd7">
+<p>
+1 -Xms 初始堆大小
+</p>
+
+<p>
+默认物理内存的1/64(&lt;1GB)，可根据实际情况调整
+</p>
+
+<p>
+2 -Xmx最大堆大小
+</p>
+
+<p>
+默认物理内存的1/4（&lt;1GB），实际中建议不大于4GB。 一但大于4GB可以多开几个进程
+</p>
+
+<p>
+内存泄漏 和 内存溢出 严格意义上不是一个问题，
+内存泄漏可能是代码问题，也可能是内存不够大。比如读20G的大文件内存只分配了1G，这就会内存溢出了，但跟程序代码是
+没有关系的。比如10G的内存用到了引用 GC回收不了，日积月累就会出现内存泄漏。
+</p>
+
+<p>
+3 一般建议设置 -Xms = -Xmx
+</p>
+
+<p>
+好处是避免每次在gc后，调整堆的大小，减少系统内存分配开销。
+</p>
+
+<p>
+4 整个堆大小=年轻代大小 + 年老代大小 +持久代大小
+</p>
+
+<p>
+spring框架里有大量的反射，这个区一般是256M，有时会通过反射的方式加载本
+地的相关的class程序，方法区可能会满，扩大到512M可解决80%的问题。
+</p>
+
+<p>
+5 -XX:+HeapDumpOnOutOfMemoryError可以让虚拟机在出现内存溢出是dump出当前的内存堆转储快照
+</p>
+</div>
+<div id="outline-container-h:903cd6b9-10e9-4f50-8ab4-0a2a51de41e2" class="outline-5">
+<h5 id="h:903cd6b9-10e9-4f50-8ab4-0a2a51de41e2">jvm新生代（yong generation)</h5>
+<div class="outline-text-5" id="text-h:903cd6b9-10e9-4f50-8ab4-0a2a51de41e2">
+<p>
+1 新生代=1个edem区+2个Survivor区
+</p>
+
+<p>
+2 -Xmn 年轻代大小(1.4 or later)
+</p>
+<pre class="example" id="orged236fb">
+-XX:NewSize, -XX:MaxNewSize (设置年轻代大小（for 1.3/1.4))
+默认值大小为整个堆的3/8
+</pre>
+
+<p>
+3 -XX:NewRatio 很少使用
+</p>
+<pre class="example" id="orgacb0205">
+年轻代(包括Eden和两个Survivor区)与年老代的比值(除去持久代)
+默认为2
+Xms=Xmx并且设置了Xmn的情况下，该参数 不需要进行设置。
+比如：整个堆100M ，持久代10M，-XX:NewRatio=7的话，就在100-10=90M中 进行分配年轻代与年老代比值=1/7
+</pre>
+
+<p>
+4 -XX:SurvivorRatio  调优很少使用
+</p>
+<pre class="example" id="orge331866">
+Eden区与Survivor区的大小比值，设置为8, 则两个Survivor区与一个Eden区的比值为2：8，一个Survivor区占整个
+年轻代的1/10
+</pre>
+
+<p>
+5 用来存放JVM刚分配的Java对象
+</p>
+</div>
+</div>
+<div id="outline-container-h:8932c070-31f6-4b5f-ab9f-e1d2fd574698" class="outline-5">
+<h5 id="h:8932c070-31f6-4b5f-ab9f-e1d2fd574698">java老年代（tenured generation)</h5>
+<div class="outline-text-5" id="text-h:8932c070-31f6-4b5f-ab9f-e1d2fd574698">
+<p>
+1 老年代=整个堆 - 年轻代大小 - 持久代大小
+</p>
+
+<p>
+2 年轻代中经过垃圾回收没有回收掉的对象被复制到年老代。
+</p>
+
+<p>
+大的对象包括缓存，
+</p>
+
+<p>
+3 老年代存储对象比年轻代年龄大的多，而且不乏大对象。
+</p>
+
+<p>
+4 新建的对象也有可能直接进入老年代
+</p>
+
+<p>
+4.1 大对象，可通过启动参数设置-XX:PretenureSizeThreshold=1024 (单位为字节，默认为0）来代表超过多大
+时就不在新生代分配，而是直接在老年代分配。建议不要这么做，如果弱引用可能出现FULL GC 等待一段时间就好了，强引用可能出现
+FULL GC 服务硬死掉- - 
+</p>
+
+<p>
+4.2 大的数组对象，且数组中无引用外部对象。
+</p>
+
+<p>
+5 老年代大小无配置参数
+</p>
+</div>
+</div>
+<div id="outline-container-h:403771c6-df64-42aa-aa80-0adc9bab9ca1" class="outline-5">
+<h5 id="h:403771c6-df64-42aa-aa80-0adc9bab9ca1">java持久代(perm generation)</h5>
+<div class="outline-text-5" id="text-h:403771c6-df64-42aa-aa80-0adc9bab9ca1">
+<p>
+持久代多种叫法  方法区
+</p>
+
+<p>
+1 持久代=整个堆 - 年轻代大小 - 老年代大小
+</p>
+
+<p>
+2 -XX:PermSize -XX:MaxPermSize
+</p>
+
+<p>
+设置持久代大小，一般情况推荐把-XX:PermSize设置成XX:MaxPermSize的值为相同的值，因为永久代大小的
+调整也会导致堆内存需要触发fgc。
+</p>
+
+<p>
+3 存放Class、Method元信息，其大小与项目的规模、类、方法的数量有关。一般设置为128M就足够了，设置
+原则是预留30%的空间。
+</p>
+
+<p>
+4 永久代的回收方式
+</p>
+
+<p>
+4.1 常量池中的常量，无用的类信息，常量的回收很简单，没有引用了就可以被回收
+</p>
+
+<p>
+4.2 对于无用的类进行回收，必须保证3点：类的所有实例都已经被回收；加载类的ClassLoader已经被回收；
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:79b1974a-6f3f-43a6-bda7-34e640f0e23c" class="outline-4">
+<h4 id="h:79b1974a-6f3f-43a6-bda7-34e640f0e23c">jvm内存垃圾回收</h4>
+<div class="outline-text-4" id="text-h:79b1974a-6f3f-43a6-bda7-34e640f0e23c">
+<p>
+程序计数器、虚拟机栈、本地方法栈3个区域随线程生，随线程而灭；
+</p>
+
+<p>
+栈中的栈帧随着方法的进入和退出而有条不紊的执行这出栈和入栈操作。
+</p>
+
+<p>
+每一个栈帧中分配多少内存基本上是在类结构确定下来是就已知的，因此这几个区域的内存分配和回收都具备确定性，
+在这几个区域内不需要过多考虑回收问题，因为方法结束或者线程结束时，内存就跟着回收了。
+</p>
+</div>
+<div id="outline-container-h:eb738549-8247-4a2a-b1c1-08cc4d6a0972" class="outline-5">
+<h5 id="h:eb738549-8247-4a2a-b1c1-08cc4d6a0972">jvm垃圾收集算法</h5>
+<div class="outline-text-5" id="text-h:eb738549-8247-4a2a-b1c1-08cc4d6a0972">
+<p>
+1 引用计数算法(jdk1.2 前的算法，现基本被抛弃了)
+</p>
+
+<p>
+原理：每个对象有一个引用计数属性，新增一个引用时计数加1，引用释放时计数减1，计数为0时可以回收。
+</p>
+
+<p>
+缺点：此方法简单，无法解决对象相互循环引用的问题。还有一个问题量如何解决精准计数。
+</p>
+
+<p>
+2 根搜索算法
+</p>
+
+<p>
+原理：从GC Roots开始向下搜索，搜索所走过的路径称为引用链。当一个对象到GC Roots没有任何引用链相连时， 则证明此对象量不可用的。不可达对象。
+</p>
+
+<p>
+在Java语言中，GC Roots包括：
+</p>
+
+<p>
+虚拟机栈(栈帧中的本地变量表)中引用的对象。
+</p>
+
+<p>
+方法区中类静态属性实体引用 的对象。
+</p>
+
+<p>
+方法区中常量引用的对象。
+</p>
+
+<p>
+本地方法栈中JNI引用的对象 。
+</p>
+</div>
+</div>
+<div id="outline-container-h:791171a0-1ddd-4c82-bce0-db1e4a3e10a3" class="outline-5">
+<h5 id="h:791171a0-1ddd-4c82-bce0-db1e4a3e10a3">jvm垃圾回收算法</h5>
+<div class="outline-text-5" id="text-h:791171a0-1ddd-4c82-bce0-db1e4a3e10a3">
+<p>
+1 复制算法(Copying)
+</p>
+
+<p>
+2 标记清除算法(Mark-Sweep)
+</p>
+
+<p>
+3 标记整理压缩算法(Mark-Compac)
+</p>
+
+<p>
+复制算法(Copying)
+</p>
+
+
+<figure id="orgf741ba4">
+<img src="./images/jvm复制算法.png" alt="jvm复制算法.png">
+
+</figure>
+
+<p>
+原理：采用从根集合扫描，并将存活对象复制到一块新的，没有使用过的空间中，这种算法当控件存活的对象比较少时，极为高效，
+</p>
+
+<p>
+缺点：但是带来的成本是需要一块内存交换空间用于进行对象的移动。需要复制，效率降低、浪费空间。
+</p>
+
+<p>
+此算法用于新生代内存回收，从E区回收到S0或者S1
+</p>
+
+
+<p>
+标记清除算法(Mark-Sweep)
+</p>
+
+
+<figure id="org0742cc1">
+<img src="./images/jvm标记清除算法.png" alt="jvm标记清除算法.png">
+
+</figure>
+
+<p>
+原理：首先标记出所有需要回收的对象，在标记完成后统一回收所有被标记的对象。   适合于old区回收
+</p>
+
+<p>
+标记-清除算法采用从根集合进行扫描，对存活的对象对象标记，标记完毕后，再扫描整个空间中末被标记的对象，进行回收，如图所示。
+</p>
+
+<p>
+优点：不需要进行对象移动，并且仅对不存活的对象进行处理，在存活对象比较多的情况下极为高效，但由于标记-清除算法直接回收不存活的对象，因此会造成
+</p>
+
+<p>
+缺点：容易产生内在碎片。
+</p>
+
+
+<p>
+标记整理压缩算法(Mark-Compac)
+</p>
+
+
+<figure id="org85ec010">
+<img src=".images/jvm标记整理压缩算法.png" alt="jvm标记整理压缩算法.png">
+
+</figure>
+
+<p>
+原理：似于标记-清除，但后续步骤不是直接对可回收对象进行清理，而是让所有存活对象都向一端移动，然后直接清理掉端边界以外的内存
+</p>
+
+<p>
+标记-整理算法采用标记-清除算法一样的方式进行对象的标记，但在清除时不同，在回收不存活的对象的空间后，会将所有的存活对象往左端空闲空间移动
+</p>
+
+<p>
+缺点：因此成本更高 ，但是却解决了内存碎片的问题。
+</p>
+
+
+<figure id="orgf303dd2">
+<img src="./images/jvm标记整理压缩算法2.png" alt="jvm标记整理压缩算法2.png">
+
+</figure>
+
+
+<p>
+分代收集算法（Generational Collection）
+</p>
+
+<p>
+原理：根据对象存活周期的不同将内存划分为几块。一般是java堆分为新生代和老年代，这样就可以根据各个年代的特点采用合适的收集算法
+</p>
+</div>
+</div>
+<div id="outline-container-h:b953f9ef-8d64-488e-8e27-5ce396bb29d6" class="outline-5">
+<h5 id="h:b953f9ef-8d64-488e-8e27-5ce396bb29d6">回收方法区</h5>
+<div class="outline-text-5" id="text-h:b953f9ef-8d64-488e-8e27-5ce396bb29d6">
+<p>
+方法区的垃圾回收主要回收两部分：废弃常量和无用的类。
+</p>
+
+<p>
+回收废弃常量和java堆中的对象非常类似。当没有对象引用它时即可回收。
+</p>
+
+<p>
+回收无用的类则比较苛刻：
+</p>
+<pre class="example" id="org900647d">
+该类所有的实例都已经被回收，即java堆中不存在该类的任何实例。
+加载该类的ClassLoader已经被回收。
+该类对应的java.lang.Class对象没有在任何地方被引用。
+</pre>
+
+<p>
+垃圾收集打印参数
+</p>
+<pre class="example" id="org85c4bf3">
+-XX:+PrintGCApplicationStoppedTime 参数打印gc停顿时间
+-XX:+PrintGCDateStamps  参数打印gc时间戳，系统时间
+-XX:+PrintGCTimeStamps 参数打印gc时间，相对于jvm启动时间
+-Xloggc:gclog.log  设置gc日志文件
+-XX:+PrintReferenceGC  打印gc引用
+-XX:+PrintGCApplicationConcurrentTime 打印每次垃圾回收前，程序未中断的执行时间
+-XX:+PrintHeapAtGC 打印GC前后的详细堆栈信息
+
+
+##elasticsearch中jvm log配置
+# GC logging options
+if [ -n "$ES_GC_LOG_FILE" ]; then
+  JAVA_OPTS="$JAVA_OPTS -XX:+PrintGCDetails"  每次GC时打印详细信息
+  JAVA_OPTS="$JAVA_OPTS -XX:+PrintGCTimeStamps" 打印每次GC的时间戳
+  JAVA_OPTS="$JAVA_OPTS -XX:+PrintGCDateStamps" 参数打印gc时间戳，系统时间
+  JAVA_OPTS="$JAVA_OPTS -XX:+PrintClassHistogram" 遇到Ctrl-Break后打印类实例的柱状信息，与jmap -histo功能相同
+  JAVA_OPTS="$JAVA_OPTS -XX:+PrintTenuringDistribution" 指定JVM 在每次新生代GC时，输出幸存区中对象的年龄分布
+  JAVA_OPTS="$JAVA_OPTS -XX:+PrintGCApplicationStoppedTime" 输出GC造成应用暂停的时间
+  JAVA_OPTS="$JAVA_OPTS -Xloggc:$ES_GC_LOG_FILE"
+
+  # Ensure that the directory for the log file exists: the JVM will not create it.
+  mkdir -p "`dirname \"$ES_GC_LOG_FILE\"`"
+fi
+</pre>
+
+
+<p>
+如：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">JAVA_OPTS</span>=<span style="color: #8b2252;">"-Xms300m -Xmx300m  -verbose:gc -XX:+PrintGCDateStamps -XX:+PrintGCDetails -Xloggc:${CATALINA_HOME}/logs/hd-server-gc.log -Dapollo.cluster=local"</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:529680c8-43cf-47ad-b877-84aefe2b5e49" class="outline-4">
+<h4 id="h:529680c8-43cf-47ad-b877-84aefe2b5e49">JVM常见垃圾回收器</h4>
+<div class="outline-text-4" id="text-h:529680c8-43cf-47ad-b877-84aefe2b5e49">
+<p>
+名词解释：
+</p>
+<ul class="org-ul">
+<li>串行回收 ： GC单线程内存回收、会暂停所有用户线程；  GC跑，用户暂停</li>
+<li>并行回收： 收集是指多个GC线程并行工作，但此时用户线程是暂停的；所以，Serial是串行的，Paralle收集器是并行的，而CMS收集器是并发的。GC跑，用户暂停</li>
+<li>并发回收： 是指用户 线程与GC线程同时执行(不一定是并行，可能交替，但总体上是在同时执行的)，不需要停顿用户线程（其实在CMS中用户线程还是需要停顿的，只是非常短，GC线程在另一个CPU执行）；GC跑，用户跑</li>
+</ul>
+
+
+<figure id="org31f8dd4">
+<img src="./images/jvm-hotSpo里的收集器.png" alt="jvm-hotSpo里的收集器.png">
+
+</figure>
+
+<p>
+上图是HotSpot里的收集器，中间的横线表示分代，有连线表示可以组合使用。
+</p>
+
+<p>
+Serial 回收器（串行回收器）
+</p>
+
+
+<figure id="orge1e90ca">
+<img src="./images/jvm-Serial回收器.png" alt="jvm-Serial回收器.png">
+
+</figure>
+
+<ol class="org-ol">
+<li>是一个单线程的收集器，只能使用一个CPU或一条线程去完成垃圾收集；在进行垃圾收集时，必须停止其它工作的线程，直到收集完成。采用复制算法。</li>
+<li>缺点：Stop-The-Worl</li>
+<li>优点：简单。对于单CPU的情况，由于没有多线程交互开销，反而可以更高效。是Clien模式下默认的新生代收集器。</li>
+</ol>
+
+<p>
+新生代Serial回收器
+</p>
+<ol class="org-ol">
+<li>-XX:+UseSerialGC 来开启。 Serial New+ Serial Old 的收集器组合进行内存回收。</li>
+<li>采用复制算法</li>
+<li>独占式的垃圾回收。一个线程进行GC，串行。其它工作线程暂停。</li>
+</ol>
+
+<p>
+老年代Serial回收器
+</p>
+<ol class="org-ol">
+<li>-XX:+UseSerialGC 来开启。Serial New+ Serial Old 的收集器组合进行内存回收。</li>
+<li>使用标记-压缩算法</li>
+<li>串行的、独占式的垃圾回收器。因为内存比较大原因，回收比新生代慢。</li>
+</ol>
+
+<p>
+ParNew回收器(并行回收器)
+</p>
+
+
+<figure id="org32d36b7">
+<img src="./images/jvm-ParNew回收器.png" alt="jvm-ParNew回收器.png">
+
+</figure>
+
+<p>
+并行回收器也是独占式的回收器，在收集过程中，应用程序会全部暂停。但由于并行回收器使用多线程进行垃圾回收，
+因此，在并发能力比较强的CPU上，它产生的停顿时间要短于串行回收器，而在单CPU或者并发能力较弱的系统中，
+并行回收器的效果不比串行回收器好，由于多线程压力，它的实际表现能力很可能比串行回收器差。
+</p>
+
+<p>
+新生代ParNew回收器
+</p>
+<ol class="org-ol">
+<li>-XX:+UseParNewGC 开启。 新生代使用并行回收收集器，老年代使用串行收集器。</li>
+<li>-XX:ParallelGCThreads 指定线程数。默认最好与CPU数量相当，避免过多的线程影响垃圾收集性能。</li>
+<li>采用复制算法</li>
+<li>并行的、独占式的垃圾回收器。</li>
+</ol>
+
+<p>
+新生代 Paralle Scavenge收集器
+</p>
+<ol class="org-ol">
+<li>吞吐量优先回收器。关注CPU吞吐量，即运行用户代码的时间/总时间， 比如： JVM运行100分钟，其中运行用户代码99分钟，垃圾收集1分钟，则吞吐量是99%，这种收集器能最高效率的利用CPU，适合运行后台运算。</li>
+<li>-XX:+UseParallelGC 开启。 使用Parallel Scavenge+Serial Old 收集器组合回收垃圾，这也是在Server 模式下的默认值。</li>
+<li>-XX:GCTimeRatio 来设置用户执行时间占总时间的比例，默认99，即1%的时间用来进行垃圾回收。</li>
+<li>-XX:MaxGCPauseMillis 设置GC最大停顿时间 。</li>
+<li>使用复制算法</li>
+</ol>
+
+<p>
+老生代 Paralle Scavenge收集器
+</p>
+<ol class="org-ol">
+<li>-XX:+UseParallelOldGC 开启。使用Parallel Scavene + Parallel Old组合收集器进行收集</li>
+<li>使用标记整理算法</li>
+<li>并行的、独占式的垃圾收集器。</li>
+</ol>
+
+<p>
+CMS（并发标记清除）回收器
+</p>
+
+
+<figure id="org0e25b32">
+<img src="./images/jvm-CMS回收器.png" alt="jvm-CMS回收器.png">
+
+</figure>
+
+<p>
+运行过程分为4 个阶段：
+</p>
+<pre class="example" id="org8b9dbd1">
+初始标记（CMS initial mark）: 值标记GC Roots能直接关联到的对象 。
+并发标记（CMS concurrent mark）：进行GC Roots Tracing 的过程。
+重新标记（CMS remark）：修正并发标记期间因用户程序继续运行而导致标记发生改变的那一部分对象的标记。
+并发清除（CMS concurrent sweep）：
+</pre>
+
+<p>
+其中标记和重新标记两个阶段仍然需要 Stop&#x2013;The-World，整个过程中耗时最长的并发标记和并发清除 过程
+中收集器都可以和用户线程一起工作。
+</p>
+
+<ol class="org-ol">
+<li>标记-清除算法。 同时它又是一个使用多线程并发回收的垃圾收集器。</li>
+<li>-XX:ParallelCMSThreads 手工设定CMS的线程数量，CMS默认启动的线程数是(ParallelGCThreads+3)/4</li>
+<li>-XX:+UseConcMarkSweepGC 开启 使用ParNew + CMS + Serial  Old 的收集器组合进行内存回收，Serial Old 作为CMS出现 “Concurrent Mode Failure”失败后的后备收集器使用。</li>
+<li>-XX:CMSInitiatingOccupancyFraction 设置CMS收集器在老年代空间被使用多少后触发垃圾收集，默认值68%，仅在CMS收集器时有效，-XX:CMSInitiatingOccupancyFraction=70</li>
+<li>-XX:+UseCMSCompactAtFullCollection 由于CMS收集器会产生碎片，此参数设置在垃圾收集器后是否需要一次内存碎片整理过程，仅在CMS收集器时有效。一般不要超过2ms-10ms。必须有达到想要的指标才调优。比如：线上用户应用，不要停顿15ms；离线计算，停留5分钟给计算，10分钟回收</li>
+<li>-XX:+CMSFullGCBeforeCompaction 设置CMS收集器在进行若干次垃圾收集后再进行一次内存碎片整理过程，通常与UseCMSCompactAtFullCollection参数一起使用。</li>
+<li>-XX:CMSInitiatingPermOccupancyFraction 设置Pem Gen持久代使用到达多少比率时触发，默认92%。一般不设置。</li>
+</ol>
+
+<p>
+2种回收失败：一种是没在进行中的，一种正在进行中的
+</p>
+
+
+<figure id="org0723ca5">
+<img src="./images/jvm回收失败.png" alt="jvm回收失败.png">
+
+</figure>
+
+
+<figure id="orgd9f18a3">
+<img src="./images/jvm-args.png" alt="jvm-args.png">
+
+</figure>
+
+
+<pre class="example" id="org9ffdd24">
+-XX:+UseCMSCompactAtFullCollection 表示在FGC之后进行压缩，因为CMS默认不压缩空间的。 
+-XX:+UseCMSInitiatingOccupancyOnly 表示只在到达阀值的时候，才进行CMS GC
+</pre>
+
+<p>
+G1收集器
+</p>
+
+<p>
+G1收集器是一个并行的、并发的和增量式压缩短暂停顿的垃圾收集器。G1收集器和其他的收集器运 行方式不一样，不区分年轻代和年老代空间。它把堆空间划分为多个大小相等的区域。当进行垃圾收集时，它会优先收集存活对象较少的区域，因此叫 “Garbage First”
+</p>
+
+<p>
+G1垃圾收集器（-XX:+UseG1GC) G1（Garbage First）：垃圾收集器是在Java 7后才可以使用的特性，它的长远目标时代替CMS收集器
+最少堆内存 4g 才有效果
+</p>
+
+<p>
+何时使用G1（-XX:+UseG1GC）
+</p>
+<ol class="org-ol">
+<li>大内存中为了达到低gc延迟.比如:heap size &gt;=6G,gc pause &lt;=0.5s</li>
+<li>FullGC时间太长，或者太频繁。</li>
+</ol>
+
+<p>
+调优参数：
+</p>
+
+<p>
+G1可用的命令行选项有：
+</p>
+<pre class="example" id="org63109c9">
+-XX:+UseG1GC——让JVM使用G1垃圾回收器
+-XX:MaxGCPauseMillis=200——设置GC暂停时间目标值，缺省200毫秒。但这不是硬指标，JVM会尽力满足。
+-XX:InitiatingHeapOccupancyPercent=45——整个堆被占用多少之后开始进行GC，也就是heap中45%的容量被使用，则会触发concurrent gc。缺省为45，0表示持续不停进行GC
+-XX:NewRatio=n——年轻代和老年代的比例，缺省为2
+-XX:SurvivorRatio=n——Eden和Survivro的比例，缺省为8
+-XX:G1ReservePercent=n——保留的堆大小，减少晋升过程中出错的可能性，也就是增加可用的to-space内存，缺省是10
+-XX:G1HeapRegionSize=n——G1中，堆分为大小相等的区域。这个参数设置区域的大小，缺省值取决于堆的总大小，有效取值是1M-32M。设置每个Region的大小，单位MB，需要为1，2，4，8，16，32其一，默认是堆内存的1/2000
+
+  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:InitialRAMPercentage=75.0
+    -XX:MinRAMPercentage=75.0
+    -XX:MaxRAMPercentage=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/opt/logs/
+</pre>
+</div>
+</div>
+<div id="outline-container-h:16195014-f940-4ddc-b5c3-270e7be5b882" class="outline-4">
+<h4 id="h:16195014-f940-4ddc-b5c3-270e7be5b882">GC性能指标</h4>
+<div class="outline-text-4" id="text-h:16195014-f940-4ddc-b5c3-270e7be5b882">
+<pre class="example" id="org960f118">
+吞吐量：应用花在非GC上的时间百分比。
+GC负荷：与吞吐量相反，指应用花在GC上的时间百分比。
+暂停时间：应用花在GC stop-the-world的时间
+GC频率：顾名思义
+反应速率：从一个对象变成垃圾到这个对象被回收时间 。
+</pre>
+
+<p>
+一个交互式的应用 要求暂停时间 越少越好，然而，一个非交互性的应用，当然是希望GC负荷越低越好。
+</p>
+
+<p>
+一个实时系统对暂停时间和GC负荷的要求 ，都是越低越好。
+</p>
+
+<p>
+一个嵌入式当然希望Footprint越小越好。
+</p>
+</div>
+</div>
+<div id="outline-container-h:3abdcb09-2439-48fb-b265-ea058affd253" class="outline-4">
+<h4 id="h:3abdcb09-2439-48fb-b265-ea058affd253">内存容量配置原则</h4>
+<div class="outline-text-4" id="text-h:3abdcb09-2439-48fb-b265-ea058affd253">
+<p>
+1 年轻代大小选择
+</p>
+
+<p>
+响应时间优先的应用 ：
+</p>
+
+<p>
+尽可能设大，直到接近系统的最低响应时间限制（根据实际情况选择）。在此种情况一，年轻代收集发生的频率也是最小 的，同时，减少到达年老代的对象。
+</p>
+
+<p>
+吞吐量优先的应用：
+</p>
+
+<p>
+尽可能的设置大，可能到达Gbit的程度。因为对响应时间没有要求，垃圾收集可以并行进行，一般适合8CPU以上的应用 。
+</p>
+
+<p>
+避免设置过小。当新生代设置 过小时会导致：1.YGC次数更加频繁 2.可能导致YGC对象直接进入旧生代，如果此时旧生代满了，会触发FGC。
+</p>
+
+<p>
+2 年老代大小选择
+</p>
+
+<p>
+响应时间优先的应用：
+</p>
+
+<p>
+年老代使用并发收集器，所以其大小需要小心设置，一般要考虑并发会话率和会话持续时间等一些参数。如果
+堆设置小了，可能会造成内存碎片，高回收频率以及应用 暂停而使用传统的标记清除 方式；如果堆大了，则
+需要较长收集时间，最优化的方案，一般需要参考以下数据获得：
+并发垃圾收集信息、持久代并发收集次数、传统GC信息、花在年轻代和年老代回收上时间比例。
+</p>
+
+<p>
+吞吐量优先的应用：
+</p>
+
+<p>
+一般吞吐量优先的应用都有一个很大的年轻代和一个较小的年老代。原因是，这样可以尽可能回收掉大部分短期对象，减少中期对象 ，而年老代尽存放长期存活对象。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:61468918-e1ea-4f2a-8ee5-35f3b18bac1b" class="outline-2">
+<h2 id="h:61468918-e1ea-4f2a-8ee5-35f3b18bac1b">jvm 支持容器</h2>
+<div class="outline-text-2" id="text-h:61468918-e1ea-4f2a-8ee5-35f3b18bac1b">
+<p>
+r5a.2xlarge	0.286 USD
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:<span style="color: #a0522d;">InitialRAMPercentage</span>=75.0
+    -XX:<span style="color: #a0522d;">MinRAMPercentage</span>=75.0
+    -XX:<span style="color: #a0522d;">MaxRAMPercentage</span>=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:<span style="color: #a0522d;">HeapDumpPath</span>=logs/
+
+&#26597;&#30475;
+java -XX:+PrintFlagsFinal -version | grep -E <span style="color: #8b2252;">"InitialRAMPercentage|MinRAMPercentage|MaxRAMPercentage"</span>
+
+&#26597;&#30475;&#22534;&#20449;&#24687;
+&#21551;&#21160;&#26102;&#26597;&#30475;
+java -XX:<span style="color: #a0522d;">MinRAMPercentage</span>=80.0 -XshowSettings:VM -version
+</pre>
+</div>
+
+<p>
+说明：
+InitialRAMPercentage JVM 参数允许我们配置 Java 应用程序的初始堆大小。它是物理服务器或容器总内存的百分比，作为双精度值传递。注意，当我们配置-Xms选项时，JVM 会忽略InitialRAMPercentage
+</p>
+
+<p>
+MinRAMPercentage参数与其名称不同，它允许为使用少量内存（小于 200MB）运行的 JVM 设置最大堆大小。容器内存总量小于200M
+</p>
+
+<p>
+MaxRAMPercentage参数允许为运行大量内存（大于 200 MB）的JVM设置最大堆大小。
+</p>
+</div>
+</section>
+<section id="outline-container-h:b4c1fd4a-55d4-4d93-b0f0-7fe674be842c" class="outline-2">
+<h2 id="h:b4c1fd4a-55d4-4d93-b0f0-7fe674be842c">oom 排查</h2>
+<div class="outline-text-2" id="text-h:b4c1fd4a-55d4-4d93-b0f0-7fe674be842c">
+</div>
+<div id="outline-container-h:e2cb6e21-324e-4251-8fcd-721d7bcdcdfa" class="outline-3">
+<h3 id="h:e2cb6e21-324e-4251-8fcd-721d7bcdcdfa">oom 原因</h3>
+<div class="outline-text-3" id="text-h:e2cb6e21-324e-4251-8fcd-721d7bcdcdfa">
+<pre class="example" id="org40d458d">
+1. 一次申请的太多
+解决：更改申请对象的数据
+
+2. 内存资源资源耗尽未释放
+解决：找到未释放的对象进行释放，可以引用池化思想
+
+3. 本身资源不够，jvm 参数不够
+解决：jmap -heap 查看堆信息
+启动时查看 java -XX:MinRAMPercentage=80.0 -XshowSettings:VM -version
+</pre>
+</div>
+</div>
+<div id="outline-container-h:54928ce3-d30a-4425-9285-87767e1dacdd" class="outline-3">
+<h3 id="h:54928ce3-d30a-4425-9285-87767e1dacdd">定位oom</h3>
+<div class="outline-text-3" id="text-h:54928ce3-d30a-4425-9285-87767e1dacdd">
+<pre class="example" id="org52ce26b">
+找到对应代码
+系统已经 oom 挂了
+解决：提前设置 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=
+
+系统运行中还未 oom 
+解决：导出 dump 文件，jmap -dump:format=b,file=pid.hprof 1460
+arthas
+
+结合 jvisualvm 进行调试
+查看最多跟业务有关对象 --&gt; 找到 GCRoot --&gt; 查看线程栈
+</pre>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="http://blog.csdn.net/u012152619/article/details/46923185">http://blog.csdn.net/u012152619/article/details/46923185</a></li>
+<li><a href="http://blog.csdn.net/chaofanwei/article/details/19835105">http://blog.csdn.net/chaofanwei/article/details/19835105</a></li>
+</ul>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer class="site-footer">
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <p>
+          <a href="/index.html">JasperHsu</a> · 
+          <a href="/publications.html">Publications</a> · 
+          <a href="/rss.xml">RSS Feeds</a> · 
+          <a rel="me" href="https://creativecommons.org/licenses/by-sa/4.0/">(CC BY-SA 4.0)</a>
+<!--
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <a rel="nofollow" target="_blank" href="https://beian.miit.gov.cn/#/Integrated/index">
+          京ICP备2021003836号-1
+          </a>
+-->
+        </p>
+        <p style="font-family: \"Source Code Pro\",\"DejaVu Sans Mono\",monospace,sans-serif;">© 2024 Jasper Hsu</p>
+      </div>
+      <div class="column align-right">
+        <p>
+          <a href="https://orgmode.org" style="float:right; margin 20px 0px 20px 20px;">
+            <img src="/static/images/made-with-emacs.webp" style="width: 120px" alt="Made with Emacs Org-Mode">
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+</footer>
+</body>
+</html>

@@ -147,14 +147,26 @@
 <h3 id="h:57709bd0-8797-45ec-86d8-e4d0dcae4aaa">脚本</h3>
 <div class="outline-text-3" id="text-h:57709bd0-8797-45ec-86d8-e4d0dcae4aaa">
 <div class="org-src-container">
-<pre class="src src-sh">cat &gt;check-hard.sh&lt;&lt;\EOF
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; check-hard.sh 
 <span style="color: #ffa54f;">#!/bin/bash</span>
 <span style="color: #ffa54f;">PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin</span>
 <span style="color: #ffa54f;">export PATH</span>
 
-<span style="color: #ffa54f;">if [ "$(</span><span style="color: #ff00ff;">cat /proc/version|grep 'centos.org'</span><span style="color: #ffa54f;">)" != "centos" ]; then</span>
-<span style="color: #ffa54f;">    apt-get install smartmontools -y</span>
-<span style="color: #ffa54f;">fi</span>
+<span style="color: #ffa54f;">__check_system() {</span>
+<span style="color: #ffa54f;">  OS_RELEASE="$(</span><span style="color: #ff00ff;">awk -F'=' '/^NAME/{print $2}' /etc/os-release| sed 's@\"@@g'</span><span style="color: #ffa54f;">)" `#OS: Amazon Linux|CentOS Linux|Ubuntu`</span>
+<span style="color: #ffa54f;">  ARCH="$(</span><span style="color: #ff00ff;">arch</span><span style="color: #ffa54f;">)" `#ARCH: x86_64(amd)|aarch64(arm)`</span>
+<span style="color: #ffa54f;">}</span>
+
+<span style="color: #ffa54f;">__init() {</span>
+<span style="color: #ffa54f;">  __check_system</span>
+<span style="color: #ffa54f;">  [[ "$OS_RELEASE" =~ "Linux" ]] &amp;&amp; yum install -y dmidecode smartmontools &amp;&gt;/dev/null ||:</span>
+<span style="color: #ffa54f;">  [[ "$OS_RELEASE" =~ "Ubuntu" ]] &amp;&amp; apt install dmidecode smartmontools &amp;&gt;/dev/null ||:</span>
+
+<span style="color: #ffa54f;">#if [ "$(</span><span style="color: #ff00ff;">cat /proc/version|grep 'centos.org'</span><span style="color: #ffa54f;">)" != "centos" ]; then</span>
+<span style="color: #ffa54f;">#    apt-get install smartmontools -y</span>
+<span style="color: #ffa54f;">#fi</span>
+<span style="color: #ffa54f;">}</span>
+<span style="color: #ffa54f;">__init</span>
 
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo "---------------------&#26381;&#21153;&#22120;&#20449;&#24687;------------------------"</span>
@@ -171,7 +183,8 @@
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo "--------------------&#25805;&#20316;&#31995;&#32479;&#20449;&#24687;------------------------"</span>
-<span style="color: #ffa54f;">echo "&#31995;&#32479;&#65306;" `cat /etc/issue |grep -v Kernel`</span>
+<span style="color: #ffa54f;">#echo "&#31995;&#32479;&#65306;" `cat /etc/issue |grep -v Kernel`</span>
+<span style="color: #ffa54f;">echo "&#31995;&#32479;&#65306;" `echo $OS_RELEASE`</span>
 <span style="color: #ffa54f;">echo "&#20027;&#26426;&#21517;&#65306;" `uname -n`</span>
 <span style="color: #ffa54f;">echo "&#20869;&#26680;&#29256;&#26412;&#65306;" `uname -r`</span>
 <span style="color: #ffa54f;">echo "" </span>
@@ -198,8 +211,11 @@
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo "---------------------&#30828;&#30424;&#20449;&#24687;--------------------------"</span>
-<span style="color: #ffa54f;">echo "&#30828;&#30424;&#21378;&#21830;&#12289;&#22411;&#21495;&#12289;&#24207;&#21015;&#21495;&#65306;" `smartctl -a /dev/sda |egrep "Device Model:|Serial Number:"`</span>
-<span style="color: #ffa54f;">echo "&#30828;&#30424;&#25968;&#37327;&#12289;&#23481;&#37327;&#65306;" `fdisk -l |grep "Disk /dev/sd"`</span>
+<span style="color: #ffa54f;">device_name=`lsblk -d -o name |sed '1d'`</span>
+<span style="color: #ffa54f;">for d in "$device_name"; do </span>
+<span style="color: #ffa54f;">  echo "&#30828;&#30424;&#21378;&#21830;&#12289;&#22411;&#21495;&#12289;&#24207;&#21015;&#21495;&#65306;" `smartctl -a /dev/$d |egrep "Device Model:|Model Number:|Serial Number:"`</span>
+<span style="color: #ffa54f;">  echo "&#30828;&#30424;&#25968;&#37327;&#12289;&#23481;&#37327;&#65306;" `fdisk -l |grep "Disk /dev/$d"`</span>
+<span style="color: #ffa54f;">done</span>
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo ""</span>
 <span style="color: #ffa54f;">echo "---------------------&#32593;&#21345;&#20449;&#24687;--------------------------"</span>
@@ -1018,7 +1034,7 @@ count不为0的行即代表存在内存错误。
 
 
 
-<figure id="orgee9a668">
+<figure id="org8486f30">
 <img src="./images/img_20241023_022927.png" alt="img_20241023_022927.png" width="100%">
 
 </figure>
@@ -1089,7 +1105,7 @@ tar xf cpuburn-1.0-amd64.tar.gz
 </div>
 
 
-<pre class="example" id="org92df3b7">
+<pre class="example" id="org54dce69">
 /opt/MegaRAID/MegaCli/MegaCli64 -LDInfo -LALL -aAll    【显示所有逻辑磁盘组信息】（查看磁盘是否开启回写、预读等提高性能的选项）
 MegaCli常用参数介绍
 /opt/MegaRAID/MegaCli/MegaCli64 -adpCount 【显示适配器个数】
@@ -1357,7 +1373,7 @@ Latency               404us     159us     198us     423us     339us    8080us
 这个就好看多了，简单解释一下：
 </p>
 
-<pre class="example" id="org12da428">
+<pre class="example" id="orgfda65f0">
 Sequential Output（顺序输出，实际是写操作）下的 Per Char是值用putc方式写，毫无疑问，因为cache的line总是大于1字节的，所以不停的骚扰CPU执行putc，看到cpu使用率是99%.写的速度是0.3MB/s，非常慢了。
 Sequential Output下的block是按照block去写的，明显CPU使用率就下来了，速度也上去了，是31MB/s，跟上面用dd测试的差不多。
 Sequential Input（顺序输入，实际是读操作）下的Per Char是指用getc的方式读文件，速度是2.5MB/s，CPU使用率是99%。
@@ -1431,7 +1447,7 @@ iozone 更加精确一些
 <p>
 测试定义：
 </p>
-<pre class="example" id="orgad91b1a">
+<pre class="example" id="orgc5e1642">
 Write:
 测试向一个新文件写入的性能。当一个新文件被写入时，不仅仅是那些文件中的数据需要被存储，还包括那些用于定位数据存储在存储介质的具体位置的额外信息。这些额外信息被称作“元数据”。它包括目录信息，所分配的空间和一些与该文件有关但又并非该文件所含数据的其他数据。拜这些额外信息所赐，Write的性能通常会比Re-write的性能低。
 Re-write: 测试向一个已存在的文件写入的性能。当一个已存在的文件被写入时，所需工作量较少，因为此时元数据已经存在。Re-write的性能通常比Write的性能高。

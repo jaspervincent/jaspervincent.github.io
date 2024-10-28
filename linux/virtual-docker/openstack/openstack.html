@@ -69,9 +69,31 @@
 </li>
 <li><a href="#org8fc1bfa">OpenStack镜像服务Glance详解</a>
 <ul>
-<li><a href="#org65d21e9">OpenStack虚拟机镜像制作</a></li>
+<li><a href="#org65d21e9">OpenStack虚拟机镜像制作</a>
+<ul>
+<li><a href="#org9acb6df">CentOS7+和Ubuntu</a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li><a href="#org4e97d18">OpenStack网络服务Neutron详解</a>
+<ul>
+<li><a href="#orgb6dd4f4">实现内外网结构</a>
+<ul>
+<li><a href="#orgbf96ab2">控制节点配置</a></li>
+<li><a href="#org79c86ad">计算节点配置</a></li>
+<li><a href="#orgc633690">创建网络并验证</a></li>
+<li><a href="#org7168ca5">创建虚拟机系统添加网卡</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org12e0f29">OpenStack计算服务详解</a>
+<ul>
+<li><a href="#orgbe1a844">指定虚拟机IP</a></li>
+</ul>
+</li>
+<li><a href="#org83c87ed">OpenStack存储服务Cinder详解</a></li>
 <li><a href="#org6ad9c7a">OpenStack高可用配置</a></li>
 <li><a href="#org6eec0c5">参考：</a></li>
 </ul>
@@ -161,22 +183,27 @@ Node&#33410;&#28857;: node1, node2, node3 <span style="color: #b22222;">#</span>
 实践环节
 </p>
 <div class="org-src-container">
-<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">controller</span>
-172.31.7.101  <span style="color: #b22222;">#</span><span style="color: #b22222;">controller1</span>
-172.31.7.102  <span style="color: #b22222;">#</span><span style="color: #b22222;">controller2</span>
+<pre class="src src-sh">172.31.0.0/21
+  172.31.0.0  172.31.1.0 172.31.2.0 172.31.3.0 172.31.4.0 172.31.5.0 172.31.6.0 172.31.7.0 
+10.10.0.0/21
+  10.10.1.0  10.10.2.0  10.10.3.0  10.10.4.0  10.10.5.0  10.10.6.0  10.10.7.0
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">controller</span>
+172.31.7.101  <span style="color: #b22222;">#</span><span style="color: #b22222;">controller1  10.10.7.101</span>
+172.31.7.102  <span style="color: #b22222;">#</span><span style="color: #b22222;">controller2  10.10.7.102</span>
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">mysql</span>
 172.31.7.103 <span style="color: #b22222;">#</span><span style="color: #b22222;">mysql-master</span>
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">haproxy+keepalive</span>
-172.31.7.105   <span style="color: #b22222;">#</span><span style="color: #b22222;">ha1 vip </span>
-172.31.7.106   <span style="color: #b22222;">#</span><span style="color: #b22222;">ha2</span>
+172.31.7.105   <span style="color: #b22222;">#</span><span style="color: #b22222;">ha1 vip  172.31.7.248</span>
+172.31.7.106   <span style="color: #b22222;">#</span><span style="color: #b22222;">ha2  </span>
 <span style="color: #b22222;">#</span><span style="color: #b22222;">openstack-vip.online.local  #vip</span>
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">node</span>
-172.31.7.107 <span style="color: #b22222;">#</span><span style="color: #b22222;">node1</span>
-172.31.7.108 <span style="color: #b22222;">#</span><span style="color: #b22222;">node2</span>
-172.31.7.109 <span style="color: #b22222;">#</span><span style="color: #b22222;">node3</span>
+172.31.7.107 <span style="color: #b22222;">#</span><span style="color: #b22222;">node1 10.10.7.107</span>
+172.31.7.108 <span style="color: #b22222;">#</span><span style="color: #b22222;">node2 10.10.7.108</span>
+172.31.7.109 <span style="color: #b22222;">#</span><span style="color: #b22222;">node3 10.10.7.109</span>
 <span style="color: #b22222;">#</span><span style="color: #b22222;">openstack-vip.online.local  #node&#33410;&#28857;&#22495;&#21517;&#35299;&#26512;/etc/hosts vip</span>
 </pre>
 </div>
@@ -347,6 +374,77 @@ tail -f /var/log/httpds/*.log
 
 </pre>
 </div>
+
+<p>
+haproxy配置
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">... ...
+
+listen openstack-mysql-3306
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:3306
+  mode tcp
+  server 172.31.7.103 172.31.7.103:3306 check inter 3s fall 3 rise 5
+
+listen openstack-rabbitmq-5672
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:5672
+  mode tcp
+  server 172.31.7.103 172.31.7.103:5672 check inter 3s fall 3 rise 5
+
+listen openstack-memcached-11211
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:11211
+  mode tcp
+  server 172.31.7.103 172.31.7.103:11211 check inter 3s fall 3 rise 5
+
+listen openstack-keystone-5000
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:5000
+  mode tcp
+  server 172.31.7.101 172.31.7.101:5000 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:5000 check inter 3s fall 3 rise 5
+
+listen openstack-glance-9292
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:9292
+  mode tcp
+  server 172.31.7.101 172.31.7.101:9292 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:9292 check inter 3s fall 3 rise 5
+
+listen openstack-placement-8778
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:8778
+  mode tcp
+  server 172.31.7.101 172.31.7.101:8778 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:8778 check inter 3s fall 3 rise 5
+
+listen openstack-nova-controller-8774
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:8774
+  mode tcp
+  server 172.31.7.101 172.31.7.101:8774 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:8774 check inter 3s fall 3 rise 5
+
+listen openstack-nova-controller-8775
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:8775
+  mode tcp
+  server 172.31.7.101 172.31.7.101:8775 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:8775 check inter 3s fall 3 rise 5
+
+listen openstack-nova-novncproxy-6080
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:6080
+  mode tcp
+  server 172.31.7.101 172.31.7.101:6080 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:6080 check inter 3s fall 3 rise 5
+
+listen openstack-neutron-9696
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:9696
+  mode tcp
+  server 172.31.7.101 172.31.7.101:9696 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:9696 check inter 3s fall 3 rise 5
+
+listen openstack-dashboard-80
+  <span style="color: #483d8b;">bind</span> 172.31.7.248:80
+  mode tcp
+  server 172.31.7.101 172.31.7.101:80 check inter 3s fall 3 rise 5
+  server 172.31.7.102 172.31.7.102:80 check inter 3s fall 3 rise 5
+</pre>
+</div>
 </div>
 </div>
 </div>
@@ -462,20 +560,24 @@ nova service-list
 <p>
 在宿主机最小化安装系统并配置优化，做完成然后将虚拟机关机，将虚拟机磁盘文件上传至glance即可启动虚拟机。
 </p>
-
+</div>
+<div id="outline-container-org9acb6df" class="outline-4">
+<h4 id="org9acb6df">CentOS7+和Ubuntu</h4>
+<div class="outline-text-4" id="text-org9acb6df">
 <div class="org-src-container">
 <pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;&#22522;&#30784;&#29615;&#22659;</span>
 yum install -y qemu-kvm qemu-kvm-tools libvirt virt-manager virt-install
-<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23545;&#34394;&#25311;&#26426;&#36827;&#34892;&#37325;&#21551;</span>
-yum install acpid
-systemctl enable acpid
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#30913;&#30424;</span>
 qemu-img create -f qcow2 /var/lib/libvirt/images/CentOS-7-x86_64.qcow2 10G
+qemu-img create -f qcow2 /var/lib/libvirt/images/ubuntu-2410.qcow2 10G
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;</span>
 virt-install --virt-type kvm --name CentOS-x86_64 --ram 1024 --cdrom=/opt/CentOS-7-x86_64-Minimal-1511.iso <span style="color: #8b2252;">\</span>
              --disk <span style="color: #a0522d;">path</span>=/var/lib/libvirt/images/CentOS-7-x86_64.qcow2 --network <span style="color: #a0522d;">bridge</span>=br0 --graphics vnc,<span style="color: #a0522d;">listen</span>=0.0.0.0 <span style="color: #8b2252;">\</span>
+             --noautoconsole
+virt-install --virt-type kvm --name ubuntu-2410 --ram 1024 --cdrom=/opt/ubuntu-24.10-live-server-amd64.iso <span style="color: #8b2252;">\</span>
+             --disk <span style="color: #a0522d;">path</span>=/var/lib/libvirt/images/ubuntu-2410.qcow2 --network <span style="color: #a0522d;">bridge</span>=br0 --graphics vnc,<span style="color: #a0522d;">listen</span>=0.0.0.0 <span style="color: #8b2252;">\</span>
              --noautoconsole
 
 <span style="color: #b22222;">#</span><span style="color: #b22222;">vnc&#23458;&#25143;&#31471;&#36830;&#25509;&#24182;&#23433;&#35013;</span>
@@ -497,7 +599,244 @@ openstack iamge list
 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#34394;&#25311;&#26426;</span>
 </pre>
 </div>
+
+<p>
+CentOS虚拟机中初始化
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#38500;&#22522;&#30784;&#30340;&#21021;&#22987;&#21270;&#22806;</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25918;&#32622;&#20844;&#38053;</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23545;&#34394;&#25311;&#26426;&#36827;&#34892;&#37325;&#21551;</span>
+yum install acpid
+systemctl enable acpid
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">cloud-init&#21487;&#20197;&#35775;&#38382;openstack api, &#21487;&#20197;&#35774;&#32622;&#20803;&#25968;&#25454;\&#25289;&#25275;&#30913;&#30424;&#31354;&#38388;</span>
+yum install cloud-init
+vim /etc/cloud/cloud.cfg
+users:
+  - name: root
+disable_root: false
+
+systemctl disable cloud-init   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21551;&#21160;&#36739;&#24930;&#12290;&#21487;&#20197;openstack&#21551;&#21160;&#23454;&#20363;&#21518;&#65292;&#20877;&#21551;&#21160;&#12290;&#19981;&#21551;&#21160;&#26080;&#27861;&#25289;&#25275;&#30913;&#30424;&#31354;&#38388;</span>
+yum install cloud-utils-growpart
+
+</pre>
 </div>
+
+<p>
+范例：导入openstack SSH公钥
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">https://docs.openstack.org/install-guide/launch-instance.html#generate-a-key-pair</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;ssh&#23494;&#38053;</span>
+<span style="color: #483d8b;">.</span> demo-openrc
+openstack keypair create --public-key ~/.ssh/id_rsa.pub mykey
+openstack keypair list
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21015;&#20986;&#32593;&#32476;id</span>
+openstack network list
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21015;&#20986;&#21487;&#29992;&#23433;&#20840;&#32452;</span>
+openstack security group list
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21629;&#20196;&#34892;&#21019;&#24314;&#34394;&#25311;&#26426;&#65292;&#24182;&#23548;&#20837;SSH&#20844;&#38053;</span>
+openstack server create --flavor m1.nano --image cirros <span style="color: #8b2252;">\</span>
+  --nic net-id=PROVIDER_NET_ID --security-group default <span style="color: #8b2252;">\</span>
+  --key-name mykey vm1111
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36827;&#20837;vm111&#26597;&#30475;&#26159;&#21542;&#26377;ssh&#20844;&#38053;&#20449;&#24687;</span>
+</pre>
+</div>
+
+<p>
+范例：重设官方镜像磁盘中root密码
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#23448;&#26041;&#38236;&#20687;&#26159;ssh&#23494;&#38053;&#30331;&#24405;&#30340;&#65292;&#24182;&#19981;&#30693;&#36947;root&#23494;&#30721;</span>
+yum install libguestfs-tools -y
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23637;&#24320;&#30913;&#30424;&#25991;&#20214;&#65292;&#20462;&#25913;&#23494;&#30721;</span>
+virt-customize -a /var/lib/libvirt/images/CentOS-7-x86_64-GenericCloud-1511.qcow2 --root-password password:123456
+</pre>
+</div>
+
+<p>
+范例：centos6.9拉抻磁盘空间
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">centos6  &#22312;openstack&#20013;&#30340;&#30913;&#30424;&#25289;&#25275;&#38382;&#39064;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">https://github.com/flegmatik/linux-rootfs-resize</span>
+yum install epel-release -y
+yum install git parted cloud-utils -y
+git clone https://github.com/flegmatik/linux-rootfs-resize.git
+<span style="color: #483d8b;">cd</span> linux-rootfs-resize
+./install
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#32593;&#21345;&#21517;&#38382;&#39064;</span>
+vim /etc/udev/rules.d/70-persistent-net.rules  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20445;&#30041;&#26368;&#26032;&#32593;&#21345;&#20449;&#24687;&#34892;&#65292;eth1&#20026;eth0, &#20462;&#25913;&#23436;&#65292;&#37325;&#21551;&#29983;&#25928;</span>
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org4e97d18" class="outline-2">
+<h2 id="org4e97d18">OpenStack网络服务Neutron详解</h2>
+<div class="outline-text-2" id="text-org4e97d18">
+<p>
+主要内容
+</p>
+<ul class="org-ul">
+<li>Neutron组件架构和模型</li>
+<li>Neutron Plugin和Agent</li>
+<li>基本网络类型介绍和管理</li>
+</ul>
+</div>
+<div id="outline-container-orgb6dd4f4" class="outline-3">
+<h3 id="orgb6dd4f4">实现内外网结构</h3>
+<div class="outline-text-3" id="text-orgb6dd4f4">
+</div>
+<div id="outline-container-orgbf96ab2" class="outline-4">
+<h4 id="orgbf96ab2">控制节点配置</h4>
+<div class="outline-text-4" id="text-orgbf96ab2">
+<div class="org-src-container">
+<pre class="src src-sh">vim  /etc/neutron/plugins/ml2/ml2_conf.ini
+[ml2_type_flat]
+<span style="color: #b22222;"># </span><span style="color: #b22222;">...</span>
+flat_networks = external,internal
+
+vim /etc/neutron/plugins/ml2/openvswitch_agent.ini 
+[ovs]
+bridge_mappings = external:eth0, internal:eth1
+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37325;&#21551;neutron</span>
+cat &lt;&lt;\EOF&gt; neutron-restart.sh
+<span style="color: #ffa54f;">systemctl restart neutron-openvswitch-agent.service</span>
+<span style="color: #ffa54f;">EOF</span>
+
+bash neutron-restart.sh
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org79c86ad" class="outline-4">
+<h4 id="org79c86ad">计算节点配置</h4>
+<div class="outline-text-4" id="text-org79c86ad">
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/neutron/plugins/ml2/openvswitch_agent.ini 
+[ovs]
+bridge_mappings = external:eth0, internal:eth1
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37325;&#21551;neutron</span>
+cat &lt;&lt;\EOF&gt; neutron-restart.sh
+<span style="color: #ffa54f;">systemctl restart neutron-openvswitch-agent.service</span>
+<span style="color: #ffa54f;">EOF</span>
+
+bash neutron-restart.sh
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgc633690" class="outline-4">
+<h4 id="orgc633690">创建网络并验证</h4>
+<div class="outline-text-4" id="text-orgc633690">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#25511;&#21046;&#31471;&#21019;&#24314;&#32593;&#32476;</span>
+<span style="color: #483d8b;">source</span> admin-openrc
+neutron net-create --shared --provider:physical_network internal --provider:network_type flat internal-net
+openstack network list
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#23376;&#32593;</span>
+neutron subnet-create --name internal-sub  --allocation-pool <span style="color: #a0522d;">start</span>=10.10.0.50,<span style="color: #a0522d;">end</span>=10.10.0.100  --dns-nameserver 223.6.6.6  internal-net 10.10.0.0/21
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;</span>
+</pre>
+</div>
+
+<p>
+或者web界面网络中创建网络internal-net，再创建子网internal-sub。
+</p>
+</div>
+</div>
+<div id="outline-container-org7168ca5" class="outline-4">
+<h4 id="org7168ca5">创建虚拟机系统添加网卡</h4>
+<div class="outline-text-4" id="text-org7168ca5">
+<p>
+制作操作系统镜像，并添加一块网卡，然后上传至glance存储
+</p>
+
+<p>
+web界面创建虚拟机实例时，在网络配置的中，先加的网络为eth0, 后加的eth1，内网为eth0, 外网为eth1
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;&#20869;&#22806;&#32593;&#24773;&#20917;</span>
+ping 10.0.7.101
+ping 172.31.7.101
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org12e0f29" class="outline-2">
+<h2 id="org12e0f29">OpenStack计算服务详解</h2>
+<div class="outline-text-2" id="text-org12e0f29">
+<p>
+主要内容
+</p>
+<ul class="org-ul">
+<li>Nova基本架构体系</li>
+<li>Nova各组件功能介绍</li>
+<li>虚拟机管理
+<ul class="org-ul">
+<li>基本管理操作</li>
+<li>虚拟机迁移</li>
+<li>虚拟机救援</li>
+</ul></li>
+</ul>
+</div>
+<div id="outline-container-orgbe1a844" class="outline-3">
+<h3 id="orgbe1a844">指定虚拟机IP</h3>
+<div class="outline-text-3" id="text-orgbe1a844">
+<div class="org-src-container">
+<pre class="src src-sh">CentOS-7.6_v1
+1C-1G-50G
+
+projectB:
+openstack-node2.online.local
+openstack-node3.online.local
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#32473;&#34394;&#25311;&#26426;&#25351;&#23450;&#21333;&#20010;IP</span>
+nova boot --image CentOS-7.6_v1  --flavor 1C-1G-50G    <span style="color: #8b2252;">\</span>
+     --availability-zone projectB:openstack-node2.online.local   --nic net-name=external-net,v4-fixed-ip=172.31.7.88   projectB-app1
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#32473;&#34394;&#25311;&#26426;&#25351;&#23450;&#22810;&#20010;IP&#65306;</span>
+nova boot --flavor=1C-1G-50G <span style="color: #8b2252;">\</span>
+  --image=CentOS-7.6_v1  <span style="color: #8b2252;">\</span>
+  --availability-zone projectB:openstack-node2.online.local  <span style="color: #8b2252;">\</span>
+  --nic net-id=16d4c3ee-7c91-4fc4-8b74-3afcfa992108,v4-fixed-ip=172.31.7.88  <span style="color: #8b2252;">\</span>
+  --nic net-id=56a614a5-b5c1-4aa4-8553-f50ef8363a07,v4-fixed-ip=10.10.7.88 <span style="color: #8b2252;">\</span>
+  projectB-app1
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org83c87ed" class="outline-2">
+<h2 id="org83c87ed">OpenStack存储服务Cinder详解</h2>
+<div class="outline-text-2" id="text-org83c87ed">
+<p>
+主要内容
+</p>
+<ul class="org-ul">
+<li>Cinder基本架构体系</li>
+<li>Cinder调度算法</li>
+<li>存储卷管理操作</li>
+</ul>
 </div>
 </section>
 <section id="outline-container-org6ad9c7a" class="outline-2">
@@ -527,7 +866,7 @@ openstack iamge list
 <h2 id="org6eec0c5">参考：</h2>
 <div class="outline-text-2" id="text-org6eec0c5">
 
-<figure id="orgb455621">
+<figure id="orgd4c102a">
 <img src="./images/img_20241026_182647.png" alt="img_20241026_182647.png" width="100%">
 
 <figcaption><span class="figure-number">Figure 1: </span>机房openstack架构1</figcaption>
@@ -627,7 +966,7 @@ OpenStack IP规划1: 10.20.112.0/21
 </p>
 
 
-<figure id="org930c0e8">
+<figure id="org0fd76d6">
 <img src="./images/img_20241026_182220.png" alt="img_20241026_182220.png" width="100%">
 
 <figcaption><span class="figure-number">Figure 2: </span>机房openstack架构2</figcaption>

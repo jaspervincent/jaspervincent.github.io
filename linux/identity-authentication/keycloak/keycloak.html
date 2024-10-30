@@ -43,9 +43,418 @@
 <main class="container" id="content" class="content">
 <header>
 <h1 class="title">Keycloak</h1>
-</header><ul class="org-ul">
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:a154132d-f331-40a6-88d3-22753f749f42">安装</a></li>
+<li><a href="#org58c6a38">配置</a>
+<ul>
+<li><a href="#org4748444">实验</a></li>
+</ul>
+</li>
+<li><a href="#org4f87e30">认证</a>
+<ul>
+<li><a href="#h:b239a506-32c5-4eac-ada5-48cda667daa5">grafana 认证</a>
+<ul>
+<li><a href="#h:b618baa9-e96d-4423-ac30-b4efe3b48537">keycloak配置</a></li>
+<li><a href="#h:ed583581-db07-4313-9664-159309fb1b24">grafana配置</a></li>
+</ul>
+</li>
+<li><a href="#org3a59a77">jenkin认证</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
 <li>TAGS: <a href="../index.html">Identity</a></li>
 </ul>
+
+<p>
+官网： <a href="https://www.keycloak.org/">https://www.keycloak.org/</a>
+</p>
+
+<p>
+架构：<a href="https://www.keycloak.org/docs/26.0.2/authorization_services/">https://www.keycloak.org/docs/26.0.2/authorization_services/</a>
+</p>
+
+<p>
+目录结构：<a href="https://www.keycloak.org/server/directory-structure">https://www.keycloak.org/server/directory-structure</a>
+</p>
+<section id="outline-container-h:a154132d-f331-40a6-88d3-22753f749f42" class="outline-2">
+<h2 id="h:a154132d-f331-40a6-88d3-22753f749f42">安装</h2>
+<div class="outline-text-2" id="text-h:a154132d-f331-40a6-88d3-22753f749f42">
+<div class="org-src-container">
+<pre class="src src-sh">kubectl create -f https://raw.githubusercontent.com/keycloak/keycloak-quickstarts/latest/kubernetes/keycloak.yaml
+</pre>
+</div>
+<p>
+账号密码：admin/admin
+</p>
+
+<p>
+nginx keycloak代理变量
+</p>
+<pre class="example" id="org506f26a">
+KC_PROXY_HEADERS=xforwarded
+KC_HOSTNAME=https://keycloak.online.local
+KC_HTTP_ENABLED=true  
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">server {
+        listen       80;
+        server_name  keycloak.online.local;
+
+        proxy_set_header Host $<span style="color: #a0522d;">http_host</span>;
+        proxy_set_header X-Real-IP $<span style="color: #a0522d;">remote_addr</span>;
+        proxy_set_header X-Forwarded-For $<span style="color: #a0522d;">proxy_add_x_forwarded_for</span>;
+        proxy_set_header X-Forwarded-Proto $<span style="color: #a0522d;">scheme</span>;
+
+        location / {
+                proxy_pass http://10.2.22.94:8080;
+        }
+}
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-org58c6a38" class="outline-2">
+<h2 id="org58c6a38">配置</h2>
+<div class="outline-text-2" id="text-org58c6a38">
+<p>
+文档：<a href="https://www.keycloak.org/documentation.html">https://www.keycloak.org/documentation.html</a>
+</p>
+
+<p>
+container配置： <a href="https://www.keycloak.org/server/containers">https://www.keycloak.org/server/containers</a>
+</p>
+
+<p>
+支持数据库类型：<a href="https://www.keycloak.org/server/db">https://www.keycloak.org/server/db</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">KC_DB</span>=dev-file &#65288;&#40664;&#35748;&#65289;&#12289; dev-mem &#12289; mariadb &#12289; mssql &#12289; mysql &#12289; oracle &#12289; postgres
+</pre>
+</div>
+
+<p>
+可选功能：<a href="https://www.keycloak.org/server/features">https://www.keycloak.org/server/features</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">KC_FEATURES</span>=xxx,xxxx
+</pre>
+</div>
+
+<p>
+导入导出领域配置： <a href="https://www.keycloak.org/server/importExport">https://www.keycloak.org/server/importExport</a>
+</p>
+</div>
+<div id="outline-container-org4748444" class="outline-3">
+<h3 id="org4748444">实验</h3>
+<div class="outline-text-3" id="text-org4748444">
+<p>
+<b>创建realm</b>
+</p>
+
+<p>
+默认realm(领域)是master，一般不用，这里可以创建一个新realm，如myrealm
+</p>
+
+<p>
+<b>创建用户</b>
+</p>
+
+<p>
+在领域下创建用于登录的用户
+</p>
+
+<p>
+Users&#x2013;&gt;Create new user &#x2013;Name(save) &#x2013;&gt;Credentials(Set password)
+</p>
+
+<p>
+如用户test
+</p>
+<pre class="example" id="org84d0014">
+Username: test
+Email: test@test.com
+Firt name: my
+Last name: test
+</pre>
+
+<p>
+设置密码时，取消勾选“Temporary”，否则下次登录还要重新设置密码
+</p>
+
+<p>
+登录：<a href="http://localhost:8080/realms/myrealm/account">http://localhost:8080/realms/myrealm/account</a>
+</p>
+
+<p>
+<b>创建第一个应用程序</b>
+</p>
+
+<ol class="org-ol">
+<li>打开Keycloak 管理控制台。</li>
+<li>单击左上角的master一词，然后单击myrealm 。</li>
+<li>单击“Clients” 。</li>
+<li>单击Create client</li>
+<li>使用以下值填写表格：
+<ul class="org-ul">
+<li>客户端类型： OpenID Connect</li>
+<li>Client ID ： myclient</li>
+</ul></li>
+<li>点击 Next</li>
+<li>确认 Standard flow 是启动的.</li>
+<li>点击 Next.</li>
+<li>在登录设置下进行这些更改、
+<ul class="org-ul">
+<li>Set Valid redirect URIs to <a href="https://www.keycloak.org/app/">https://www.keycloak.org/app/</a>*</li>
+<li>Set Web origins to <a href="https://www.keycloak.org">https://www.keycloak.org</a></li>
+</ul></li>
+<li>点击 Save.</li>
+</ol>
+
+<p>
+打开<a href="https://www.keycloak.org/app/">https://www.keycloak.org/app/</a>  
+</p>
+
+<p>
+验证角色权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">curl --location <span style="color: #8b2252;">'http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/token'</span> <span style="color: #8b2252;">\</span>
+--header <span style="color: #8b2252;">'Content-Type: application/x-www-form-urlencoded'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'grant_type=password'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'client_id=grafana-oauth'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'client_secret=PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'username=test'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'password=123456'</span>
+</pre>
+</div>
+
+<p>
+将得到的access_token解析， 使用token转换：<a href="https://jwt.io/">https://jwt.io/</a>
+</p>
+
+
+
+<p>
+<b>中文</b>
+</p>
+
+<p>
+Realm setting &#x2013;&gt; Localization &#x2013;&gt; Locales 启动
+</p>
+
+<p>
+在支持的语言中选择简体中文，本地默认选择中文，刷新页面即可。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-org4f87e30" class="outline-2">
+<h2 id="org4f87e30">认证</h2>
+<div class="outline-text-2" id="text-org4f87e30">
+</div>
+<div id="outline-container-h:b239a506-32c5-4eac-ada5-48cda667daa5" class="outline-3">
+<h3 id="h:b239a506-32c5-4eac-ada5-48cda667daa5">grafana 认证</h3>
+<div class="outline-text-3" id="text-h:b239a506-32c5-4eac-ada5-48cda667daa5">
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/keycloak/">grafana官方文档</a></li>
+</ul>
+</div>
+<div id="outline-container-h:b618baa9-e96d-4423-ac30-b4efe3b48537" class="outline-4">
+<h4 id="h:b618baa9-e96d-4423-ac30-b4efe3b48537">keycloak配置</h4>
+<div class="outline-text-4" id="text-h:b618baa9-e96d-4423-ac30-b4efe3b48537">
+<p>
+1.在领域下创建用于登录的用户
+</p>
+
+<p>
+如用户test
+</p>
+
+<p>
+2.创建Clients
+</p>
+
+<p>
+grafana-oauth
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Client ID: grafana-oauth
+Name: grafana-oauth
+Client authentication: On
+Standard flow: On
+Direct access grants: On
+Implicit flow: OFF
+Root URL: http://10.0.0.128:3000
+Home URL: http://10.0.0.128:3000
+Valid redirect URIs: http://10.0.0.128:3000/login/* <span style="color: #b22222;">#</span><span style="color: #b22222;">&#29992;&#20110;&#37325;&#26032;&#30331;&#24405;grafana&#25509;&#21475;&#39564;&#35777;</span>
+Web origins : http://10.0.0.128:3000
+Admin URL: http://10.0.0.128:3000
+</pre>
+</div>
+
+<p>
+完成后可在Credentials看到Client Secret密钥信息。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Client ID: grafana-oauth
+Client Secret: PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3
+</pre>
+</div>
+
+<p>
+3.添加角色引用
+</p>
+
+<p>
+Clients&#x2013;&gt;grafana-oauth&#x2013;&gt;Client scopes&#x2013;&gt;grafana-oauth-dedicated&#x2013;&gt;Mappers
+</p>
+
+<p>
+添加一个映射器 Add mapper &#x2013;&gt; By configuration &#x2013;&gt; User Real Role
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">name: grafana roles <span style="color: #b22222;">#</span><span style="color: #b22222;">&#38543;&#24847;</span>
+Token Cliam Name: roles
+</pre>
+</div>
+
+<p>
+保存
+</p>
+
+<p>
+4.添加领域角色
+</p>
+
+<p>
+Realm roles &#x2013;&gt; Create role
+</p>
+
+<p>
+创建3个角色：admin, editor, viewer
+</p>
+
+<p>
+5.用户绑定角色
+</p>
+
+<p>
+Users 选择一个用户，如test，选择"Role mapping" &#x2013;&gt; Assign role&#x2013;&gt;过滤条件选择Filter by realm roles
+</p>
+
+<p>
+绑定领域角色，如editor
+</p>
+
+
+<p>
+6.验证角色权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">curl --location <span style="color: #8b2252;">'http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/token'</span> <span style="color: #8b2252;">\</span>
+--header <span style="color: #8b2252;">'Content-Type: application/x-www-form-urlencoded'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'grant_type=password'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'client_id=grafana-oauth'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'client_secret=PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'username=test'</span> <span style="color: #8b2252;">\</span>
+--data-urlencode <span style="color: #8b2252;">'password=123456'</span>
+</pre>
+</div>
+
+<p>
+将得到的access_token解析， 使用token转换：<a href="https://jwt.io/">https://jwt.io/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:ed583581-db07-4313-9664-159309fb1b24" class="outline-4">
+<h4 id="h:ed583581-db07-4313-9664-159309fb1b24">grafana配置</h4>
+<div class="outline-text-4" id="text-h:ed583581-db07-4313-9664-159309fb1b24">
+<p>
+root_url在docker环境变量为GF_SERVER_ROOT_URL
+</p>
+
+<p>
+grafana.ini
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[server]
+root_url = http://10.0.0.128:3000
+
+[auth.generic_oauth]
+enabled = true
+name = OAuth
+allow_sign_up = true
+client_id = grafana-oauth
+client_secret = PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3
+scopes = openid email profile offline_access roles
+email_attribute_path = email
+login_attribute_path = username
+name_attribute_path = full_name
+auth_url = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/auth
+token_url = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/token
+api_url = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/userinfo
+redirect_url = http://10.0.0.128:8080/login/generic_oauth
+role_attribute_path = contains(roles[*], <span style="color: #8b2252;">'admin'</span>) &amp;&amp; <span style="color: #8b2252;">'Admin'</span> || contains(roles[*], <span style="color: #8b2252;">'editor'</span>) &amp;&amp; <span style="color: #8b2252;">'Editor'</span> || <span style="color: #8b2252;">'Viewer'</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">role_attribute_path = contains(realm_access.roles[*], 'Admin') &amp;&amp; 'Admin' || contains(realm_access.roles[*], 'editor') &amp;&amp; 'Editor' || 'Viewer'</span>
+signout_redirect_url = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/logout?<span style="color: #a0522d;">post_logout_redirect_uri</span>=http%3A%2F%2F10.0.0.128%3A3000%2Flogin
+use_refresh_token = true
+</pre>
+</div>
+
+<p>
+访问grafana地址，验证用户登录。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org3a59a77" class="outline-3">
+<h3 id="org3a59a77">jenkin认证</h3>
+<div class="outline-text-3" id="text-org3a59a77">
+<p>
+1.登录Keycloak，在对应Realm领域中创建Client客户端, 如jenkins
+</p>
+
+<p>
+配置好，在右上角操作选项中点击下载配置(Download adapter config)，复制内容。
+</p>
+
+<pre class="example" id="org2085b56">
+{
+  "realm": "myrealm",
+  "auth-server-url": "http://10.0.0.128:8080/",
+  "ssl-required": "external",
+  "resource": "jenkins",
+  "credentials": {
+    "secret": "hoQVgcYlc4cK76XzpPUNJWoTkavimwKk"
+  },
+  "confidential-port": 0
+}
+</pre>
+
+<p>
+2.登录jenkins
+</p>
+
+<p>
+安装插件keycloak。在【系统管理】-【全局安全配置】点击安全域选择配置keycloak，将keycloak客户端
+配置粘贴到Keycloak JSON中, 授权策略可选做任何事或者安全矩阵。
+</p>
+</div>
+</div>
+</section>
 </main class="container">
 <footer id="postamble" class="status">
 <footer class="site-footer">

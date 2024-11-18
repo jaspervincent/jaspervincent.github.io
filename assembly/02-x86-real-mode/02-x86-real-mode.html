@@ -135,8 +135,17 @@
 <li><a href="#h:56e2e5e3-c5b0-4b6d-8783-7abd223ba666">安装Bochs虚拟机</a></li>
 <li><a href="#h:2a1d281b-bc23-47a9-a0d3-49fb7174b704">为Bochs虚拟机安装虚拟硬盘</a></li>
 <li><a href="#h:bce7c485-20cc-4010-bc8c-3c669afd8c2e">创建主引导扇区程序</a></li>
-<li><a href="#h:c2578057-deb7-40f0-bd86-b53044fdf1a4">将程序写入硬盘主引导扇区</a></li>
-<li><a href="#h:0ddf27df-95a6-4216-a291-94e5fe54b30d">用调试器观察程序的执行</a></li>
+<li><a href="#h:c2578057-deb7-40f0-bd86-b53044fdf1a4">将程序写入硬盘主引导扇区</a>
+<ul>
+<li><a href="#h:9d28ad31-4f92-46f8-a562-cc40cfba58ae">LBA</a></li>
+</ul>
+</li>
+<li><a href="#h:0ddf27df-95a6-4216-a291-94e5fe54b30d">用调试器观察程序的执行</a>
+<ul>
+<li><a href="#h:8e5a73d8-6101-43c1-99b3-447c8f3edd5b">8086处理器之后的32位64位寄存器</a></li>
+<li><a href="#h:bdcb3401-d356-4c29-b19b-a1cf2f4a55d2">开始调试</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#h:d22d6388-723c-4c18-8e85-394adf30318b">在屏幕上显示文本</a>
@@ -407,7 +416,7 @@ VHD相对简单
 
 
 
-<figure id="org0fe60e6">
+<figure id="orgb98af4c">
 <img src="./images/img_20241114_070855.png" alt="img_20241114_070855.png" width="90%">
 
 </figure>
@@ -510,7 +519,7 @@ VHD相对简单
 
 <p>
 计算机启动过程：
-只程序内容写入主引导扇区，因为计算机在启动时都会读取并加载主引导扇区的内容并执行。
+程序内容写入主引导扇区，因为在计算机加电或者复位后，将首先从ROM BIOS中执行，然后硬盘主引导区的内容读到内存，并执行读取后的指令
 </p>
 
 <p>
@@ -553,6 +562,11 @@ bochs <span style="color: #b22222;">#</span><span style="color: #b22222;">&#3687
 <p>
 Bochs是一台完整的虚拟计算机，第一次启动时需要配置一套自己的硬件配置。
 </p>
+
+<ul class="org-ul">
+<li>bochsdbg.exe 具有调试功能的虚拟机</li>
+<li>bochs.exe 虚拟机</li>
+</ul>
 </div>
 </div>
 <div id="outline-container-h:2a1d281b-bc23-47a9-a0d3-49fb7174b704" class="outline-3">
@@ -576,7 +590,7 @@ Bochs是一台完整的虚拟计算机，第一次启动时需要配置一套自
 <li>fixvhdwr.exe 自己编写的查看VDH硬盘信息工具</li>
 </ul>
 
-<pre class="example" id="org286b3e3">
+<pre class="example" id="orgefc24e3">
 虚拟硬盘： D:\VirtualBox VMs\learn.vhd
 VHD规范的原始创建者标识： conectix
 创建此文件的程序：vbox
@@ -619,6 +633,10 @@ VHD规范的原始创建者标识： conectix
 <p>
 quit 退出
 </p>
+
+<p>
+退出后启动需要重新设置，可 <code>Save</code> 保存配置到bochs工作目录下, 保存名称为bochsrc.bxrc，这是bochs默认启动的配置。
+</p>
 </div>
 </div>
 <div id="outline-container-h:bce7c485-20cc-4010-bc8c-3c669afd8c2e" class="outline-3">
@@ -632,16 +650,757 @@ quit 退出
 <li>Windows 版 010 editor， 下载地址：<a href="https://www.sweetscape.com/010editor/">https://www.sweetscape.com/010editor/</a></li>
 <li>命令行查看 hexdump -C ctfhub.png</li>
 </ul>
+
+<p>
+创建主引导扇区程序exam.asm
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">mov ax, 0x30      ;&#23558;&#31435;&#21363;&#25968;&#20256;&#36865;&#21040;AX&#23492;&#23384;&#22120;
+mov dx, 0xC0
+add ax, dx  ;&#23558;&#23492;&#23384;&#22120;ax&#21644;dx&#30340;&#20540;&#30456;&#21152;&#65292;&#32467;&#26524;&#22312;ax
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">D:\project\assemblyprojs&gt;nasm  exam.asm -f bin -o exam.bin  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24471;&#21040;8&#20010;&#23383;&#33410;&#30340;&#25968;&#25454;&#12290;</span>
+$ hexdump -C exam.bin
+00000000  b8 30 00 ba c0 00 01 d0                           |.0......|
+00000008
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">8086&#26159;&#20302;&#31471;&#23383;&#33410;&#24207;&#30340;&#12290;</span>
+b8 30 00 &#23601;&#26159; b8 0030
+ba 00c0
+0d0a
+</pre>
+</div>
+
+<p>
+主引导扇区512个字节。一个有效的主引导扇区其最后2个字节的数据必须是55AA。exam.bin程序总长8个字节。缺少的502个字节用0填充。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-asm"><span style="color: #0000ff;">mov</span> <span style="color: #a020f0;">ax</span>, 0x30      <span style="color: #b22222;">;</span><span style="color: #b22222;">&#23558;&#31435;&#21363;&#25968;&#20256;&#36865;&#21040;AX&#23492;&#23384;&#22120;</span>
+<span style="color: #0000ff;">mov</span> <span style="color: #a020f0;">dx</span>, 0xC0
+<span style="color: #0000ff;">add</span> <span style="color: #a020f0;">ax</span>, dx  <span style="color: #b22222;">;</span><span style="color: #b22222;">&#23558;&#23492;&#23384;&#22120;ax&#21644;dx&#30340;&#20540;&#30456;&#21152;&#65292;&#32467;&#26524;&#22312;ax</span>
+
+<span style="color: #0000ff;">times</span> <span style="color: #a020f0;">502</span> db 0 <span style="color: #b22222;">;</span><span style="color: #b22222;">&#37325;&#22797;&#25191;&#34892;502&#27425;&#21518;&#38754;&#30340;&#25351;&#20196;&#65292;db 0 &#21521;&#31243;&#24207;&#28155;&#21152;1&#23383;&#33410;&#25968;&#25454;</span>
+
+<span style="color: #0000ff;">db</span> <span style="color: #a020f0;">0x55</span>
+<span style="color: #0000ff;">db</span> <span style="color: #a020f0;">0xAA</span> <span style="color: #b22222;">;</span><span style="color: #b22222;">&#20027;&#24341;&#23548;&#25159;&#21306;&#26377;&#25928;&#26631;&#35782;55AA</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">db <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20301;&#25351;&#20196;&#65292;&#26469;&#21521;&#31243;&#24207;&#20013;&#28155;&#21152;1&#20010;&#23383;&#33410;&#30340;&#25968;&#25454;&#12290;&#25968;&#25454;&#21487;&#20197;&#26159;0&#65292;55&#31561;&#19968;&#20010;&#23383;&#33410;&#30340;&#25968;&#25454;&#12290;&#20301;&#25351;&#20196;&#19981;&#26159;&#30495;&#27491;&#22788;&#29702;&#22120;&#25351;&#20196;&#32780;&#26159;&#21482;&#23545;&#32534;&#35793;&#22120;&#26377;&#25928;&#30340;&#25351;&#20196;&#12290;</span>
+<span style="color: #483d8b;">times</span> n <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20301;&#25351;&#20196;&#65292;&#37325;&#22797;&#21518;&#25351;&#20196;&#27425;&#25968;&#65292;n&#20026;&#27425;&#25968;</span>
+</pre>
+</div>
+
+<p>
+重新编译
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">D:\project\assemblyprojs&gt;nasm  exam.asm -f bin -o exam.bin
+jasper@jasper MINGW64 /d/project/assemblyprojs
+$ hexdump -C exam.bin
+00000000  b8 30 00 ba c0 00 01 d0  00 00 00 00 00 00 00 00  |.0..............|
+00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+000001f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 55 aa  |..............U.|
+00000200
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:c2578057-deb7-40f0-bd86-b53044fdf1a4" class="outline-3">
 <h3 id="h:c2578057-deb7-40f0-bd86-b53044fdf1a4">将程序写入硬盘主引导扇区</h3>
 <div class="outline-text-3" id="text-h:c2578057-deb7-40f0-bd86-b53044fdf1a4">
+<p>
+将2进制程序写入虚拟硬盘文件learn.vhd
+</p>
+<ul class="org-ul">
+<li>方法1 fixvhdwr.exe 用自定义的程序导入。
+<ul class="org-ul">
+<li>LBA连续直写模式，起始LBA区号为0</li>
+</ul></li>
+<li>方法2 其他有效方法</li>
+</ul>
+</div>
+<div id="outline-container-h:9d28ad31-4f92-46f8-a562-cc40cfba58ae" class="outline-4">
+<h4 id="h:9d28ad31-4f92-46f8-a562-cc40cfba58ae">LBA</h4>
+<div class="outline-text-4" id="text-h:9d28ad31-4f92-46f8-a562-cc40cfba58ae">
+<p>
+传统上，为了读写硬盘必须指定磁头号、柱面号、扇区号。但这样非常麻烦，可以指定逻辑扇区号。
+</p>
+
+<p>
+1个扇区的大小512字节，可以看成一个数据块Block。所以可以认为硬盘是典型的块设备。
+</p>
+
+<p>
+采用柱面(Cylinder)、磁盘(Header)和扇区(Sector)来访问硬盘的方法叫做CHS模式。每次访问读写
+磁盘都要考虑这些不是很方便，传统的CHS采用24bit寻址，这样硬盘容量太小
+</p>
+<ul class="org-ul">
+<li>传统的CHS采用 24 bit位寻址</li>
+<li>其中前10位表示cylinder，中间8位表示head，后面6位表示sector</li>
+<li>最大寻址空间 8 GB.   echo 2^24*512/1024/1024|bc</li>
+</ul>
+
+<p>
+如果将磁盘的所有扇区统一编号，在读写时只用指定的统一编号将方便很多。
+</p>
+
+<p>
+逻辑块地址(LBA):  logical block addressing
+</p>
+<ul class="org-ul">
+<li>LBA是一个整数，通过转换成 CHS 格式完成磁盘具体寻址</li>
+<li>ATA-1规范中定义了28位寻址模式，以每扇区512位组来计算，ATA-1所定义的 28位LBA上限达到128 GiB。2002年ATA-6规范采用48位LBA，同样以每扇区512 位组计算容量上限可达128Petabytes</li>
+</ul>
+
+<p>
+范例：逻辑扇区编号
+</p>
+
+<pre class="example" id="orgb0c19a0">
+假定某硬盘有2个磁头，100个柱面，每磁盘有17个扇区。那么：
+逻辑0扇区对应着0面0道1扇区；
+逻辑1扇区对应着0面0道2扇区；
+......
+逻辑16扇区对应着0面0道16扇区；
+逻辑17扇区对应着1面0道1扇区；
+逻辑18扇区对应着1面0道2扇区；
+......
+逻辑33扇区对应着1面0道17扇区；
+逻辑34扇区对应着0面1道1扇区；
+逻辑35扇区对应着0面1道2扇区；
+......
+要注意，扇区在编号时，是以柱面为单位的。即，先是0面0道，接着是1面0道，直到把所有
+盘面上的0磁道处理完，再接着处理下一个柱面。之所以这样，是因为要加速硬盘的访问速度，
+最好是尽可能不移动磁头。
+因为这里总共有3400(2*100*17)个扇区，故最后一个逻辑扇区的编号是3399，它对应着1面99道17扇区，
+这也是整个硬盘上最后一个物理扇区。
+</pre>
+
+<p>
+若已知物理扇区的位置是对于H面(头)、C道的第S个扇区，则它的逻辑扇区号是：
+</p>
+\begin{equation*}
+C \times 磁头总数 \times 每道扇区数 + H \times 每道扇区数 + (S - 1)
+\end{equation*}
+</div>
 </div>
 </div>
 <div id="outline-container-h:0ddf27df-95a6-4216-a291-94e5fe54b30d" class="outline-3">
 <h3 id="h:0ddf27df-95a6-4216-a291-94e5fe54b30d">用调试器观察程序的执行</h3>
 <div class="outline-text-3" id="text-h:0ddf27df-95a6-4216-a291-94e5fe54b30d">
+<blockquote>
+<p>
+通过调试主引导扇区程序，来了解Bochs虚拟机的软件调试环境，以及软件调试的一般过程
+</p>
+</blockquote>
+</div>
+<div id="outline-container-h:8e5a73d8-6101-43c1-99b3-447c8f3edd5b" class="outline-4">
+<h4 id="h:8e5a73d8-6101-43c1-99b3-447c8f3edd5b">8086处理器之后的32位64位寄存器</h4>
+<div class="outline-text-4" id="text-h:8e5a73d8-6101-43c1-99b3-447c8f3edd5b">
+<table class="infobox" style="font-size:88%;width:38em;float: right;">
+
+<caption style="font-weight: bold;">Intel 8086 registers
+</caption>
+<tbody><tr>
+<td>
+<table style="font-size:88%;">
+
+<tbody><tr>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>9</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>8</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>7</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>6</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>5</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>4</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>3</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>2</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>1</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>1</sup><sub>0</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>9</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>8</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>7</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>6</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>5</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>4</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>3</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>2</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>1</sub>
+</td>
+<td style="width:10px; text-align:center;"><sup>0</sup><sub>0</sub>
+</td>
+<td style="width:auto; background:white; color:black"><i>(bit position)</i>
+</td></tr>
+<tr>
+<td colspan="21"><b>Main registers</b> <br>
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center; background:white" colspan="4">&nbsp;
+</td>
+<td style="text-align:center;" colspan="8">AH
+</td>
+<td style="text-align:center;" colspan="8">AL
+</td>
+<td style="background:white; color:black;"><b><a href="https://en.wikipedia.org/wiki/Accumulator_(computing)" title="Accumulator (computing)">AX</a></b> (primary accumulator)
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="text-align:center;" colspan="8">BH
+</td>
+<td style="text-align:center;" colspan="8">BL
+</td>
+<td style="background:white; color:black;"><b>BX</b> (base, accumulator)
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center; background:white" colspan="4">&nbsp;
+</td>
+<td style="text-align:center;" colspan="8">CH
+</td>
+<td style="text-align:center;" colspan="8">CL
+</td>
+<td style="background:white; color:black;"><b>CX</b> (counter, accumulator)
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center; background:white" colspan="4">&nbsp;
+</td>
+<td style="text-align:center;" colspan="8">DH
+</td>
+<td style="text-align:center;" colspan="8">DL
+</td>
+<td style="background:white; color:black;"><b>DX</b> (accumulator, extended acc)
+</td></tr>
+<tr>
+<td colspan="21"><b>Index registers</b> <br>
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="text-align:center;" colspan="16"><a href="https://en.wikipedia.org/wiki/Index_register" title="Index register">SI</a>
+</td>
+<td style="background:white; color:black;"><b>S</b>ource <b>I</b>ndex
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="text-align:center;" colspan="16">DI
+</td>
+<td style="background:white; color:black;"><b>D</b>estination <b>I</b>ndex
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="text-align:center;" colspan="16">BP
+</td>
+<td style="background:white; color:black;"><b>B</b>ase <b>P</b>ointer
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="text-align:center;" colspan="16"><a href="https://en.wikipedia.org/wiki/Stack_register" title="Stack register">SP</a>
+</td>
+<td style="background:white; color:black;"><b>S</b>tack <b>P</b>ointer
+</td></tr>
+<tr>
+<td colspan="21"><b>Program counter</b> <br>
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="text-align:center;" colspan="16"><a href="https://en.wikipedia.org/wiki/Program_counter" title="Program counter">IP</a>
+</td>
+<td style="background:white; color:black;"><b>I</b>nstruction <b>P</b>ointer
+</td></tr>
+<tr>
+<td colspan="21"><b>Segment registers</b> <br>
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;" colspan="16">CS
+</td>
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="background:white; color:black;"><b>C</b>ode <b>S</b>egment
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;" colspan="16">DS
+</td>
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="background:white; color:black;"><b>D</b>ata <b>S</b>egment
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;" colspan="16">ES
+</td>
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="background:white; color:black;"><b>E</b>xtra <b>S</b>egment
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center;" colspan="16">SS
+</td>
+<td style="text-align:center;background:#DDD" colspan="4">0&nbsp;0&nbsp;0&nbsp;0
+</td>
+<td style="background:white; color:black;"><b>S</b>tack <b>S</b>egment
+</td></tr>
+<tr>
+<td colspan="21"><b>Status register</b>
+</td></tr>
+<tr style="background:silver;color:black">
+<td style="text-align:center; background:white" colspan="4">&nbsp;
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Overflow_flag" title="Overflow flag">O</a>
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Direction_flag" title="Direction flag">D</a>
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/IF_(x86_flag)" class="mw-redirect" title="IF (x86 flag)">I</a>
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Trap_flag" title="Trap flag">T</a>
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Sign_flag" class="mw-redirect" title="Sign flag">S</a>
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Zero_flag" title="Zero flag">Z</a>
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Adjust_flag" class="mw-redirect" title="Adjust flag">A</a>
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Parity_flag" title="Parity flag">P</a>
+</td>
+<td style="text-align:center;">-
+</td>
+<td style="text-align:center;"><a href="https://en.wikipedia.org/wiki/Carry_flag" title="Carry flag">C</a>
+</td>
+<td style="background:white; color:black">Flags
+</td></tr></tbody></table>
+</td></tr></tbody></table>
+
+
+<table>
+<caption class="t-above"><span class="table-number">Table 1:</span> 通过寄存器</caption>
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">64位寄存器</th>
+<th scope="col" class="org-left">低32位</th>
+<th scope="col" class="org-left">低16位</th>
+<th scope="col" class="org-left">低8位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">rax</td>
+<td class="org-left">eax</td>
+<td class="org-left">ax</td>
+<td class="org-left">al</td>
+</tr>
+
+<tr>
+<td class="org-left">rbx</td>
+<td class="org-left">ebx</td>
+<td class="org-left">bx</td>
+<td class="org-left">bl</td>
+</tr>
+
+<tr>
+<td class="org-left">rcx</td>
+<td class="org-left">ecx</td>
+<td class="org-left">cx</td>
+<td class="org-left">cl</td>
+</tr>
+
+<tr>
+<td class="org-left">rdx</td>
+<td class="org-left">edx</td>
+<td class="org-left">dx</td>
+<td class="org-left">dl</td>
+</tr>
+
+<tr>
+<td class="org-left">rsi</td>
+<td class="org-left">esi</td>
+<td class="org-left">si</td>
+<td class="org-left">sil</td>
+</tr>
+
+<tr>
+<td class="org-left">rdi</td>
+<td class="org-left">edi</td>
+<td class="org-left">di</td>
+<td class="org-left">dil</td>
+</tr>
+
+<tr>
+<td class="org-left">rbp</td>
+<td class="org-left">ebp</td>
+<td class="org-left">bp</td>
+<td class="org-left">bpl</td>
+</tr>
+
+<tr>
+<td class="org-left">rsp</td>
+<td class="org-left">esp</td>
+<td class="org-left">sp</td>
+<td class="org-left">spl</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+ax、bx、cx 和 dx 的高 8 位仍可寻址为 ah、bh、ch、dh，但不能与所有类型的操作数一起使用。
+</p>
+
+<table>
+<caption class="t-above"><span class="table-number">Table 2:</span> 指令指针寄存</caption>
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">64位寄存器</th>
+<th scope="col" class="org-left">低32位</th>
+<th scope="col" class="org-left">低16位</th>
+<th scope="col" class="org-left">低8位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">rip</td>
+<td class="org-left">eip</td>
+<td class="org-left">ip</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+<b>x86体系结构（32位）</b>
+</p>
+
+<p>
+x86体系结构源自1980年代，它是一种CISC（复杂指令集计算）架构，广泛应用于个人电脑中。在32位的x86体系结构中，主要包括以下几类寄存器：
+</p>
+
+<ul class="org-ul">
+<li>通用寄存器（EAX, EBX, ECX, EDX）：用于多种算术和逻辑运算。</li>
+<li>索引寄存器（ESI, EDI）：主要用于指针操作和字符串处理。</li>
+<li>指针寄存器（ESP, EBP）：用于管理堆栈操作。</li>
+<li>段寄存器（CS, DS, SS, ES, FS, GS）：用于存储内存段的地址。</li>
+<li>指令指针（EIP）：存储即将执行的下一条指令的地址。</li>
+<li>标志寄存器（EFLAGS）：存储当前状态标志，如零标志、符号标志等。</li>
+</ul>
+
+<p>
+<b>x86-64体系结构（64位）</b>
+</p>
+
+<p>
+随着技术的发展，64位计算成为必要，因此x86架构被扩展到了x86-64，也称为AMD64或Intel 64。这个架构不仅增加了寄存器的数量，而且扩展了寄存器的大小。在64位架构中，主要的变化包括：
+</p>
+
+<ul class="org-ul">
+<li>扩展的通用寄存器：每个32位寄存器（如EAX）都有对应的64位版本（如RAX）。</li>
+<li>新增的通用寄存器：R8 到 R15。</li>
+<li>扩展的索引寄存器：ESI、EDI、EBP、ESP都有对应的64位版本（如RSI、RDI、RBP、RSP）。</li>
+<li>扩展的指令指针和标志寄存器：RIP 和 RFLAGS。</li>
+</ul>
+
+<p>
+这些改进提供了更大的地址空间和更高的数据处理能力，使得64位处理器可以高效地处理更大的数据集和更复杂的程序。
+</p>
+
+
+<p>
+参考：<a href="https://learn.microsoft.com/en-au/windows-hardware/drivers/debugger/x64-architecture">x64 Architecture</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:bdcb3401-d356-4c29-b19b-a1cf2f4a55d2" class="outline-4">
+<h4 id="h:bdcb3401-d356-4c29-b19b-a1cf2f4a55d2">开始调试</h4>
+<div class="outline-text-4" id="text-h:bdcb3401-d356-4c29-b19b-a1cf2f4a55d2">
+<p>
+已经准备
+</p>
+<ul class="org-ul">
+<li>虚拟硬盘文件</li>
+<li>主引导扇区程序</li>
+</ul>
+
+<p>
+之后就可在Bochs虚拟中调试了。打开具有调试功能的虚拟机 bochsdbg.exe 
+</p>
+
+<p>
+与真正的处理器不同，bochs在取第1条指令之前会停下来，等待你的调试命令。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Next at <span style="color: #a0522d;">t</span>=0  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26102;&#38047;&#28404;&#31572;&#30340;&#31532;1&#27425;&#65292;&#21363;&#19979;&#19968;&#26465;&#25351;&#20196;&#22312;t=0&#30340;&#22522;&#30784;&#19978;&#25191;&#34892;&#12290;&#27599;&#27169;&#25311;1&#27425;&#65292;&#26102;&#38047;&#20250;&#28404;&#31572;1&#27425;</span>
+(0) [0x0000fffffff0] f000:fff0 (unk. ctxt): jmpf 0xf000:e05b          ; ea5be000f0  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36825;&#34892;&#34920;&#31034;&#21363;&#23558;&#25191;&#34892;&#30340;&#25351;&#20196;</span>
+&lt;bochs:1&gt;
+
+[0x0000fffffff0] <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36825;&#26465;&#25351;&#20196;&#25152;&#22312;&#29289;&#29702;&#20869;&#23384;&#22320;&#22336;&#12290;&#20180;&#32454;&#35266;&#23519;&#21487;&#21457;&#29616;&#65292;&#19982;&#19979;&#38754;&#30340;&#36923;&#36753;&#22320;&#22336;&#19981;&#19968;&#33268;&#65292; &#36923;&#36753;&#22320;&#22336;&#23545;&#24212;ffff0&#30340;&#29289;&#29702;&#22320;&#22336;&#12290;&#36825;&#26159;&#26377;&#21407;&#22240;&#30340;&#65292;&#21482;&#22312;&#22788;&#29702;&#22120;&#21018;&#21551;&#21160;&#26102;&#21457;&#29983;&#65292;&#26242;&#19981;&#35752;&#35770;</span>
+f000:fff0 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36923;&#36753;&#22320;&#22336;&#65292;&#21487;&#20197;&#29702;&#35299;&#20026;&#27573;&#23492;&#23384;&#22120;CS&#20869;&#23481;F000, &#25351;&#20196;&#25351;&#38024;&#23492;&#23384;&#22120;IP&#20869;&#23481;FFF0&#12290;&#19981;&#20687;8086&#22788;&#29702;&#22120;&#27573;&#23492;&#23384;&#22120;FFFF&#65292;&#25351;&#20196;&#25351;&#38024;&#23492;&#23384;&#22120;0&#12290;</span>
+jmpf 0xf000:e05b <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36825;&#26465;&#25351;&#20196;&#30340;&#27719;&#32534;&#35821;&#35328;&#24418;&#24335;&#12290;&#36339;&#36716;&#25351;&#20196;&#65292;&#30446;&#26631;&#20301;&#32622;0xf000:e05b</span>
+;  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20998;&#21495;&#20026;&#27880;&#37322;</span>
+ea5be000f0  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36825;&#26465;&#25351;&#20196;&#30340;&#26426;&#22120;&#30721;</span>
+</pre>
+</div>
+
+<p>
+<b>调试命令</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">sreg   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034;&#27573;&#23492;&#23384;&#22120;&#20869;&#23481;</span>
+r    <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034;&#36890;&#36807;&#23492;&#23384;&#22120;</span>
+s  <span style="color: #b22222;">#</span><span style="color: #b22222;">step &#21333;&#27493;&#25191;&#34892;</span>
+b <span style="color: #b22222;">#</span><span style="color: #b22222;">break&#26029;&#28857;&#25351;&#20196;&#65292;&#35774;&#32622;&#19968;&#20010;&#20869;&#23384;&#22320;&#22336;&#65292;&#24403;&#21069;&#22788;&#29702;&#22120;&#25191;&#34892;&#21040;&#27492;&#20301;&#32622;&#23558;&#20572;&#19968;&#19979;&#26469;</span>
+c <span style="color: #b22222;">#</span><span style="color: #b22222;">countine&#25345;&#32493;&#25191;&#34892;&#65292;&#22914;&#26524;&#36935;&#21040;&#26029;&#28857;&#20250;&#20572;&#19979;&#26469;</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034;&#27573;&#23492;&#23384;&#22120;</span>
+&lt;bochs:1&gt; sreg
+es:0x0000, <span style="color: #a0522d;">dh</span>=0x00009300, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=7
+        Data segment, <span style="color: #a0522d;">base</span>=0x00000000, <span style="color: #a0522d;">limit</span>=0x0000ffff, Read/Write, Accessed
+cs:0xf000, <span style="color: #a0522d;">dh</span>=0xff0093ff, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=7
+        Data segment, <span style="color: #a0522d;">base</span>=0xffff0000, <span style="color: #a0522d;">limit</span>=0x0000ffff, Read/Write, Accessed
+ss:0x0000, <span style="color: #a0522d;">dh</span>=0x00009300, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=7
+        Data segment, <span style="color: #a0522d;">base</span>=0x00000000, <span style="color: #a0522d;">limit</span>=0x0000ffff, Read/Write, Accessed
+ds:0x0000, <span style="color: #a0522d;">dh</span>=0x00009300, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=7
+        Data segment, <span style="color: #a0522d;">base</span>=0x00000000, <span style="color: #a0522d;">limit</span>=0x0000ffff, Read/Write, Accessed
+fs:0x0000, <span style="color: #a0522d;">dh</span>=0x00009300, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=7
+        Data segment, <span style="color: #a0522d;">base</span>=0x00000000, <span style="color: #a0522d;">limit</span>=0x0000ffff, Read/Write, Accessed
+gs:0x0000, <span style="color: #a0522d;">dh</span>=0x00009300, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=7
+        Data segment, <span style="color: #a0522d;">base</span>=0x00000000, <span style="color: #a0522d;">limit</span>=0x0000ffff, Read/Write, Accessed
+ldtr:0x0000, <span style="color: #a0522d;">dh</span>=0x00008200, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=1
+tr:0x0000, <span style="color: #a0522d;">dh</span>=0x00008b00, <span style="color: #a0522d;">dl</span>=0x0000ffff, <span style="color: #a0522d;">valid</span>=1
+gdtr:<span style="color: #a0522d;">base</span>=0x0000000000000000, <span style="color: #a0522d;">limit</span>=0xffff
+idtr:<span style="color: #a0522d;">base</span>=0x0000000000000000, <span style="color: #a0522d;">limit</span>=0xffff
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">cs, ds &#26089;&#22312;8086&#22788;&#29702;&#22120;&#26377;&#26377;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">es, ss, fs, gs, tr, gdtr, idtr &#26159;8086&#20043;&#21518;&#22788;&#29702;&#22120;&#26032;&#22686;&#30340;</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034;&#36890;&#29992;&#23492;&#23384;&#22120;</span>
+&lt;bochs:2&gt; r
+rax: 00000000_00000000
+rbx: 00000000_00000000
+rcx: 00000000_00000000
+rdx: 00000000_00000000
+rsp: 00000000_00000000
+rbp: 00000000_00000000
+rsi: 00000000_00000000
+rdi: 00000000_00000000
+r8 : 00000000_00000000
+r9 : 00000000_00000000
+r10: 00000000_00000000
+r11: 00000000_00000000
+r12: 00000000_00000000
+r13: 00000000_00000000
+r14: 00000000_00000000
+r15: 00000000_00000000
+rip: 00000000_0000fff0  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25351;&#20196;&#25351;&#38024;&#23492;&#23384;&#22120;&#20869;&#23481;fff0</span>
+eflags: 0x00000002: id vip vif ac vm rf nt <span style="color: #a0522d;">IOPL</span>=0 of df if tf sf zf af pf cf
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">bochs&#24320;&#26426;&#21518;&#65292;&#25152;&#26377;&#30340;&#36890;&#36807;&#23492;&#23384;&#22120;&#20869;&#23481;&#37117;&#26159;0</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21333;&#27493;&#25191;&#34892;&#25351;&#20196;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36825;&#37324;&#25191;&#34892;&#20102; jmpf 0xf000:e05b &#25351;&#20196;&#65292;&#21487;&#20197;&#30475;&#21040;&#19979;&#19968;&#26465;&#23558;&#25191;&#34892;&#25351;&#20196;&#26159; xor ax, ax</span>
+&lt;bochs:3&gt; s
+Next at <span style="color: #a0522d;">t</span>=1 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26102;&#38047;&#28404;&#31572;&#30340;&#31532;2&#27425;&#65292;&#21363;&#19979;&#19968;&#26465;&#25351;&#20196;&#22312;t=1&#30340;&#22522;&#30784;&#19978;&#25191;&#34892;&#12290;</span>
+(0) [0x0000000fe05b] f000:e05b (unk. ctxt): xor ax, ax                ; 31c0
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21487;&#20197;&#30475;&#21040;&#65292;f000:e05b &#21644; &#29289;&#29702;&#22320;&#22336;fe05b&#19968;&#33268;&#20102;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20174;&#22320;&#22336;&#21487;&#20197;&#30475;&#20986;&#65292;&#30446;&#21069;&#36824;&#26159;&#22312; ROM BIOS&#20013;&#25191;&#34892;</span>
+
+Next at <span style="color: #a0522d;">t</span>=2
+(0) [0x0000000fe05d] f000:e05d (unk. ctxt): out 0x0d, al              ; e60d
+&lt;bochs:5&gt; s
+Next at <span style="color: #a0522d;">t</span>=3
+(0) [0x0000000fe05f] f000:e05f (unk. ctxt): out 0xda, al              ; e6da
+&lt;bochs:6&gt; s
+Next at <span style="color: #a0522d;">t</span>=4
+(0) [0x0000000fe061] f000:e061 (unk. ctxt): mov al, 0xc0              ; b0c0
+</pre>
+</div>
+
+<p>
+<b>定位到离开ROM BIOS最后一条指令</b>
+</p>
+
+<p>
+因为计算机启动后，总是把主引导扇区内容读取物理内存地址7c00处，然后从主引导扇区开始取指令并执行指令。
+可以将这个地址设置为断点。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">b <span style="color: #b22222;">#</span><span style="color: #b22222;">break&#26029;&#28857;&#25351;&#20196;&#65292;&#35774;&#32622;&#19968;&#20010;&#20869;&#23384;&#22320;&#22336;&#65292;&#24403;&#21069;&#22788;&#29702;&#22120;&#25191;&#34892;&#21040;&#27492;&#20301;&#32622;&#23558;&#20572;&#19968;&#19979;&#26469;</span>
+c <span style="color: #b22222;">#</span><span style="color: #b22222;">countine&#25345;&#32493;&#25191;&#34892;&#65292;&#22914;&#26524;&#36935;&#21040;&#26029;&#28857;&#20250;&#20572;&#19979;&#26469;</span>
+
+&lt;bochs:1&gt; b 0x7c00
+&lt;bochs:2&gt; c
+... ...
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#24050;&#32463;&#20572;&#22312;&#26029;&#28857;&#22788;</span>
+Next at <span style="color: #a0522d;">t</span>=17175563
+(0) [0x000000007c00] 0000:7c00 (unk. ctxt): mov ax, 0x0030            ; b83000
+</pre>
+</div>
+
+<p>
+可以看到下一次指令就是主引导扇区第1条指令 mov ax, 0x30, 也就是我们前面编写的主引导扇区程序。
+</p>
+
+<p>
+<b>执行程序</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&lt;bochs:3&gt; r
+rax: 00000000_0000aa55  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20869;&#23481;&#26159;&#22312;&#25191;&#34892;ROM BIOS&#26102;&#36951;&#30041;&#30340;&#65292;&#19981;&#29992;&#31649;</span>
+rbx: 00000000_00000000
+rcx: 00000000_00090000
+rdx: 00000000_00000080
+rsp: 00000000_0000ffd6
+rbp: 00000000_00000000
+rsi: 00000000_000e0000
+rdi: 00000000_0000ffac
+r8 : 00000000_00000000
+r9 : 00000000_00000000
+r10: 00000000_00000000
+r11: 00000000_00000000
+r12: 00000000_00000000
+r13: 00000000_00000000
+r14: 00000000_00000000
+r15: 00000000_00000000
+rip: 00000000_00007c00
+eflags: 0x00000082: id vip vif ac vm rf nt <span style="color: #a0522d;">IOPL</span>=0 of df if tf SF zf af pf cf
+
+&lt;bochs:4&gt; s  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25191;&#34892;mov ax, 0x30</span>
+Next at <span style="color: #a0522d;">t</span>=17175564
+(0) [0x000000007c03] 0000:7c03 (unk. ctxt): mov dx, 0x00c0            ; bac000
+&lt;bochs:5&gt; r
+rax: 00000000_00000030  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21487;&#20197;&#30475;&#21040;rax&#30340;&#26368;&#20302;16&#20301;&#20869;&#23481; 0030&#65292;&#35828;&#26126;&#21018;&#25165;mov ax, 0x30&#24050;&#32463;&#25104;&#21151;&#25191;&#34892;</span>
+rbx: 00000000_00000000
+rcx: 00000000_00090000
+rdx: 00000000_00000080
+rsp: 00000000_0000ffd6
+rbp: 00000000_00000000
+rsi: 00000000_000e0000
+rdi: 00000000_0000ffac
+r8 : 00000000_00000000
+r9 : 00000000_00000000
+r10: 00000000_00000000
+r11: 00000000_00000000
+r12: 00000000_00000000
+r13: 00000000_00000000
+r14: 00000000_00000000
+r15: 00000000_00000000
+rip: 00000000_00007c03
+eflags: 0x00000082: id vip vif ac vm rf nt <span style="color: #a0522d;">IOPL</span>=0 of df if tf SF zf af pf cf
+
+&lt;bochs:6&gt; s <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25191;&#34892; mov dx, 0xc0</span>
+Next at <span style="color: #a0522d;">t</span>=17175565
+(0) [0x000000007c06] 0000:7c06 (unk. ctxt): add ax, dx                ; 01d0
+&lt;bochs:7&gt; r
+rax: 00000000_00000030
+rbx: 00000000_00000000
+rcx: 00000000_00090000
+rdx: 00000000_000000c0  <span style="color: #b22222;">#</span><span style="color: #b22222;">rdx&#23492;&#23384;&#22120;&#20869;&#23481;&#20302;16&#20301; 00c0</span>
+rsp: 00000000_0000ffd6
+rbp: 00000000_00000000
+rsi: 00000000_000e0000
+rdi: 00000000_0000ffac
+r8 : 00000000_00000000
+r9 : 00000000_00000000
+r10: 00000000_00000000
+r11: 00000000_00000000
+r12: 00000000_00000000
+r13: 00000000_00000000
+r14: 00000000_00000000
+r15: 00000000_00000000
+rip: 00000000_00007c06
+eflags: 0x00000082: id vip vif ac vm rf nt <span style="color: #a0522d;">IOPL</span>=0 of df if tf SF zf af pf cf
+
+&lt;bochs:8&gt; s <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25191;&#34892;add ax, dx</span>
+Next at <span style="color: #a0522d;">t</span>=17175566
+(0) [0x000000007c08] 0000:7c08 (unk. ctxt): add byte ptr ds:[bx+si], al ; 0000  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19979;&#19968;&#26465;&#23558;&#25191;&#34892;&#25351;&#20196;&#65292;&#37117;&#26159;0&#19981;&#26159;&#26377;&#25928;&#25351;&#20196;</span>
+&lt;bochs:9&gt; r
+rax: 00000000_000000f0  <span style="color: #b22222;">#</span><span style="color: #b22222;">rax&#20869;&#23481;  ax + dx = 0x30 + 0xc0 = 0xf0</span>
+rbx: 00000000_00000000
+rcx: 00000000_00090000
+rdx: 00000000_000000c0
+rsp: 00000000_0000ffd6
+rbp: 00000000_00000000
+rsi: 00000000_000e0000
+rdi: 00000000_0000ffac
+r8 : 00000000_00000000
+r9 : 00000000_00000000
+r10: 00000000_00000000
+r11: 00000000_00000000
+r12: 00000000_00000000
+r13: 00000000_00000000
+r14: 00000000_00000000
+r15: 00000000_00000000
+rip: 00000000_00007c08
+eflags: 0x00000006: id vip vif ac vm rf nt <span style="color: #a0522d;">IOPL</span>=0 of df if tf sf zf af PF cf
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36864;&#20986;&#65292;&#25353;&#22238;&#36710;&#38190;&#32467;&#26463;&#26412;&#27425;&#35843;&#35797;</span>
+&lt;bochs:10&gt; q
+
+Bochs is exiting. Press ENTER when you<span style="color: #8b2252;">'re ready to close this window.</span>
+</pre>
+</div>
+</div>
 </div>
 </div>
 </section>

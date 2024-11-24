@@ -127,6 +127,7 @@
 <ul>
 <li><a href="#h:afa04ea4-6e31-4382-be1b-864aa149f1f3">ec2 开关机</a></li>
 <li><a href="#h:8f45ba44-1162-4933-98c8-bb25c48b259a">ec2 标签</a></li>
+<li><a href="#h:47626657-549d-4838-80e1-2574c41e3a28">EBS扩容</a></li>
 </ul>
 </li>
 </ul>
@@ -139,6 +140,11 @@
 <li><a href="#h:611815e7-e20d-460b-9e41-8d4a5e0ec861">域名</a>
 <ul>
 <li><a href="#h:bde80434-6600-4c82-ab2b-132ca468edb1">修改名称服务器</a></li>
+</ul>
+</li>
+<li><a href="#h:d6c269c8-e876-4c15-90c4-88af2ea589d1">服务安装</a>
+<ul>
+<li><a href="#h:aefb5d34-2224-4571-b1ab-cb4bf49d3d8f">lrzsz</a></li>
 </ul>
 </li>
 <li><a href="#h:83d97033-5597-48ff-ae24-b1325fc67eec">aws 基础入门</a>
@@ -286,6 +292,54 @@ cat b.log |grep -v RDS  |sort -n -k 11 &gt;c.log
 </div>
 </div>
 </div>
+<div id="outline-container-h:47626657-549d-4838-80e1-2574c41e3a28" class="outline-4">
+<h4 id="h:47626657-549d-4838-80e1-2574c41e3a28">EBS扩容</h4>
+<div class="outline-text-4" id="text-h:47626657-549d-4838-80e1-2574c41e3a28">
+<p>
+官方文档：<a href="https://docs.aws.amazon.com/zh_cn/ebs/latest/userguide/recognize-expanded-volume-linux.html">调整 Amazon EBS 卷大小后扩展文件系统</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#30830;&#23450;&#23454;&#20363;&#26159;&#22522;&#20110; Xen &#36824;&#26159;&#22522;&#20110; Nitro</span>
+<span style="color: #a0522d;">instance_type</span>=m7g.2xlarge
+aws ec2 describe-instance-types --instance-type $<span style="color: #a0522d;">instance_type</span> --query <span style="color: #8b2252;">"InstanceTypes[].Hypervisor"</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">nitro</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">1.&#35843;&#25972;&#20998;&#21306;&#30340;&#22823;&#23567;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#26816;&#26597;&#21367;&#26159;&#21542;&#26377;&#20998;&#21306;&#12290;&#20351;&#29992; lsblk &#21629;&#20196;. &#26681;&#21367;&#65288;nvme0n1&#65289;&#26377;&#20004;&#20010;&#20998;&#21306;&#65288;nvme0n1p1 &#21644; nvme0n1p128</span>
+[ec2-user@ip-172-31-5-34 ~]$ sudo lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+nvme0n1       259:0    0  200G  0 disk 
+&#9500;&#9472;nvme0n1p1   259:1    0  100G  0 part /
+&#9492;&#9472;nvme0n1p128 259:2    0   10M  0 part /boot/efi
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25193;&#23637;&#20998;&#21306;&#12290;&#20351;&#29992; growpart &#21629;&#20196;&#24182;&#25351;&#23450;&#35774;&#22791;&#21517;&#31216;&#21644;&#20998;&#21306;&#32534;&#21495;&#12290;</span>
+[ec2-user@ip-172-31-5-34 ~]$ sudo growpart /dev/nvme0n1 1
+CHANGED: <span style="color: #a0522d;">partition</span>=1 <span style="color: #a0522d;">start</span>=22528 old: <span style="color: #a0522d;">size</span>=209692639 <span style="color: #a0522d;">end</span>=209715167 new: <span style="color: #a0522d;">size</span>=419407839 <span style="color: #a0522d;">end</span>=419430367
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;&#26159;&#21542;&#24050;&#25193;&#23637;&#20998;&#21306;</span>
+[ec2-user@ip-172-31-5-34 ~]$ sudo lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+nvme0n1       259:0    0  200G  0 disk 
+&#9500;&#9472;nvme0n1p1   259:1    0  200G  0 part /
+&#9492;&#9472;nvme0n1p128 259:2    0   10M  0 part /boot/efi
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">2.&#25193;&#23637;&#25991;&#20214;&#31995;&#32479;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#33719;&#21462;&#38656;&#35201;&#25193;&#23637;&#30340;&#25991;&#20214;&#31995;&#32479;&#30340;&#21517;&#31216;&#12289;&#22823;&#23567;&#12289;&#31867;&#22411;&#21644;&#25346;&#36733;&#28857;&#12290;&#20351;&#29992; df -hT &#21629;&#20196;&#12290;</span>
+[ec2-user@ip-172-31-5-34 ~]$ df -hT
+Filesystem       Type      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1   xfs       100G   92G  8.1G  92% /
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25193;&#23637;&#25991;&#20214;&#31995;&#32479;&#30340;&#21629;&#20196;&#22240;&#25991;&#20214;&#31995;&#32479;&#31867;&#22411;&#32780;&#24322;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">[XFS &#25991;&#20214;&#31995;&#32479;] &#20351;&#29992; xfs_growfs &#21629;&#20196;&#24182;&#25351;&#23450;&#24744;&#22312;&#19978;&#19968;&#27493;&#20013;&#35760;&#24405;&#30340;&#25991;&#20214;&#31995;&#32479;&#30340;&#25346;&#36733;&#28857;</span>
+[ec2-user@ip-172-31-5-34 ~]$ sudo xfs_growfs -d /
+<span style="color: #b22222;">#</span><span style="color: #b22222;">[Ext4 &#25991;&#20214;&#31995;&#32479;] &#20351;&#29992; resize2fs &#21629;&#20196;&#24182;&#25351;&#23450;&#24744;&#22312;&#19978;&#19968;&#27493;&#20013;&#35760;&#24405;&#30340;&#25991;&#20214;&#31995;&#32479;&#30340;&#21517;&#31216;</span>
+sudo resize2fs /dev/nvme0n1p1
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;&#26159;&#21542;&#24050;&#25193;&#23637;&#25991;&#20214;&#31995;&#32479;&#12290;&#20351;&#29992; df -hT &#21629;&#20196;&#24182;&#30830;&#35748;&#25991;&#20214;&#31995;&#32479;&#22823;&#23567;&#31561;&#20110;&#21367;&#22823;&#23567;</span>
+[ec2-user@ip-172-31-5-34 ~]$ df -hT
+Filesystem       Type      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1   xfs       200G   93G  108G  47% /
+</pre>
+</div>
+</div>
+</div>
 </div>
 </section>
 <section id="outline-container-h:a9ed094c-ca36-4f4a-8813-3825ffc7c772" class="outline-2">
@@ -367,7 +421,7 @@ Route53&#x2014;域名&#x2014;已注册域名
 点击操作，编辑名称服务器
 </p>
 
-<pre class="example" id="org13d3324">
+<pre class="example" id="orgd25fe0b">
 当前DNS   
 ns-71.awsdns-08.com
 ns-684.awsdns-21.net
@@ -378,6 +432,32 @@ ns-1445.awsdns-52.org
 ns1.alidns.com复制
 ns2.alidns.com复制
 </pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:d6c269c8-e876-4c15-90c4-88af2ea589d1" class="outline-2">
+<h2 id="h:d6c269c8-e876-4c15-90c4-88af2ea589d1">服务安装</h2>
+<div class="outline-text-2" id="text-h:d6c269c8-e876-4c15-90c4-88af2ea589d1">
+</div>
+<div id="outline-container-h:aefb5d34-2224-4571-b1ab-cb4bf49d3d8f" class="outline-3">
+<h3 id="h:aefb5d34-2224-4571-b1ab-cb4bf49d3d8f">lrzsz</h3>
+<div class="outline-text-3" id="text-h:aefb5d34-2224-4571-b1ab-cb4bf49d3d8f">
+<p>
+Amazon linux 2023下编译安装. 在上传文件时会用到rz命令
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install gcc -y
+wget&#160;http://ohse.de/uwe/releases/lrzsz-0.12.20.tar.gz
+tar -xzvf lrzsz-0.12.20.tar.gz
+<span style="color: #483d8b;">cd</span> lrzsz-0.12.20
+./configure --prefix=/usr/local/lrzsz
+make &amp;&amp; make install
+
+ln -svf /usr/local/lrzsz/bin/lrz  /usr/bin/rz
+ln -svf /usr/local/lrzsz/bin/lsz  /usr/bin/sz
+</pre>
+</div>
 </div>
 </div>
 </section>
@@ -454,7 +534,7 @@ AWS进入中国，北京
 </ul>
 
 
-<figure id="org9943def">
+<figure id="org970e856">
 <img src="./images/img_20240827_154712.png" alt="img_20240827_154712.png" width="90%">
 
 <figcaption><span class="figure-number">Figure 1: </span>基础服务</figcaption>
@@ -462,7 +542,7 @@ AWS进入中国，北京
 
 
 
-<figure id="org5b51121">
+<figure id="org21f1c4f">
 <img src="./images/img_20240827_160604.png" alt="img_20240827_160604.png" width="90%">
 
 <figcaption><span class="figure-number">Figure 2: </span>全球基础设施(管理分区：China\Global\US-Government Cloud)</figcaption>
@@ -544,7 +624,7 @@ Spot 实例
 </ul>
 
 
-<figure id="orge515632">
+<figure id="org0623fd8">
 <img src="./images/img_20240827_164900.png" alt="img_20240827_164900.png" width="90%">
 
 <figcaption><span class="figure-number">Figure 3: </span>EC2定价模型</figcaption>
@@ -553,7 +633,7 @@ Spot 实例
 <p>
 资源标签(方便管理)
 </p>
-<pre class="example" id="org4d03077">
+<pre class="example" id="orgcae7129">
 Name: Demo-ec2
 Env: Demo
 Department: T&amp;C
@@ -609,7 +689,7 @@ VPC功能
 
 
 
-<figure id="orgf619ca6">
+<figure id="orgc308995">
 <img src="./images/img_20240827_170859.png" alt="img_20240827_170859.png" width="90%">
 
 </figure>
@@ -674,7 +754,7 @@ s3 旨在进行无缝扩展和提供 99.999999999%的持久性
 
 
 
-<figure id="org24461cf">
+<figure id="orgd860391">
 <img src="./images/img_20240826_175940.png" alt="img_20240826_175940.png" width="90%">
 
 </figure>
@@ -863,14 +943,14 @@ Amazon Aurora vs. Amazon RDS
 </table>
 
 
-<figure id="org64605a0">
+<figure id="org0b46ccf">
 <img src="./images/img_20240827_101038.png" alt="img_20240827_101038.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org4b432e9">
+<figure id="orgf6689ba">
 <img src="./images/img_20240827_101532.png" alt="img_20240827_101532.png" width="90%">
 
 </figure>
@@ -896,7 +976,7 @@ Action = &lt;&#26381;&#21153;&#21517;&gt;:&lt;API&gt;s3:getobject
 <h3 id="h:aa8e8655-ff7c-4e3b-bea4-6d66a3f0d1fd">培训与认证</h3>
 <div class="outline-text-3" id="text-h:aa8e8655-ff7c-4e3b-bea4-6d66a3f0d1fd">
 
-<figure id="org861b0e5">
+<figure id="orgeaf89bf">
 <img src="./images/img_20240827_141332.png" alt="img_20240827_141332.png" width="90%">
 
 </figure>
@@ -907,14 +987,14 @@ Action = &lt;&#26381;&#21153;&#21517;&gt;:&lt;API&gt;s3:getobject
 
 
 
-<figure id="org8c6ca0d">
+<figure id="orgf82cab7">
 <img src="./images/img_20240827_141413.png" alt="img_20240827_141413.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org27cd20f">
+<figure id="orga222e20">
 <img src="./images/img_20240827_141608.png" alt="img_20240827_141608.png" width="90%">
 
 </figure>

@@ -132,6 +132,7 @@
 </ul>
 </li>
 <li><a href="#h:cd448add-22b2-442a-a54c-6bfea0e331ed">改变默认存储类</a></li>
+<li><a href="#org284bc1f">使用NFS做为PVC</a></li>
 </ul>
 </li>
 </ul>
@@ -511,7 +512,7 @@ volumes挂载
 </p>
 
 
-<figure id="orgf0febad">
+<figure id="orge859a52">
 <img src="./images/Snipaste_2022-09-15_22-54-35.png" alt="Snipaste_2022-09-15_22-54-35.png">
 
 </figure>
@@ -540,7 +541,7 @@ PersistentVolumeClaim：简称PVC，是对存储PV的请求，表示需要什么
 <h4 id="h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">PV、PVC图解</h4>
 <div class="outline-text-4" id="text-h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">
 
-<figure id="orgcb49241">
+<figure id="org3ee331c">
 <img src="./images/Snipaste_2022-09-15_23-05-56.png" alt="Snipaste_2022-09-15_23-05-56.png" width="90%">
 
 </figure>
@@ -724,7 +725,7 @@ spec:
 <h5 id="h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">PVC 如何绑定到 PV</h5>
 <div class="outline-text-5" id="text-h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">
 
-<figure id="org5bb40d6">
+<figure id="orgcbf4d1e">
 <img src="./images/Snipaste_2022-09-16_10-54-37.png" alt="Snipaste_2022-09-16_10-54-37.png" width="90%">
 
 </figure>
@@ -1017,6 +1018,204 @@ PV文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <p>
 官方参考：<a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/change-default-storage-class/">https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/change-default-storage-class/</a>
 </p>
+</div>
+</div>
+<div id="outline-container-org284bc1f" class="outline-4">
+<h4 id="org284bc1f">使用NFS做为PVC</h4>
+<div class="outline-text-4" id="text-org284bc1f">
+<p>
+安装NFS服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">apt install nfs-server
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#20849;&#20139;&#25968;&#25454;&#30446;&#24405;</span>
+mkdir -pv /data/nfs-share
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25480;&#26435;</span>
+cat &lt;&lt;\EOF &gt;&gt; /etc/exports
+<span style="color: #ffa54f;">/data/nfs-share *(rw,no_root_squash)</span>
+<span style="color: #ffa54f;">EOF</span>
+
+systemctl restart nfs-server
+</pre>
+</div>
+
+<p>
+部署 NFS驱动
+</p>
+
+<p>
+准备文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; rback.yaml
+<span style="color: #ffa54f;">kind: ClusterRole</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner-runner</span>
+<span style="color: #ffa54f;">rules:</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["persistentvolumes"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "create", "delete"]</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["persistentvolumeclaims"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "update"]</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["endpoints"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "create", "update", "patch"]</span>
+<span style="color: #ffa54f;">- apiGroups: ["storage.k8s.io"]</span>
+<span style="color: #ffa54f;">  resources: ["storageclasses"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch"]</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["events"]</span>
+<span style="color: #ffa54f;">  verbs: ["create", "update", "patch"]</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: ClusterRoleBinding</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: run-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">subjects:</span>
+<span style="color: #ffa54f;">- kind: ServiceAccount</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  namespace: default</span>
+<span style="color: #ffa54f;">roleRef:</span>
+<span style="color: #ffa54f;">  kind: ClusterRole</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner-runner</span>
+<span style="color: #ffa54f;">  apiGroup: rbac.authorization.k8s.io</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: Role</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: leader-locking-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">rules:</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["endpoints"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "create", "update", "patch"]</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: RoleBinding</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: leader-locking-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">subjects:</span>
+<span style="color: #ffa54f;">- kind: ServiceAccount</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  # replace with namespace where provisioner is deployed</span>
+<span style="color: #ffa54f;">  namespace: default</span>
+<span style="color: #ffa54f;">roleRef:</span>
+<span style="color: #ffa54f;">  kind: Role</span>
+<span style="color: #ffa54f;">  name: leader-locking-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  apiGroup: rbac.authorization.k8s.io</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; deployment.yaml
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: ServiceAccount</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: Deployment</span>
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  replicas: 1</span>
+<span style="color: #ffa54f;">  strategy:</span>
+<span style="color: #ffa54f;">    type: Recreate</span>
+<span style="color: #ffa54f;">  selector:</span>
+<span style="color: #ffa54f;">    matchLabels:</span>
+<span style="color: #ffa54f;">      app: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      serviceAccount: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">        - name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">          image: quay.io/external_storage/nfs-client-provisioner:latest</span>
+<span style="color: #ffa54f;">          volumeMounts:</span>
+<span style="color: #ffa54f;">            - name: nfs-client-root</span>
+<span style="color: #ffa54f;">              mountPath: /persistentvolumes</span>
+<span style="color: #ffa54f;">          env:</span>
+<span style="color: #ffa54f;">            - name: PROVISIONER_NAME</span>
+<span style="color: #ffa54f;">              value: fuseim.pri/ifs</span>
+<span style="color: #ffa54f;">            - name: NFS_SERVER</span>
+<span style="color: #ffa54f;">              value: 172.17.79.3</span>
+<span style="color: #ffa54f;">            - name: NFS_PATH</span>
+<span style="color: #ffa54f;">              value: /data/nfs-share</span>
+<span style="color: #ffa54f;">      volumes:</span>
+<span style="color: #ffa54f;">        - name: nfs-client-root</span>
+<span style="color: #ffa54f;">          nfs:</span>
+<span style="color: #ffa54f;">            server: 172.17.79.3</span>
+<span style="color: #ffa54f;">            path: /data/nfs-share</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; class.yaml
+<span style="color: #ffa54f;">apiVersion: storage.k8s.io/v1</span>
+<span style="color: #ffa54f;">kind: StorageClass</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-csi</span>
+<span style="color: #ffa54f;">provisioner: fuseim.pri/ifs</span>
+<span style="color: #ffa54f;">reclaimPolicy: Retain #PV&#30340;&#21024;&#38500;&#31574;&#30053;&#65292;&#40664;&#35748;&#20026;delete&#65292;&#21024;&#38500;&#21518;PV&#31435;&#21363;&#21024;&#38500;NFS server&#30340;&#25968;&#25454;</span>
+<span style="color: #ffa54f;">mountOptions:</span>
+<span style="color: #ffa54f;">  - noatime #&#35775;&#38382;&#25991;&#20214;&#26102;&#19981;&#26356;&#26032;&#25991;&#20214;inode&#20013;&#30340;&#26102;&#38388;&#25139;</span>
+<span style="color: #ffa54f;">parameters:</span>
+<span style="color: #ffa54f;">  archiveOnDelete: "true"  #true&#20026;&#21024;&#38500;pod&#26102;&#20445;&#30041;pod&#25968;&#25454;&#12290;false &#21024;&#38500;&#26102;&#19981;&#20445;&#30041;&#25968;&#25454;</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#35282;&#33394;</span>
+kubectl create -f rbac.yaml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314; ServiceAccount &#21644;&#37096;&#32626; NFS-Client Provisioner</span>
+kubectl create -f deployment.yaml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314; NFS StorageClass</span>
+kubectl create -f class.yaml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;NFS&#37096;&#32626;&#25104;&#21151;</span>
+kubectl get pod -l <span style="color: #a0522d;">app</span>=nfs-client-provisioner
+</pre>
+</div>
+
+<p>
+动态创建pvc
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; sts.yaml
+
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">kind: StatefulSet</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nacos</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">...</span>
+<span style="color: #ffa54f;">  serviceName: nacos-headless</span>
+<span style="color: #ffa54f;">  replicas: 3</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nacos</span>
+<span style="color: #ffa54f;">...</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">        - name: nacos</span>
+<span style="color: #ffa54f;">          imagePullPolicy: Always</span>
+<span style="color: #ffa54f;">          image: nacos/nacos-server:latest</span>
+<span style="color: #ffa54f;">          volumeMounts:</span>
+<span style="color: #ffa54f;">            - name: data</span>
+<span style="color: #ffa54f;">              mountPath: /home/nacos/data</span>
+<span style="color: #ffa54f;">              subPath: data</span>
+<span style="color: #ffa54f;">  volumeClaimTemplates:</span>
+<span style="color: #ffa54f;">    - metadata:</span>
+<span style="color: #ffa54f;">        name: data</span>
+<span style="color: #ffa54f;">      spec:</span>
+<span style="color: #ffa54f;">        storageClassName: nfs-csi</span>
+<span style="color: #ffa54f;">        accessModes: [ "ReadWriteMany" ]</span>
+<span style="color: #ffa54f;">        resources:</span>
+<span style="color: #ffa54f;">          requests:</span>
+<span style="color: #ffa54f;">            storage: 10Gi</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
 </div>
 </div>
 </div>

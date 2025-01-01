@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Jasper Hsu' Blog</title>
+<title>Linux: Prometheus-exporter</title>
 <meta name="generator" content="Org Mode" />
 <link rel="stylesheet" type="text/css" href="/static/font.css"/>
 <link rel="stylesheet" type="text/css" href="/static/drollery.e825b870.css"/>
@@ -81,19 +81,405 @@
 </header>
 <main class="container" id="content" class="content">
 <header>
-<h1 class="title">Jasper Hsu' Blog</h1>
+<h1 class="title">Linux: Prometheus-exporter</h1>
 </header><nav id="table-of-contents" role="doc-toc">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org588a0bf">Codelog</a></li>
+<li><a href="#orgf4518e0">数据库</a>
+<ul>
+<li><a href="#org50e8d13">MySQL server exporter</a></li>
+<li><a href="#org0be31b5">Redis exporter</a></li>
+<li><a href="#org739dbdd">MongoDB exporter</a></li>
+</ul>
+</li>
+<li><a href="#org44d414f">硬件相关</a></li>
+<li><a href="#orgbdf4e85">问题跟踪器和持续集成</a></li>
+<li><a href="#orgc4c704c">消息系统</a>
+<ul>
+<li><a href="#org1d31e93">RocketMQ exporter</a></li>
+</ul>
+</li>
+<li><a href="#org98320bf">存储</a></li>
+<li><a href="#orgb31cc1d">HTTP</a></li>
+<li><a href="#orgd64073c">APIs</a></li>
+<li><a href="#org619a628">日志</a></li>
+<li><a href="#orgf5f8c49">金融运营</a></li>
+<li><a href="#orge312d9b">其他</a></li>
 </ul>
 </div>
 </nav>
-<section id="outline-container-org588a0bf" class="outline-2">
-<h2 id="org588a0bf"><a href="jcodelog.html">Codelog</a></h2>
-<div class="outline-text-2" id="text-org588a0bf">
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+
+<p>
+<a href="https://prometheus.io/docs/instrumenting/exporters/">https://prometheus.io/docs/instrumenting/exporters/</a>
+</p>
+
+<p>
+指标导出器一些应用现实
+</p>
+<section id="outline-container-orgf4518e0" class="outline-2">
+<h2 id="orgf4518e0">数据库</h2>
+<div class="outline-text-2" id="text-orgf4518e0">
 </div>
+<div id="outline-container-org50e8d13" class="outline-3">
+<h3 id="org50e8d13">MySQL server exporter</h3>
+<div class="outline-text-3" id="text-org50e8d13">
+<p>
+<a href="https://github.com/prometheus/mysqld_exporter">https://github.com/prometheus/mysqld_exporter</a>
+</p>
+
+<p>
+数据库授权
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">CREATE USER <span style="color: #8b2252;">'mysqld_exporter'</span>@<span style="color: #8b2252;">'%'</span> IDENTIFIED BY <span style="color: #8b2252;">'hIhO6h_j(azn=F17'</span> WITH MAX_USER_CONNECTIONS 10;
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO <span style="color: #8b2252;">'mysqld_exporter'</span>@<span style="color: #8b2252;">'%'</span>;
+flush privileges;
+</pre>
+</div>
+
+<p>
+准备配置文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; .my.cnf 
+<span style="color: #ffa54f;">[client]</span>
+<span style="color: #ffa54f;">user=xxx</span>
+<span style="color: #ffa54f;">password=xxxxx</span>
+<span style="color: #ffa54f;">[client.servers]</span>
+<span style="color: #ffa54f;">user=mysqld_exporter</span>
+<span style="color: #ffa54f;">password=hIhO6h_j(azn=F17</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+启动
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml 
+<span style="color: #ffa54f;">volumes:</span>
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  vm_net:</span>
+<span style="color: #ffa54f;">    name: vm_net</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">    ipam:</span>
+<span style="color: #ffa54f;">      config:</span>
+<span style="color: #ffa54f;">        - subnet: 172.26.0.0/24</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  mysqld_exporter:</span>
+<span style="color: #ffa54f;">    image: prom/mysqld-exporter:v0.15.1</span>
+<span style="color: #ffa54f;">    hostname: mysqld-exporter</span>
+<span style="color: #ffa54f;">    container_name: mysqld_exporter</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9104:9104</span>
+<span style="color: #ffa54f;">    command:</span>
+<span style="color: #ffa54f;">      - "--config.my-cnf=/opt/my.cnf"</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - .my.cnf:/opt/my.cnf</span>
+<span style="color: #ffa54f;">    #restart: always</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      - vm_net</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl <span style="color: #8b2252;">'http://localhost:9104/probe?auth_module=client.servers&amp;target=pc-txxx.mysql.polardb.singapore.rds.aliyuncs.com:3306'</span> | grep mysql_version_info
+</pre>
+</div>
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: mysql
+  metrics_path: /probe
+  params:
+    auth_module: [client.servers]
+  static_configs:
+  - targets:
+    - xx:3306
+    labels:
+      project: mysql-test
+  - targets:
+    - 47.xxx:3306
+    labels:
+      project: mysql-test2
+
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      <span style="color: #b22222;"># </span><span style="color: #b22222;">The mysqld_exporter host:port</span>
+      replacement: 172.xxx:9104
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org0be31b5" class="outline-3">
+<h3 id="org0be31b5">Redis exporter</h3>
+<div class="outline-text-3" id="text-org0be31b5">
+<p>
+<a href="https://github.com/oliver006/redis_exporter">https://github.com/oliver006/redis_exporter</a>
+</p>
+
+<p>
+准备密码文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; redis-pwd-file 
+<span style="color: #ffa54f;">{</span>
+<span style="color: #ffa54f;">  "redis://redis6:6379": "",</span>
+<span style="color: #ffa54f;">  "rediss://replica.redixxxx.com:6379": "tKZyvtON547IfnhX"</span>
+<span style="color: #ffa54f;">}</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+启动redis-exporter
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml 
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  vm_net:</span>
+<span style="color: #ffa54f;">    name: vm_net</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">    ipam:</span>
+<span style="color: #ffa54f;">      config:</span>
+<span style="color: #ffa54f;">        - subnet: 172.26.0.0/24</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  redis_exporter:</span>
+<span style="color: #ffa54f;">    image: oliver006/redis_exporter:v1.67.0</span>
+<span style="color: #ffa54f;">    container_name: redis_exporter</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9121:9121</span>
+<span style="color: #ffa54f;">    command:</span>
+<span style="color: #ffa54f;">      - "--redis.password-file=/opt/sample-pwd-file.json"</span>
+<span style="color: #ffa54f;">      - '--debug'</span>
+<span style="color: #ffa54f;">    volumes:</span>
+<span style="color: #ffa54f;">      - ./redis-pwd-file:/opt/sample-pwd-file.json</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      - vm_net</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl http://127.0.0.1:9121/scrape?<span style="color: #a0522d;">target</span>=redis://xxxx:6379
+</pre>
+</div>
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: redis-exporter
+  metrics_path: /scrape
+  static_configs:
+  - targets:
+    - redis://replica.redixxxx.com:6379
+    labels:
+      dbtype: <span style="color: #8b2252;">"redis"</span>
+      project: test
+  - targets:
+    - redis://xxx:6379
+    labels:
+      dbtype: <span style="color: #8b2252;">"redis"</span>
+      project: test2
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: 172.xxx:9121
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org739dbdd" class="outline-3">
+<h3 id="org739dbdd">MongoDB exporter</h3>
+<div class="outline-text-3" id="text-org739dbdd">
+<p>
+<a href="https://github.com/percona/mongodb_exporter">https://github.com/percona/mongodb_exporter</a>
+</p>
+
+<p>
+启动redis-exporter
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml 
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  vm_net:</span>
+<span style="color: #ffa54f;">    name: vm_net</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">    ipam:</span>
+<span style="color: #ffa54f;">      config:</span>
+<span style="color: #ffa54f;">        - subnet: 172.26.0.0/24</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  mongodb-exporter:</span>
+<span style="color: #ffa54f;">    image: percona/mongodb_exporter:0.43</span>
+<span style="color: #ffa54f;">    container_name: mongodb-exporter</span>
+<span style="color: #ffa54f;">    #environment:</span>
+<span style="color: #ffa54f;">    #  MONGODB_URI: "mongodb://user:pass@host1:27017,host2:27017/admin"</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 9216:9216</span>
+<span style="color: #ffa54f;">    command:</span>
+<span style="color: #ffa54f;">      - --mongodb.uri=mongodb://root:dMrMPfSq0gNko14@dxs.com:3717,dds-t4n9s.com:3717/admin?replicaSet=mgset-310035630,mongodb://root:dMrMPfSq0gNko14@dxxcom:3717,ddsxxx:3717/admin?replicaSet=mgset-310037394</span>
+<span style="color: #ffa54f;">      - '--collect-all'</span>
+<span style="color: #ffa54f;">      - '--split-cluster=true'</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      - vm_net</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl 127.0.0.1:9216/scrape?<span style="color: #a0522d;">target</span>=mongodb://ddsxxx:3717|grep mongodb_up
+</pre>
+</div>
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: mongodb-exporter
+  metrics_path: /scrape
+  static_configs:
+  - targets:
+    - mongodb://dxxx:3717
+    labels:
+      dbtype: <span style="color: #8b2252;">"mongodb"</span>
+      project: <span style="color: #8b2252;">"&#27979;&#35797;1"</span>
+  - targets:
+    - mongodb://ddxxx:3717
+    labels:
+      dbtype: <span style="color: #8b2252;">"mongodb"</span>
+      project: <span style="color: #8b2252;">"&#27979;&#35797;2"</span>
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: 172.xxx:9216
+</pre>
+</div>
+
+<p>
+grafana监控：<a href="https://github.com/percona/grafana-dashboards/blob/main/dashboards/MongoDB/MongoDB_Cluster_Summary.json">https://github.com/percona/grafana-dashboards/blob/main/dashboards/MongoDB/MongoDB_Cluster_Summary.json</a>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-org44d414f" class="outline-2">
+<h2 id="org44d414f">硬件相关</h2>
+</section>
+
+<section id="outline-container-orgbdf4e85" class="outline-2">
+<h2 id="orgbdf4e85">问题跟踪器和持续集成</h2>
+</section>
+
+<section id="outline-container-orgc4c704c" class="outline-2">
+<h2 id="orgc4c704c">消息系统</h2>
+<div class="outline-text-2" id="text-orgc4c704c">
+</div>
+<div id="outline-container-org1d31e93" class="outline-3">
+<h3 id="org1d31e93">RocketMQ exporter</h3>
+<div class="outline-text-3" id="text-org1d31e93">
+<p>
+<a href="https://github.com/apache/rocketmq-exporter">https://github.com/apache/rocketmq-exporter</a>
+</p>
+
+<p>
+启动redis-exporter
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml 
+<span style="color: #ffa54f;">networks:</span>
+<span style="color: #ffa54f;">  vm_net:</span>
+<span style="color: #ffa54f;">    name: vm_net</span>
+<span style="color: #ffa54f;">    driver: bridge</span>
+<span style="color: #ffa54f;">    ipam:</span>
+<span style="color: #ffa54f;">      config:</span>
+<span style="color: #ffa54f;">        - subnet: 172.26.0.0/24</span>
+<span style="color: #ffa54f;">services:</span>
+<span style="color: #ffa54f;">  rocketmq-exporter:</span>
+<span style="color: #ffa54f;">    image: apache/rocketmq-exporter:0.0.2-SNAPSHOT</span>
+<span style="color: #ffa54f;">    container_name: rocketmq-exporter</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">      - 5557:5557</span>
+<span style="color: #ffa54f;">    entrypoint:</span>
+<span style="color: #ffa54f;">      - java</span>
+<span style="color: #ffa54f;">      - -jar</span>
+<span style="color: #ffa54f;">      - rocketmq-exporter.jar</span>
+<span style="color: #ffa54f;">      - --server.port=5557</span>
+<span style="color: #ffa54f;">      - --rocketmq.config.namesrvAddr=127.0.0.1:9876</span>
+<span style="color: #ffa54f;">      - --rocketmq.config.enableACL=true</span>
+<span style="color: #ffa54f;">      - --rocketmq.config.accessKey=C65GKxxxx</span>
+<span style="color: #ffa54f;">      - --rocketmq.config.secretKey=oqHc0xxxx</span>
+<span style="color: #ffa54f;">    deploy:</span>
+<span style="color: #ffa54f;">      resources:</span>
+<span style="color: #ffa54f;">        limits:</span>
+<span style="color: #ffa54f;">          cpus: '2'</span>
+<span style="color: #ffa54f;">          memory: 2048M</span>
+<span style="color: #ffa54f;">        reservations:</span>
+<span style="color: #ffa54f;">          cpus: '0.25'</span>
+<span style="color: #ffa54f;">          memory: 256M</span>
+<span style="color: #ffa54f;">    networks:</span>
+<span style="color: #ffa54f;">      - vm_net</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: rocketmq-exporter
+  static_configs:
+  - targets: [<span style="color: #8b2252;">'172.xxx:5557'</span>]
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org98320bf" class="outline-2">
+<h2 id="org98320bf">存储</h2>
+</section>
+
+<section id="outline-container-orgb31cc1d" class="outline-2">
+<h2 id="orgb31cc1d">HTTP</h2>
+</section>
+<section id="outline-container-orgd64073c" class="outline-2">
+<h2 id="orgd64073c">APIs</h2>
+</section>
+<section id="outline-container-org619a628" class="outline-2">
+<h2 id="org619a628">日志</h2>
+</section>
+<section id="outline-container-orgf5f8c49" class="outline-2">
+<h2 id="orgf5f8c49">金融运营</h2>
+</section>
+<section id="outline-container-orge312d9b" class="outline-2">
+<h2 id="orge312d9b">其他</h2>
 </section>
 </main class="container">
 <footer id="postamble" class="status">

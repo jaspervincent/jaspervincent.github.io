@@ -97,6 +97,11 @@
 <li><a href="#h:986c1252-31a6-407d-831a-699573410f1f">监控_连接数检查</a></li>
 <li><a href="#h:356fe2c1-f269-48e7-954a-9810563e7d6e">监控-marathon-check</a></li>
 <li><a href="#h:b73a8850-4e2e-4774-9e18-ae426741fc99">高峰关闭服务</a></li>
+<li><a href="#h:1afde075-2ee4-499a-9451-7fe9d84fd56d">prometheus</a>
+<ul>
+<li><a href="#h:8748d3fe-8b3b-4eb9-9c3a-ec9216e4e62b">阿里SLS分析</a></li>
+</ul>
+</li>
 <li><a href="#h:fb49990a-421f-4368-9a44-f96a808530db">openflcon</a>
 <ul>
 <li><a href="#h:18e1e22c-e42f-4020-a5ac-e5e5d59320c0">网络质量监控脚本</a></li>
@@ -505,6 +510,247 @@ tc hb2  nginx:tc-xy-nginx002-192.168.100.81 app:yzbizcenter-admin-yzprod ip:192.
 
 check_time
 </pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:1afde075-2ee4-499a-9451-7fe9d84fd56d" class="outline-2">
+<h2 id="h:1afde075-2ee4-499a-9451-7fe9d84fd56d">prometheus</h2>
+<div class="outline-text-2" id="text-h:1afde075-2ee4-499a-9451-7fe9d84fd56d">
+</div>
+<div id="outline-container-h:8748d3fe-8b3b-4eb9-9c3a-ec9216e4e62b" class="outline-3">
+<h3 id="h:8748d3fe-8b3b-4eb9-9c3a-ec9216e4e62b">阿里SLS分析</h3>
+<div class="outline-text-3" id="text-h:8748d3fe-8b3b-4eb9-9c3a-ec9216e4e62b">
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #b22222;"># </span><span style="color: #b22222;">-*- coding:UTF-8 -*-</span>
+<span style="color: #a020f0;">import</span> datetime
+<span style="color: #a020f0;">import</span> os
+<span style="color: #a020f0;">import</span> time
+
+<span style="color: #a020f0;">from</span> alibabacloud_cms20190101 <span style="color: #a020f0;">import</span> models <span style="color: #a020f0;">as</span> cms_20190101_models
+<span style="color: #a020f0;">from</span> alibabacloud_cms20190101.client <span style="color: #a020f0;">import</span> Client <span style="color: #a020f0;">as</span> Cms20190101Client
+<span style="color: #a020f0;">from</span> alibabacloud_sls20201230 <span style="color: #a020f0;">import</span> models <span style="color: #a020f0;">as</span> sls_20201230_models
+<span style="color: #a020f0;">from</span> alibabacloud_sls20201230.client <span style="color: #a020f0;">import</span> Client <span style="color: #a020f0;">as</span> Sls20201230Client
+<span style="color: #a020f0;">from</span> alibabacloud_tea_openapi <span style="color: #a020f0;">import</span> models <span style="color: #a020f0;">as</span> open_api_models
+<span style="color: #a020f0;">from</span> alibabacloud_tea_util <span style="color: #a020f0;">import</span> models <span style="color: #a020f0;">as</span> util_models
+<span style="color: #a020f0;">from</span> alibabacloud_tea_util.client <span style="color: #a020f0;">import</span> Client <span style="color: #a020f0;">as</span> UtilClient
+<span style="color: #a020f0;">from</span> prometheus_client <span style="color: #a020f0;">import</span> Gauge, start_http_server
+
+<span style="color: #a0522d;">g4_1</span> = Gauge(<span style="color: #8b2252;">'sls_undertow_service_qps'</span>, <span style="color: #8b2252;">'service qps'</span>, [<span style="color: #8b2252;">'service'</span>])
+<span style="color: #a0522d;">g4_2</span> = Gauge(<span style="color: #8b2252;">'sls_undertow_service_avg_rt'</span>, <span style="color: #8b2252;">'service avg rt'</span>, [<span style="color: #8b2252;">'service'</span>])
+<span style="color: #a0522d;">g4_3_0</span> = Gauge(<span style="color: #8b2252;">'sls_undertow_api_slow_level0'</span>, <span style="color: #8b2252;">'api slow graater than 200ms '</span>, [<span style="color: #8b2252;">'service'</span>, <span style="color: #8b2252;">'uri'</span>])
+<span style="color: #a0522d;">g4_3_4</span> = Gauge(<span style="color: #8b2252;">'sls_undertow_api_slow_detail'</span>, <span style="color: #8b2252;">'slow query detail'</span>,
+               [<span style="color: #8b2252;">'service'</span>, <span style="color: #8b2252;">'uri'</span>, <span style="color: #8b2252;">'avg_timeused'</span>, <span style="color: #8b2252;">'min_timeused'</span>, <span style="color: #8b2252;">'max_timeused'</span>])
+
+<span style="color: #a0522d;">g6</span> = Gauge(<span style="color: #8b2252;">'sls_exception_qpm'</span>, <span style="color: #8b2252;">'exception qpm'</span>, [<span style="color: #8b2252;">'service'</span>])
+
+
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">get_content_from_file</span>(file_path):
+    <span style="color: #a020f0;">if</span> <span style="color: #a020f0;">not</span> os.path.exists(file_path):
+        <span style="color: #a020f0;">return</span> <span style="color: #8b2252;">""</span>
+    <span style="color: #a020f0;">with</span> <span style="color: #483d8b;">open</span>(file_path, <span style="color: #8b2252;">'r'</span>) <span style="color: #a020f0;">as</span> f:
+        <span style="color: #a0522d;">content</span> = f.readlines()
+        <span style="color: #a020f0;">if</span> content:
+            <span style="color: #a020f0;">return</span> content[0].strip()
+        <span style="color: #a020f0;">return</span> <span style="color: #8b2252;">""</span>
+
+
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">set_content_to_file</span>(content, file_path):
+    <span style="color: #a020f0;">with</span> <span style="color: #483d8b;">open</span>(file_path, <span style="color: #8b2252;">'w'</span>) <span style="color: #a020f0;">as</span> f:
+        f.write(content)
+        f.close()
+
+
+<span style="color: #a020f0;">class</span> <span style="color: #228b22;">getSlsLogData</span>:
+    <span style="color: #a0522d;">access_key_id</span> = <span style="color: #8b2252;">"Lxx"</span>
+    <span style="color: #a0522d;">access_key_secret</span> = <span style="color: #8b2252;">"fxxx"</span>
+    <span style="color: #a0522d;">undertow_project</span> = <span style="color: #8b2252;">"singapore"</span>
+    <span style="color: #a0522d;">undertow_logstore</span> = <span style="color: #8b2252;">"undertow"</span>
+    <span style="color: #a0522d;">logback_project</span> = <span style="color: #8b2252;">"overseas-logback-server"</span>
+    <span style="color: #a0522d;">logback_logstore</span> = <span style="color: #8b2252;">"server-exception"</span>
+    <span style="color: #a0522d;">sls_endpoint</span> = f<span style="color: #8b2252;">'ap-southeast-1-intranet.log.aliyuncs.com'</span>
+    <span style="color: #a0522d;">service_all</span> = [
+        <span style="color: #8b2252;">"attribute-server"</span>,
+        <span style="color: #8b2252;">"attribute-server-manager"</span>,
+    ]
+    <span style="color: #a0522d;">prefix_uris</span> = [
+        <span style="color: #8b2252;">"/episodic_drama"</span>,
+        <span style="color: #8b2252;">"/ads_unlock/episodic_drama"</span>,
+    ]
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">__init__</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">config</span> = open_api_models.Config(
+            access_key_id=<span style="color: #a020f0;">self</span>.access_key_id,
+            access_key_secret=<span style="color: #a020f0;">self</span>.access_key_secret
+        )
+        config.<span style="color: #a0522d;">endpoint</span> = <span style="color: #a020f0;">self</span>.sls_endpoint
+        <span style="color: #a020f0;">self</span>.<span style="color: #a0522d;">client</span> = Sls20201230Client(config)
+        <span style="color: #a020f0;">self</span>.<span style="color: #a0522d;">is_pre</span> = <span style="color: #008b8b;">False</span>
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">get_sls_data</span>(<span style="color: #a020f0;">self</span>, current=0, project=<span style="color: #8b2252;">""</span>, logstore=<span style="color: #8b2252;">""</span>, query=<span style="color: #8b2252;">""</span>):
+        <span style="color: #a020f0;">if</span> <span style="color: #a020f0;">not</span> current:
+            <span style="color: #a0522d;">current</span> = <span style="color: #483d8b;">int</span>(time.time())
+        <span style="color: #a020f0;">if</span> <span style="color: #a020f0;">not</span> project:
+            <span style="color: #a0522d;">project</span> = <span style="color: #a020f0;">self</span>.undertow_project
+        <span style="color: #a020f0;">if</span> <span style="color: #a020f0;">not</span> logstore:
+            <span style="color: #a0522d;">logstore</span> = <span style="color: #a020f0;">self</span>.undertow_logstore
+        <span style="color: #a0522d;">from_time</span> = current - 60
+        <span style="color: #a0522d;">to_time</span> = current
+        <span style="color: #a0522d;">headers</span> = {}
+        <span style="color: #a0522d;">runtime</span> = util_models.RuntimeOptions()
+        <span style="color: #a0522d;">get_logs_request</span> = sls_20201230_models.GetLogsRequest(from_=from_time, to=to_time, query=query)
+        <span style="color: #a020f0;">try</span>:
+            <span style="color: #a0522d;">res</span> = <span style="color: #a020f0;">self</span>.client.get_logs_with_options(project, logstore, get_logs_request, headers, runtime)
+            <span style="color: #a020f0;">return</span> res.body
+        <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> error:
+            UtilClient.assert_as_string(error)
+            <span style="color: #a020f0;">return</span> []
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">set_metric_service_qps</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">query</span> = <span style="color: #8b2252;">'*|select "__tag__:_container_name_" as service ,COUNT(*) as cnt group by service order by cnt desc '</span>
+        <span style="color: #a0522d;">res_list</span> = <span style="color: #a020f0;">self</span>.get_sls_data(query=query)
+        <span style="color: #a020f0;">for</span> data <span style="color: #a020f0;">in</span> res_list:
+            <span style="color: #a0522d;">service</span> = data[<span style="color: #8b2252;">"service"</span>]
+            <span style="color: #a0522d;">cnt</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"cnt"</span>])
+            g4_1.labels(service).<span style="color: #483d8b;">set</span>(cnt)
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">set_metric_service_avg_rt</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">query</span> = <span style="color: #8b2252;">'* |select "__tag__:_container_name_" as service , avg(timeUsed) as avg_time  group by service order by avg_time desc '</span>
+        <span style="color: #a0522d;">res_list</span> = <span style="color: #a020f0;">self</span>.get_sls_data(query=query)
+        <span style="color: #a020f0;">for</span> data <span style="color: #a020f0;">in</span> res_list:
+            <span style="color: #a0522d;">service</span> = data[<span style="color: #8b2252;">"service"</span>]
+            <span style="color: #a020f0;">try</span>:
+                <span style="color: #a0522d;">avg_time_ns</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"avg_time"</span>])
+            <span style="color: #a020f0;">except</span>:
+                <span style="color: #a020f0;">continue</span>
+            <span style="color: #a0522d;">avg_time_ms</span> = <span style="color: #483d8b;">int</span>(avg_time_ns / 1000)
+            g4_2.labels(service).<span style="color: #483d8b;">set</span>(avg_time_ms)
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">get_undertow_data_daily</span>(<span style="color: #a020f0;">self</span>, query=<span style="color: #8b2252;">""</span>):
+        <span style="color: #a0522d;">now</span> = datetime.datetime.now()
+        <span style="color: #a0522d;">midnight</span> = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        <span style="color: #a0522d;">midnight_ts</span> = <span style="color: #483d8b;">int</span>(midnight.timestamp())
+        <span style="color: #a0522d;">from_time</span> = midnight_ts - 9000
+        <span style="color: #a0522d;">to_time</span> = from_time + 1800
+        <span style="color: #a0522d;">project</span> = <span style="color: #a020f0;">self</span>.undertow_project
+        <span style="color: #a0522d;">logstore</span> = <span style="color: #a020f0;">self</span>.undertow_logstore
+        <span style="color: #a0522d;">headers</span> = {}
+        <span style="color: #a0522d;">runtime</span> = util_models.RuntimeOptions()
+        <span style="color: #a0522d;">get_logs_request</span> = sls_20201230_models.GetLogsRequest(from_=from_time, to=to_time, query=query)
+        <span style="color: #a020f0;">try</span>:
+            <span style="color: #a0522d;">res</span> = <span style="color: #a020f0;">self</span>.client.get_logs_with_options(project, logstore, get_logs_request, headers, runtime)
+            <span style="color: #a020f0;">return</span> res.body
+        <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> error:
+            UtilClient.assert_as_string(error)
+            <span style="color: #a020f0;">return</span> []
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">set_metric_slow_detail</span>(<span style="color: #a020f0;">self</span>):
+        g4_3_4.clear()
+        <span style="color: #a020f0;">for</span> service <span style="color: #a020f0;">in</span> <span style="color: #a020f0;">self</span>.get_service_list():
+            <span style="color: #a0522d;">query</span> = <span style="color: #8b2252;">'* and __tag__:_container_name_: {} |select COUNT(*) as cnt, avg(timeUsed)/1000 as avg_timeused, min(timeUsed)/1000 as min_timeused, max(timeUsed)/1000 as max_timeused , sum(timeUsed)/1000 as sum_timeused, "__tag__:_container_name_" as service ,uri group by service,uri  HAVING  avg_timeused &gt;200 order by avg_timeused desc limit 100000'</span>.<span style="color: #483d8b;">format</span>(
+                service)
+            <span style="color: #a0522d;">res_list</span> = <span style="color: #a020f0;">self</span>.get_undertow_data_daily(query=query)
+            <span style="color: #a0522d;">pre_map</span> = {}
+            <span style="color: #483d8b;">sum</span> = <span style="color: #483d8b;">float</span>(0)
+            <span style="color: #a020f0;">for</span> data <span style="color: #a020f0;">in</span> res_list:
+                <span style="color: #a020f0;">self</span>.<span style="color: #a0522d;">is_pre</span> = <span style="color: #008b8b;">False</span>
+                <span style="color: #a0522d;">uri</span> = data[<span style="color: #8b2252;">"uri"</span>]
+                <span style="color: #a0522d;">cnt</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"cnt"</span>])
+                <span style="color: #a0522d;">min_timeused</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"min_timeused"</span>])
+                <span style="color: #a0522d;">max_timeused</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"max_timeused"</span>])
+                <span style="color: #483d8b;">sum</span> += cnt
+
+                <span style="color: #a020f0;">for</span> prefix_uri <span style="color: #a020f0;">in</span> <span style="color: #a020f0;">self</span>.prefix_uris:
+                    <span style="color: #a020f0;">if</span> <span style="color: #a020f0;">not</span> uri.startswith(prefix_uri):
+                        <span style="color: #a020f0;">continue</span>
+                    <span style="color: #a0522d;">uri_len</span> = <span style="color: #483d8b;">len</span>(uri.split(<span style="color: #8b2252;">"/"</span>))
+                    <span style="color: #a0522d;">prefix_uri_len</span> = <span style="color: #483d8b;">len</span>(prefix_uri.split(<span style="color: #8b2252;">"/"</span>))
+                    <span style="color: #a0522d;">param_str</span> = <span style="color: #8b2252;">""</span>
+                    <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">range</span>(uri_len - prefix_uri_len):
+                        <span style="color: #a0522d;">param_str</span> = param_str + <span style="color: #8b2252;">"/{param}"</span>
+                    <span style="color: #a0522d;">sum_timeused</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"sum_timeused"</span>])
+                    <span style="color: #a0522d;">key</span> = prefix_uri + param_str
+                    <span style="color: #a0522d;">pre_uri_data</span> = pre_map.get(key, {})
+                    <span style="color: #a0522d;">pre_uri_data</span>[<span style="color: #8b2252;">"sum_timeused"</span>] = <span style="color: #483d8b;">float</span>(pre_uri_data.get(<span style="color: #8b2252;">"sum_timeused"</span>, 0)) + sum_timeused
+                    <span style="color: #a0522d;">pre_uri_data</span>[<span style="color: #8b2252;">"cnt"</span>] = <span style="color: #483d8b;">float</span>(pre_uri_data.get(<span style="color: #8b2252;">"cnt"</span>, 0)) + cnt
+                    <span style="color: #a0522d;">pre_uri_data</span>[<span style="color: #8b2252;">"min_timeused"</span>] = <span style="color: #483d8b;">min</span>(<span style="color: #483d8b;">float</span>(pre_uri_data.get(<span style="color: #8b2252;">"min_timeused"</span>, min_timeused)),
+                                                       min_timeused)
+                    <span style="color: #a0522d;">pre_uri_data</span>[<span style="color: #8b2252;">"max_timeused"</span>] = <span style="color: #483d8b;">max</span>(<span style="color: #483d8b;">float</span>(pre_uri_data.get(<span style="color: #8b2252;">"max_timeused"</span>, max_timeused)),
+                                                       max_timeused)
+                    <span style="color: #a0522d;">pre_map</span>[key] = pre_uri_data
+                    <span style="color: #a020f0;">self</span>.<span style="color: #a0522d;">is_pre</span> = <span style="color: #008b8b;">True</span>
+                    <span style="color: #a020f0;">break</span>
+                <span style="color: #a020f0;">if</span> <span style="color: #a020f0;">not</span> <span style="color: #a020f0;">self</span>.is_pre:
+                    <span style="color: #a0522d;">avg_timeused</span> = data[<span style="color: #8b2252;">"avg_timeused"</span>]
+                    <span style="color: #a0522d;">min_timeused</span> = <span style="color: #483d8b;">str</span>(min_timeused)
+                    <span style="color: #a0522d;">max_timeused</span> = <span style="color: #483d8b;">str</span>(max_timeused)
+                    g4_3_4.labels(service, uri, avg_timeused, min_timeused, max_timeused).<span style="color: #483d8b;">set</span>(cnt)
+
+            <span style="color: #a020f0;">for</span> uri, pre_uri_data <span style="color: #a020f0;">in</span> pre_map.items():
+                <span style="color: #a0522d;">cnt</span> = pre_uri_data[<span style="color: #8b2252;">"cnt"</span>]
+                <span style="color: #a0522d;">sum_timeused</span> = pre_uri_data[<span style="color: #8b2252;">"sum_timeused"</span>]
+                <span style="color: #a0522d;">min_timeused</span> = <span style="color: #483d8b;">str</span>(pre_uri_data[<span style="color: #8b2252;">"min_timeused"</span>])
+                <span style="color: #a0522d;">max_timeused</span> = <span style="color: #483d8b;">str</span>(pre_uri_data[<span style="color: #8b2252;">"max_timeused"</span>])
+                <span style="color: #a0522d;">avg_timeused</span> = <span style="color: #483d8b;">str</span>(<span style="color: #483d8b;">round</span>(sum_timeused / cnt, 2))
+                g4_3_4.labels(service, uri, avg_timeused, min_timeused, max_timeused).<span style="color: #483d8b;">set</span>(cnt)
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">get_service_list</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">service_list</span> = []
+        <span style="color: #a0522d;">query</span> = <span style="color: #8b2252;">'*|select DISTINCT "__tag__:_container_name_" as service'</span>
+        <span style="color: #a0522d;">res_list</span> = <span style="color: #a020f0;">self</span>.get_undertow_data_daily(query=query)
+        <span style="color: #a020f0;">for</span> data <span style="color: #a020f0;">in</span> res_list:
+            <span style="color: #a0522d;">service</span> = data[<span style="color: #8b2252;">"service"</span>]
+            service_list.append(service)
+        <span style="color: #a020f0;">return</span> service_list
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">set_metric_api_slow_level0</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">query</span> = <span style="color: #8b2252;">'* and timeUsed &gt;= 200000|select "__tag__:_container_name_" as service ,uri, COUNT(*) as cnt group by service,uri order by cnt desc '</span>
+        <span style="color: #a0522d;">res_list</span> = <span style="color: #a020f0;">self</span>.get_sls_data(query=query)
+        g4_3_0.clear()
+        <span style="color: #a020f0;">for</span> data <span style="color: #a020f0;">in</span> res_list:
+            <span style="color: #a0522d;">service</span> = data[<span style="color: #8b2252;">"service"</span>]
+            <span style="color: #a0522d;">uri</span> = data[<span style="color: #8b2252;">"uri"</span>]
+            <span style="color: #a0522d;">cnt</span> = <span style="color: #483d8b;">float</span>(data[<span style="color: #8b2252;">"cnt"</span>])
+            g4_3_0.labels(service, uri).<span style="color: #483d8b;">set</span>(cnt)
+
+    <span style="color: #a020f0;">def</span> <span style="color: #0000ff;">set_metric_logback_exception</span>(<span style="color: #a020f0;">self</span>):
+        <span style="color: #a0522d;">query</span> = <span style="color: #8b2252;">"* | select __topic__ as service , COUNT(*) as cnt group by service"</span>
+        <span style="color: #a0522d;">res_list</span> = <span style="color: #a020f0;">self</span>.get_sls_data(project=<span style="color: #a020f0;">self</span>.logback_project, logstore=<span style="color: #a020f0;">self</span>.logback_logstore, query=query)
+        g6.clear()
+        g6.labels(<span style="color: #8b2252;">"content-distribution-platform"</span>).<span style="color: #483d8b;">set</span>(0)
+        <span style="color: #a020f0;">for</span> service <span style="color: #a020f0;">in</span> <span style="color: #a020f0;">self</span>.service_all:
+            g6.labels(service).<span style="color: #483d8b;">set</span>(0)
+        <span style="color: #a020f0;">for</span> data <span style="color: #a020f0;">in</span> res_list:
+            <span style="color: #a0522d;">service</span> = data[<span style="color: #8b2252;">"service"</span>]
+            <span style="color: #a0522d;">cnt</span> = data[<span style="color: #8b2252;">"cnt"</span>]
+            g6.labels(service).<span style="color: #483d8b;">set</span>(cnt)
+
+
+<span style="color: #a020f0;">if</span> <span style="color: #483d8b;">__name__</span> == <span style="color: #8b2252;">'__main__'</span>:
+    <span style="color: #a0522d;">already_file</span> = <span style="color: #8b2252;">"/opt/ops/others/already_run"</span>
+    start_http_server(9111)  <span style="color: #b22222;"># </span><span style="color: #b22222;">8006&#31471;&#21475;&#21551;&#21160;</span>
+    <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"&#30417;&#25511;&#31243;&#24207;&#21551;&#21160;..."</span>)
+    <span style="color: #a0522d;">data4</span> = getSlsLogData()
+    <span style="color: #a020f0;">while</span> <span style="color: #008b8b;">True</span>:
+        <span style="color: #a020f0;">try</span>:
+            <span style="color: #a0522d;">current_day</span> = datetime.datetime.now().strftime(<span style="color: #8b2252;">"%Y%m%d"</span>)
+            <span style="color: #a0522d;">already_day</span> = get_content_from_file(already_file)
+            <span style="color: #a020f0;">if</span> current_day != already_day:
+                set_content_to_file(current_day, already_file)
+                <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"&#25191;&#34892;&#24930;&#25509;&#21475;&#32479;&#35745;&#20219;&#21153;"</span>)
+                data4.set_metric_slow_detail()
+                <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"&#24930;&#25509;&#21475;&#32479;&#35745;&#20219;&#21153;&#25191;&#34892;&#23436;&#27605;"</span>)
+            data4.set_metric_service_qps()
+            data4.set_metric_service_avg_rt()
+            data4.set_metric_api_slow_level0()
+            data4.set_metric_logback_exception()
+            <span style="color: #a0522d;">current_time</span> = datetime.datetime.now().strftime(<span style="color: #8b2252;">"%Y-%m-%d %H:%M:%S"</span>)
+            <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"{} &#30417;&#25511;&#25968;&#25454;&#37319;&#38598;&#25104;&#21151;"</span>.<span style="color: #483d8b;">format</span>(current_time))
+            time.sleep(40)
+        <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> e:
+            <span style="color: #483d8b;">print</span>(e)
+            time.sleep(40)
+</pre>
+</div>
 </div>
 </div>
 </section>

@@ -106,6 +106,7 @@
 <ul>
 <li><a href="#h:18e1e22c-e42f-4020-a5ac-e5e5d59320c0">网络质量监控脚本</a></li>
 <li><a href="#h:725329d7-d66d-4578-aeaf-c3cc41e813e9">openflacon-zookeeeper</a></li>
+<li><a href="#h:294b25b4-1d3a-4777-b478-51dc1a70deed">服务监控治理</a></li>
 </ul>
 </li>
 </ul>
@@ -863,6 +864,243 @@ curl -X POST -d <span style="color: #8b2252;">"[{\"metric\": \"ZK.zk_approximate
 curl -X POST -d <span style="color: #8b2252;">"[{\"metric\": \"ZK.zk_open_file_descriptor_count\", \"endpoint\": \"$host_name\", \"timestamp\": $timestamp, \"step\": 60,\"value\": $zk_open_file_descriptor_count,\"counterType\": \"GAUGE\",\"tags\": \"\"}]"</span> http://127.0.0.1:1988/v1/push
 curl -X POST -d <span style="color: #8b2252;">"[{\"metric\": \"ZK.zk_max_file_descriptor_count\", \"endpoint\": \"$host_name\", \"timestamp\": $timestamp, \"step\": 60,\"value\": $zk_max_file_descriptor_count,\"counterType\": \"GAUGE\",\"tags\": \"\"}]"</span> http://127.0.0.1:1988/v1/push
 <span style="color: #a020f0;">fi</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:294b25b4-1d3a-4777-b478-51dc1a70deed" class="outline-3">
+<h3 id="h:294b25b4-1d3a-4777-b478-51dc1a70deed">服务监控治理</h3>
+<div class="outline-text-3" id="text-h:294b25b4-1d3a-4777-b478-51dc1a70deed">
+<p>
+监控脚本说明
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#21442;&#25968;&#35828;&#26126;&#65306;
+--service&#65306;&#26381;&#21153;&#31867;&#22411;
+--ports&#65306;&#26381;&#21153;&#31471;&#21475;&#65292;&#22810;&#31471;&#21475;&#38388;,&#36887;&#21495;&#20998;&#38548;&#12290;&#27809;&#26377;&#31471;&#21475;&#21017;&#22635;0&#12290;
+--names: &#30417;&#25511;&#25351;&#26631;&#12290;&#22810;&#20010;&#25351;&#26631;&#20197;,&#36887;&#21495;&#20998;&#38548;&#12290;
+</pre>
+</div>
+
+<p>
+bash脚本模板
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">monitor[root@nginx001 vhosts]# crontab -l
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Ansible: zookeeper.connect_port</span>
+*/1 * * * * /home/scripts/zookeeper/zookeeper.connect_port.sh  --service zk  --ports 2181,3888  --names  zk.connect_port
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Ansible: zookeeper.daemon_status</span>
+*/1 * * * * /home/scripts/zookeeper/zookeeper.daemon_status.sh  --service zk  --ports 0  --names  zk.daemon_status
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">!/usr/bin/</span><span style="color: #a020f0;">env</span><span style="color: #b22222;"> bash</span>
+<span style="color: #b22222;">#</span>
+<span style="color: #483d8b;">source</span> /etc/profile
+<span style="color: #a0522d;">timestamp</span>=<span style="color: #ff00ff;">`date +%s`</span>
+<span style="color: #a0522d;">host_name</span>=<span style="color: #ff00ff;">`hostname`</span>
+<span style="color: #a0522d;">exit_status</span>=0
+
+<span style="color: #a020f0;">function</span> <span style="color: #0000ff;">usage</span>(){
+cat &lt;&lt;EOF
+<span style="color: #ffa54f;">Usage: $0 [MODE] [OPTION]</span>
+
+<span style="color: #ffa54f;">OPTION:</span>
+<span style="color: #ffa54f;">  -s, --service &lt;server_name&gt;     &#25351;&#23450;&#26381;&#21153;</span>
+<span style="color: #ffa54f;">  -p, --ports &lt;port1,port2...&gt;    &#25351;&#23450;&#31471;&#21475;&#21495;</span>
+<span style="color: #ffa54f;">  -n, --names &lt;tag_name&gt;          &#25351;&#23450;&#30417;&#25511;&#25351;&#26631;</span>
+<span style="color: #ffa54f;">  --help                   show help</span>
+<span style="color: #ffa54f;">EOF</span>
+}
+
+<span style="color: #a0522d;">parameters</span>=$(<span style="color: #ff00ff;">getopt -o s:p:n: --long service:,ports:,names:,help -n "$0" -- "$@"</span>)
+[ $<span style="color: #a0522d;">?</span> -ne 0 ] &amp;&amp; { <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Try '$0 --help' for more information."</span>; <span style="color: #a020f0;">exit</span> 1; }
+
+<span style="color: #483d8b;">eval</span> set -- <span style="color: #8b2252;">"$parameters"</span>
+
+<span style="color: #a020f0;">while</span> true; <span style="color: #a020f0;">do</span>
+    <span style="color: #a020f0;">case</span> <span style="color: #8b2252;">"$1"</span><span style="color: #a020f0;"> in</span>
+    -s|--service) <span style="color: #a0522d;">service</span>=$<span style="color: #a0522d;">2</span>; <span style="color: #483d8b;">shift</span> 2;;
+    -p|--ports) <span style="color: #a0522d;">ports</span>=$<span style="color: #a0522d;">2</span> ; <span style="color: #483d8b;">shift</span> 2 ;;
+    -n|--names) <span style="color: #a0522d;">names</span>=$<span style="color: #a0522d;">2</span> ; <span style="color: #483d8b;">shift</span> 2 ;;
+    --help) usage;<span style="color: #a020f0;">exit</span> ;;
+    --)
+        <span style="color: #483d8b;">shift</span>
+        <span style="color: #a0522d;">FIRST</span>=$<span style="color: #a0522d;">1</span>
+        <span style="color: #a0522d;">SECOND</span>=$<span style="color: #a0522d;">2</span>
+        <span style="color: #a0522d;">LAST</span>=$<span style="color: #a0522d;">3</span>
+        <span style="color: #a020f0;">break</span> ;;
+    *) usage;<span style="color: #a020f0;">exit</span> 1 ;;
+    <span style="color: #a020f0;">esac</span>
+<span style="color: #a020f0;">done</span>
+
+<span style="color: #a020f0;">function</span> <span style="color: #0000ff;">open_falcon_push</span>() {
+    <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">metric</span>=$<span style="color: #a0522d;">1</span>
+    <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">tag</span>=$<span style="color: #a0522d;">2</span>
+    <span style="color: #483d8b;">local</span> <span style="color: #a0522d;">value</span>=$<span style="color: #a0522d;">3</span>
+    curl --connect-timeout 5 -X POST -d <span style="color: #8b2252;">'[{"'</span>metric<span style="color: #8b2252;">'": "'</span>$<span style="color: #a0522d;">metric</span><span style="color: #8b2252;">'", "endpoint": "'</span>$<span style="color: #a0522d;">host_name</span><span style="color: #8b2252;">'", "timestamp": '</span>$<span style="color: #a0522d;">timestamp</span><span style="color: #8b2252;">', "step": 60,"value": '</span>$<span style="color: #a0522d;">value</span><span style="color: #8b2252;">',"counterType": "GAUGE","tags": "'</span>$<span style="color: #a0522d;">tag</span><span style="color: #8b2252;">'"}]'</span> http://127.0.0.1:1988/v1/push
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">echo  '[{"metric": "'$metric'", "endpoint": "'$host_name'", "timestamp": '$timestamp', "step": 60,"value": '$value',"counterType": "GAUGE","tags": "'$tag'"}]' http://127.0.0.1:1988/v1/push</span>
+}
+
+[ -z <span style="color: #8b2252;">"$service"</span> ] &amp;&amp; { <span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"\033[31;1;4mERR\033[0m: the service is not found, please --help"</span> &amp;&amp; <span style="color: #a0522d;">exit_status</span>=1; }
+[ -z <span style="color: #8b2252;">"$ports"</span> ] &amp;&amp; { <span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"\033[31;1;4mERR\033[0m: the ports are not found, please --help"</span> &amp;&amp; <span style="color: #a0522d;">exit_status</span>=1; }
+[ -z <span style="color: #8b2252;">"$names"</span> ] &amp;&amp; { <span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"\033[31;1;4mERR\033[0m: the names are not found, please --help"</span> &amp;&amp; <span style="color: #a0522d;">exit_status</span>=1; }
+[  $<span style="color: #a0522d;">exit_status</span> == 1 ]&amp;&amp; <span style="color: #a020f0;">exit</span> 1
+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">----------------------------------change</span>
+[ -z <span style="color: #8b2252;">"$(</span><span style="color: #ff00ff;">which nc</span><span style="color: #8b2252;">)"</span> ] &amp;&amp; yum install -y nc
+<span style="color: #a0522d;">daemon_status</span>=<span style="color: #ff00ff;">`echo ruok | nc 127.0.0.1 2181|grep imok|wc -l`</span>
+
+<span style="color: #a0522d;">zk_pid</span>=<span style="color: #ff00ff;">`jps |grep QuorumPeerMain| grep -v 'grep'|awk '{print $1}'`</span>
+
+<span style="color: #a020f0;">function</span> <span style="color: #0000ff;">noport_check</span>() {
+    <span style="color: #a020f0;">for</span> port<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">echo ${ports//,/ }</span>); <span style="color: #a020f0;">do</span>
+        <span style="color: #a020f0;">if</span> [ <span style="color: #8b2252;">"$port"</span> -ge 0 ] 2&gt;/dev/null ; <span style="color: #a020f0;">then</span> :;<span style="color: #a020f0;">else </span><span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"\033[31;1;4mERR\033[0m: port $port is not number"</span> &amp;&amp; <span style="color: #a020f0;">exit</span> 1; <span style="color: #a020f0;">fi</span>
+        <span style="color: #a020f0;">for</span> name<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">echo ${names//,/ }</span>); <span style="color: #a020f0;">do</span>
+            open_falcon_push   <span style="color: #8b2252;">"$name"</span> <span style="color: #8b2252;">"name=$name,port=0,service=$service"</span> <span style="color: #8b2252;">"$daemon_status"</span>
+        <span style="color: #a020f0;">done</span>
+    <span style="color: #a020f0;">done</span>
+}
+
+<span style="color: #a020f0;">function</span> <span style="color: #0000ff;">ports_check</span>() {
+    <span style="color: #a020f0;">for</span> port<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">echo ${ports//,/ }</span>); <span style="color: #a020f0;">do</span>
+        <span style="color: #a020f0;">if</span> [ <span style="color: #8b2252;">"$port"</span> -ge 0 ] 2&gt;/dev/null ; <span style="color: #a020f0;">then</span> :;<span style="color: #a020f0;">else </span><span style="color: #483d8b;">echo</span> -e <span style="color: #8b2252;">"\033[31;1;4mERR\033[0m: port $port is not number"</span> &amp;&amp; <span style="color: #a020f0;">exit</span> 1; <span style="color: #a020f0;">fi</span>
+        <span style="color: #a020f0;">for</span> name<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">echo ${names//,/ }</span>); <span style="color: #a020f0;">do</span>
+            <span style="color: #a0522d;">zk_port</span>=<span style="color: #ff00ff;">`netstat -antlp|grep $zk_pid|grep $port|wc -l`</span>
+            open_falcon_push   <span style="color: #8b2252;">"$name"</span> <span style="color: #8b2252;">"name=$name,port=$port,service=$service"</span> <span style="color: #8b2252;">"$zk_port"</span>
+        <span style="color: #a020f0;">done</span>
+    <span style="color: #a020f0;">done</span>
+}
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">----------------------------------end</span>
+<span style="color: #a020f0;">function</span> <span style="color: #0000ff;">monitor</span>() {
+   noport_check
+   <span style="color: #b22222;">#</span><span style="color: #b22222;">ports_check</span>
+}
+</pre>
+</div>
+
+
+
+<p>
+python脚本模板
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@nginx001 vhosts]# /home/scripts/nginx/nginx.openfiles_check.py  --service nginx  --ports 0  --names  nginx.openfiles_check
+success
+[{<span style="color: #8b2252;">'metric'</span>: <span style="color: #8b2252;">'nginx.openfiles_check'</span>, <span style="color: #8b2252;">'endpoint'</span>: <span style="color: #8b2252;">'nginx001'</span>, <span style="color: #8b2252;">'timestamp'</span>: 1575447496, <span style="color: #8b2252;">'step'</span>: 120, <span style="color: #8b2252;">'value'</span>: 1, <span style="color: #8b2252;">'counterType'</span>: <span style="color: #8b2252;">'GAUGE'</span>, <span style="color: #8b2252;">'tags'</span>: <span style="color: #8b2252;">'name=nginx.openfiles_check,port=0,service=nginx'</span>}]
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #b22222;">#</span><span style="color: #b22222;">!/usr/bin/env python3</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">-*- coding:utf-8 -*-</span>
+<span style="color: #a020f0;">import</span> time,datetime
+<span style="color: #a020f0;">import</span> json
+<span style="color: #a020f0;">import</span> socket
+<span style="color: #a020f0;">import</span> requests
+<span style="color: #a020f0;">import</span> os
+
+<span style="color: #a020f0;">import</span> argparse
+<span style="color: #a0522d;">parser</span> = argparse.ArgumentParser(description=<span style="color: #8b2252;">'monitor script'</span>)
+parser.add_argument(<span style="color: #8b2252;">"-s"</span>,<span style="color: #8b2252;">"--service"</span>, <span style="color: #483d8b;">help</span>=<span style="color: #8b2252;">"&#25351;&#23450;&#26381;&#21153;"</span>, <span style="color: #483d8b;">type</span>=<span style="color: #483d8b;">str</span>, required=<span style="color: #008b8b;">True</span>)
+parser.add_argument(<span style="color: #8b2252;">"-p"</span>,<span style="color: #8b2252;">"--ports"</span>, <span style="color: #483d8b;">help</span>=<span style="color: #8b2252;">"&#25351;&#23450;&#31471;&#21475;&#21495;"</span>, <span style="color: #483d8b;">type</span>=<span style="color: #483d8b;">str</span>, required=<span style="color: #008b8b;">True</span>)
+parser.add_argument(<span style="color: #8b2252;">"-n"</span>,<span style="color: #8b2252;">"--names"</span>, <span style="color: #483d8b;">help</span>=<span style="color: #8b2252;">"&#25351;&#23450;&#30417;&#25511;&#25351;&#26631;"</span>, <span style="color: #483d8b;">type</span>=<span style="color: #483d8b;">str</span>, required=<span style="color: #008b8b;">True</span>)
+<span style="color: #a0522d;">args</span> = parser.parse_args()
+
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">open_falcon_push</span>(payload):
+    <span style="color: #a0522d;">url</span> = <span style="color: #8b2252;">'http://127.0.0.1:1988/v1/push'</span>
+    <span style="color: #a0522d;">headers</span> = {<span style="color: #8b2252;">"Content-Type"</span>: <span style="color: #8b2252;">"application/json"</span>}
+    <span style="color: #a020f0;">try</span>:
+        <span style="color: #a0522d;">r</span> = requests.post(url, data=json.dumps(payload), headers=headers, timeout=3)
+        <span style="color: #a020f0;">if</span> r.status_code == 200:
+            <span style="color: #483d8b;">print</span>(r.text)
+        <span style="color: #a020f0;">else</span>:
+            <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">'{"err":1,"msg":"%s"}'</span> % r.text)
+    <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> e:
+        <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"Exception: {traceback.format_exc(chain=False)}"</span>)
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">---------------------------------------------change</span>
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">main</span>():
+    <span style="color: #a0522d;">service</span> = args.service
+    <span style="color: #a0522d;">ports</span> = args.ports
+    <span style="color: #a0522d;">names</span> = args.names
+    <span style="color: #a0522d;">hostname</span> = socket.gethostname()
+    <span style="color: #a0522d;">timestamp</span> = <span style="color: #483d8b;">int</span>(time.time())
+    <span style="color: #a0522d;">step</span> = 120
+    <span style="color: #a0522d;">payload</span> = []
+
+    <span style="color: #a020f0;">try</span>:
+        <span style="color: #a0522d;">ports</span> = ports.split(<span style="color: #8b2252;">','</span>)
+        <span style="color: #a0522d;">names</span> = names.split(<span style="color: #8b2252;">','</span>)
+
+        <span style="color: #a020f0;">for</span> port <span style="color: #a020f0;">in</span> ports:
+            <span style="color: #a0522d;">tags</span> = <span style="color: #8b2252;">'port=%s'</span> % port
+            <span style="color: #a020f0;">for</span> name <span style="color: #a020f0;">in</span> names:
+                <span style="color: #a0522d;">tag</span> =<span style="color: #8b2252;">"name={},port={},service={}"</span>.<span style="color: #483d8b;">format</span>(name,port,service)
+                <span style="color: #a020f0;">if</span> <span style="color: #8b2252;">"openfiles_check"</span> <span style="color: #a020f0;">in</span> name: 
+                    <span style="color: #a0522d;">value</span> = openfiles()
+                    <span style="color: #a0522d;">i</span> = {
+                        <span style="color: #8b2252;">'metric'</span>: name,
+                        <span style="color: #8b2252;">'endpoint'</span>: hostname,
+                        <span style="color: #8b2252;">'timestamp'</span>: timestamp,
+                        <span style="color: #8b2252;">'step'</span>: step,
+                        <span style="color: #8b2252;">'value'</span>: value,
+                        <span style="color: #8b2252;">'counterType'</span>: <span style="color: #8b2252;">"GAUGE"</span>,
+                        <span style="color: #8b2252;">'tages'</span>: tag
+                    }
+                    payload.append(i)
+        open_falcon_push(payload)
+    <span style="color: #a020f0;">except</span> <span style="color: #228b22;">Exception</span> <span style="color: #a020f0;">as</span> e:
+        <span style="color: #a0522d;">msg</span> = traceback.format_exc(chain=<span style="color: #008b8b;">False</span>)
+        <span style="color: #483d8b;">print</span>(<span style="color: #8b2252;">"Exception: {msg}"</span>)
+    <span style="color: #a020f0;">finally</span>:
+        <span style="color: #483d8b;">print</span>(payload)
+
+<span style="color: #a020f0;">def</span> <span style="color: #0000ff;">openfiles</span>():
+    <span style="color: #a0522d;">nginx_conf</span> = []
+    <span style="color: #a0522d;">nginx_path</span> = <span style="color: #8b2252;">"/data/logs/"</span>
+    <span style="color: #a0522d;">value</span>=1
+
+    <span style="color: #a0522d;">g</span> = os.walk(nginx_path)
+    <span style="color: #a020f0;">for</span> path, dir_list, file_list <span style="color: #a020f0;">in</span> g:
+        <span style="color: #a020f0;">for</span> <span style="color: #483d8b;">file</span> <span style="color: #a020f0;">in</span> file_list:
+            <span style="color: #a020f0;">if</span> <span style="color: #8b2252;">'error.log'</span> <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">file</span> <span style="color: #a020f0;">and</span> <span style="color: #8b2252;">'2019'</span> <span style="color: #a020f0;">not</span> <span style="color: #a020f0;">in</span> <span style="color: #483d8b;">file</span>:
+                nginx_conf.append(<span style="color: #483d8b;">file</span>)
+
+    <span style="color: #a020f0;">for</span> conf_name <span style="color: #a020f0;">in</span> nginx_conf:
+        <span style="color: #a0522d;">nginxpath</span> = <span style="color: #8b2252;">''</span>
+        <span style="color: #a0522d;">nginxpath</span> = nginx_path + conf_name
+        <span style="color: #a0522d;">f</span> = <span style="color: #483d8b;">open</span>(nginxpath,<span style="color: #8b2252;">"r"</span>,encoding=<span style="color: #8b2252;">'utf-8'</span>, errors=<span style="color: #8b2252;">'replace'</span>)
+        <span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> f.readlines():
+            <span style="color: #a0522d;">i</span> = i.strip(<span style="color: #8b2252;">"</span><span style="color: #008b8b;">\n</span><span style="color: #8b2252;">"</span>)
+            <span style="color: #a0522d;">time_date</span> = i.split(<span style="color: #8b2252;">" "</span>)
+            <span style="color: #a0522d;">fiveminago</span> =  (datetime.datetime.now()-datetime.timedelta(minutes=5)).strftime(<span style="color: #8b2252;">"%H:%M:%S"</span>)
+            <span style="color: #a020f0;">if</span> time_date[1] &lt; fiveminago:
+                <span style="color: #a020f0;">pass</span>
+            <span style="color: #a020f0;">else</span>:
+                <span style="color: #a020f0;">if</span> <span style="color: #8b2252;">"Too many open files"</span> <span style="color: #a020f0;">in</span> i :
+                    <span style="color: #a0522d;">value</span>=0
+        f.close()
+    <span style="color: #a020f0;">return</span> value
+<span style="color: #b22222;">#</span><span style="color: #b22222;">--------------------------------------end</span>
+
+<span style="color: #a020f0;">if</span> <span style="color: #483d8b;">__name__</span> == <span style="color: #8b2252;">'__main__'</span>:
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">print(sys.argv)</span>
+    main()
+</pre>
+</div>
+
+<p>
+go脚本模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">
 </pre>
 </div>
 </div>

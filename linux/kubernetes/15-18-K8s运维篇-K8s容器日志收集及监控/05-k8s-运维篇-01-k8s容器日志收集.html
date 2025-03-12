@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 运维篇-k8s容器日志收集</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/drollery.e825b870.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="{className}" data-astro-cid-3ef6ksr2>
+  <div class=header-branding data-astro-cid-g2lrb5xm>
+      <span class=header-text data-astro-cid-g2lrb5xm>
+          <span class=dropcap data-astro-cid-g2lrb5xm aria-hidden=true>
+              <span class=actual data-astro-cid-g2lrb5xm>J</span>
+              <span class=rest data-astro-cid-g2lrb5xm>asper Hsu</span>
+              <span class=period data-astro-cid-g2lrb5xm>.</span>
+          </span>
+          <span class=sr-only data-astro-cid-g2lrb5xm>Drollery</span>
+      </span>
+      <img alt="Medieval drollery of a knight on a horse" class=spring decoding=async height=250 loading=lazy src=/images/knight-horse.a96eee7d_Z1WCOYs.webp width=68 data-astro-cid-g2lrb5xm>
+  </div>
+
+  <nav data-astro-cid-pux6a34n>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/jcodelog.html class=nobracket data-astro-cid-pux6a34n>技术</a>
+      <span class=flower2 data-astro-cid-pux6a34n>K</span>
+      <a href=/reading/index.html class=nobracket data-astro-cid-pux6a34n>阅读</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+      <a href=/lisp/jasper-emacs.html class=nobracket data-astro-cid-pux6a34n>我的Emacs配置</a>
+      <span class=flower2 data-astro-cid-pux6a34n>L</span>
+      <a href=/link/index.html class=nobracket data-astro-cid-pux6a34n>友链</a>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/about.html class=nobracket data-astro-cid-pux6a34n>关于</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+  </nav>
+
+
+  <div class="container" data-astro-cid-3ef6ksr2>
+    <p class="info" data-astro-cid-3ef6ksr2>
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+  <div id=borderArtWrapper class="tt1" data-astro-cid-5hce7sga data-turbo-permanent>
+      <script>
+          var man, shakeCount = 0, noSound = new Audio("/audio/effects/no.m4a"), screamSound = new Audio("/audio/effects/scream.m4a");
+          function animateManShakeHandler() {
+              man.removeEventListener("animationend", animateManShakeHandler, !1),
+              shakeCount += 1,
+              man.classList.remove("shakeMan")
+          }
+          function animateManFallHandler() {
+              man.removeEventListener("animationend", animateManFallHandler, !1),
+              man.classList.add("hide")
+          }
+          function animateMan() {
+              man = man ?? document.getElementById("borderMan"),
+              3 === shakeCount ? (man.classList.add("fallMan"),
+              screamSound.play(),
+              man.addEventListener("animationend", animateManFallHandler, !1)) : (man.classList.add("shakeMan"),
+              noSound.play(),
+              man.addEventListener("animationend", animateManShakeHandler, !1))
+          }
+      </script>
+      <div class=borderArt data-astro-cid-5dda5nwp id=articleBorder>
+          <img alt="flowery border with man falling" decoding=async height=620 loading=lazy src=/images/border-vines-no-man.b7d246cc_DRxSe.webp width=909 class=border data-astro-cid-5dda5nwp>
+          <div class=fallWrapper data-astro-cid-5dda5nwp>
+              <img alt="flowery border with man falling" decoding=async height=292 loading=lazy src=/images/man-no-vines.247a3187_Z2ioXNM.webp width=98 class=man data-astro-cid-5dda5nwp id=borderMan onclick=animateMan()>
+          </div>
+      </div>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 运维篇-k8s容器日志收集</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org9263c92">k8s 运维篇-k8s容器日志收集</a>
+<ul>
+<li><a href="#org1713d3e">说明</a>
+<ul>
+<li><a href="#org6a663fc">K8s集群需要收集哪些日志？</a></li>
+<li><a href="#org2daee7a">收集日志常用的技术栈</a></li>
+</ul>
+</li>
+<li><a href="#orgcdb9bb2">使用 EFK 收集控制台日志</a>
+<ul>
+<li><a href="#orgf763aee">ES+Fluentd+Kibana架构解析</a></li>
+<li><a href="#orga232435">部署EFK Stack收集K8s日志</a></li>
+<li><a href="#org8f74610">Kibana 使用</a></li>
+</ul>
+</li>
+<li><a href="#orgb122eb3">使用 Filebeat 收集自定义文件日志</a>
+<ul>
+<li><a href="#org27adaa9">Filebeat+Kafka+Logstash+ES架构解析</a></li>
+<li><a href="#org2927057">创建 Kafka 和 Logstash</a>
+<ul>
+<li><a href="#org497206d">logstash-cm.yaml</a></li>
+<li><a href="#orgbdaad62">logstash-service.yaml</a></li>
+<li><a href="#orgf187620">logstash-deploy.yaml</a></li>
+</ul>
+</li>
+<li><a href="#org3e71a96">使用Filebeat采集容器内日志文件</a>
+<ul>
+<li><a href="#org6124323">es &amp; kibana</a></li>
+</ul>
+</li>
+<li><a href="#org7dade7a">实现Pod名称和命名空间检索日志</a></li>
+</ul>
+</li>
+<li><a href="#orgd7a2522">Loki</a>
+<ul>
+<li><a href="#orgc4c2303">Loki架构解析</a></li>
+<li><a href="#org8dfc17d">使用Loki收集K8s日志</a></li>
+<li><a href="#orgbb2819e">Loki语法入门</a></li>
+</ul>
+</li>
+<li><a href="#orga6a5602">样例</a>
+<ul>
+<li><a href="#orgd034b6c">filebeat+logstash 示例1</a>
+<ul>
+<li><a href="#orgb1329bc">从 kafka 收集数据输出到 ES</a></li>
+<li><a href="#org3471610">filebeat</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a><br></li>
+</ul>
+<section id="outline-container-org9263c92" class="outline-2">
+<h2 id="org9263c92">k8s 运维篇-k8s容器日志收集</h2>
+<div class="outline-text-2" id="text-org9263c92">
+</div>
+<div id="outline-container-org1713d3e" class="outline-3">
+<h3 id="org1713d3e">说明</h3>
+<div class="outline-text-3" id="text-org1713d3e">
+</div>
+<div id="outline-container-org6a663fc" class="outline-4">
+<h4 id="org6a663fc">K8s集群需要收集哪些日志？</h4>
+<div class="outline-text-4" id="text-org6a663fc">
+<ul class="org-ul">
+<li>系统和 k8s 组件日志<br>
+<ul class="org-ul">
+<li>/var/log/messages<br></li>
+<li>apiserver,contorllor manager<br></li>
+</ul></li>
+<li>业务应用程序日志<br>
+<ul class="org-ul">
+<li>云原生-控制台日志<br></li>
+<li>非云原生-容器内日志文件<br></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org2daee7a" class="outline-4">
+<h4 id="org2daee7a">收集日志常用的技术栈</h4>
+<div class="outline-text-4" id="text-org2daee7a">
+<ul class="org-ul">
+<li>传统架构<br>
+<ul class="org-ul">
+<li>ELK 技术栈 Elasticsearch+Logstash+Kibana<br></li>
+</ul></li>
+</ul>
+
+<p>
+logstash 缺点：java 语言，占用资源、语法复杂<br>
+</p>
+
+<ul class="org-ul">
+<li>Kubernetes<br>
+<ul class="org-ul">
+<li>EFK 技术栈 Elasticsearch+Fluentd+Kibana<br></li>
+<li>Filebeat  占用资源小，sidecar 形式注入容器，收集容器内日志<br></li>
+<li>Loki 新贵<br></li>
+</ul></li>
+</ul>
+
+<p>
+fluentd 优点：k8s 中使用 fluentd 代替 Logstash，配置简单，收集控制台输出日志。<br>
+Loki：不依赖 EFK，可直接在 grafana 查询日志。<br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orgcdb9bb2" class="outline-3">
+<h3 id="orgcdb9bb2">使用 EFK 收集控制台日志</h3>
+<div class="outline-text-3" id="text-orgcdb9bb2">
+</div>
+<div id="outline-container-orgf763aee" class="outline-4">
+<h4 id="orgf763aee">ES+Fluentd+Kibana架构解析</h4>
+<div class="outline-text-4" id="text-orgf763aee">
+
+<figure id="org405268b">
+<img src="./images/Snipaste_2022-12-27_06-51-27.png" alt="Snipaste_2022-12-27_06-51-27.png"><br>
+
+</figure>
+</div>
+</div>
+<div id="outline-container-orga232435" class="outline-4">
+<h4 id="orga232435">部署EFK Stack收集K8s日志</h4>
+<div class="outline-text-4" id="text-orga232435">
+<p>
+<a href="https://github.com/kubernetes/kubernetes/tree/release-1.23/cluster/addons/fluentd-elasticsearch">https://github.com/kubernetes/kubernetes/tree/release-1.23/cluster/addons/fluentd-elasticsearch</a><br>
+</p>
+
+<p>
+收集宿主机日志 /var/log<br>
+</p>
+
+<p>
+下载需要部署的文件<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">git clone https://github.com/dotbalo/k8s.git
+<span style="color: #483d8b;">cd</span> k8s/efk-7.10.2/
+</pre>
+</div>
+
+<p>
+创建 EFK 所用的命令空间<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f create-logging-namespace.yaml
+</pre>
+</div>
+
+<p>
+创建 ES 集群<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f es-service.yaml
+kubectl create -f es-statefulset.yaml
+</pre>
+</div>
+
+<p>
+创建 kibana<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f kibana-deployment.yaml
+kubectl create -f kibana-service.yaml
+
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#22914;&#26524;&#35775;&#38382;&#26377;&#38382;&#39064;&#65292;kibana-deployment.yaml &#20851;&#25481;&#37324;&#38754;&#30340;&#35775;&#38382;&#27169;&#24335;proxy</span>
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#27880;&#37322;&#20197;&#19979;2&#34892;&#65288;kibana-deployment.yaml &#65289;</span>
+  <span style="color: #b22222;">#</span><span style="color: #b22222;">- name: SERVER_BASEPATH</span>
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy</span>
+</pre>
+</div>
+
+<p>
+由于在 k8s 中，我们可能并不需要对所有机器采集日志，所以可以更改 fluentd 的部署文件，添加节点绑定：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f fluentd-es-configmap.yaml -f fluentd-es-ds.yaml
+</pre>
+</div>
+
+<p>
+参考：<a href="https://www.cnblogs.com/hsyw/p/14397700.html">https://www.cnblogs.com/hsyw/p/14397700.html</a><br>
+</p>
+</div>
+</div>
+<div id="outline-container-org8f74610" class="outline-4">
+<h4 id="org8f74610">Kibana 使用</h4>
+</div>
+</div>
+<div id="outline-container-orgb122eb3" class="outline-3">
+<h3 id="orgb122eb3">使用 Filebeat 收集自定义文件日志</h3>
+<div class="outline-text-3" id="text-orgb122eb3">
+</div>
+<div id="outline-container-org27adaa9" class="outline-4">
+<h4 id="org27adaa9">Filebeat+Kafka+Logstash+ES架构解析</h4>
+<div class="outline-text-4" id="text-org27adaa9">
+
+<figure id="org22c073e">
+<img src="./images/Snipaste_2022-12-27_14-00-55.png" alt="Snipaste_2022-12-27_14-00-55.png"><br>
+
+</figure>
+
+<p>
+Pod 中有 2 个容器<br>
+</p>
+<ul class="org-ul">
+<li>业务容器 日志未输出到控制台，输出到指定文件<br></li>
+<li>日志容器 volume 使用 EmptyDir<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org2927057" class="outline-4">
+<h4 id="org2927057">创建 Kafka 和 Logstash</h4>
+<div class="outline-text-4" id="text-org2927057">
+<p>
+首先需要部署 Kafka 和 logstash 至 k8s 集群。如果企业内已经有比较成熟的技术栈，可以无需部署，直接将 filebeat 的输出指向外部 kafka 集群即可：<br>
+参考： <a href="https://github.com/dotbalo/k8s/tree/master/fklek/7.x">https://github.com/dotbalo/k8s/tree/master/fklek/7.x</a><br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #483d8b;">cd</span> filebeat
+helm install zookeeper zookeeper/ -n logging
+helm install kafka kafka/ -n logging
+</pre>
+</div>
+
+<p>
+待 pod 都正常后，创建 logstash 服务：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f logstash-cm.yaml -f logstash-service.yaml -f logstash.yaml
+</pre>
+</div>
+</div>
+<div id="outline-container-org497206d" class="outline-5">
+<h5 id="org497206d">logstash-cm.yaml</h5>
+<div class="outline-text-5" id="text-org497206d">
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-configmap
+data:
+  logstash.yml: |
+    http.host: <span style="color: #8b2252;">"0.0.0.0"</span>
+    path.config: /usr/share/logstash/pipeline
+  logstash.conf: |
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">all input will come from filebeat, no local logs</span>
+    input {
+      kafka {
+              enable_auto_commit =&gt; true
+              auto_commit_interval_ms =&gt; <span style="color: #8b2252;">"1000"</span>
+              bootstrap_servers =&gt; <span style="color: #8b2252;">"kafka:9092"</span>
+              topics =&gt; [<span style="color: #8b2252;">"test-filebeat"</span>]
+              codec =&gt; json
+          }
+    }
+    output {
+       stdout{ <span style="color: #a0522d;">codec</span>=&gt;rubydebug}
+       <span style="color: #a020f0;">if</span> [fields][pod_namespace] =~ <span style="color: #8b2252;">"public-service"</span> {
+           elasticsearch {
+             hosts =&gt; [<span style="color: #8b2252;">"elasticsearch-logging:9200"</span>]
+             index =&gt; <span style="color: #8b2252;">"%{[fields][pod_namespace]}-s-%{+YYYY.MM.dd}"</span>
+          }
+       } <span style="color: #a020f0;">else</span> {
+          elasticsearch {
+             hosts =&gt; [<span style="color: #8b2252;">"elasticsearch-logging:9200"</span>]
+             index =&gt; <span style="color: #8b2252;">"no-index-%{+YYYY.MM.dd}"</span>
+          }
+       }
+    }
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgbdaad62" class="outline-5">
+<h5 id="orgbdaad62">logstash-service.yaml</h5>
+<div class="outline-text-5" id="text-orgbdaad62">
+<div class="org-src-container">
+<pre class="src src-shell">kind: Service
+apiVersion: v1
+metadata:
+  name: logstash-service
+spec:
+  selector:
+    app: logstash
+  ports:
+  - protocol: TCP
+    port: 5044
+    targetPort: 5044
+  <span style="color: #483d8b;">type</span>: ClusterIP
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgf187620" class="outline-5">
+<h5 id="orgf187620">logstash-deploy.yaml</h5>
+<div class="outline-text-5" id="text-orgf187620">
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash-deployment
+spec:
+  selector:
+    matchLabels:
+      app: logstash
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: logstash:7.4.2
+        ports:
+        - containerPort: 5044
+        volumeMounts:
+          - name: config-volume
+            mountPath: /usr/share/logstash/config
+          - name: logstash-pipeline-volume
+            mountPath: /usr/share/logstash/pipeline
+      volumes:
+      - name: config-volume
+        configMap:
+          name: logstash-configmap
+          items:
+            - key: logstash.yml
+              path: logstash.yml
+      - name: logstash-pipeline-volume
+        configMap:
+          name: logstash-configmap
+          items:
+            - key: logstash.conf
+              path: logstash.conf
+</pre>
+</div>
+
+<p>
+需要注意 logstash-cm.yaml 文件中的一些配置：<br>
+</p>
+<ul class="org-ul">
+<li>input:  数据来源，示例配置的是 kafka<br></li>
+<li>input.kakfa.topics: kafka 的 topic，需要和 filebeat 输出的 topic 一致<br></li>
+<li>output: 数据输出至哪里，示例输出至 ES 集群<br></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-org3e71a96" class="outline-4">
+<h4 id="org3e71a96">使用Filebeat采集容器内日志文件</h4>
+<div class="outline-text-4" id="text-org3e71a96">
+<p>
+filebeat-cm.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #483d8b;">cd</span> /root/install-some-apps/efk
+mkdir filebeat &amp;&amp; <span style="color: #483d8b;">cd</span> filebeat
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim filebeat-cm.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeatconf
+data:
+  filebeat.yml: |-
+    filebeat.inputs:
+    - input_type: log
+      paths:
+        - /data/log/*/*.log
+      tail_files: true
+      fields:
+        pod_name: <span style="color: #8b2252;">'${podName}'</span>
+        pod_ip: <span style="color: #8b2252;">'${podIp}'</span>
+        pod_deploy_name: <span style="color: #8b2252;">'${podDeployName}'</span>
+        pod_namespace: <span style="color: #8b2252;">'${podNamespace}'</span>
+      tags: [test-filebeat] 
+    output.kafka:
+      hosts: [<span style="color: #8b2252;">"kafka:9092"</span>]
+      topic: <span style="color: #8b2252;">"test-filebeat"</span>
+      codec.json:
+        pretty: false
+      keep_alive: 30s
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f filebeat-cm.yaml -n public-service
+</pre>
+</div>
+
+
+<p>
+接下来创建一个模拟程序<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f app-filebeat.yaml -nlogging
+</pre>
+</div>
+<p>
+该程序会一直在/opt/date.log 文件输出当前日期，配置如下<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shll">command:
+  - sh
+  - -c
+  - while true; do date &gt;&gt; /opt/date.log; sleep 2;  done
+</pre>
+</div>
+<p>
+/opt 目录数据共享<br>
+</p>
+
+<p>
+app-filebeat.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+    env: release
+spec:
+  selector:
+    matchLabels:
+      app: app
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  # minReadySeconds: 30
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: filebeat
+          image: registry.cn-beijing.aliyuncs.com/dotbalo/filebeat:7.10.2
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "10m"
+            limits:
+              cpu: "200m"
+              memory: "300Mi"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: podIp
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: podName
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: podNamespace
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: podDeployName
+              value: app
+            - name: TZ
+              value: "Asia/Shanghai"
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: logpath
+              mountPath: /data/log/app/
+            - name: filebeatconf
+              mountPath: /usr/share/filebeat/filebeat.yml
+              subPath: usr/share/filebeat/filebeat.yml
+        - name: app
+          image: registry.cn-beijing.aliyuncs.com/dotbalo/alpine:3.6
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: logpath
+              mountPath: /opt/
+          env:
+            - name: TZ
+              value: "Asia/Shanghai"
+            - name: LANG
+              value: C.UTF-8
+            - name: LC_ALL
+              value: C.UTF-8
+          command:
+            - sh
+            - -c
+            - while true; do date &gt;&gt; /opt/date.log; sleep 2;  done
+      volumes:
+        - name: logpath
+          emptyDir: {}
+        - name: filebeatconf
+          configMap:
+            name: filebeatconf
+            items:
+              - key: filebeat.yml
+                path: usr/share/filebeat/filebeat.yml
+</pre>
+</div>
+</div>
+<div id="outline-container-org6124323" class="outline-5">
+<h5 id="org6124323">es &amp; kibana</h5>
+<div class="outline-text-5" id="text-org6124323">
+<p>
+#+end_src<br>
+es 和 kibana 用的上面安装的<br>
+#+end_src<br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org7dade7a" class="outline-4">
+<h4 id="org7dade7a">实现Pod名称和命名空间检索日志</h4>
+<div class="outline-text-4" id="text-org7dade7a">
+<p>
+登录 kibana ，添加 filebeat 的索引即可查看日志。点击菜单栏&#x2013;&gt; Stack Management<br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orgd7a2522" class="outline-3">
+<h3 id="orgd7a2522">Loki</h3>
+<div class="outline-text-3" id="text-orgd7a2522">
+</div>
+<div id="outline-container-orgc4c2303" class="outline-4">
+<h4 id="orgc4c2303">Loki架构解析</h4>
+</div>
+
+<div id="outline-container-org8dfc17d" class="outline-4">
+<h4 id="org8dfc17d">使用Loki收集K8s日志</h4>
+<div class="outline-text-4" id="text-org8dfc17d">
+<p>
+<a href="https://grafana.com/docs/loki/latest/installation/helm/install-scalable/">https://grafana.com/docs/loki/latest/installation/helm/install-scalable/</a><br>
+</p>
+
+<p>
+Loki 提供了 helm 的安装方式，可以直接下载包进行安装。<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+</pre>
+</div>
+
+<p>
+创建 loki namespace<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create ns loki
+</pre>
+</div>
+
+<p>
+创建 loki stack:<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm upgrade --install loki grafana/loki --set grafana.enalbed=true --set grafana.service.type=NodePort -n loki
+
+<span style="color: #b22222;">#  </span><span style="color: #b22222;">&#27809;&#26377; grafana &#35774;&#32622;&#20026; true</span>
+</pre>
+</div>
+<p>
+访问grafana<br>
+</p>
+
+<p>
+查看grafana 密码（账号 admin）：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get secret --namespace loki loki-grafana -o <span style="color: #a0522d;">jsonpath</span>=<span style="color: #8b2252;">"{.data.admin-password}"</span> | base64 -d; <span style="color: #483d8b;">echo</span> 
+</pre>
+</div>
+
+<p>
+grfana 页面中点击左边栏 Explore 找到 loki 来查询<br>
+</p>
+</div>
+</div>
+<div id="outline-container-orgbb2819e" class="outline-4">
+<h4 id="orgbb2819e">Loki语法入门</h4>
+<div class="outline-text-4" id="text-orgbb2819e">
+<p>
+语法 prometheus 语法相似<br>
+</p>
+
+<p>
+支持 pipline，如过滤 avg 字段<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">{<span style="color: #a0522d;">namespace</span>=<span style="color: #8b2252;">"kube-system"</span>, <span style="color: #a0522d;">pod</span>=~<span style="color: #8b2252;">"calico.*"</span>} |~ <span style="color: #8b2252;">"avg"</span>
+</pre>
+</div>
+
+<p>
+格式化后过滤，如过滤 avg 字段，同时其中 longest 大于 18ms 的行<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">{<span style="color: #a0522d;">namespace</span>=<span style="color: #8b2252;">"kube-system"</span>, <span style="color: #a0522d;">pod</span>=~<span style="color: #8b2252;">"calico.*"</span>} |~ <span style="color: #8b2252;">"avg"</span> |logfmt| longest &gt; 18ms
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orga6a5602" class="outline-3">
+<h3 id="orga6a5602">样例</h3>
+<div class="outline-text-3" id="text-orga6a5602">
+</div>
+<div id="outline-container-orgd034b6c" class="outline-4">
+<h4 id="orgd034b6c">filebeat+logstash 示例1</h4>
+<div class="outline-text-4" id="text-orgd034b6c">
+</div>
+<div id="outline-container-orgb1329bc" class="outline-5">
+<h5 id="orgb1329bc">从 kafka 收集数据输出到 ES</h5>
+<div class="outline-text-5" id="text-orgb1329bc">
+<p>
+logstash-configmap.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+data:
+  jvm.options: |
+    #-Xms16g
+    #-Xmx16g
+    -XX:+UseG1GC
+    -XX:MaxGCPauseMillis=50
+    -Djava.awt.headless=true
+    -Dfile.encoding=UTF-8
+    -Djruby.compile.invokedynamic=true
+    -Djruby.jit.threshold=0
+    -Djruby.regexp.interruptible=true
+    -XX:+HeapDumpOnOutOfMemoryError
+    -Djava.security.egd=file:/dev/urandom
+    -Dlog4j2.isThreadContextMapInheritable=true
+  logstash.conf: |
+    input {
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "taskcenter-prd-new-${POD_NAME}"
+        client_id =&gt; "taskcenter-prd-client"
+        #group_id =&gt; "taskcenter-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "taskcenter-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_bytes =&gt; "204857600"
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "messagcenter-prd-new-${POD_NAME}"
+        client_id =&gt; "messagcenter-prd-client"
+        #group_id =&gt; "messagecenter-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "messagecenter-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "clevertap-prd-new-${POD_NAME}"
+        client_id =&gt; "clevertap-prd-client"
+        #group_id =&gt; "clevertap-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "clevertap-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_bytes =&gt; "204857600"
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "rummy-sc-prd-new-${POD_NAME}"
+        client_id =&gt; "rummy-sc-prd-client"
+        #group_id =&gt; "rummy-sc-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "rummy-sc-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+    }
+
+    filter {
+      if [kafka_topic] =~ "clevertap-prd" {
+                  grok {
+                      # patterns_dir =&gt; ["/etc/logstash/conf.d"]
+                      match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) %{GREEDYDATA:class}" }
+                  }
+                  date {
+                      match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                      target =&gt; "@timestamp"
+                      timezone =&gt; "Asia/Kolkata"
+                  }
+      }
+      if [kafka_topic] =~ "taskcenter-prd" {
+                  grok {
+                      # patterns_dir =&gt; ["/etc/logstash/conf.d"]
+                      match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) %{GREEDYDATA:class}" }
+                  }
+                  date {
+                      match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                      target =&gt; "@timestamp"
+                      timezone =&gt; "Asia/Kolkata"
+                  }
+      }
+      if [kafka_topic] =~ "messagecenter-prd" {
+                  grok {
+                      # patterns_dir =&gt; ["/etc/logstash/conf.d"]
+                      match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) %{GREEDYDATA:class}" }
+                  }
+                  date {
+                      match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                      target =&gt; "@timestamp"
+                      timezone =&gt; "Asia/Kolkata"
+                  }
+                  #mutate {
+                  #        split =&gt; {"class" =&gt; ":"}
+                  #        add_field =&gt; { "error_class" =&gt; "%{[class][0]}" }
+                  #}
+      }
+      if [kafka_topic] =~ "rummy-sc-prd" {
+                    grok {
+                       match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) (?&lt;logv&gt;(-\s\S+\d|-\s\S+)) (param: AppLogReqParam\(userId=(?&lt;userid&gt;\d+( |)),\scontent=(?&lt;content_json&gt;(\[.*\]|\{.*\})),\stype=(?&lt;apptype&gt;.*)\)|)%{GREEDYDATA:class}" }
+                    }
+
+                    date {
+                       match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                       target =&gt; "@timestamp"
+                       timezone =&gt; "Asia/Kolkata"
+                          }
+      }
+      mutate {
+        remove_field  =&gt; ["agent","ecs","host"]
+      }
+    }
+
+
+    output {
+        #if "-dev" in [kafka_topic] {
+        #if [kafka_topic] =~ "-dev(|\s+)" {
+            elasticsearch {
+                  #hosts =&gt; ["elasticsearch-log-master.public-middleware:9200"]
+                  hosts =&gt; ["elasticsearch-growth.public-middleware:9200"]
+                  #index =&gt; "%{kafka_topic}-%{service}-%{+YYYY.MM.dd}"
+                  index =&gt; "%{[@metadata][kafka][topic]}-%{service}-%{+YYYY.MM.dd}"
+                }
+        #}
+        #if [kafka_topic] =~ "-prd(|\s+)" {
+        #    elasticsearch {
+        #          hosts =&gt; ["elasticsearch-log-master.public-middleware:9200"]
+        #          index =&gt; "%{kafka_topic}-%{+YYYY.MM.dd}"
+        #        }
+        #}
+    }
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    pipeline.workers: 20
+    pipeline.batch.size: 50240
+    pipeline.batch.delay: 10
+    pipeline.ecs_compatibility: disabled
+    config.reload.automatic: true
+    config.reload.interval: 300s
+kind: ConfigMap
+metadata:
+  name: logstash-growth-prd
+  namespace: logstash
+</pre>
+</div>
+
+
+<p>
+logstash-deployment.yaml<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: logstash-growth-prd
+  name: logstash-growth-prd
+  namespace: logstash
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: logstash-growth-prd
+  template:
+    metadata:
+      labels:
+        app: logstash-growth-prd
+    spec:
+      nodeSelector:
+        type: ops-prod-logstash
+        #type: ops-prod-infra
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: logstash-growth-prd
+              namespaces:
+              - logstash
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - env:
+        - name: ES_HOSTS
+          value: es:9200
+        #- name: MY_NODE_NAME
+        #  valueFrom:
+        #    fieldRef:
+        #      apiVersion: v1
+        #      fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: TZ
+          value: Asia/Calcutta
+        image: docker.elastic.co/logstash/logstash:7.17.8
+        imagePullPolicy: IfNotPresent
+        name: logstash-growth-prd
+        ports:
+        - containerPort: 5044
+          protocol: TCP
+        #resources:
+        #  requests:
+        #    memory: "10Gi"
+        #    cpu: "1"
+        #  limits:
+        #    memory: "30Gi"
+        #    cpu: "16"
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/share/logstash/config/jvm.options
+          name: conf
+          subPath: jvm.options
+        - mountPath: /usr/share/logstash/config/logstash.yml
+          name: conf
+          subPath: logstash.yml
+        - mountPath: /usr/share/logstash/pipeline/logstash.conf
+          name: conf
+          subPath: logstash.conf
+        - mountPath: /etc/localtime
+          name: time
+      restartPolicy: Always
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: logstash-growth-prd
+        name: conf
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+          type: ""
+        name: time
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org3471610" class="outline-5">
+<h5 id="org3471610">filebeat</h5>
+<div class="outline-text-5" id="text-org3471610">
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat config/app-config.yaml
+apiVersion: v1
+data:
+  TZ: Asia/Calcutta
+  APP_NAMESPACE: taskcenter-prd
+  APP_ENV: prod
+  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:InitialRAMPercentage=75.0
+    -XX:MinRAMPercentage=75.0
+    -XX:MaxRAMPercentage=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/opt/logs/
+  PreStop.sh: |-
+    #! /bin/bash
+    sleep 50
+    curl  --connect-timeout 5 --max-time 5 -s -i -H "Content-Type: application/json" -X POST  http://localhost:8099/actuator/shutdown
+    sleep 60
+  PreStop_task.sh: |-
+    #! /bin/bash
+    sleep 50
+    curl --connect-timeout 5 --max-time 5 -s -i "http://localhost:8080/xxljob/shutdown"
+    sleep 20
+    curl --connect-timeout 5 --max-time 5 -s -i -H "Content-Type: application/json" -X POST  http://localhost:8099/actuator/shutdown
+    sleep 40
+  app-config.yml: |-
+    - type: log
+      scan_frequency: 10s
+      paths:
+        - '/data/logs/${POD_NAME}/*/*.log'
+      fields:
+        service: ${SERVICE_NAME}
+        kafka_topic: ${KAFKA_TOPIC_NAME}
+      #  LOG_TYPE: 'dc'
+      #  POD_IP: '${POD_IP}'
+      #  POD_NAME: '${POD_NAME}'
+      #  NODE_NAME: '${NODE_NAME}'
+      #  POD_NAMESPACE: '${POD_NAMESPACE}'
+      # json.overwrite_keys: true
+      # json.keys_under_root: true
+      force_close_files: true
+      fields_under_root: true
+      ignore_older: 24h  # 忽略1天前的日志
+      clean_inactive: 25h
+      close_inactive: 20m
+      exclude_lines: ['DEBUG']
+      exclude_files: ['.gz$', 'gc.log']
+      tags: ['taskcenter']
+      multiline.pattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]][0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}[[:space:]]\[)'
+      multiline.negate: true
+      multiline.match: after
+  filebeat.yml: |-
+    filebeat.config.inputs:
+      path: ${path.config}/conf.d/app-config.yml
+      enable: true
+      reload.enabled: true
+      reload.period: 10s
+      max_bytes: 20480  # 单条日志限制20kb
+    # ============================== Filebeat modules ==============================
+    filebeat.config.modules:
+      path: ${path.config}/modules.d/*.yml
+      reload.enabled: false
+      reload.period: 10s
+    # =================================== Filebeat output ===================================
+    output.kafka:
+      enabled: true
+      hosts: ["kafka.xxx.com:9094"]
+      topic: '%{[kafka_topic]}'
+      partition.round_robin:
+        reachable_only: false
+      required_acks: 1
+      compression: gzip
+      max_message_bytes: 1000000
+    # =================================== Queue ===================================
+    max_procs: 1
+    queue.mem:
+      events: 2048
+      flush.min_events: 1024
+      flush.timeout: 2s
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: taskcenter
+</pre>
+</div>
+
+<p>
+日志容器<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat task-center-web/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: task-center-web
+    department: taskcenter
+    env: prod
+  name: task-center-web
+  namespace: taskcenter
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: task-center-web
+      department: taskcenter
+      env: prod
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "10081"
+        prometheus.io/scrape: "true"
+      labels:
+        app: task-center-web
+        department: taskcenter
+        env: prod
+    spec:
+      terminationGracePeriodSeconds: 90
+      nodeSelector:
+        type: paltform-growth-arm
+      topologySpreadConstraints:
+      - maxSkew: 2
+        topologyKey: eks.amazonaws.com/capacityType
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: task-center-web
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: task-center-web
+              namespaces:
+              - taskcenter
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+        #nodeAffinity:
+        #  preferredDuringSchedulingIgnoredDuringExecution:
+        #  - weight: 100
+        #    preference:
+        #      matchExpressions:
+        #      - key: eks.amazonaws.com/capacityType
+        #        operator: In
+        #        values:
+        #        - SPOT
+      initContainers:
+      - image: ops-harbor.xxx.com/devops/skywalking-agent:vv8.7.0
+        name: skywalking-sidecar
+        imagePullPolicy: Always
+        command: ['sh']
+        args: ['-c', 'mkdir -p /skywalking &amp;&amp; /bin/cp -rf /opt/skywalking/agent /skywalking']
+        volumeMounts:
+        - mountPath: /skywalking
+          name: skywalking
+      containers:
+      - args:
+        - -javaagent:/opt/skywalking/agent/skywalking-agent.jar
+        - -server
+        - -XX:+HeapDumpOnOutOfMemoryError
+        - -XX:HeapDumpPath=logs/
+        - -Xms6g
+        - -Xmx6g
+        - -XX:G1HeapRegionSize=16m
+        - -XX:G1ReservePercent=25
+        - -XX:InitiatingHeapOccupancyPercent=30
+        - -XX:SoftRefLRUPolicyMSPerMB=0
+        - -verbose:gc
+        - -Xloggc:logs/$(POD_NAME)/gc.log
+        - -XX:+PrintGCDetails
+        - -XX:+PrintGCDateStamps
+        - -XX:+PrintGCApplicationStoppedTime
+        - -XX:+PrintAdaptiveSizePolicy
+        - -XX:+UseGCLogFileRotation
+        - -XX:NumberOfGCLogFiles=5
+        - -XX:GCLogFileSize=30m
+        - -XX:-OmitStackTraceInFastThrow
+        - -XX:+AlwaysPreTouch
+        - -XX:MaxDirectMemorySize=512m
+        - -XX:-UseLargePages
+        - -XX:LargePageSizeInBytes=128m
+        - -XX:+UseFastAccessorMethods
+        - -XX:-UseBiasedLocking
+        - -Dfile.encoding=UTF-8
+        - -Dspring.profiles.active=k8sprod
+        - -XX:+DisableExplicitGC
+        - -jar
+        - /opt/task-center-web/task-center-web.jar
+        command:
+        - java
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: SW_AGENT_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SW_AGENT_NAME
+          value: "taskcenter-prd-task-center-web"
+        - name: SW_LOGGING_DIR
+          value: "/opt/skywalking/logs"
+        - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+          value: "ops-public-skywalking:11800"
+        image: ops-harbor.xxx.com/taskcenter/task-center-web:dev_20221226_141335
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - curl -X PUT "http://nacos-0.nacos.base.svc.cluster.local:8848/nacos/v1/ns/instance?serviceName=task-center-web&amp;groupName=FENCE_GROUP_PROD&amp;ip=${POD_IP}&amp;port=18081&amp;namespaceId=f043157a-7d73-4f9c-99c0-d90de4db8163&amp;enabled=false"
+                &amp;&amp; sleep 60
+        startupProbe:
+          httpGet:
+            path: /taskcenter/health/check
+            port: 18081
+            scheme: HTTP
+          periodSeconds: 10
+          failureThreshold: 50
+          successThreshold: 1
+          timeoutSeconds: 2
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /taskcenter/health/check
+            port: 18081
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: task-center-web
+        ports:
+        - containerPort: 18081
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /taskcenter/health/check
+            port: 18081
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "2.5"
+            memory: 7.5Gi
+          requests:
+            cpu: "1"
+            memory: 7.5Gi
+        volumeMounts:
+        - mountPath: /opt/task-center-web/logs
+          name: logs
+        - mountPath: /etc/localtime
+          name: time
+        - mountPath: /opt/skywalking
+          name: skywalking
+      - env:
+        - name: TZ
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: TZ
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: KAFKA_TOPIC_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SERVICE_NAME
+          value: "task-center-web"
+        image: docker.elastic.co/beats/filebeat:8.5.2
+        imagePullPolicy: IfNotPresent
+        name: filebeat
+        resources:
+          limits:
+            cpu: 100m
+            memory: 200Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /usr/share/filebeat/filebeat.yml
+          name: filebeat-config
+          subPath: filebeat.yml
+        - mountPath: /usr/share/filebeat/conf.d
+          name: filebeat-config
+        - mountPath: /data/logs
+          name: logs
+      imagePullSecrets:
+      - name: docker-pull
+      securityContext:
+        runAsUser: 0
+      volumes:
+      - configMap:
+          defaultMode: 511
+          name: app-config
+        name: app-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: filebeat.yml
+            path: filebeat.yml
+          - key: app-config.yml
+            path: app-config.yml
+          name: app-config
+        name: filebeat-config
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+          type: ""
+        name: time
+      - emptyDir: {}
+        name: logs
+      - emptyDir: {}
+        name: skywalking
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer data-astro-cid-sz7xmlte data-turbo-permanent id=rootFooter>
+    <script>
+        const shuffle = e => e.map((e => ({
+            v: e,
+            sort: Math.random()
+        }))).sort(( (e, o) => e.sort - o.sort)).map(( ({v: e}) => e));
+        var songList = ["barbie-girl--stantough", "blue-da-ba-dee--cornelius-link", "hips-dont-lie--stantough", "i-want-it-that-way--stantough", "seven-nation-army--stantough", "smooth-criminal--stantough"]
+          , songOrder = songOrder ?? shuffle(songList).map((e => `/audio/music/${e}.opus`))
+          , song = new Audio(songOrder[0])
+          , nextSong = new Audio(songOrder[1])
+          , songIndex = 2
+          , musicWrapper = void 0
+          , arrow = void 0
+          , notes = void 0;
+        song.addEventListener("ended", next);
+        const toggle = () => song.paused ? play() : pause();
+        function play() {
+            song.play(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.add("shakeManHorse"),
+            notes.classList.remove("hideNotes")
+        }
+        function pause() {
+            song.pause(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.remove("shakeManHorse"),
+            notes.classList.add("hideNotes")
+        }
+        function next() {
+            song = nextSong,
+            play(),
+            songIndex === songOrder.length && (songIndex = 0),
+            nextSong = new Audio(songOrder[songIndex]),
+            songIndex += 1
+        }
+        function skip() {
+            pause(),
+            (arrow = arrow || document.getElementById("musicArrow")).classList.add("shootArrow");
+            new Audio("/audio/effects/ohno.m4a").play(),
+            arrow.addEventListener("animationend", arrowShootHandler, !1)
+        }
+        function arrowShootHandler() {
+            arrow.removeEventListener("animationend", arrowShootHandler, !1),
+            arrow.classList.remove("shootArrow");
+            new Audio("/audio/effects/heythathurt.m4a").play(),
+            next()
+        }
+    </script>
+    <div id=musicPlayer data-astro-cid-q7a5pyro>
+        <button class=skip data-astro-cid-q7a5pyro onclick=skip() title="Skip song">
+            <div id=skipWrapper data-astro-cid-q7a5pyro>
+                <img alt="Medieval drollery of a man/snail/bat/monkey shooting an arrow" class=archer decoding=async height=334 loading=lazy src=/images/archer-no-arrow.448ccd8b_Z1KfRYq.webp width=226 data-astro-cid-q7a5pyro>
+                <img alt="Arrow for archer" class="arrow complete" decoding=async height=23 loading=lazy src=/images/no-archer-full-arrow.87aa9971_Z2qL2KO.webp width=141 data-astro-cid-q7a5pyro id=musicArrow>
+            </div>
+        </button>
+        <button class=playPause data-astro-cid-q7a5pyro onclick=toggle() title="Play/pause song">
+            <div id=musicWrapper data-astro-cid-q7a5pyro>
+                <div class=hideNotes id=notesWrapper data-astro-cid-q7a5pyro>
+                    <div class=lyreNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                    <div class=fluteNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                </div>
+                <img alt="Medieval drollery of a man/horse playing a lyre and a horn" class=manHorse decoding=async height=665 loading=lazy src=/images/man-horse-band.e3a2efcf_q8FCa.webp width=531 data-astro-cid-q7a5pyro>
+            </div>
+        </button>
+    </div>
+    <hr data-astro-cid-sz7xmlte>
+    <div class=salutation data-astro-cid-gdmrbrho>
+        <p data-astro-cid-gdmrbrho>
+            <span class=flower2 data-astro-cid-gdmrbrho>A</span>
+            <span class=smallcap data-astro-cid-gdmrbrho>pax vobiscum</span>
+            <span class="flower2 wiggle" data-astro-cid-gdmrbrho id=leaf>a</span>
+        </p>
+    </div>
+    <script>
+        function animateLeafBlownHandler() {
+            leaf.removeEventListener("animationend", animateLeafBlownHandler, !1),
+            leaf.classList.remove("blownAway"),
+            leaf.classList.add("wiggle")
+        }
+        function animateLeaf() {
+            leaf = leaf ?? document.getElementById("leaf"),
+            leaf.classList.remove("wiggle"),
+            leaf.classList.add("blownAway"),
+            leaf.addEventListener("animationend", animateLeafBlownHandler, !1)
+        }
+        document.getElementById("leaf").onclick = animateLeaf
+    </script>
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2024 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+</footer>
+</footer>
+</body>
+</html>

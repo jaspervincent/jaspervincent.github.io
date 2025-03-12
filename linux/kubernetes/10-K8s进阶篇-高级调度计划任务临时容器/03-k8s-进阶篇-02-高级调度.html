@@ -1,0 +1,2544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 进阶篇-高级调度</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/drollery.e825b870.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="{className}" data-astro-cid-3ef6ksr2>
+  <div class=header-branding data-astro-cid-g2lrb5xm>
+      <span class=header-text data-astro-cid-g2lrb5xm>
+          <span class=dropcap data-astro-cid-g2lrb5xm aria-hidden=true>
+              <span class=actual data-astro-cid-g2lrb5xm>J</span>
+              <span class=rest data-astro-cid-g2lrb5xm>asper Hsu</span>
+              <span class=period data-astro-cid-g2lrb5xm>.</span>
+          </span>
+          <span class=sr-only data-astro-cid-g2lrb5xm>Drollery</span>
+      </span>
+      <img alt="Medieval drollery of a knight on a horse" class=spring decoding=async height=250 loading=lazy src=/images/knight-horse.a96eee7d_Z1WCOYs.webp width=68 data-astro-cid-g2lrb5xm>
+  </div>
+
+  <nav data-astro-cid-pux6a34n>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/jcodelog.html class=nobracket data-astro-cid-pux6a34n>技术</a>
+      <span class=flower2 data-astro-cid-pux6a34n>K</span>
+      <a href=/reading/index.html class=nobracket data-astro-cid-pux6a34n>阅读</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+      <a href=/lisp/jasper-emacs.html class=nobracket data-astro-cid-pux6a34n>我的Emacs配置</a>
+      <span class=flower2 data-astro-cid-pux6a34n>L</span>
+      <a href=/link/index.html class=nobracket data-astro-cid-pux6a34n>友链</a>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/about.html class=nobracket data-astro-cid-pux6a34n>关于</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+  </nav>
+
+
+  <div class="container" data-astro-cid-3ef6ksr2>
+    <p class="info" data-astro-cid-3ef6ksr2>
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+  <div id=borderArtWrapper class="tt1" data-astro-cid-5hce7sga data-turbo-permanent>
+      <script>
+          var man, shakeCount = 0, noSound = new Audio("/audio/effects/no.m4a"), screamSound = new Audio("/audio/effects/scream.m4a");
+          function animateManShakeHandler() {
+              man.removeEventListener("animationend", animateManShakeHandler, !1),
+              shakeCount += 1,
+              man.classList.remove("shakeMan")
+          }
+          function animateManFallHandler() {
+              man.removeEventListener("animationend", animateManFallHandler, !1),
+              man.classList.add("hide")
+          }
+          function animateMan() {
+              man = man ?? document.getElementById("borderMan"),
+              3 === shakeCount ? (man.classList.add("fallMan"),
+              screamSound.play(),
+              man.addEventListener("animationend", animateManFallHandler, !1)) : (man.classList.add("shakeMan"),
+              noSound.play(),
+              man.addEventListener("animationend", animateManShakeHandler, !1))
+          }
+      </script>
+      <div class=borderArt data-astro-cid-5dda5nwp id=articleBorder>
+          <img alt="flowery border with man falling" decoding=async height=620 loading=lazy src=/images/border-vines-no-man.b7d246cc_DRxSe.webp width=909 class=border data-astro-cid-5dda5nwp>
+          <div class=fallWrapper data-astro-cid-5dda5nwp>
+              <img alt="flowery border with man falling" decoding=async height=292 loading=lazy src=/images/man-no-vines.247a3187_Z2ioXNM.webp width=98 class=man data-astro-cid-5dda5nwp id=borderMan onclick=animateMan()>
+          </div>
+      </div>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 进阶篇-高级调度</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org4b58b16">进阶篇-高级调度</a>
+<ul>
+<li><a href="#org77e9a2c">CronJob</a>
+<ul>
+<li><a href="#org1c5e35d">什么是 Job</a></li>
+<li><a href="#org917968f">Job 使用</a></li>
+<li><a href="#org54dc81a">更强大的计划任务 CronJob 介绍</a>
+<ul>
+<li><a href="#org5ae1c67">CronJob 配置参数</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org96c62de">InitContainer介绍</a>
+<ul>
+<li><a href="#org40feb4a">初始化容器的用途</a></li>
+<li><a href="#org5d9eaf2">初始化容器和普通容器、PostStart 区别</a></li>
+<li><a href="#orgb120401">什么是Init Container</a></li>
+<li><a href="#orgd3e176c">初始化容器配置解析</a></li>
+<li><a href="#org2e6b1a8">初始化容器使用示例</a></li>
+</ul>
+</li>
+<li><a href="#org08434ee">临时容器</a>
+<ul>
+<li><a href="#org5d97ff9">为什么要用临时容器</a>
+<ul>
+<li><a href="#orgd4be832">从镜像的角度探讨容器的安全</a></li>
+<li><a href="#org9ea6427">临时容器</a></li>
+<li><a href="#org360067c">开启临时容器</a></li>
+</ul>
+</li>
+<li><a href="#org7945813">使用临时容器在线 debug</a>
+<ul>
+<li><a href="#orga6f5178">json 方式临时容器</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org08dc2bb">污点Taint和容忍Toleration</a>
+<ul>
+<li><a href="#orgbcccf2c">容忍和污点Taint和Toleration 设计理念</a>
+<ul>
+<li><a href="#orgb212eb0">生产环境的调度并非随便</a></li>
+<li><a href="#org5fe6033">容忍和污点Taint和Toleration</a></li>
+</ul>
+</li>
+<li><a href="#org195329e">污点和容忍配置解析</a>
+<ul>
+<li><a href="#org751deef">污点(Taint)配置解析</a></li>
+<li><a href="#org212a3bd">Toleration 配置解析</a></li>
+</ul>
+</li>
+<li><a href="#orgb86b445">Taint 和  nodeSelector 区别：</a></li>
+<li><a href="#org7f2e04e">污点和容忍配置解析示例</a></li>
+<li><a href="#org2663a82">内置污点</a>
+<ul>
+<li><a href="#orgc414699">实现节点宕机快速迁移服务</a></li>
+</ul>
+</li>
+<li><a href="#org22a02f2">Taint 命令入门</a></li>
+</ul>
+</li>
+<li><a href="#orgb34cfae">Affinity 亲和力</a>
+<ul>
+<li><a href="#orga87d0a0">生产环境依旧存在高可用率问题</a></li>
+<li><a href="#orgcd8a615">Affinity 分类</a>
+<ul>
+<li><a href="#org29d8d46">提升可用性</a></li>
+</ul>
+</li>
+<li><a href="#orgde29881">节点亲和力配置</a></li>
+<li><a href="#orgd9380aa">Pod 亲和力和反亲和力配置</a></li>
+<li><a href="#org3289008">范例</a>
+<ul>
+<li><a href="#orga97f3eb">范例-实现同一个应用分布在不同缩主机</a></li>
+<li><a href="#org602d5a8">范例-应用和缓存尽量部署在同一个域内</a></li>
+<li><a href="#org681202b">范例-尽量调度到高配置服务器</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#orgf0e84ee">Topology 拓扑域</a>
+<ul>
+<li><a href="#orgda0f174">Topology拓扑域的重要性</a></li>
+<li><a href="#org98bf9dd">如何使用topologyKey</a>
+<ul>
+<li><a href="#orga2390df">同一个应用多区域部署</a></li>
+</ul>
+</li>
+<li><a href="#orga591352">注意事项</a></li>
+</ul>
+</li>
+<li><a href="#org3130246">弹性伸缩方案</a>
+<ul>
+<li><a href="#orga908c91">虚拟节点</a></li>
+</ul>
+</li>
+<li><a href="#org8cc65fa">参考</a>
+<ul>
+<li><a href="#orgdccb66d">Pod 拓扑分布约束</a>
+<ul>
+<li><a href="#org5900cbd">aws on-demand 与 spot 实例混部</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a><br></li>
+</ul>
+<section id="outline-container-org4b58b16" class="outline-2">
+<h2 id="org4b58b16">进阶篇-高级调度</h2>
+<div class="outline-text-2" id="text-org4b58b16">
+</div>
+<div id="outline-container-org77e9a2c" class="outline-3">
+<h3 id="org77e9a2c">CronJob</h3>
+<div class="outline-text-3" id="text-org77e9a2c">
+</div>
+<div id="outline-container-org1c5e35d" class="outline-4">
+<h4 id="org1c5e35d">什么是 Job</h4>
+<div class="outline-text-4" id="text-org1c5e35d">
+<p>
+<img src="./images/Snipaste_2022-09-16_15-14-28.png" alt="Snipaste_2022-09-16_15-14-28.png"><br>
+<img src="./images/Snipaste_2022-09-16_17-42-56.png" alt="Snipaste_2022-09-16_17-42-56.png"><br>
+</p>
+
+<ul class="org-ul">
+<li>等待可用后才执行<br></li>
+<li>并行执行多个 pod，分别执行各自的逻辑<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org917968f" class="outline-4">
+<h4 id="org917968f">Job 使用</h4>
+<div class="outline-text-4" id="text-org917968f">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: batch/v1
+kind: Job
+metadata:
+  name: echo
+  labels:
+    job-name: echo
+  namespace: default
+spec:
+  suspend: true # 1.21+
+  ttlSecondsAfterFinished: 100
+  backoffLimit: 4
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      containers:
+      - name: echo
+        image: perl:5.34.0
+        command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+        imagePullPolicy: IfNotPresent
+        resources: {}
+      restartPolicy: Never
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>suspend：默认 false，马上开始执行 Pod。设置为 true 为挂起状态不执行 pod。<br>
+<ul class="org-ul">
+<li><code>kubectl patch job/xxx --type=strategic --patch '{"spec":{"suspend":false}}'</code><br></li>
+</ul></li>
+<li>backoffLimit: 如果任务执行失败，失败多少次后不再执行<br></li>
+<li>completions：有多少个Pod执行成功，认为任务是成功的<br>
+<ul class="org-ul">
+<li>为空默认和parallelism数值一样<br></li>
+</ul></li>
+<li>parallelism：并行执行任务的数量<br>
+<ul class="org-ul">
+<li>如果parallelism数值大于未完成任务数，只会创建未完成的数量；比如completions是4，并发是3，第一次会创建3个Pod执行任务，第二次只会创建一个Pod执行任务<br></li>
+</ul></li>
+<li>ttlSecondsAfterFinished：Job在执行结束之后（状态为completed或Failed）自动清理。设置为0表示执行结束立即删除，不设置则不会清除，需要开启TTLAfterFinished特性<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org54dc81a" class="outline-4">
+<h4 id="org54dc81a">更强大的计划任务 CronJob 介绍</h4>
+<div class="outline-text-4" id="text-org54dc81a">
+<div class="org-src-container">
+<pre class="src src-shell">&#22312;k8s &#37324;&#38754;&#36816;&#34892;&#21608;&#26399;&#24615;&#30340;&#35745;&#21010;&#20219;&#21153;&#65292;crontab
+* * * * * &#20998;&#26102;&#26085;&#26376;&#21608;
+
+&#21487;&#20197;&#21033;&#29992; CronJobs &#25191;&#34892;&#22522;&#20110;&#26102;&#38388;&#35843;&#24230;&#30340;&#20219;&#21153;&#12290;&#36825;&#20123;&#33258;&#21160;&#21270;&#20219;&#21153;&#21644; Linux &#25110;&#32773; Unix &#31995;&#32479;&#30340; Cron &#20219;&#21153;&#31867;&#20284;
+CronJobs&#22312;&#21019;&#24314;&#21608;&#26399;&#24615;&#20197;&#21450;&#37325;&#22797;&#24615;&#30340;&#20219;&#21153;&#26102;&#24456;&#26377;&#24110;&#21161;&#65292;&#20363;&#22914;&#25191;&#34892;&#22791;&#20221;&#25805;&#20316;&#25110;&#32773;&#21457;&#36865;&#37038;&#20214;&#12290;CronJobs &#20063;&#21487;&#20197;&#22312;&#29305;&#23450;&#26102;&#38388;&#35843;&#24230;&#21333;&#20010;&#20219;&#21153;&#65292;&#20363;&#22914;&#20320;&#24819;&#35843;&#24230;&#20302;&#27963;&#36291;&#21608;&#26399;&#30340;&#20219;&#21153;&#12290;
+</pre>
+</div>
+
+<p>
+.spec.schedule 字段是必需的。该字段的值遵循 <a href="https://zh.wikipedia.org/wiki/Cron">Cron</a> 语法：<br>
+</p>
+<pre class="example" id="org2277279">
+# ┌───────────── 分钟 (0 - 59)
+# │ ┌───────────── 小时 (0 - 23)
+# │ │ ┌───────────── 月的某天 (1 - 31)
+# │ │ │ ┌───────────── 月份 (1 - 12)
+# │ │ │ │ ┌───────────── 周的某天 (0 - 6)（周日到周六）
+# │ │ │ │ │                          或者是 sun，mon，tue，web，thu，fri，sat
+# │ │ │ │ │
+# │ │ │ │ │
+# * * * * *
+</pre>
+</div>
+<div id="outline-container-org5ae1c67" class="outline-5">
+<h5 id="org5ae1c67">CronJob 配置参数</h5>
+<div class="outline-text-5" id="text-org5ae1c67">
+<p>
+和 Job 配置类似<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello
+  labels:
+    run: hell
+  namespace: default
+spec:
+  concurrencyPolicy: Allow
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 64800
+      template:
+        metadata:
+          labels:
+            run: hello
+        spec:
+          containers:
+          - name: hello
+            image: busybox:1.28
+            imagePullPolicy: IfNotPresent
+            args:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+            resources: {}
+          restartPolicy: OnFailure
+  schedule: "*/1 * * * *"
+  successfulJobsHistoryLimit: 3
+  suspend: false
+</pre>
+</div>
+
+<p>
+参数说明：<br>
+</p>
+<ul class="org-ul">
+<li>apiVersion: batch/v1beta1 #1.21+ batch/v1<br></li>
+<li>schedule：调度周期，和Linux一致，分别是分时日月周。<br></li>
+<li>restartPolicy：重启策略，和Pod一致。<br></li>
+<li>concurrencyPolicy：并发调度策略。可选参数如下：<br>
+<ul class="org-ul">
+<li>Allow： 默认，允许同时运行多个任务。<br></li>
+<li>Forbid：不允许并发运行，如果之前的任务尚未完成，新的任务不会被创建。<br></li>
+<li>Replace：如果之前的任务尚未完成，新的任务会替换的之前的任务。<br></li>
+</ul></li>
+<li>suspend：如果设置为true，则暂停后续的任务，默认为false。<br></li>
+<li>successfulJobsHistoryLimit：保留多少已完成的任务，按需配置。默认为 3<br></li>
+<li>failedJobsHistoryLimit：保留多少失败的任务。 默认为 1，设置为 0 代表相应类型的任务完成后不会保留。<br></li>
+<li>jobTemplate.spec.ttlSecondsAfterFinished: Job在执行结束之后（状态为completed或Failed）自动清理。默认不清理。<br></li>
+</ul>
+
+<p>
+范例 crontJob mysql 删除表数据<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ludo-xxl-job-clean
+  namespace: ludo
+spec:
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 64800
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -c
+            - echo 操作前总数为：;mysql -h$HOST -P 6033 -u$USER -p$PASSWORD ludo_xxl_job -e 'select count(*)
+              from xxl_job_log';mysql -h$HOST -P 6033 -u$USER -p$PASSWORD ludo_xxl_job
+              -e 'delete from xxl_job_log';  echo 操作后总数为：;mysql -h$HOST -P 6033 -u$USER -p$PASSWORD
+              ludo_xxl_job -e 'select count(*) from xxl_job_log'
+            env:
+            - name: HOST
+              value: nlbxxx.elb.ap-south-1.amazonaws.com
+            - name: USER
+              value: xxl_job
+            - name: PASSWORD
+              value: FfVFSj/fdUCRYZ8Y
+            image: mysql:5.7
+            imagePullPolicy: Always
+            name: ludo-xxl-job-clean
+          nodeSelector:
+            type: prod-app
+          restartPolicy: OnFailure
+  schedule: "58 1 * * *"
+</pre>
+</div>
+
+<p>
+自动清理<br>
+ttlSecondsAfterFinished: 64800 每 12 小时清理一次<br>
+</p>
+
+<p>
+查看job<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 app]# kubectl get cj hello
+NAME    SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+hello   */1 * * * *   False     6        4s              8m20s
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21024;&#38500;</span>
+[root@k8s-master01 app]# kubectl delete cronjob hello
+cronjob.batch <span style="color: #8b2252;">"hello"</span> deleted
+</pre>
+</div>
+
+
+<p>
+范例：定时重启服务<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployment-restart
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployment-restart
+  namespace: default
+rules:
+- apiGroups: [<span style="color: #8b2252;">"apps"</span>, <span style="color: #8b2252;">"extensions"</span>]
+  resources: [<span style="color: #8b2252;">"deployments"</span>]
+  resourceNames: [<span style="color: #8b2252;">"singapore-report"</span>]
+  verbs: [<span style="color: #8b2252;">"get"</span>, <span style="color: #8b2252;">"patch"</span>, <span style="color: #8b2252;">"list"</span>, <span style="color: #8b2252;">"watch"</span>]
+- apiGroups: [<span style="color: #8b2252;">""</span>]
+  resources: [<span style="color: #8b2252;">"pods"</span>]
+  verbs: [<span style="color: #8b2252;">"get"</span>, <span style="color: #8b2252;">"patch"</span>,<span style="color: #8b2252;">"delete"</span>,<span style="color: #8b2252;">"list"</span>, <span style="color: #8b2252;">"watch"</span>]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployment-restart
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deployment-restart
+subjects:
+- kind: ServiceAccount
+  name: deployment-restart
+  namespace: default
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: deployment-restart
+  namespace: default
+spec:
+  concurrencyPolicy: Forbid
+  schedule: <span style="color: #8b2252;">'0 0 * * 0'</span>  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21608;&#26085;0&#28857;</span>
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 64800
+      backoffLimit: 2
+      activeDeadlineSeconds: 900  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#22686;&#21152;&#36229;&#26102;&#26102;&#38388;&#20197;&#24212;&#23545;&#22797;&#26434;&#24773;&#20917;</span>
+      template:
+        spec:
+          serviceAccountName: deployment-restart
+          restartPolicy: OnFailure
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl:latest
+            <span style="color: #483d8b;">command</span>:
+            - /bin/bash
+            - -c
+            - &gt;-
+              which kubectl; kubectl version ; kubectl rollout restart
+              deployment singapore-report ; 
+              <span style="color: #a0522d;">pod_names</span>=<span style="color: #ff00ff;">`kubectl get po --field-selector 'status.phase=Failed'  |sed '1d'|awk '{print $1}'`</span> ;  
+              <span style="color: #a020f0;">if</span> [ -n <span style="color: #8b2252;">"$pod_names"</span> ]; <span style="color: #a020f0;">then</span>  
+              <span style="color: #a020f0;">for</span> p<span style="color: #a020f0;"> in</span> ${<span style="color: #a0522d;">pod_names</span>};<span style="color: #a020f0;">do</span>
+                <span style="color: #483d8b;">echo</span> delete $<span style="color: #a0522d;">p</span> ;
+                kubectl delete po $<span style="color: #a0522d;">p</span> ;
+              <span style="color: #a020f0;">done</span>  ;   
+              <span style="color: #a020f0;">else</span>  
+              <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">'Nothing to do'</span> ;  
+              <span style="color: #a020f0;">fi</span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">volumeMounts:</span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">- name: script-volume</span>
+<span style="color: #b22222;">#              </span><span style="color: #b22222;">mountPath: /etc/script</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">volumes:</span>
+<span style="color: #b22222;">#          </span><span style="color: #b22222;">- name: script-volume</span>
+<span style="color: #b22222;">#            </span><span style="color: #b22222;">configMap:</span>
+<span style="color: #b22222;">#              </span><span style="color: #b22222;">name: restart-script-cm</span>
+
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: restart-script-cm
+  namespace: default
+data:
+  restart-script: |
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">kubectl --kubeconfig=/tmp/.confg rollout restart deployment/my-deployment</span>
+    which kubectl
+    kubectl version
+    cat /tmp/.config
+---
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org96c62de" class="outline-3">
+<h3 id="org96c62de">InitContainer介绍</h3>
+<div class="outline-text-3" id="text-org96c62de">
+</div>
+<div id="outline-container-org40feb4a" class="outline-4">
+<h4 id="org40feb4a">初始化容器的用途</h4>
+<div class="outline-text-4" id="text-org40feb4a">
+<ul class="org-ul">
+<li>Init 容器可以包含一些安装过程中应用容器中不存在的实用工具或个性化代码；<br></li>
+<li>Init 容器可以安全地运行这些工具，避免这些工具导致应用镜像的安全性降低；<br></li>
+<li>Init容器可以以root身份运行，执行一些高权限命令；<br></li>
+<li>Init容器相关操作执行完成以后即退出，不会给业务容器带来安全隐患。<br></li>
+</ul>
+
+<p>
+在主应用启动之前，做一些初始化的操作，比如创建文件、修改内核参数、等待依赖程序启动或其他需要在主程序启动之前需要做的工作<br>
+</p>
+</div>
+</div>
+<div id="outline-container-org5d9eaf2" class="outline-4">
+<h4 id="org5d9eaf2">初始化容器和普通容器、PostStart 区别</h4>
+<div class="outline-text-4" id="text-org5d9eaf2">
+<p>
+初始化容器和PostStart区别：<br>
+</p>
+<ul class="org-ul">
+<li>PostStart：依赖主应用的环境，而且并不一定先于Command运行<br></li>
+<li>InitContainer：不依赖主应用的环境，可以有更高的权限和更多的工具，一定会在主应用启动之前完成<br></li>
+</ul>
+
+<p>
+初始化容器和普通容器的区别：<br>
+Init 容器与普通的容器非常像，除了如下几点：<br>
+</p>
+<ul class="org-ul">
+<li>它们总是运行到完成；<br></li>
+<li>上一个运行完成才会运行下一个；<br></li>
+<li>如果 Pod 的 Init 容器失败，Kubernetes 会不断地重启该 Pod，直到 Init 容器成功为止，但是Pod 对应的 restartPolicy 值为 Never，Kubernetes 不会重新启动 Pod。<br></li>
+<li>Init 容器不支持 lifecycle、livenessProbe、readinessProbe 和 startupProbe<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgb120401" class="outline-4">
+<h4 id="orgb120401">什么是Init Container</h4>
+<div class="outline-text-4" id="text-orgb120401">
+<p>
+Init Container就是用来做初始化工作的容器，可以是一个或者多个，如果有多个的话，这些容器会按定义的顺序依次执行，只有所有的Init Container执行完后，主容器才会被启动。我们知道一个Pod里面的所有容器是共享数据卷和网络命名空间的，所以Init Container里面产生的数据可以被主容器使用到的。<br>
+</p>
+
+<p>
+Init Container与应用容器本质上是一样的，但他们是仅运行一次就结束的任务，并且必须在成功执行完后，系统才能继续执行下一个容器<br>
+</p>
+</div>
+</div>
+<div id="outline-container-orgd3e176c" class="outline-4">
+<h4 id="orgd3e176c">初始化容器配置解析</h4>
+<div class="outline-text-4" id="text-orgd3e176c">
+<ul class="org-ul">
+<li>initContainers 和 containers 、volumes 是同级的。<br></li>
+<li>修改目录权限时一定要把目录挂载起来<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org2e6b1a8" class="outline-4">
+<h4 id="org2e6b1a8">初始化容器使用示例</h4>
+<div class="outline-text-4" id="text-org2e6b1a8">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: test-init
+  name: test-init
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: test-init
+  template:
+    metadata:
+      labels:
+        app: test-init
+    spec:
+      volumes:
+      - name: data
+        emptyDir: {}
+      initContainers: 
+      - command:
+        - sh
+        - -c 
+        - touch /mnt/test-init.txt
+        image: nginx
+        imagePullPolicy: IfNotPresent
+        name: init-touch
+        volumeMounts: 
+        - name: data
+          mountPath: /mnt
+      - command:
+        - sh
+        - -c 
+        - for i in `seq 1 100`; do echo $i; sleep 1; done
+        image: nginx
+        imagePullPolicy: IfNotPresent
+        name: echo
+      containers:
+      - image: nginx
+        imagePullPolicy: IfNotPresent
+        name: test-init
+        volumeMounts: 
+        - name: data
+          mountPath: /mnt
+</pre>
+</div>
+
+
+<p>
+查看 pod 容器的日志，先 `describe` 看哪个初始化容器没执行完，使用 `logs`查看<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl  logs -f test-init-7c58ff4db4-dbhrx -c echo
+1
+2
+3
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org08434ee" class="outline-3">
+<h3 id="org08434ee">临时容器</h3>
+<div class="outline-text-3" id="text-org08434ee">
+</div>
+<div id="outline-container-org5d97ff9" class="outline-4">
+<h4 id="org5d97ff9">为什么要用临时容器</h4>
+<div class="outline-text-4" id="text-org5d97ff9">
+</div>
+<div id="outline-container-orgd4be832" class="outline-5">
+<h5 id="orgd4be832">从镜像的角度探讨容器的安全</h5>
+<div class="outline-text-5" id="text-orgd4be832">
+
+<figure id="org1e7d8b6">
+<img src="./images/Snipaste_2022-09-18_22-30-17.png" alt="Snipaste_2022-09-18_22-30-17.png"><br>
+
+</figure>
+
+<ul class="org-ul">
+<li>容器中有 bash 或 sh ，通过渗透可以注入 sidecar 当矿机<br></li>
+<li>不要以 root 身份的运行 pod，不会安装一些工具包<br></li>
+</ul>
+
+<p>
+容器没有 root 权限或者一些工具命令，程序出问题时不好排查。<br>
+</p>
+</div>
+</div>
+<div id="outline-container-org9ea6427" class="outline-5">
+<h5 id="org9ea6427">临时容器</h5>
+<div class="outline-text-5" id="text-org9ea6427">
+
+<figure id="org0dd43c3">
+<img src="./images/Snipaste_2022-09-18_22-37-43.png" alt="Snipaste_2022-09-18_22-37-43.png"><br>
+
+</figure>
+
+<ul class="org-ul">
+<li>shareProcessNamespace 默认是打开的<br></li>
+</ul>
+
+<p>
+在 pod 中注入临时容器：<br>
+</p>
+<ul class="org-ul">
+<li>有 root 权限<br></li>
+<li>有 debug 工具<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org360067c" class="outline-5">
+<h5 id="org360067c">开启临时容器</h5>
+<div class="outline-text-5" id="text-org360067c">
+<p>
+二进制修改方式<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">master &#33410;&#28857;</span>
+vi /usr/lib/systemd/system/kube-apiserver.service
+--feature-gates=<span style="color: #a0522d;">EphemeralContainers</span>=true
+
+vi /usr/lib/systemd/system/kube-controller-manager.service
+--feature-gates=<span style="color: #a0522d;">EphemeralContainers</span>=true
+
+vi /usr/lib/systemd/system/kube-scheduler.service
+--feature-gates=<span style="color: #a0522d;">EphemeralContainers</span>=true
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">node &#33410;&#28857;</span>
+vi /usr/lib/systemd/system/kube-proxy.service
+--feature-gates=<span style="color: #a0522d;">EphemeralContainers</span>=true
+vi /etc/kubernetes/kubelet-conf.yml
+featureGates:
+EphemeralContainers: true
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#37325;&#21551;&#25152;&#26377;&#26381;&#21153;</span>
+systemctl daemon-reload
+systemctl restart kube-apiserver kube-scheduler kube-controller-mannager kubelet kube-proxy
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21028;&#26029;&#26159;&#21542;&#29983;&#25928;&#26041;&#27861;&#65306;&#37197;&#32622;&#22909;&#20102;&#65292;&#33021;&#20351;&#29992;&#21629;&#20196;&#25554;&#20214;&#20020;&#26102;&#23481;&#22120;&#35828;&#26126;&#26159;&#21487;&#20197;&#30340;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org7945813" class="outline-4">
+<h4 id="org7945813">使用临时容器在线 debug</h4>
+<div class="outline-text-4" id="text-org7945813">
+<p>
+临时容器使用<br>
+K8s 1.16+ <a href="https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/">https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/</a><br>
+</p>
+
+<p>
+K8s 1.18+ `kubectl alpha debug redis-new-5b577b46c7-2jv4j -ti &#x2013;image=registry.cn-beijing.aliyuncs.com/dotbalo/debug-tools`<br>
+</p>
+
+<p>
+K8s 1.20+ `kubectl debug redis-new-5b577b46c7-2jv4j -ti &#x2013;image=registry.cn-beijing.aliyuncs.com/dotbalo/debug-tools`<br>
+</p>
+
+<p>
+`kubectl debug node/k8s-node01 -it &#x2013;image=registry.cn-beijing.aliyuncs.com/dotbalo/debug-tools`<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">]$ kubectl exec -it stg-prometheus-kube-state-metrics-598bc78c87-j6cpc bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed<span style="color: #a020f0;"> in</span> a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+OCI runtime exec failed: exec failed: container_linux.go:380: starting container process caused: exec: <span style="color: #8b2252;">"bash"</span>: executable file not found<span style="color: #a020f0;"> in</span> $<span style="color: #a0522d;">PATH</span>: unknown
+<span style="color: #483d8b;">command</span> terminated with exit code 126
+
+]$ kubectl exec -it stg-prometheus-kube-state-metrics-598bc78c87-j6cpc sh
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed<span style="color: #a020f0;"> in</span> a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+OCI runtime exec failed: exec failed: container_linux.go:380: starting container process caused: exec: <span style="color: #8b2252;">"sh"</span>: executable file not found<span style="color: #a020f0;"> in</span> $<span style="color: #a0522d;">PATH</span>: unknown
+<span style="color: #483d8b;">command</span> terminated with exit code 126
+
+
+kubectl  debug stg-prometheus-kube-state-metrics-598bc78c87-j6cpc -it --image=busybox
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22914;&#26524;&#19978;&#38754;&#32456;&#31471;&#21345;&#27515;&#21487;&#20197;&#20351;&#29992; exec &#36827;&#20837;&#23481;&#22120;</span>
+kubectl exec -it podName -c containName -- bash
+</pre>
+</div>
+</div>
+<div id="outline-container-orga6f5178" class="outline-5">
+<h5 id="orga6f5178">json 方式临时容器</h5>
+<div class="outline-text-5" id="text-orga6f5178">
+<p>
+临时容器：一种特殊的容器，该容器在现有 [Pod](<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/">https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/</a>) 中临时运行，以便完成用户发起的操作，例如故障排查。 你会使用临时容器来检查服务，而不是用它来构建应用程序。<br>
+</p>
+
+<p>
+临时容器与其他容器的不同之处在于，它们缺少对资源或执行的保证，并且永远不会自动重启， 因此不适用于构建应用程序。 临时容器使用与常规容器相同的 <code>ContainerSpec</code> 节来描述，但许多字段是不兼容和不允许的。<br>
+</p>
+
+<ul class="org-ul">
+<li>临时容器没有端口配置，因此像 ports，livenessProbe，readinessProbe 这样的字段是不允许的。<br></li>
+<li>Pod 资源分配是不可变的，因此 <code>resources</code> 配置是不允许的。<br></li>
+<li>有关允许字段的完整列表，请参见 [EphemeralContainer 参考文档](<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#ephemeralcontainer-v1-core">https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#ephemeralcontainer-v1-core</a>)。<br></li>
+</ul>
+
+<p>
+临时容器是使用 API 中的一种特殊的 <code>ephemeralcontainers</code> 处理器进行创建的， 而不是直接添加到 <code>pod.spec</code> 段，因此无法使用 <code>kubectl edit</code> 来添加一个临时容器。<br>
+</p>
+
+<p>
+与常规容器一样，将临时容器添加到 Pod 后，将不能更改或删除临时容器。<br>
+</p>
+
+<p>
+临时容器是使用 Pod 的 <code>ephemeralcontainers</code> 子资源创建的，可以使用 <code>kubectl --raw</code> 命令进行显示。 首先描述临时容器被添加为一个 <code>EphemeralContainers</code> 列表：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-json">{
+    "apiVersion": "v1",
+    "kind": "EphemeralContainers",
+    "metadata": {
+        "name": "example-pod"
+    },
+    "ephemeralContainers": [{
+        "command": [
+            "sh"
+        ],
+        "image": "busybox",
+        "imagePullPolicy": "IfNotPresent",
+        "name": "debugger",
+        "stdin": true,
+        "tty": true,
+        "terminationMessagePolicy": "File"
+    }]
+}
+</pre>
+</div>
+
+<p>
+使用如下命令更新已运行的临时容器 =example-pod=：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl replace --raw /api/v1/namespaces/default/pods/example-pod/ephemeralcontainers  -f ec.json
+</pre>
+</div>
+
+<p>
+这将返回临时容器的新列表：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-json">{
+   "kind":"EphemeralContainers",
+   "apiVersion":"v1",
+   "metadata":{
+      "name":"example-pod",
+      "namespace":"default",
+      "selfLink":"/api/v1/namespaces/default/pods/example-pod/ephemeralcontainers",
+      "uid":"a14a6d9b-62f2-4119-9d8e-e2ed6bc3a47c",
+      "resourceVersion":"15886",
+      "creationTimestamp":"2019-08-29T06:41:42Z"
+   },
+   "ephemeralContainers":[
+      {
+         "name":"debugger",
+         "image":"busybox",
+         "command":[
+            "sh"
+         ],
+         "resources":{
+
+         },
+         "terminationMessagePolicy":"File",
+         "imagePullPolicy":"IfNotPresent",
+         "stdin":true,
+         "tty":true
+      }
+   ]
+}
+</pre>
+</div>
+
+<p>
+可以使用以下命令查看新创建的临时容器的状态：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl describe pod example-pod
+</pre>
+</div>
+
+<p>
+输出为：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">...
+Ephemeral Containers:
+  debugger:
+    Container ID:  docker://cf81908f149e7e9213d3c3644eda55c72efaff67652a2685c1146f0ce151e80f
+    Image:         busybox
+    Image ID:      docker-pullable://busybox@sha256:9f1003c480699be56815db0f8146ad2e22efea85129b5b5983d0e0fb52d9ab70
+    Port:          &lt;none&gt;
+    Host Port:     &lt;none&gt;
+    Command:
+      sh
+    State:          Running
+      Started:      Thu, 29 Aug 2019 06:42:21 +0000
+    Ready:          False
+    Restart Count:  0
+    Environment:    &lt;none&gt;
+    Mounts:         &lt;none&gt;
+...
+</pre>
+</div>
+
+<p>
+可以使用以下命令连接到新的临时容器：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl attach -it example-pod -c debugger
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org08dc2bb" class="outline-3">
+<h3 id="org08dc2bb">污点Taint和容忍Toleration</h3>
+<div class="outline-text-3" id="text-org08dc2bb">
+</div>
+<div id="outline-container-orgbcccf2c" class="outline-4">
+<h4 id="orgbcccf2c">容忍和污点Taint和Toleration 设计理念</h4>
+<div class="outline-text-4" id="text-orgbcccf2c">
+</div>
+<div id="outline-container-orgb212eb0" class="outline-5">
+<h5 id="orgb212eb0">生产环境的调度并非随便</h5>
+<div class="outline-text-5" id="text-orgb212eb0">
+<ul class="org-ul">
+<li>Master节点：其他类型的 Pod 不要部署到我身上<br>
+<ul class="org-ul">
+<li>Kube-Proxy, Kube-ControllerManager, Kube-APIServer, Calico, Metrics-Server, Dashboard<br></li>
+</ul></li>
+<li>新增节点：我还没有经过完整的可用性测试，不能部署 Pod 到我身上<br></li>
+<li>维护节点：我要进行维护/升级了，需要将 Pod 提前迁移到其他节点<br></li>
+<li>特殊节点（SSD/GPU）：我很昂贵，不能随便一个 Pod 都能部署到我身上<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org5fe6033" class="outline-5">
+<h5 id="org5fe6033">容忍和污点Taint和Toleration</h5>
+<div class="outline-text-5" id="text-org5fe6033">
+<p>
+设计理念：Taint 在一类服务器上打上污点，让不能容忍这个污点的 Pod 不能部署在打了污点的服务器上，类似给节点加了锁。Toleration 是让 Pod 容忍节点上配置的污点，可以让一些需要特殊配置的 Pod 能够调用到具有污点和特殊配置的节点上，类似给节点加钥匙。<br>
+</p>
+
+<p>
+官 方 文 档 ：<a href="https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/">https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/</a><br>
+</p>
+
+<p>
+所谓污点就是故意给某个节点服务器上设置个污点参数，那么你就能让生成pod的时候使用相应的参数去避开有污点参数的node服务器。而容忍呢，就是当资源不够用的时候，即使这个node服务器上有污点，那么只要pod的yaml配置文件中写了容忍参数，最终pod还是会容忍的生成在该污点服务器上。默认master节点是NoSchedule<br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org195329e" class="outline-4">
+<h4 id="org195329e">污点和容忍配置解析</h4>
+<div class="outline-text-4" id="text-org195329e">
+</div>
+<div id="outline-container-org751deef" class="outline-5">
+<h5 id="org751deef">污点(Taint)配置解析</h5>
+<div class="outline-text-5" id="text-org751deef">
+<p>
+创建一个污点（一个节点可以有多个污点）：<br>
+使用kubectl taint命令可以给某个Node节点设置污点，Node被设置上污点之后就和Pod之间存在了一种相斥的关系，可以让Node拒绝Pod的调度执行，甚至将Node已经存在的Pod驱逐出去。key=value:effect<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl taint nodes NODE_NAME <span style="color: #a0522d;">TAINT_KEY</span>=TAINT_VALUE:EFFECT
+&#27604;&#22914;&#65306;
+kubectl taint nodes k8s-node01 <span style="color: #a0522d;">ssd</span>=true:PreferNoSchedule
+</pre>
+</div>
+
+
+<p>
+每个污点有一个key和value作为污点的标签，其中value可以为空，effect描述污点的作用。当前taint effect支持如下三个选项：<br>
+</p>
+<ul class="org-ul">
+<li>NoSchedule：禁止调度到该节点，已经在该节点上的Pod不受影响<br></li>
+<li>NoExecute：禁止调度到该节点，如果不符合这个污点，会立马被驱逐（或在一段时间后）<br></li>
+<li>PreferNoSchedule：尽量避免将Pod调度到指定的节点上，如果没有更合适的节点，可以部署到该节点<br></li>
+</ul>
+
+
+<p>
+去除污点NoSchedule，最后一个"-"代表删除：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl taint nodes k8s-master02 node-role.kubernetes.io/master:NoSchedule-
+</pre>
+</div>
+
+
+
+<p>
+查看某个节点的Taint配置情况：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">]# kubectl describe node k8s-node01  (&#20869;&#23481;&#22826;&#22810;&#19981;&#36148;&#20840;&#20102;)
+Taints:             &lt;none&gt;   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20851;&#27880;&#36825;&#20010;&#22320;&#26041;&#21363;&#21487; ---&#27809;&#26377;&#35774;&#32622;&#36807;&#27745;&#28857;&#30340;&#33410;&#28857;&#23646;&#24615;&#20013;&#30340;&#21442;&#25968;&#26159;&#36825;&#26679;&#30340;Taints:     &lt;none&gt;</span>
+</pre>
+</div>
+</div>
+<ul class="org-ul">
+<li><a id="org23f65c6"></a>节点的Taint设置样例<br>
+<div class="outline-text-6" id="text-org23f65c6">
+<ul class="org-ul">
+<li>Master节点：其他类型的 Pod 不要部署到我身上<br>
+<ul class="org-ul">
+<li>node-role.kubernetes.io/master:NoSchedule<br></li>
+</ul></li>
+<li>新增节点：我还没有经过完整的可用性测试，不能部署 Pod 到我身上<br>
+<ul class="org-ul">
+<li>node-role.kubernetes.io/new-node:NoExecute<br></li>
+<li>node-role.kubernetes.io/maintain:NoExecute<br></li>
+</ul></li>
+<li>维护节点：我要进行维护/升级了，需要将 Pod 提前迁移到其他节点<br>
+<ul class="org-ul">
+<li>node-role.kubernetes.io/new-node: NoSchedule<br></li>
+</ul></li>
+<li>特殊节点（SSD/GPU）：我很昂贵，不能随便一个 Pod 都能部署到我身上<br>
+<ul class="org-ul">
+<li>node-role.kubernetes.io/ssd:PreferNoSchedule<br></li>
+</ul></li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-org212a3bd" class="outline-5">
+<h5 id="org212a3bd">Toleration 配置解析</h5>
+<div class="outline-text-5" id="text-org212a3bd">
+<p>
+Toleration 配置在 Pod 中<br>
+</p>
+
+<p>
+方式一完全匹配：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">tolerations:
+- key: "key"
+  operator: "Equal"
+  value: "value"
+  effect: "NoSchedule"
+</pre>
+</div>
+
+<p>
+方式二不完全匹配：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">tolerations:
+- key: "key"
+  operator: "Exists"
+  effect: "NoSchedule"
+</pre>
+</div>
+
+<p>
+一个Toleration和一个Taint相匹配是指它们有一样的key和effect，并且如果operator是Exists（此时toleration不指定value）或者operator是Equal，则它们的value应该相等。<br>
+</p>
+
+
+
+<p>
+方式三大范围匹配（不推荐key为内置Taint）：<br>
+如果一个 Toleration 的 effect 为空，则 key 与之相同的相匹配的 Taint 的 effect 可以是任意值：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">tolerations:
+- key: "key"
+  operator: "Exists"
+</pre>
+</div>
+
+<p>
+方式四匹配所有（不推荐）：<br>
+如果一个Toleration的key为空且operator为Exists，表示这个Toleration与任意的key、value和effect都匹配，即这个Toleration能容忍任意的Taint：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">tolerations:
+- operator: "Exists"
+</pre>
+</div>
+
+<p>
+停留时间配置：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">tolerations:
+- key: "key1"
+  operator: "Equal"
+  value: "value1"
+  effect: "NoExecute"
+  tolerationSeconds: 3600 # 在 3600 秒后 pod 被驱逐
+</pre>
+</div>
+
+<p>
+Kubernetes会自动给Pod添加一个key为node.kubernetes.io/not-ready的Toleration并配置tolerationSeconds=300，同样也会给Pod添加一个key为node.kubernetes.io/unreachable的Toleration并配置tolerationSeconds=300，除非用户自定义了上述key，否则会采用这个默认设置。<br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orgb86b445" class="outline-4">
+<h4 id="orgb86b445">Taint 和  nodeSelector 区别：</h4>
+<div class="outline-text-4" id="text-orgb86b445">
+<ul class="org-ul">
+<li>nodeSelector 是强制性的 pod 在指定节点上<br></li>
+<li>toleration 不是强制指定节点而附加允许的操作；调度到这个加污点的节点上了就匹配是否可以容忍，调度到没加污点的节点上 pod 有没有容忍都可以部署。如果想指定节点要用 nodeSelector 或者 Affinity 实现。<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org7f2e04e" class="outline-4">
+<h4 id="org7f2e04e">污点和容忍配置解析示例</h4>
+<div class="outline-text-4" id="text-org7f2e04e">
+<p>
+有一个节点是纯SSD硬盘的节点，现需要只有一些需要高性能存储的Pod才能调度到该节点上<br>
+</p>
+
+<p>
+给节点打上污点和标签：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">1. kubectl taint nodes k8s-node01 <span style="color: #a0522d;">ssd</span>=true:NoExecute&#65288;&#27492;&#26102;&#20250;&#39537;&#36880;&#27809;&#26377;&#23481;&#24525;&#35813;&#27745;&#28857;&#30340;Pod&#65289;
+2. kubectl taint nodes k8s-node01 <span style="color: #a0522d;">ssd</span>=true:NoSchedule
+3. kubectl label node k8s-node01 <span style="color: #a0522d;">ssd</span>=true
+</pre>
+</div>
+
+<p>
+配置 deplyment nginx：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+      nodeSelector:
+        ssh: "true"
+      tolerations:
+      - key: "ssd"
+        operator: "Exists"
+</pre>
+</div>
+
+
+<p>
+范例：deployment<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">node &#27745;&#28857;</span>
+kubectl taint nodes k8s-node02 <span style="color: #a0522d;">ludo</span>=staging:NoExecute
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">deploy</span>
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: <span style="color: #8b2252;">'true'</span>
+        prometheus.io/path: <span style="color: #8b2252;">'/actuator/prometheus'</span>
+        prometheus.io/port: <span style="color: #8b2252;">'10082'</span>
+      labels:
+        department: taskcenter
+        app: task-center-job
+        env: prod
+    spec:
+      nodeSelector:
+        <span style="color: #483d8b;">type</span>: ludo-staging-app
+      tolerations:
+      - key: <span style="color: #8b2252;">"ludo"</span>
+        operator: <span style="color: #8b2252;">"Exists"</span>
+      terminationGracePeriodSeconds: 90
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: task-center-job
+              namespaces:
+              - taskcenter
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+</pre>
+</div>
+
+<p>
+damonset 在任意节点运行<br>
+</p>
+<pre class="example" id="org8b2abaf">
+spec:
+  tolerations:
+  - effect: NoSchedule
+    operator: "Exists"
+  - effect: NoExecute
+    operator: "Exists"
+</pre>
+</div>
+</div>
+<div id="outline-container-org2663a82" class="outline-4">
+<h4 id="org2663a82">内置污点</h4>
+<div class="outline-text-4" id="text-org2663a82">
+<p>
+k8s 节点出现问题时 pod 飘移走就是因为自动打了污点：<br>
+</p>
+<ul class="org-ul">
+<li>node.kubernetes.io/not-ready：节点未准备好，相当于节点状态Ready的值为False。<br></li>
+<li>node.kubernetes.io/unreachable：Node Controller访问不到节点，相当于节点状态Ready的值为Unknown。<br>
+<ul class="org-ul">
+<li>node.kubernetes.io/out-of-disk：节点磁盘耗尽。<br></li>
+</ul></li>
+<li>node.kubernetes.io/memory-pressure：节点存在内存压力。<br></li>
+<li>node.kubernetes.io/disk-pressure：节点存在磁盘压力。<br></li>
+<li>node.kubernetes.io/network-unavailable：节点网络不可达。<br></li>
+<li>node.kubernetes.io/unschedulable：节点不可调度。<br></li>
+<li>node.cloudprovider.kubernetes.io/uninitialized：如果Kubelet启动时指定了一个外部的cloudprovider，它将给当前节点添加一个Taint将其标记为不可用。在cloud-controller-manager的一个controller初始化这个节点后，Kubelet将删除这个Taint。<br></li>
+</ul>
+
+<p>
+k8s 为 pod 自动注入容忍。当节点不健康，pod 6000秒后再驱逐（默认是300秒）：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">tolerations:
+- key: "node.kubernetes.io/unreachable"
+  operator: "Exists"
+  effect: "NoExecute"
+  tolerationSeconds: 6000
+</pre>
+</div>
+
+<p>
+节点不健康的检查间隔由 controller manager 的 `&#x2013;node_monitor-period=5s` 探测间隔和 `&#x2013;node-monitor-grace-period=40s` 标记不可用来控制。<br>
+pod 的飘移时间为大于 `40+5+pod tolerationSeconds`<br>
+</p>
+</div>
+<div id="outline-container-orgc414699" class="outline-5">
+<h5 id="orgc414699">实现节点宕机快速迁移服务</h5>
+<div class="outline-text-5" id="text-orgc414699">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+      nodeSelector:
+        ssh: "true"
+      tolerations:
+      - key: ssd
+        operator: Equal
+        value: "true"
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 10
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 10
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org22a02f2" class="outline-4">
+<h4 id="org22a02f2">Taint 命令入门</h4>
+<div class="outline-text-4" id="text-org22a02f2">
+<p>
+创建一个污点（一个节点可以有多个污点）：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl taint nodes NODE_NAME <span style="color: #a0522d;">TAINT_KEY</span>=TAINT_VALUE:EFFECT
+&#27604;&#22914;&#65306;
+kubectl taint nodes k8s-node01 <span style="color: #a0522d;">ssd</span>=true:PreferNoSchedule
+</pre>
+</div>
+
+<p>
+查看一个节点的污点：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get node k8s-node01 -o go-template --template {{.spec.taints}}
+kubectl describe node k8s-node01 | grep Taints -A 10
+</pre>
+</div>
+
+<p>
+删除污点（和label类似）：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">&#22522;&#20110;Key&#21024;&#38500;&#65306; kubectl taint nodes k8s-node01 ssd-
+&#22522;&#20110;Key+Effect&#21024;&#38500;&#65306; kubectl taint nodes k8s-node01 ssd:PreferNoSchedule-
+</pre>
+</div>
+
+
+<p>
+修改污点（Key和Effect相同）：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl taint nodes k8s-node01 <span style="color: #a0522d;">ssd</span>=true:PreferNoSchedule --overwrite
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgb34cfae" class="outline-3">
+<h3 id="orgb34cfae">Affinity 亲和力</h3>
+<div class="outline-text-3" id="text-orgb34cfae">
+</div>
+<div id="outline-container-orga87d0a0" class="outline-4">
+<h4 id="orga87d0a0">生产环境依旧存在高可用率问题</h4>
+<div class="outline-text-4" id="text-orga87d0a0">
+<p>
+Pod和节点之间的关系：<br>
+</p>
+<ul class="org-ul">
+<li>某些Pod优先选择有ssd=true标签的节点，如果没有在考虑部署到其它节点；nodeSelector 因为是强制指定所以满足不了<br></li>
+<li>某些Pod需要部署在ssd=true和type=physical的节点上，但是优先部署在ssd=true的节点上；<br></li>
+</ul>
+
+<p>
+Pod和Pod之间的关系：<br>
+</p>
+<ul class="org-ul">
+<li>同一个应用的Pod不同的副本或者同一个项目的应用尽量或必须不部署在同一个节点或者符合某个标签的一类节点上或者不同的区域；（反亲和力）<br></li>
+<li>相互依赖的两个Pod尽量或必须部署在同一个节点上或者同一个域内。（亲和力）<br></li>
+</ul>
+
+<p>
+Affinity亲和力可以帮忙我们解决这些问题。<br>
+</p>
+</div>
+</div>
+<div id="outline-container-orgcd8a615" class="outline-4">
+<h4 id="orgcd8a615">Affinity 分类</h4>
+<div class="outline-text-4" id="text-orgcd8a615">
+<p>
+Affinity 亲和力：<br>
+</p>
+<ul class="org-ul">
+<li>NodeAffinity：节点亲和力/反亲和力<br></li>
+<li>PodAffinity：Pod亲和力<br></li>
+<li>PodAntiAffinity：Pod反亲和力<br></li>
+</ul>
+
+<p>
+Affinity 亲和力：<br>
+</p>
+<ul class="org-ul">
+<li>NodeAffinity：<br>
+<ul class="org-ul">
+<li>requiredDuringSchedulingIgnoredDuringExecution（硬亲和力）<br></li>
+<li>preferredDuringSchedulingIgnoredDuringExecution（软亲和力）<br></li>
+</ul></li>
+<li>PodAffinity &amp; PodAntiAffinity：：<br>
+<ul class="org-ul">
+<li>requiredDuringSchedulingIgnoredDuringExecution （硬亲和力）<br></li>
+<li>preferredDuringSchedulingIgnoredDuringExecution（软亲和力）<br></li>
+</ul></li>
+</ul>
+</div>
+<div id="outline-container-org29d8d46" class="outline-5">
+<h5 id="org29d8d46">提升可用性</h5>
+<div class="outline-text-5" id="text-org29d8d46">
+<ul class="org-ul">
+<li>部署在不同的宿主机上<br></li>
+<li>部署在不同机房<br></li>
+<li>尽量把同项目中不同的服务部署到不同的节点上，避免单节点挂掉影响范围大问题。<br></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-orgde29881" class="outline-4">
+<h4 id="orgde29881">节点亲和力配置</h4>
+<div class="outline-text-4" id="text-orgde29881">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: with-affinity-anti-affinity
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/os
+            operator: In
+            values:
+            - linux
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+          - key: label-1
+            operator: In
+            values:
+            - key-1
+      - weight: 50
+        preference:
+          matchExpressions:
+          - key: label-2
+            operator: In
+            values:
+            - key-2
+  containers:
+  - name: with-node-affinity
+    image: k8s.gcr.io/pause:2.0
+</pre>
+</div>
+
+<p>
+配置说明：<br>
+</p>
+<ul class="org-ul">
+<li>requiredDuringSchedulingIgnoredDuringExecution：硬亲和力配置<br>
+<ul class="org-ul">
+<li>nodeSelectorTerms：节点选择器配置，可以配置多个matchExpressions（满足其一），每个matchExpressions下可以配置多个key、value类型的选择器（都需要满足），其中values可以配置多个（满足其一）<br></li>
+</ul></li>
+<li>preferredDuringSchedulingIgnoredDuringExecution：软亲和力配置<br>
+<ul class="org-ul">
+<li>weight：软亲和力的权重，权重越高优先级越大，范围1-100<br></li>
+<li>preference：软亲和力配置项，和weight同级，可以配置多个，matchExpressions和硬亲和力一致<br></li>
+</ul></li>
+<li>operator：标签匹配的方式<br>
+<ul class="org-ul">
+<li>In：相当于key = value的形式<br></li>
+<li>NotIn：相当于key != value的形式<br></li>
+<li>Exists：节点存在label的key为指定的值即可，不能配置values字段。<br></li>
+<li>DoesNotExist：节点不存在label的key为指定的值即可，不能配置values字段。如部署在没有 GPU key 标签的节点<br></li>
+<li>Gt：大于value指定的值<br></li>
+<li>Lt：小于value指定的值<br></li>
+</ul></li>
+</ul>
+
+<p>
+范例：node 软硬亲和性联合<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">]# cat node_affinity.yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-affinity-deploy
+  labels:
+    app: nodeaffinity-deploy
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp-pod
+        image: registry.cn-beijing.aliyuncs.com/google_registry/myapp:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 80
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              <span style="color: #b22222;"># </span><span style="color: #b22222;">&#34920;&#31034;node&#26631;&#31614;&#23384;&#22312; cpu-num&#19988;&#20540;&#22823;&#20110;10</span>
+            - matchExpressions:
+              - key: cpu-num
+                operator: Gt
+                values:
+                - <span style="color: #8b2252;">"10"</span>
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+                <span style="color: #b22222;"># </span><span style="color: #b22222;">&#34920;&#31034;node&#26631;&#31614;&#23384;&#22312; disk-type=ssd &#25110; disk-type=sas</span>
+              - key: disk-type
+                operator: In
+                values:
+                - ssd
+                - sas
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgd9380aa" class="outline-4">
+<h4 id="orgd9380aa">Pod 亲和力和反亲和力配置</h4>
+<div class="outline-text-4" id="text-orgd9380aa">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-server
+spec:
+  selector:
+    matchLabels:
+      app: web-store
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: web-store
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - store
+            topologyKey: failure-domain.beta.kubernetes.io/zone
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: security
+                  operator: In
+                  values:
+                  - S2
+              namespaces:
+              - default
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+          - weight: 10
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: ludo-user
+              namespaces:
+              - default
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - canal-admin
+            namespaces:
+            - default
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: web-app
+        image: nginx:1.16-alpine
+
+</pre>
+</div>
+
+<p>
+配置说明:<br>
+</p>
+<ul class="org-ul">
+<li>requiredDuringSchedulingIgnoredDuringExecution：硬亲和力配置<br>
+<ul class="org-ul">
+<li>labelSelector：Pod选择器配置，可以配置多个<br></li>
+<li>topologyKey：匹配的拓扑域的key，也就是节点上label的key，key和value相同的为同一个域，可以用于标注不同的机房和地区<br></li>
+<li>namespaces: 和哪个命名空间的Pod进行匹配，空 或者没有 namespaceSelector 为当前命名空间<br></li>
+<li>namespaceSelector：空 <code>{}</code> 为所有名称空间<br></li>
+</ul></li>
+<li>preferredDuringSchedulingIgnoredDuringExecution：软亲和力配置<br>
+<ul class="org-ul">
+<li>weight：软亲和力的权重，权重越高优先级越大，范围1-100<br></li>
+<li>podAffinityTerm：软亲和力配置项，和weight同级<br>
+<ul class="org-ul">
+<li>labelSelector：Pod选择器配置<br></li>
+<li>topologyKey：匹配的拓扑域的key，也就是节点上label的key，key和value相同的为同一个域，可以用于标注不同的机房和地区<br></li>
+<li>namespaces: 和哪个命名空间的Pod进行匹配，空 或者没有 namespaceSelector 为当前命名空间<br></li>
+<li>namespaceSelector：空`{}`为所有名称空间<br></li>
+</ul></li>
+</ul></li>
+
+<li>matchExpressions：和节点亲和力配置一致<br></li>
+<li>operator：配置和节点亲和力一致，但是没有Gt和Lt<br></li>
+</ul>
+
+<p>
+与节点亲和性一样，当前有Pod亲和性/反亲和性都有两种类型，称为requiredDuringSchedulingIgnoredDuringExecution和 preferredDuringSchedulingIgnoredDuringExecution，分别表示“硬”与“软”要求。对于硬要求，如果不满足则pod会一直处于Pending状态。<br>
+</p>
+
+<p>
+Pod的亲和性与反亲和性是基于Node节点上已经运行pod的标签(而不是节点上的标签)决定的，从而约束哪些节点适合调度你的pod。<br>
+</p>
+
+<p>
+规则的形式是：如果X已经运行了一个或多个符合规则Y的pod，则此pod应该在X中运行(如果是反亲和的情况下，则不应该在X中运行）。当然pod必须处在同一名称空间，不然亲和性/反亲和性无作用。从概念上讲，X是一个拓扑域。我们可以使用topologyKey来表示它，topologyKey 的值是node节点标签的键以便系统用来表示这样的拓扑域。当然这里也有个隐藏条件，就是node节点标签的键值相同时，才是在同一拓扑域中；如果只是节点标签名相同，但是值不同，那么也不在同一拓扑域。★★★★★<br>
+</p>
+
+<p>
+也就是说：Pod的亲和性/反亲和性调度是根据拓扑域来界定调度的，而不是根据node节点。★★★★★<br>
+</p>
+
+<p>
+注意事项<br>
+1、pod之间亲和性/反亲和性需要大量的处理，这会明显降低大型集群中的调度速度。不建议在大于几百个节点的集群中使用它们。<br>
+</p>
+
+<p>
+2、Pod反亲和性要求对节点进行一致的标记。换句话说，集群中的每个节点都必须有一个匹配topologyKey的适当标签。如果某些或所有节点缺少指定的topologyKey标签，可能会导致意外行为。<br>
+</p>
+
+<p>
+requiredDuringSchedulingIgnoredDuringExecution中亲和性的一个示例是“将服务A和服务B的Pod放置在同一区域【拓扑域】中，因为它们之间有很多交流”；preferredDuringSchedulingIgnoredDuringExecution中反亲和性的示例是“将此服务的 pod 跨区域【拓扑域】分布”【此时硬性要求是说不通的，因为你可能拥有的 pod 数多于区域数】。<br>
+</p>
+
+<p>
+Pod亲和性/反亲和性语法支持以下运算符：In，NotIn，Exists，DoesNotExist。<br>
+</p>
+
+<p>
+原则上，topologyKey可以是任何合法的标签键。但是，出于性能和安全方面的原因，topologyKey有一些限制：<br>
+</p>
+
+<p>
+1、对于Pod亲和性，在requiredDuringSchedulingIgnoredDuringExecution和preferredDuringSchedulingIgnoredDuringExecution中topologyKey都不允许为空。<br>
+</p>
+
+<p>
+2、对于Pod反亲和性，在requiredDuringSchedulingIgnoredDuringExecution和preferredDuringSchedulingIgnoredDuringExecution中topologyKey也都不允许为空。<br>
+</p>
+
+<p>
+3、对于requiredDuringSchedulingIgnoredDuringExecution的pod反亲和性，引入了允许控制器LimitPodHardAntiAffinityTopology来限制topologyKey的kubernet.io/hostname。如果你想让它对自定义拓扑可用，你可以修改许可控制器，或者干脆禁用它。<br>
+</p>
+
+<p>
+4、除上述情况外，topologyKey可以是任何合法的标签键。<br>
+</p>
+
+<p>
+Pod 间亲和通过 PodSpec 中 affinity 字段下的 podAffinity 字段进行指定。而 pod 间反亲和通过 PodSpec 中 affinity 字段下的 podAntiAffinity 字段进行指定。<br>
+</p>
+
+<p>
+Pod亲和性/反亲和性的requiredDuringSchedulingIgnoredDuringExecution所关联的matchExpressions下有多个key列表，那么只有当所有key满足时，才能将pod调度到某个区域【针对Pod硬亲和】。<br>
+</p>
+
+<p>
+deployment 示例<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: xx-1
+          namespaces:
+          - xx
+          topologyKey: kubernetes.io/hostname
+        weight: 1
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org3289008" class="outline-4">
+<h4 id="org3289008">范例</h4>
+<div class="outline-text-4" id="text-org3289008">
+</div>
+<div id="outline-container-orga97f3eb" class="outline-5">
+<h5 id="orga97f3eb">范例-实现同一个应用分布在不同缩主机</h5>
+<div class="outline-text-5" id="text-orga97f3eb">
+<p>
+准备节点池<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26816;&#26597;&#33410;&#28857;&#26159;&#21542;&#26377;&#27745;&#28857;</span>
+kubectl  describe node |grep Taint
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl taint node k8s-node01 ssd-  # &#21024;&#38500;&#27745;&#28857;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#33410;&#28857;&#28155;&#21152;&#26631;&#31614;&#65292;--overwrite&#35206;&#30422;&#24050;&#23384;&#22312;&#30340;&#26631;&#31614;&#20449;&#24687;</span>
+kubectl label nodes k8s-node01 <span style="color: #a0522d;">type</span>=app-prod --overwrite
+</pre>
+</div>
+
+<p>
+pod 反亲和<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: must-be-diff-nodes
+  name: must-be-diff-nodes
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: must-be-diff-nodes
+  template:
+    metadata:
+      labels:
+        app: must-be-diff-nodes
+    spec:
+      nodeSelector:
+        type: app-prod
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - must-be-diff-nodes
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - image: nginx:1.15.12
+        name: must-be-diff-nodes
+        imagePullPolicy: IfNotPresent
+</pre>
+</div>
+
+<p>
+如果配置每个项目不用的标签的服务创建到不同的节点上，可以为该项目中所有服务添加统一项目标签：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: must-be-diff-nodes
+  name: must-be-diff-nodes
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: must-be-diff-nodes
+      project: multi
+  template:
+    metadata:
+      labels:
+        app: must-be-diff-nodes
+        project: multi
+    spec:
+      nodeSelector:
+        type: app-prod
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: project
+                operator: In
+                values:
+                - multi
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - image: nginx:1.15.12
+        name: must-be-diff-nodes
+        imagePullPolicy: IfNotPresent
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org602d5a8" class="outline-5">
+<h5 id="org602d5a8">范例-应用和缓存尽量部署在同一个域内</h5>
+<div class="outline-text-5" id="text-org602d5a8">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web-store
+  name: web-store
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-store
+  template:
+    metadata:
+      labels:
+        app: web-store
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - web-store
+          # 拓扑域  若多个node节点具有相同的标签信息【标签键值相同】，则表示这些node节点就在同一拓扑域
+          topologyKey: kubernetes.io/hostname
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - store
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - image: nginx:1.15.12
+        name: web-app
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org681202b" class="outline-5">
+<h5 id="org681202b">范例-尽量调度到高配置服务器</h5>
+<div class="outline-text-5" id="text-org681202b">
+<p>
+不占用 GPU 资源，只占 SSD  资源。<br>
+</p>
+
+<p>
+给node节点打label标签：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl label nodes k8s-node01 <span style="color: #a0522d;">ssd</span>=true
+kubectl label nodes k8s-master01 <span style="color: #a0522d;">sshd</span>=true 
+kubectl label nodes k8s-master01 <span style="color: #a0522d;">gpu</span>=true
+kubectl label nodes k8s-node02 <span style="color: #a0522d;">type</span>=physical
+</pre>
+</div>
+
+<p>
+node节点亲和：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prefer-ssd
+  name: prefer-ssd
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: prefer-ssd
+  template:
+    metadata:
+      labels:
+        app: prefer-ssd
+    spec:
+      nodeSelector:
+        type: prefer-ssd
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: ssd
+                operator: In
+                values:
+                - true
+              - key: gpu
+                operator: NotIn
+                values:
+                - true
+          - weight: 10
+            preference:
+              matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - physical
+      containers:
+      - image: nginx:1.15.12
+        name: prefer-ssd
+        imagePullPolicy: IfNotPresent
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgf0e84ee" class="outline-3">
+<h3 id="orgf0e84ee">Topology 拓扑域</h3>
+<div class="outline-text-3" id="text-orgf0e84ee">
+</div>
+<div id="outline-container-orgda0f174" class="outline-4">
+<h4 id="orgda0f174">Topology拓扑域的重要性</h4>
+<div class="outline-text-4" id="text-orgda0f174">
+<p>
+topologyKey：拓扑域，主要针对宿主机，相当于对宿主机进行区域的划分。用label进行判断， <b>不同的key和不同的value是属于不同的拓扑域</b> 。<br>
+<img src="./images/Snipaste_2022-09-27_14-32-18.png" alt="Snipaste_2022-09-27_14-32-18.png"><br>
+</p>
+<ul class="org-ul">
+<li>拓扑域 A：kubernetes.io/hostname=k8s-master01<br></li>
+<li>拓扑域 B：kubernetes.io/hostname=k8s-master02<br></li>
+<li>拓扑域 C：kubernetes.io/hostname=k8s-master03<br></li>
+<li>拓扑域 D：kubernetes.io/hostname=k8s-node01<br></li>
+<li>拓扑域 X：kubernetes.io/hostname=xxx<br></li>
+</ul>
+
+<p>
+node 节点会自动打上标签 <code>kubernetes.io/hostname: xxx</code> ，可以看出每个缩主机是一个域。<br>
+</p>
+
+<p>
+这里的 topologyKey 对应的是 Node 上的标签的 Key（没有Value），可以看出，其实 topologyKey 就是用于筛选 Node 的。通过这种方式，我们就可以将各个 Pod 进行跨集群、跨机房、跨地区的调度了。<br>
+</p>
+
+<p>
+把 node 节点的每个区划分成一个域：<br>
+<img src="./images/Snipaste_2022-09-27_14-37-12.png" alt="Snipaste_2022-09-27_14-37-12.png"><br>
+</p>
+<ul class="org-ul">
+<li>大兴区：k8s-master01  region=daxing<br></li>
+<li>大兴区：k8s-master02  region=daxing<br></li>
+<li>朝阳区：k8s-master03  region=chaoyang<br></li>
+<li>朝阳区：k8s-node01    region=chaoyang<br></li>
+<li>XX 区：xxx  region=xxx<br></li>
+</ul>
+
+<p>
+针对某个区划分不同机房、机柜：<br>
+<img src="./images/Snipaste_2022-09-27_14-40-02.png" alt="Snipaste_2022-09-27_14-40-02.png"><br>
+</p>
+<ul class="org-ul">
+<li>大兴区<br>
+<ul class="org-ul">
+<li>机房 1<br>
+<ul class="org-ul">
+<li>机柜 1<br></li>
+<li>机柜 2<br></li>
+</ul></li>
+<li>机房 2<br>
+<ul class="org-ul">
+<li>机柜 1<br></li>
+<li>机柜 2<br></li>
+</ul></li>
+<li>机房 x<br>
+<ul class="org-ul">
+<li>机柜 x<br></li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org98bf9dd" class="outline-4">
+<h4 id="org98bf9dd">如何使用topologyKey</h4>
+<div class="outline-text-4" id="text-org98bf9dd">
+</div>
+<div id="outline-container-orga2390df" class="outline-5">
+<h5 id="orga2390df">同一个应用多区域部署</h5>
+<div class="outline-text-5" id="text-orga2390df">
+<p>
+给节点打标签，划分 3 个域：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl label node k8s-master01 k8s-master02 <span style="color: #a0522d;">region</span>=daxing
+kubectl label node k8s-master03 k8s-node01 <span style="color: #a0522d;">region</span>=chaoyang
+kubectl label node k8s-node02 <span style="color: #a0522d;">region</span>=xxx
+</pre>
+</div>
+
+<p>
+pod 反亲和<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: must-be-diff-zone
+  name: must-be-diff-zone
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: must-be-diff-zone
+      project: multi
+  template:
+    metadata:
+      labels:
+        app: must-be-diff-zone
+        project: multi
+    spec:
+      nodeSelector:
+        type: app-prod
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - must-be-diff-zone
+          topologyKey: region
+      containers:
+      - image: nginx:1.15.12
+        name: must-be-diff-zone
+        imagePullPolicy: IfNotPresent
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: Pod
+metadata:
+  name: with-pod-affinity
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: security
+            operator: In
+            values:
+            - S1
+        topologyKey: failure-domain.beta.kubernetes.io/zone
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: security
+              operator: In
+              values:
+              - S2
+          topologyKey: kubernetes.io/hostname
+  containers:
+  - name: with-pod-affinity
+    image: k8s.gcr.io/pause:2.0
+</pre>
+</div>
+
+<p>
+这里 Pod 的亲和性规则是：这个 Pod 要调度到的 Node 必须有一个标签为 security: S1 的 Pod，且该 Node 必须有一个 Key 为 failure-domain.beta.kubernetes.io/zone 的 标签，即 Node 必须属于 failure-domain.beta.kubernetes.io/zone 拓扑域。<br>
+</p>
+
+<p>
+Pod 的反亲和性规则是：这个 Pod 尽量不要调度到这样的 Node，其包含一个 Key 为 kubernetes.io/hostname 的标签，且该 Node 上有标签为 security: S2 的 Pod。<br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orga591352" class="outline-4">
+<h4 id="orga591352">注意事项</h4>
+<div class="outline-text-4" id="text-orga591352">
+<p>
+原则上，topologyKey 可以是任何合法的标签 Key。但是出于性能和安全原因，对 topologyKey 有一些限制：<br>
+</p>
+
+<ul class="org-ul">
+<li>对于亲和性和 requiredDuringSchedulingIgnoredDuringExecution 的 Pod 反亲和性，topologyKey 不能为空。<br></li>
+<li>对于 requiredDuringSchedulingIgnoredDuringExecution 的 Pod 反亲和性，引入 LimitPodHardAntiAffinityTopology 准入控制器来限制 topologyKey 只能是 kubernetes.io/hostname。如果要使用自定义拓扑域，则可以修改准入控制器，或者直接禁用它。<br></li>
+<li>对于 preferredDuringSchedulingIgnoredDuringExecution 的 Pod 反亲和性，空的 topologyKey 表示所有拓扑域。截止 v1.12 版本，所有拓扑域还只能是 kubernetes.io/hostname、failure-domain.beta.kubernetes.io/zone 和 failure-domain.beta.kubernetes.io/region 的组合。<br></li>
+<li>除上述情况外，topologyKey 可以是任何合法的标签 key。<br></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-org3130246" class="outline-3">
+<h3 id="org3130246">弹性伸缩方案</h3>
+<div class="outline-text-3" id="text-org3130246">
+<p>
+弹性伸缩方案 <a href="https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/auto-scaling-overview?spm=a2c4g.11186623.0.0.49b3470cC3BcmA">https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/auto-scaling-overview?spm=a2c4g.11186623.0.0.49b3470cC3BcmA</a><br>
+</p>
+</div>
+<div id="outline-container-orga908c91" class="outline-4">
+<h4 id="orga908c91">虚拟节点</h4>
+<div class="outline-text-4" id="text-orga908c91">
+<p>
+<a href="https://virtual-kubelet.io/">https://virtual-kubelet.io/</a>  虚拟节点对应  阿里 eci、AWS  fargate<br>
+</p>
+
+
+<p>
+<b>ECI</b><br>
+</p>
+
+<p>
+安装组件后，pod配置污点容忍和节点亲和<br>
+</p>
+
+<p>
+<a href="https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/spread-eci-based-pods-across-zones-and-configure-affinities-1?spm=a2c4g.11186623.0.0.636557bcM57Ck7">阿里eci pod 亲和调度</a><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">nodeAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+  - weight: 1
+    preference:
+      matchExpressions:
+      - key: type
+        operator: NotIn
+        values:
+        - virtual-kubelet
+
+tolerations:
+  - key: <span style="color: #8b2252;">"virtual-kubelet.io/provider"</span>
+    operator: <span style="color: #8b2252;">"Exists"</span>
+    effect: <span style="color: #8b2252;">"NoSchedule"</span>
+</pre>
+</div>
+
+<p>
+<b>EKS Fargate</b><br>
+</p>
+
+<p>
+<a href="https://blog.bitipcman.com/eks-fargate-101/">https://blog.bitipcman.com/eks-fargate-101/</a><br>
+</p>
+
+<ul class="org-ul">
+<li>名称空间<br></li>
+<li>名称空间+pod标签<br></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-org8cc65fa" class="outline-3">
+<h3 id="org8cc65fa">参考</h3>
+<div class="outline-text-3" id="text-org8cc65fa">
+</div>
+<div id="outline-container-orgdccb66d" class="outline-4">
+<h4 id="orgdccb66d">Pod 拓扑分布约束</h4>
+<div class="outline-text-4" id="text-orgdccb66d">
+</div>
+<div id="outline-container-org5900cbd" class="outline-5">
+<h5 id="org5900cbd">aws on-demand 与 spot 实例混部</h5>
+<div class="outline-text-5" id="text-org5900cbd">
+<p>
+目的：pod 有 4 个副本，一半副本在 spot 中。<br>
+</p>
+
+
+<p>
+总结：<br>
+</p>
+<ol class="org-ol">
+<li>特定机器<br>
+<ul class="org-ul">
+<li>不建议在同一个组中同时 spot ,on-demand，在调度和扩容上会有问题，要拆成2个组 on-demand 和 spot 组，打同一个业务标签,如 type: growth<br></li>
+<li>spot 不足时，推荐在拓扑分布约束中使用 <code>whenUnsatisfiable: ScheduleAnyway</code> <br></li>
+</ul></li>
+
+<li>平均分配<br>
+<ul class="org-ul">
+<li>Pod 拓扑分布约束 [1]: 你可以使用 拓扑分布约束（Topology Spread Constraints） 来控制 Pod 在集群内故障域之间的分布， 例如区域（Region）、可用区（Zone）、节点和其他用户自定义拓扑域。 这样做有助于实现高可用并提升资源利用率<br></li>
+<li>节点亲和性 (NodeAffinity) [2]: 通过节点亲和性来约束 Pod 只能被部署在具有特定标签的节点上。<br></li>
+</ul></li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: eks.amazonaws.com/capacityType
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        &lt;pod label&gt;
+  affinity:
+    nodeaffinity:
+      requiredduringschedulingignoredduringexecution:
+        nodeselectorterms:
+        - matchexpressions:
+          - key: zone
+            operator: notin
+            values:
+            - zonec
+</pre>
+</div>
+
+<p>
+参数：<br>
+</p>
+<ul class="org-ul">
+<li>topologyKey：是节点标签的键。根据节点标签 <code>eks.amazonaws.com/capacityType</code> 来做拓扑分布约束，on-demand 实例标签 <code>eks.amazonaws.com/capacityType=ON_DEMAND</code> ，Spot 实例标签 <code>eks.amazonaws.com/capacityType=SPOT</code><br></li>
+
+<li>whenUnsatisfiable：指示如果 Pod 不满足分布约束时如何处理。<br>
+<ul class="org-ul">
+<li>设定为 <code>whenUnsatisfiable: DoNotSchedule</code> ，这意味着当我第一个 Pod 部署到 On-demand 上后，第二个 Pod 一定只能部署在 Spot 上。如果无法满足，则 Pod 会处于 Pending 状态无法部署，推荐使用 <code>whenUnsatisfiable: ScheduleAnyway</code><br></li>
+<li>ScheduleAnyway 的做法仍然保有弹性空间。注意：已经部署的 Pod 不会重新部署，后续的部署会尝试恢复这个平衡。<br>
+<ul class="org-ul">
+<li>要不停监控是否有 spot 实例来重新部署 pod 吗？目前还是需要依靠外部的监控或是代码来实现自动化的重部署<br></li>
+</ul></li>
+</ul></li>
+
+<li>maxSkew：描述这些 Pod 可能被均匀分布的程度。可以把此参数想像为最大可允许的差异值。举例来说，如果 MaxSkew 设定为 1，则表示两个区域或是标签之间的 Pod 数量差异不能大于 1。您可以参考此文档来了解详细的参数定义 [3]。<br></li>
+</ul>
+
+<p>
+注意：Spot 实例有可能因为任何理由被回收，除了价格之外，还有区域容量空间的问题。在使用 Spot 上，您考虑的不应该是怎样不会被回收，而是考虑我的应用能不能处例被回收的场景<br>
+</p>
+
+
+<p>
+[1] Pod 拓扑分布约束 - <a href="https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/topology-spread-constraints/">https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/topology-spread-constraints/</a> <br>
+[2] 节点亲和性 - <a href="https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity">https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity</a> <br>
+[3] maxSkew 参数定义：<a href="https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/#spread-constraint-definition">https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/#spread-constraint-definition</a><br>
+</p>
+
+
+<p>
+结论：1. 设置 pod 约束可保障服务可用性。2. pod 约束条件只在服务发布时生效，对于违反 pod 约束条件的服务需要重新调度，这里使用 Descheduler，参考官方建议[1]<br>
+</p>
+
+<p>
+[1] 已知局限性 <a href="https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/#known-limitations">Pod Topology Spread Constraints</a><br>
+</p>
+</div>
+<ul class="org-ul">
+<li><a id="orgef78dcd"></a>Descheduler pod 驱逐<br>
+<div class="outline-text-6" id="text-orgef78dcd">
+<p>
+安装 Descheduler ：<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">git clone -b release-1.21  https://github.com/kubernetes-sigs/descheduler.git
+<span style="color: #483d8b;">cd</span> descheduler/
+kubectl create -f kubernetes/base/rbac.yaml
+kubectl create -f kubernetes/base/configmap.yaml
+kubectl create -f kubernetes/deployment/deployment.yaml
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20854;&#20013;&#20462;&#25913;&#20869;&#23481;</span>
+$ cat kubernetes/base/configmap.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: descheduler-policy-configmap
+  namespace: kube-system
+data:
+  policy.yaml: |
+    apiVersion: <span style="color: #8b2252;">"descheduler/v1alpha1"</span>
+    kind: <span style="color: #8b2252;">"DeschedulerPolicy"</span>
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">nodeSelector: eks.amazonaws.com/capacityType=ON_DEMAND # &#36890;&#36807;&#22312;PodSpec&#20013;&#23450;&#20041;&#23427;&#65292;&#36873;&#25321;node&#26631;&#31614;&#20013;&#21253;&#21547;&#27599;&#20010;&#38190;&#20540;&#23545;&#30340;&#23545;&#24212;&#30340;&#33410;&#28857;</span>
+    evictLocalStoragePods: true
+    maxNoOfPodsToEvictPerNode: 40
+    strategies:
+      <span style="color: #8b2252;">"PodLifeTime"</span>:
+        enabled: true
+        params:
+          podLifeTime:
+            maxPodLifeTimeSeconds: 86400
+            podStatusPhases:
+            - <span style="color: #8b2252;">"Pending"</span>
+          namespaces:
+            include:
+            - <span style="color: #8b2252;">"staging-taskcenter"</span>
+            - <span style="color: #8b2252;">"dev-taskcenter"</span>
+      <span style="color: #8b2252;">"RemovePodsViolatingTopologySpreadConstraint"</span>: <span style="color: #b22222;"># </span><span style="color: #b22222;">&#24320;&#21551; pod &#36719;&#32422;&#26463;&#39537;&#36880;</span>
+        enabled: true
+        params:
+          nodeFit: true
+          includeSoftConstraints: true
+          namespaces:
+            include:
+            - <span style="color: #8b2252;">"staging-taskcenter"</span>
+            - <span style="color: #8b2252;">"dev-taskcenter"</span>
+          labelSelector: <span style="color: #b22222;"># </span><span style="color: #b22222;">podSpec &#20013;&#23450;&#20041;&#30340;&#26631;&#31614;</span>
+            matchExpressions:
+              - {key: app, operator: In, values: [job,web]}
+
+$ cat kubernetes/deployment/deployment.yaml
+      containers:
+        - name: descheduler
+          image: k8s.gcr.io/descheduler/descheduler:v0.21.0
+          imagePullPolicy: IfNotPresent
+          <span style="color: #483d8b;">command</span>:
+            - <span style="color: #8b2252;">"/bin/descheduler"</span>
+          args:
+            - --policy-config-file
+            - /policy-dir/policy.yaml
+            - --descheduling-interval
+            - 5m  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26816;&#26597;&#39057;&#29575;</span>
+            - --v
+            - 3
+            - --log-dir
+            - /tmp
+            - --log-file
+            - descheduler.log
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer data-astro-cid-sz7xmlte data-turbo-permanent id=rootFooter>
+    <script>
+        const shuffle = e => e.map((e => ({
+            v: e,
+            sort: Math.random()
+        }))).sort(( (e, o) => e.sort - o.sort)).map(( ({v: e}) => e));
+        var songList = ["barbie-girl--stantough", "blue-da-ba-dee--cornelius-link", "hips-dont-lie--stantough", "i-want-it-that-way--stantough", "seven-nation-army--stantough", "smooth-criminal--stantough"]
+          , songOrder = songOrder ?? shuffle(songList).map((e => `/audio/music/${e}.opus`))
+          , song = new Audio(songOrder[0])
+          , nextSong = new Audio(songOrder[1])
+          , songIndex = 2
+          , musicWrapper = void 0
+          , arrow = void 0
+          , notes = void 0;
+        song.addEventListener("ended", next);
+        const toggle = () => song.paused ? play() : pause();
+        function play() {
+            song.play(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.add("shakeManHorse"),
+            notes.classList.remove("hideNotes")
+        }
+        function pause() {
+            song.pause(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.remove("shakeManHorse"),
+            notes.classList.add("hideNotes")
+        }
+        function next() {
+            song = nextSong,
+            play(),
+            songIndex === songOrder.length && (songIndex = 0),
+            nextSong = new Audio(songOrder[songIndex]),
+            songIndex += 1
+        }
+        function skip() {
+            pause(),
+            (arrow = arrow || document.getElementById("musicArrow")).classList.add("shootArrow");
+            new Audio("/audio/effects/ohno.m4a").play(),
+            arrow.addEventListener("animationend", arrowShootHandler, !1)
+        }
+        function arrowShootHandler() {
+            arrow.removeEventListener("animationend", arrowShootHandler, !1),
+            arrow.classList.remove("shootArrow");
+            new Audio("/audio/effects/heythathurt.m4a").play(),
+            next()
+        }
+    </script>
+    <div id=musicPlayer data-astro-cid-q7a5pyro>
+        <button class=skip data-astro-cid-q7a5pyro onclick=skip() title="Skip song">
+            <div id=skipWrapper data-astro-cid-q7a5pyro>
+                <img alt="Medieval drollery of a man/snail/bat/monkey shooting an arrow" class=archer decoding=async height=334 loading=lazy src=/images/archer-no-arrow.448ccd8b_Z1KfRYq.webp width=226 data-astro-cid-q7a5pyro>
+                <img alt="Arrow for archer" class="arrow complete" decoding=async height=23 loading=lazy src=/images/no-archer-full-arrow.87aa9971_Z2qL2KO.webp width=141 data-astro-cid-q7a5pyro id=musicArrow>
+            </div>
+        </button>
+        <button class=playPause data-astro-cid-q7a5pyro onclick=toggle() title="Play/pause song">
+            <div id=musicWrapper data-astro-cid-q7a5pyro>
+                <div class=hideNotes id=notesWrapper data-astro-cid-q7a5pyro>
+                    <div class=lyreNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                    <div class=fluteNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                </div>
+                <img alt="Medieval drollery of a man/horse playing a lyre and a horn" class=manHorse decoding=async height=665 loading=lazy src=/images/man-horse-band.e3a2efcf_q8FCa.webp width=531 data-astro-cid-q7a5pyro>
+            </div>
+        </button>
+    </div>
+    <hr data-astro-cid-sz7xmlte>
+    <div class=salutation data-astro-cid-gdmrbrho>
+        <p data-astro-cid-gdmrbrho>
+            <span class=flower2 data-astro-cid-gdmrbrho>A</span>
+            <span class=smallcap data-astro-cid-gdmrbrho>pax vobiscum</span>
+            <span class="flower2 wiggle" data-astro-cid-gdmrbrho id=leaf>a</span>
+        </p>
+    </div>
+    <script>
+        function animateLeafBlownHandler() {
+            leaf.removeEventListener("animationend", animateLeafBlownHandler, !1),
+            leaf.classList.remove("blownAway"),
+            leaf.classList.add("wiggle")
+        }
+        function animateLeaf() {
+            leaf = leaf ?? document.getElementById("leaf"),
+            leaf.classList.remove("wiggle"),
+            leaf.classList.add("blownAway"),
+            leaf.addEventListener("animationend", animateLeafBlownHandler, !1)
+        }
+        document.getElementById("leaf").onclick = animateLeaf
+    </script>
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2024 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+</footer>
+</footer>
+</body>
+</html>

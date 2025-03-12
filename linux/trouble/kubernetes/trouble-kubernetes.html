@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: k8s故障处理</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/drollery.e825b870.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="{className}" data-astro-cid-3ef6ksr2>
+  <div class=header-branding data-astro-cid-g2lrb5xm>
+      <span class=header-text data-astro-cid-g2lrb5xm>
+          <span class=dropcap data-astro-cid-g2lrb5xm aria-hidden=true>
+              <span class=actual data-astro-cid-g2lrb5xm>J</span>
+              <span class=rest data-astro-cid-g2lrb5xm>asper Hsu</span>
+              <span class=period data-astro-cid-g2lrb5xm>.</span>
+          </span>
+          <span class=sr-only data-astro-cid-g2lrb5xm>Drollery</span>
+      </span>
+      <img alt="Medieval drollery of a knight on a horse" class=spring decoding=async height=250 loading=lazy src=/images/knight-horse.a96eee7d_Z1WCOYs.webp width=68 data-astro-cid-g2lrb5xm>
+  </div>
+
+  <nav data-astro-cid-pux6a34n>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/jcodelog.html class=nobracket data-astro-cid-pux6a34n>技术</a>
+      <span class=flower2 data-astro-cid-pux6a34n>K</span>
+      <a href=/reading/index.html class=nobracket data-astro-cid-pux6a34n>阅读</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+      <a href=/lisp/jasper-emacs.html class=nobracket data-astro-cid-pux6a34n>我的Emacs配置</a>
+      <span class=flower2 data-astro-cid-pux6a34n>L</span>
+      <a href=/link/index.html class=nobracket data-astro-cid-pux6a34n>友链</a>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/about.html class=nobracket data-astro-cid-pux6a34n>关于</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+  </nav>
+
+
+  <div class="container" data-astro-cid-3ef6ksr2>
+    <p class="info" data-astro-cid-3ef6ksr2>
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+  <div id=borderArtWrapper class="tt1" data-astro-cid-5hce7sga data-turbo-permanent>
+      <script>
+          var man, shakeCount = 0, noSound = new Audio("/audio/effects/no.m4a"), screamSound = new Audio("/audio/effects/scream.m4a");
+          function animateManShakeHandler() {
+              man.removeEventListener("animationend", animateManShakeHandler, !1),
+              shakeCount += 1,
+              man.classList.remove("shakeMan")
+          }
+          function animateManFallHandler() {
+              man.removeEventListener("animationend", animateManFallHandler, !1),
+              man.classList.add("hide")
+          }
+          function animateMan() {
+              man = man ?? document.getElementById("borderMan"),
+              3 === shakeCount ? (man.classList.add("fallMan"),
+              screamSound.play(),
+              man.addEventListener("animationend", animateManFallHandler, !1)) : (man.classList.add("shakeMan"),
+              noSound.play(),
+              man.addEventListener("animationend", animateManShakeHandler, !1))
+          }
+      </script>
+      <div class=borderArt data-astro-cid-5dda5nwp id=articleBorder>
+          <img alt="flowery border with man falling" decoding=async height=620 loading=lazy src=/images/border-vines-no-man.b7d246cc_DRxSe.webp width=909 class=border data-astro-cid-5dda5nwp>
+          <div class=fallWrapper data-astro-cid-5dda5nwp>
+              <img alt="flowery border with man falling" decoding=async height=292 loading=lazy src=/images/man-no-vines.247a3187_Z2ioXNM.webp width=98 class=man data-astro-cid-5dda5nwp id=borderMan onclick=animateMan()>
+          </div>
+      </div>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Linux: k8s故障处理</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:2eb3d4bf-a94d-44f9-92d9-9344b7492cae">应用故障排查-了解状态机制</a>
+<ul>
+<li><a href="#h:6ceb6182-1f71-4044-b636-416d56dcff0b">进入POD名称空间</a></li>
+<li><a href="#h:b4092589-0447-49bc-897f-46716b7f12ff">Pod 的阶段</a></li>
+<li><a href="#h:a1abf1be-35dc-4ced-8031-c59b1bffc142">容器状态</a></li>
+<li><a href="#h:0fcda79d-12c3-404a-84fb-a88208fd6fdd">pod状况</a></li>
+<li><a href="#h:43d23625-a94b-4189-bac7-75828f20a87b">pod 事件</a>
+<ul>
+<li><a href="#h:6125fa65-2d80-4b3c-9d8a-7ac9ad7ef046">容器事件原因</a>
+<ul>
+<li><a href="#h:e33a902a-7b59-4327-afc7-9dfd6bb1eef7">容器事件</a></li>
+<li><a href="#h:0cfeed3f-0e8c-4879-82cb-9f263b42357e">dockershim容器</a></li>
+</ul>
+</li>
+<li><a href="#h:f679eff7-5fe6-4786-8fb4-67cb13db1669">Pod事件原因</a></li>
+<li><a href="#h:8846c107-f2ef-446c-aa3b-42a0794947b1">镜像事件原因</a></li>
+<li><a href="#h:62bed850-2a65-43b1-943d-ab485152cc93">kubelet事件原因</a></li>
+<li><a href="#h:9d27a963-c58d-48b5-a183-d4b3e4bf806b">pod日志</a></li>
+<li><a href="#h:c0fae5fa-63ae-4b5f-854b-1b79ce86764d">应用故障排查-常见应用异常</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:503ad123-a3d2-4c34-8dbe-cecd452bd9e1">Kubernetes 故障</a>
+<ul>
+<li><a href="#h:0525e096-c8e5-4b81-82e1-432f0fad1589">节点PLEG异常</a></li>
+<li><a href="#h:7b8660cf-a4cb-493f-8369-6bc57ce5637c">状态码503</a></li>
+<li><a href="#h:2a2c61f1-5134-4ed0-a740-d5a5d08d817a">ephemeral-storage存储限制</a></li>
+<li><a href="#h:ea98dff8-aac2-4486-a9f1-e77ed6c4eaa9">field is immutable</a></li>
+<li><a href="#h:ff3611e9-9da0-4f98-bf2a-e4155649f1ee">pod-亲和问题</a></li>
+<li><a href="#h:088ae2d8-c051-475c-ae0c-c25dec0264f8">service-LoadBalancer模式下cluster策略获取用户真实IP</a></li>
+<li><a href="#h:c1caf3a8-227e-4fd3-8e79-7377fe36fbbf">k8s-删除名称空间卡住</a></li>
+</ul>
+</li>
+<li><a href="#h:13ac10b2-9c02-4de7-954b-d510dbda3956">rancher</a>
+<ul>
+<li><a href="#h:75a701a3-32e9-4626-a787-5c587e9ef98e">证书过期</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Trouble</a></li>
+</ul>
+<section id="outline-container-h:2eb3d4bf-a94d-44f9-92d9-9344b7492cae" class="outline-2">
+<h2 id="h:2eb3d4bf-a94d-44f9-92d9-9344b7492cae">应用故障排查-了解状态机制</h2>
+<div class="outline-text-2" id="text-h:2eb3d4bf-a94d-44f9-92d9-9344b7492cae">
+<p>
+K8s 是整个的一个设计是面向状态机的，它里面通过 yaml 的方式来定义的是一个期望到达
+的一个状态，而真正这个 yaml 在执行过程中会由各种各样的 controller来负责整体的状
+态之间的一个转换。
+</p>
+
+
+<figure id="org70b1a44">
+<img src="images/image-20210602142305121.png" alt="image-20210602142305121.png">
+
+<figcaption><span class="figure-number">Figure 1: </span>image-20210602142305121</figcaption>
+</figure>
+
+<p>
+比如说上面的图，实际上是一个 Pod 的一个生命周期。刚开始它处在一个pending 的状态，
+那接下来可能会转换到类似像 running，也可能转换到Unknown，甚至可以转换到 failed。
+然后，当 running执行了一段时间之后，它可以转换到类似像 successded 或者是failed，
+然后当出现在 unknown这个状态时，可能由于一些状态的恢复，它会重新恢复到 running
+或者successded 或者是 failed。
+</p>
+
+<p>
+其实 K8s整体的一个状态就是基于这种类似像状态机的一个机制进行转换的，而不同状态之
+间的转化都会在相应的K8s对象上面留下来类似像 Status 或者像 Conditions 的一些字段
+来进行表示
+</p>
+
+
+<figure id="orgc3efd76">
+<img src="images/image-20220205142356334.png" alt="image-20220205142356334.png">
+
+<figcaption><span class="figure-number">Figure 2: </span>image-20220205142356334</figcaption>
+</figure>
+</div>
+<div id="outline-container-h:6ceb6182-1f71-4044-b636-416d56dcff0b" class="outline-3">
+<h3 id="h:6ceb6182-1f71-4044-b636-416d56dcff0b">进入POD名称空间</h3>
+<div class="outline-text-3" id="text-h:6ceb6182-1f71-4044-b636-416d56dcff0b">
+<p>
+登录到宿主机切换一下网络空间
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">$  crictl  ps  | grep  &lt;pod&#21517;&#31216;&gt;
+&#25343;&#19968;&#19979;&#23481;&#22120;ID
+
+$ crictl  inspect  ID   | grep  pid
+&#25343;&#19968;&#19979;pid
+
+$  nsenter --target  xxxx  -n
+&#36827;&#20837;&#36825;&#20010;pods&#30340;&#32593;&#32476;&#31354;&#38388;
+</pre>
+</div>
+
+<p>
+之后可以做抓包的工作了
+</p>
+</div>
+</div>
+<div id="outline-container-h:b4092589-0447-49bc-897f-46716b7f12ff" class="outline-3">
+<h3 id="h:b4092589-0447-49bc-897f-46716b7f12ff">Pod 的阶段</h3>
+<div class="outline-text-3" id="text-h:b4092589-0447-49bc-897f-46716b7f12ff">
+<p>
+参考：<a href="https://kubernetes.io/zh/docs/concepts/workloads/pods/pod-lifecycle/">https://kubernetes.io/zh/docs/concepts/workloads/pods/pod-lifecycle/</a>
+</p>
+
+<p>
+Pod 的阶段（Phase）是 Pod 在其生命周期中所处位置的简单宏观概述。该阶段并不是对容
+器或 Pod 状态的综合汇总，也不是为了成为完整的状态机。
+</p>
+
+<p>
+Kubernetes 以 <code>PodStatus.Phase</code> 抽象 Pod的状态（但并不直接反映所有容器的状态）。
+这个 Status 表示的是 Pod的一个聚合状态
+</p>
+
+<p>
+下面是 phase 可能的值：
+</p>
+
+<ul class="org-ul">
+<li>Pending（悬决）： Pod 已被 Kubernetes
+系统接受，但有一个或者多个容器尚未创建亦未运行。此阶段包括等待 Pod被调度的时间
+和通过网络下载镜像的时间</li>
+
+<li>Running（运行中）： Pod 已经绑定到了某个节点，Pod
+中所有的容器都已被创建。至少有一个容器仍在运行，或者正处于启动或重启状态。</li>
+
+<li>Succeeded（成功）： Pod 中的所有容器都已成功终止，并且不会再重启。</li>
+
+<li>Failed（失败）： Pod中的所有容器都已终止，并且至少有一个容器是因为失败终止。也
+就是说，容器以非0 状态退出或者被系统终止。</li>
+
+<li>Unknown（未知）： 因为某些原因无法取得 Pod的状态。这种情况通常是因为与 Pod 所
+在主机通信失败。</li>
+</ul>
+
+<p>
+可以用 kubectl 命令查询 Pod Phase：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ kubectl get pod reviews-v1-5bdc544bbd-5qgxj -o <span style="color: #a0522d;">jsonpath</span>=<span style="color: #8b2252;">"{.status.phase}"</span>
+Running
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a1abf1be-35dc-4ced-8031-c59b1bffc142" class="outline-3">
+<h3 id="h:a1abf1be-35dc-4ced-8031-c59b1bffc142">容器状态</h3>
+<div class="outline-text-3" id="text-h:a1abf1be-35dc-4ced-8031-c59b1bffc142">
+<p>
+Kubernetes 会跟踪 Pod 中每个容器的状态，就像它跟踪 Pod总体上的阶段一样。你可以使
+用<a href="https://kubernetes.io/zh/docs/concepts/containers/container-lifecycle-hooks/">容器生命周期回调</a> (<code>PostStart</code>, <code>PreStop</code>)来在容器生命周期中的特定时间点触发事
+件。容器的状态有三种： <code>Waiting</code> （等待）、 <code>Running</code> （运行中）和 <code>Terminated</code> （已终
+止）。
+</p>
+
+<p>
+可以使用 <code>kubectl describe pod &lt;pod 名称&gt;</code> 。
+</p>
+
+<p>
+其输出中 <code>Containers.State</code> 包含 Pod 中每个容器的状态。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ kubectl describe pod mypod
+...
+Containers:
+  sh:
+    Container ID:  docker://3f7a2ee0e7e0e16c22090a25f9b6e42b5c06ec049405bc34d3aa183060eb4906
+    Image:         alpine
+    Image ID:      docker-pullable://alpine@sha256:7b848083f93822dd21b0a2f14a110bd99f6efb4b838d499df6d04a49d0debf8b
+    Port:          &lt;none&gt;
+    Host Port:     &lt;none&gt;
+    State:          Terminated
+      Reason:       OOMKilled
+      Exit Code:    2
+    Last State:     Terminated
+      Reason:       OOMKilled
+      Exit Code:    2
+    Ready:          False
+    Restart Count:  3
+    Limits:
+      cpu:     1
+      memory:  1G
+    Requests:
+      cpu:        100m
+      memory:     500M
+...
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get pod chinese-user-login-server-85dfc64db4-rnqfn -n chinese-old  -o yaml</span>
+... 
+  containerStatuses:
+  - containerID: docker://030bef4fd72f9f1a237e6a7dada0cf41b3fbcc5471b873a5035e05d8124c4bb5
+    image: tope365-registry-vpc.cn-beijing.cr.aliyuncs.com/chinese-old-prod/chinese-user-login-server:3
+    imageID: docker-pullable://tope365-registry-vpc.cn-beijing.cr.aliyuncs.com/chinese-old-prod/chinese-user-login-server@sha256:6630b71f9b554b2d2b1a8ffa141e849f10c18348df1d7288d114f7840493fa6c
+    lastState: {}
+    name: chinese-user-login-server
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: <span style="color: #8b2252;">"2021-06-01T13:13:38Z"</span>
+  hostIP: 10.16.30.159
+  initContainerStatuses:
+  - containerID: docker://62ed6e20278d0e89c8e7d1477508babda0e6718a446b2d92b20ed8a89b9e15a1
+    image: registry-vpc.cn-beijing.aliyuncs.com/arms-docker-repo/arms-pilot-init:v1.0.1
+    imageID: docker-pullable://registry-vpc.cn-beijing.aliyuncs.com/arms-docker-repo/arms-pilot-init@sha256:a63c9a6d090e3ba7ec83c39c1aa92e8aca71181065a00f54087f3c6dcb0cb364
+    lastState: {}
+    name: arms-pilot-initcontainer
+    ready: true
+    restartCount: 0
+    state:
+      terminated:
+        containerID: docker://62ed6e20278d0e89c8e7d1477508babda0e6718a446b2d92b20ed8a89b9e15a1
+        exitCode: 0
+        finishedAt: <span style="color: #8b2252;">"2021-06-01T13:13:37Z"</span>
+        reason: Completed
+        startedAt: <span style="color: #8b2252;">"2021-06-01T13:13:31Z"</span>
+  phase: Running
+...
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21629;&#20196;&#36807;&#28388;</span>
+<span style="color: #a0522d;">rinfo2</span>=<span style="color: #ff00ff;">`$kube_CMD -n $namespace get pods $rname  -o go-template="{{range .status.containerStatuses}}{{.lastState.terminated.finishedAt}}@{{.lastState.terminated.reason}}{{end}}@{{.status.podIP}}@{{.status.hostIP}}"`</span>
+<span style="color: #a0522d;">r_last_time</span>=<span style="color: #ff00ff;">`date -d "@$(date -d "$(echo $rinfo2|awk -F@ '{print $1}')" +%s)" +"%F %H:%M:%S"`</span>
+<span style="color: #a0522d;">rinfo</span>=<span style="color: #8b2252;">"$rname&#21457;&#29983;&#37325;&#21551;&#65292;$rinfo&#65292;&#26368;&#36817;$r_last_time&#65292;&#21407;&#22240;&#65306;$(</span><span style="color: #ff00ff;">echo $rinfo2|awk -F@ '{print $2}'</span><span style="color: #8b2252;">)&#65292;&#23481;&#22120;ip/&#33410;&#28857;ip:$(</span><span style="color: #ff00ff;">echo $rinfo2|awk -F@ '{print $3}'</span><span style="color: #8b2252;">)/$(</span><span style="color: #ff00ff;">echo $rinfo2|awk -F@ '{print $4}'</span><span style="color: #8b2252;">)\n"</span>
+</pre>
+</div>
+
+<p>
+<code>Waiting</code> （等待） 如果容器并不处在 <code>Running</code> 或 <code>Terminated=状态之一，它就处在
+=Waiting</code> 状态。 处于 <code>Waiting</code> 状态的容器仍在运行它完成启动所需要的操作：
+例如，
+从某个容器镜像仓库拉取容器镜像，或者向容器应用<a href="https://kubernetes.io/zh/docs/concepts/configuration/secret/">Secret</a>数据等等。 当你使用
+<code>kubectl</code> 来查询包含 <code>Waiting</code> 状态的容器的 Pod时，你也会看到一个 Reason 字段，
+其中给出了容器处于等待状态的原因。
+</p>
+
+<p>
+<code>Running=（运行中） =Running</code> 状态表明容器正在执行状态并且没有问题发生。
+如果配置了 <code>postStart</code> 回调，那么该回调已经执行且已完成。 如果你使用
+<code>kubectl</code> 来查询包含 <code>Running</code> 状态的容器的 Pod 时，你也会看到
+关于容器进入 <code>Running</code> 状态的信息。
+</p>
+
+<p>
+<code>Terminated=（已终止） 处于 =Terminated</code> 状态的容器已经开始执行并且或者正常结束或
+者因为某些原因失败。 如果你使用 <code>kubectl</code> 来查询包含 <code>Terminated</code> 状态的容器的
+Pod 时，你会看到容器进入此状态的原因、退出代码以及容器执行期间的起止时间。
+</p>
+
+<p>
+如果容器配置了 <code>preStop</code> 回调，则该回调会在容器进入 <code>Terminated</code> 状态之前执行。
+</p>
+</div>
+</div>
+<div id="outline-container-h:0fcda79d-12c3-404a-84fb-a88208fd6fdd" class="outline-3">
+<h3 id="h:0fcda79d-12c3-404a-84fb-a88208fd6fdd">pod状况</h3>
+<div class="outline-text-3" id="text-h:0fcda79d-12c3-404a-84fb-a88208fd6fdd">
+<p>
+Pod 有一个 PodStatus 对象，其中包含一个<a href="https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus">PodConditions</a>数组。Pod可能通过也可能未通
+过其中的一些状况测试。这个状态之间的聚合会变成上层的这个Status。
+</p>
+
+<p>
+<a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions">PodConditions</a> 数组有
+</p>
+
+<ul class="org-ul">
+<li>PodScheduled：Pod 已经被调度到某节点；</li>
+<li>ContainersReady：Pod 中所有容器都已就绪；</li>
+<li>Initialized：所有的 Init 容器 都已成功启动；</li>
+<li>Ready：Pod
+可以为请求提供服务，并且应该被添加到对应服务的负载均衡池中。</li>
+</ul>
+
+<p>
+数组内包含：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">type</span>&#65306;              Pod &#29366;&#20917;&#30340;&#21517;&#31216;
+status&#65306;            &#34920;&#26126;&#35813;&#29366;&#20917;&#26159;&#21542;&#36866;&#29992;&#65292;&#21487;&#33021;&#30340;&#21462;&#20540;&#26377; <span style="color: #8b2252;">"True"</span>, <span style="color: #8b2252;">"False"</span> &#25110; <span style="color: #8b2252;">"Unknown"</span>
+lastProbeTime&#65306;     &#19978;&#27425;&#25506;&#27979; Pod &#29366;&#20917;&#26102;&#30340;&#26102;&#38388;&#25139;
+lastTransitionTime&#65306;Pod &#19978;&#27425;&#20174;&#19968;&#31181;&#29366;&#24577;&#36716;&#25442;&#21040;&#21478;&#19968;&#31181;&#29366;&#24577;&#26102;&#30340;&#26102;&#38388;&#25139;
+reason&#65306;            &#26426;&#22120;&#21487;&#35835;&#30340;&#12289;&#39548;&#23792;&#32534;&#30721;&#65288;UpperCamelCase&#65289;&#30340;&#25991;&#23383;&#65292;&#34920;&#36848;&#19978;&#27425;&#29366;&#20917;&#21464;&#21270;&#30340;&#21407;&#22240;
+message&#65306;            &#20154;&#31867;&#21487;&#35835;&#30340;&#28040;&#24687;&#65292;&#32473;&#20986;&#19978;&#27425;&#29366;&#24577;&#36716;&#25442;&#30340;&#35814;&#32454;&#20449;&#24687;
+</pre>
+</div>
+
+<p>
+可以使用kubectl 命令查询
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl describe pod chinese-user-login-server-85dfc64db4-rnqfn -n chinese-old</span>
+... 
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+...
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get pod chinese-user-login-server-85dfc64db4-rnqfn -n chinese-old  -o yaml</span>
+...
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: <span style="color: #8b2252;">"2021-06-01T13:13:38Z"</span>
+    status: <span style="color: #8b2252;">"True"</span>
+    <span style="color: #483d8b;">type</span>: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: <span style="color: #8b2252;">"2021-06-01T13:15:23Z"</span>
+    status: <span style="color: #8b2252;">"True"</span>
+    <span style="color: #483d8b;">type</span>: Ready
+  - lastProbeTime: null
+    lastTransitionTime: <span style="color: #8b2252;">"2021-06-01T13:15:23Z"</span>
+    status: <span style="color: #8b2252;">"True"</span>
+    <span style="color: #483d8b;">type</span>: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: <span style="color: #8b2252;">"2021-06-01T13:13:30Z"</span>
+    status: <span style="color: #8b2252;">"True"</span>
+    <span style="color: #483d8b;">type</span>: PodScheduled
+...
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:43d23625-a94b-4189-bac7-75828f20a87b" class="outline-3">
+<h3 id="h:43d23625-a94b-4189-bac7-75828f20a87b">pod 事件</h3>
+<div class="outline-text-3" id="text-h:43d23625-a94b-4189-bac7-75828f20a87b">
+<p>
+查看 Pod 的事件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;Pod&#30340;&#20107;&#20214;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">1.</span>
+kubectl describe pod mypod
+...
+Events:
+  Type     Reason            Age                From               Message
+  ----     ------            ----               ----               -------
+  Warning  FailedScheduling  12s (x6 over 27s)  default-scheduler  0/4 nodes are available: 2 Insufficient cpu.
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">2.</span>
+kubectl get events --field-selector involvedObject.name=nginx-85cb5867f-bs7pn,involvedObject.kind=Pod
+</pre>
+</div>
+
+<p>
+事件类型：
+</p>
+
+<p>
+参考源码：<a href="https://github.com/kubernetes/kubernetes/blob/22ec3b0eddf2bea9d7137516c15d85d17f059357/staging/src/k8s.io/api/core/v1/types.go#L5465">https://github.com/kubernetes/kubernetes/blob/22ec3b0eddf2bea9d7137516c15d85d17f059357/staging/src/k8s.io/api/core/v1/types.go#L5465</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">type</span> Event struct {
+...
+  // This should be a short, machine understandable string that gives the reason
+  // for the transition into the object<span style="color: #8b2252;">'s current status.</span>
+<span style="color: #8b2252;">  // TODO: provide exact specification for format.</span>
+<span style="color: #8b2252;">  // +optional</span>
+<span style="color: #8b2252;">  Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`</span>
+
+<span style="color: #8b2252;">  // A human-readable description of the status of this operation.</span>
+<span style="color: #8b2252;">  // TODO: decide on maximum length.</span>
+<span style="color: #8b2252;">  // +optional</span>
+<span style="color: #8b2252;">  Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`</span>
+
+<span style="color: #8b2252;">  // Type of this event (Normal, Warning), new types could be added in the future</span>
+<span style="color: #8b2252;">  // +optional</span>
+<span style="color: #8b2252;">  Type string `json:"type,omitempty" protobuf:"bytes,9,opt,name=type"`</span>
+<span style="color: #8b2252;">...</span>
+<span style="color: #8b2252;">}</span>
+</pre>
+</div>
+
+<p>
+事件原因
+</p>
+
+<p>
+参考源码：<a href="https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/kubelet/events/event.go">https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/kubelet/events/event.go</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">// Container event reason list
+<span style="color: #0000ff;">const</span> (
+    CreatedContainer        = <span style="color: #8b2252;">"Created"</span>
+    StartedContainer        = <span style="color: #8b2252;">"Started"</span>
+    FailedToCreateContainer = <span style="color: #8b2252;">"Failed"</span>
+    FailedToStartContainer  = <span style="color: #8b2252;">"Failed"</span>
+    KillingContainer        = <span style="color: #8b2252;">"Killing"</span>
+    PreemptContainer        = <span style="color: #8b2252;">"Preempting"</span>
+    BackOffStartContainer   = <span style="color: #8b2252;">"BackOff"</span>
+    ExceededGracePeriod     = <span style="color: #8b2252;">"ExceededGracePeriod"</span>
+)
+
+// Pod event reason list
+<span style="color: #0000ff;">const</span> (
+    FailedToKillPod                = <span style="color: #8b2252;">"FailedKillPod"</span>
+    FailedToCreatePodContainer     = <span style="color: #8b2252;">"FailedCreatePodContainer"</span>
+    FailedToMakePodDataDirectories = <span style="color: #8b2252;">"Failed"</span>
+    NetworkNotReady                = <span style="color: #8b2252;">"NetworkNotReady"</span>
+)
+
+// Image event reason list
+<span style="color: #0000ff;">const</span> (
+    PullingImage            = <span style="color: #8b2252;">"Pulling"</span>
+    PulledImage             = <span style="color: #8b2252;">"Pulled"</span>
+    FailedToPullImage       = <span style="color: #8b2252;">"Failed"</span>
+    FailedToInspectImage    = <span style="color: #8b2252;">"InspectFailed"</span>
+    ErrImageNeverPullPolicy = <span style="color: #8b2252;">"ErrImageNeverPull"</span>
+    BackOffPullImage        = <span style="color: #8b2252;">"BackOff"</span>
+)
+
+// kubelet event reason list
+<span style="color: #0000ff;">const</span> (
+    NodeReady                            = <span style="color: #8b2252;">"NodeReady"</span>
+    NodeNotReady                         = <span style="color: #8b2252;">"NodeNotReady"</span>
+    NodeSchedulable                      = <span style="color: #8b2252;">"NodeSchedulable"</span>
+    NodeNotSchedulable                   = <span style="color: #8b2252;">"NodeNotSchedulable"</span>
+    StartingKubelet                      = <span style="color: #8b2252;">"Starting"</span>
+    KubeletSetupFailed                   = <span style="color: #8b2252;">"KubeletSetupFailed"</span>
+    FailedAttachVolume                   = <span style="color: #8b2252;">"FailedAttachVolume"</span>
+    FailedMountVolume                    = <span style="color: #8b2252;">"FailedMount"</span>
+    VolumeResizeFailed                   = <span style="color: #8b2252;">"VolumeResizeFailed"</span>
+    VolumeResizeSuccess                  = <span style="color: #8b2252;">"VolumeResizeSuccessful"</span>
+    FileSystemResizeFailed               = <span style="color: #8b2252;">"FileSystemResizeFailed"</span>
+    FileSystemResizeSuccess              = <span style="color: #8b2252;">"FileSystemResizeSuccessful"</span>
+    FailedMapVolume                      = <span style="color: #8b2252;">"FailedMapVolume"</span>
+    WarnAlreadyMountedVolume             = <span style="color: #8b2252;">"AlreadyMountedVolume"</span>
+    SuccessfulAttachVolume               = <span style="color: #8b2252;">"SuccessfulAttachVolume"</span>
+    SuccessfulMountVolume                = <span style="color: #8b2252;">"SuccessfulMountVolume"</span>
+    NodeRebooted                         = <span style="color: #8b2252;">"Rebooted"</span>
+    ContainerGCFailed                    = <span style="color: #8b2252;">"ContainerGCFailed"</span>
+    ImageGCFailed                        = <span style="color: #8b2252;">"ImageGCFailed"</span>
+    FailedNodeAllocatableEnforcement     = <span style="color: #8b2252;">"FailedNodeAllocatableEnforcement"</span>
+    SuccessfulNodeAllocatableEnforcement = <span style="color: #8b2252;">"NodeAllocatableEnforced"</span>
+    SandboxChanged                       = <span style="color: #8b2252;">"SandboxChanged"</span>
+    FailedCreatePodSandBox               = <span style="color: #8b2252;">"FailedCreatePodSandBox"</span>
+    FailedStatusPodSandBox               = <span style="color: #8b2252;">"FailedPodSandBoxStatus"</span>
+    FailedMountOnFilesystemMismatch      = <span style="color: #8b2252;">"FailedMountOnFilesystemMismatch"</span>
+)
+
+// Image manager event reason list
+<span style="color: #0000ff;">const</span> (
+    InvalidDiskCapacity = <span style="color: #8b2252;">"InvalidDiskCapacity"</span>
+    FreeDiskSpaceFailed = <span style="color: #8b2252;">"FreeDiskSpaceFailed"</span>
+)
+
+// Probe event reason list
+<span style="color: #0000ff;">const</span> (
+    ContainerUnhealthy    = <span style="color: #8b2252;">"Unhealthy"</span>
+    ContainerProbeWarning = <span style="color: #8b2252;">"ProbeWarning"</span>
+)
+
+// Pod worker event reason list
+<span style="color: #0000ff;">const</span> (
+    FailedSync = <span style="color: #8b2252;">"FailedSync"</span>
+)
+
+// Config event reason list
+<span style="color: #0000ff;">const</span> (
+    FailedValidation = <span style="color: #8b2252;">"FailedValidation"</span>
+)
+</pre>
+</div>
+</div>
+<div id="outline-container-h:6125fa65-2d80-4b3c-9d8a-7ac9ad7ef046" class="outline-4">
+<h4 id="h:6125fa65-2d80-4b3c-9d8a-7ac9ad7ef046">容器事件原因</h4>
+<div class="outline-text-4" id="text-h:6125fa65-2d80-4b3c-9d8a-7ac9ad7ef046">
+</div>
+<div id="outline-container-h:e33a902a-7b59-4327-afc7-9dfd6bb1eef7" class="outline-5">
+<h5 id="h:e33a902a-7b59-4327-afc7-9dfd6bb1eef7">容器事件</h5>
+<div class="outline-text-5" id="text-h:e33a902a-7b59-4327-afc7-9dfd6bb1eef7">
+<p>
+参考源码：<a href="https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/kubelet/container/sync_result.go#L29">https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/kubelet/container/sync_result.go#L29</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">RunContainerError    &#23481;&#22120;&#26080;&#27861;&#21551;&#21160;&#12290;&#25346;&#36733;&#20102;&#19981;&#23384;&#22312;&#30340;&#21367;&#12289;&#21019;&#24314;&#19981;&#20102;&#38236;&#20687;
+CrashLoopBackOff     &#23481;&#22120;&#26366;&#32463;&#21551;&#21160;&#20102;&#65292;&#20294;&#21448;&#24322;&#24120;&#36864;&#20986;&#20102;&#12290;&#24212;&#29992;&#31243;&#24207;&#20013;&#23384;&#22312;&#38169;&#35823;&#12289;Liveness&#25506;&#38024;&#22833;&#36133;&#27425;&#25968;&#22826;&#22810;
+KillContainerError
+CreatePodSandboxError
+ConfigPodSandboxError
+KillPodSandboxError
+no matching container
+</pre>
+</div>
+
+<p>
+范例：RunContainerError状态
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">kubectl describe pod mypod</span>
+...
+Status:     Pending
+Containers:
+  udp-echo:
+...
+    State:          Waiting
+      Reason:           RunContainerError
+    Ready:          False
+Conditions:
+  Type      Status
+  Ready     False 
+...
+Events:
+Type        Reason      Message
+  --------- --------    -----   ----                    -------------           --------    ------      -------
+Normal      Scheduled   Successfully assigned my-udp-rc-ld468 to e2e-test-mixia-minion-9ou9
+Normal      Pulling     pulling image <span style="color: #8b2252;">"gcr.io/mixia-kube/udptest:v1"</span>
+Normal      Pulled      Successfully pulled image <span style="color: #8b2252;">"gcr.io/mixia-kube/udptest:v1"</span>
+Warning     Failed      Failed to create docker container with error: Error: No such image: gcr.io/mixia-kube/udptest:v1
+Warning     FailedSync  Error syncing pod, skipping: failed to <span style="color: #8b2252;">"StartContainer"</span> for <span style="color: #8b2252;">"udp-echo"</span> with RunContainerError: <span style="color: #8b2252;">"runContainer: Error: No such image: gcr.io/mixia-kube/udptest:v1"</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubelet.log&#26085;&#24535;</span>
+E0411 17:51:03.049180    3391 pod_workers.go:138] Error syncing pod f4d5367c-000d-11e6-95cc-42010af00002, skipping: failed to <span style="color: #8b2252;">"StartContainer"</span> for <span style="color: #8b2252;">"udp-echo"</span> with RunContainerError: <span style="color: #8b2252;">"runContainer: Error: No such image: gcr.io/mixia-kube/udptest:v1"</span>
+</pre>
+</div>
+
+<p>
+范例：CrashLoopBackOff状态ERROR状态
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get pod english-readmanager2-76598ccd6b-4pch9 -n english-prod</span>
+NAME                                    READY   STATUS             RESTARTS   AGE
+english-readmanager2-76598ccd6b-4pch9   0/1     CrashLoopBackOff   5          9m59s
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl describe pod english-readmanager2-76598ccd6b-4pch9 -n english-prod</span>
+Status:       Running
+Containers:
+  english-readmanager2:
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+
+    Ready:          False
+    Restart Count:  5
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             False
+  ContainersReady   False
+  PodScheduled      True
+Events:
+  Type     Reason     Age                    From                            Message
+  ----     ------     ----                   ----                            -------
+  Warning  Unhealthy  7m6s (x4 over 8m46s)   kubelet, cn-beijing.10.16.20.1  Readiness probe failed: Get http://172.20.28.194:8090/health: dial tcp 
+  Warning  BackOff    8s (x24 over 7m52s)    kubelet, cn-beijing.10.16.20.1  Back-off restarting failed container
+
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get pod english-readmanager2-76598ccd6b-4pch9 -n english-prod</span>
+NAME                                    READY   STATUS   RESTARTS   AGE
+english-readmanager2-76598ccd6b-4pch9   0/1     Error    6          11m
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl describe pod english-readmanager2-76598ccd6b-4pch9 -n english-prod</span>
+Status:       Running
+Init Containers:
+  arms-pilot-initcontainer:
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+Containers:
+    State:          Terminated
+      Reason:       Error
+      Exit Code:    1
+    Ready:          False
+    Restart Count:  6
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             False
+  ContainersReady   False
+  PodScheduled      True
+Events:
+  Type     Reason     Age                   From                            Message
+  ----     ------     ----                  ----                            -------
+  Warning  Unhealthy  8m30s (x4 over 10m)   kubelet, cn-beijing.10.16.20.1  Readiness probe failed: Get http://172.20.28.194:8090/health:
+  Warning  BackOff    92s (x24 over 9m16s)  kubelet, cn-beijing.10.16.20.1  Back-off restarting failed container
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23481;&#22120;&#19994;&#21153;&#25253;&#38169;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">kubectl logs &lt;pod-name&gt; [-c &lt;container-name&gt;]</span>
+Error starting ApplicationContext. To display the conditions report re-run your application with <span style="color: #8b2252;">'debug'</span> enabled. ]
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0cfeed3f-0e8c-4879-82cb-9f263b42357e" class="outline-5">
+<h5 id="h:0cfeed3f-0e8c-4879-82cb-9f263b42357e">dockershim容器</h5>
+<div class="outline-text-5" id="text-h:0cfeed3f-0e8c-4879-82cb-9f263b42357e">
+<p>
+参考源码：<a href="https://github.com/kubernetes/kubernetes/blob/669016067d49110a35769f7db42705cc5f0becff/pkg/kubelet/dockershim/docker_container.go#L415">https://github.com/kubernetes/kubernetes/blob/669016067d49110a35769f7db42705cc5f0becff/pkg/kubelet/dockershim/docker_container.go#L415</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">OOMKilled
+Completed           &#23481;&#22120;&#36827;&#31243;&#32467;&#26463;&#12290;sidercar&#20013;&#21487;&#20197;&#30475;&#21040;
+Error
+ContainerCannotRun
+</pre>
+</div>
+
+<p>
+范例：OOMKilled
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl describe pod mem-nginx</span>
+...
+Status:             Running
+Containers:
+...
+    State:          Running
+      Started:      Fri, 22 May 2020 11:20:13 +0800
+    Last State:     Terminated
+      Reason:       OOMKilled
+      Exit Code:    0
+    Ready:          True
+...
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+Events:
+  Type    Reason          Age                 From             Message
+  ----    ------          ----                ----             -------
+  Normal  SandboxChanged  2m3s (x2 over 10m)  kubelet, paasn3  Pod sandbox changed, it will be killed and re-created.
+  Normal  Killing         2m2s (x2 over 10m)  kubelet, paasn3  Killing container with id docker://mem-nginx-container:Need to kill Pod
+  Normal  Pulled          2m (x3 over 17h)    kubelet, paasn3  Container image <span style="color: #8b2252;">"registry.paas/library/nginx:1.15.9"</span> already present on machine
+  Normal  Created         2m (x3 over 17h)    kubelet, paasn3  Created container
+  Normal  Started         2m (x3 over 17h)    kubelet, paasn3  Started container
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f679eff7-5fe6-4786-8fb4-67cb13db1669" class="outline-4">
+<h4 id="h:f679eff7-5fe6-4786-8fb4-67cb13db1669">Pod事件原因</h4>
+<div class="outline-text-4" id="text-h:f679eff7-5fe6-4786-8fb4-67cb13db1669">
+</div>
+</div>
+<div id="outline-container-h:8846c107-f2ef-446c-aa3b-42a0794947b1" class="outline-4">
+<h4 id="h:8846c107-f2ef-446c-aa3b-42a0794947b1">镜像事件原因</h4>
+<div class="outline-text-4" id="text-h:8846c107-f2ef-446c-aa3b-42a0794947b1">
+<p>
+参考源码：<a href="https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/kubelet/images/types.go#L28">https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/pkg/kubelet/images/types.go#L28</a>
+</p>
+
+<pre class="example" id="org48f91ad">
+ImagePullBackOff    通常是镜像名称配置错误或者私有镜像的密钥配置错误导致
+ImageInspectError
+ErrImagePull
+ErrImageNeverPull
+RegistryUnavailable
+InvalidImageName
+</pre>
+
+<p>
+范例：ImagePullBackOff
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl get pods
+NAME                    READY STATUS            RESTARTS  AGE
+app1                    0/1   ImagePullBackOff  0         47h
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl describe pods --namespace=kube-system</span>
+...
+Status:     Pending
+Containers:
+  kubernetes-dashboard:
+...
+    State:      Waiting
+      Reason:       ImagePullBackOff
+    Ready:      False
+...
+Conditions:
+  Type      Status
+  Initialized   True 
+  Ready     False 
+  PodScheduled  True 
+...
+Events:
+Type        Reason      Message
+  --------- --------    -----   ----            -------------               --------    ------      -------
+Normal      Scheduled   Successfully assigned kubernetes-dashboard-3825951078-ywerf to 127.0.0.1
+Warning     Failed      Failed to pull image <span style="color: #8b2252;">"gcr.io/google_containers/kubernetes-dashboard-amd64:v1.1.1"</span>
+Warning FailedSync  Error syncing pod, skipping: failed to <span style="color: #8b2252;">"StartContainer"</span> for <span style="color: #8b2252;">"kubernetes-dashboard"</span> with ErrImagePull: 
+Normal  BackOff     Back-off pulling image <span style="color: #8b2252;">"gcr.io/google_containers/kubernetes-dashboard-amd64:v1.1.1"</span>
+Warning FailedSync  Error syncing pod, skipping: failed to <span style="color: #8b2252;">"StartContainer"</span> for <span style="color: #8b2252;">"kubernetes-dashboard"</span> with ImagePullBackOff: <span style="color: #8b2252;">"Back-off pulling image \"gcr.io/google_containers/kubernetes-dashboard-amd64:v1.1.1\""</span>
+Normal  Pulling pulling image <span style="color: #8b2252;">"gcr.io/google_containers/kubernetes-dashboard-amd64:v1.1.1"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:62bed850-2a65-43b1-943d-ab485152cc93" class="outline-4">
+<h4 id="h:62bed850-2a65-43b1-943d-ab485152cc93">kubelet事件原因</h4>
+<div class="outline-text-4" id="text-h:62bed850-2a65-43b1-943d-ab485152cc93">
+</div>
+</div>
+<div id="outline-container-h:9d27a963-c58d-48b5-a183-d4b3e4bf806b" class="outline-4">
+<h4 id="h:9d27a963-c58d-48b5-a183-d4b3e4bf806b">pod日志</h4>
+<div class="outline-text-4" id="text-h:9d27a963-c58d-48b5-a183-d4b3e4bf806b">
+<p>
+<code>kubectl logs &lt;pod-name&gt; [-c &lt;container-name&gt;]</code>
+</p>
+</div>
+</div>
+<div id="outline-container-h:c0fae5fa-63ae-4b5f-854b-1b79ce86764d" class="outline-4">
+<h4 id="h:c0fae5fa-63ae-4b5f-854b-1b79ce86764d">应用故障排查-常见应用异常</h4>
+<div class="outline-text-4" id="text-h:c0fae5fa-63ae-4b5f-854b-1b79ce86764d">
+
+<figure id="orge77f7eb">
+<img src="images/image-20210603171021922.png" alt="image-20210603171021922.png">
+
+<figcaption><span class="figure-number">Figure 3: </span>image-20210603171021922</figcaption>
+</figure>
+
+<p>
+Pod 停留在 Pending pending 表示调度器没有进行介入。可以通过 kubectl describe pod
+查看事件排查，通常和资源使用相关。
+</p>
+
+<p>
+如果由于资源或者说端口占用，或者是由于 node selector 造成 pod无法调度的时候，可
+以在相应的事件里面看到相应的结果，这个结果里面会表示说有多少个不满足的node，有多
+少是因为 CPU 不满足，有多少是由于 node 不满足，有多少是由于tag 打标造成的不满足。
+</p>
+
+<p>
+Pod 停留在 waiting 通常表示说这个 pod的镜像没有正常拉取，原因可能是由于这个镜像
+是私有镜像，但是没有配置 Pod secret；那第二种是说可能由于这个镜像地址是不存在的，
+造成这个镜像拉取不下来；还有这个镜像可能是一个公网的镜像，造成镜像的拉取失败。
+</p>
+
+<p>
+Pod 不断被拉取并且可以看到 crashing pod 不断被拉起，而且可以看到类似像backoff。
+这个通常表示说 pod已经被调度完成了，但是启动失败，通常要关注的应该是这个应用自身
+的一个状态，并不是说配置是否正确、权限是否正确，此时需要查看的应该是pod 的具体日
+志。
+</p>
+
+<p>
+Pod 处在 Runing 但是没有正常工作比较常见可能是一些非常细碎的配置，类似像有一些字
+段可能拼写错误，造成了yaml 下发下去了，但是有一段没有正常地生效，从而使得这个
+pod 处在 running的状态没有对外服。可以通过检验部署来排查 。kubectl
+apply-validate-f pod.yaml 的方式来进行判断当前 yaml 是否是正常的。
+</p>
+
+<p>
+Service 无法正常的工作 最后一种就是 service无法正常工作的时候，该怎么去判断呢？
+那比较常见的 service出现问题的时候，是自己的使用上面出现了问题。因为 service 和
+底层的 pod之间的关联关系是通过 selector 的方式来匹配的，也就是说 pod上面配置了一
+些 label，然后 service 通过 match label 的方式和这个 pod进行相互关联。如果这个
+label 配置的有问题，可能会造成这个 service无法找到后面的 endpoint，从而造成相应
+的 service没有办法对外提供服务，那如果 service 出现异常的时候，第一个要看的是这
+个service 后面是不是有一个真正的 endpoint，其次来看这个 endpoint是否可以对外提供
+正常的服务。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:503ad123-a3d2-4c34-8dbe-cecd452bd9e1" class="outline-2">
+<h2 id="h:503ad123-a3d2-4c34-8dbe-cecd452bd9e1">Kubernetes 故障</h2>
+<div class="outline-text-2" id="text-h:503ad123-a3d2-4c34-8dbe-cecd452bd9e1">
+</div>
+<div id="outline-container-h:0525e096-c8e5-4b81-82e1-432f0fad1589" class="outline-3">
+<h3 id="h:0525e096-c8e5-4b81-82e1-432f0fad1589">节点PLEG异常</h3>
+<div class="outline-text-3" id="text-h:0525e096-c8e5-4b81-82e1-432f0fad1589">
+<p>
+现象：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[container runtime status check may not have completed yet, PLEG is not healthy: pleg was last seen active 3m28.93894374s ago; threshold is 3m0s]
+ skipping pod synchronization - container runtime status check may not have completed yet
+</pre>
+</div>
+
+<p>
+原因：
+</p>
+
+<p>
+PLEG是pod生命周期事件生成器，会记录Pod生命周期中的各种事件，如容器的启动、终止等。一般是由于节点上的daemon进程异常或者节点systemd版本bug导致。出现该问题会导致集群节点不可用
+</p>
+
+<p>
+升级k8s集群版本，其中一台实例由于systemd
+低版本问题触发hang住，通过重启runc服务后完成升级。建议后续针对节点中存在同样版本的实例做下升级（现在快照备份）
+</p>
+
+<p>
+解决：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">1. &#20445;&#30041;&#24403;&#26102;&#29616;&#22330;&#35786;&#26029;&#20449;&#24687;&#21518;   &#25191;&#34892;&#30340;&#25805;&#20316;&#26159;system restart docker &#26381;&#21153;&#26469;&#24674;&#22797;&#30340;
+https://help.aliyun.com/knowledge_detail/178340.html   CentOS 7.6&#31995;&#32479;&#20351;&#29992;&#30340;systemd-219-62.el7_6.6.x86_64&#36719;&#20214;&#21253;&#23384;&#22312;&#32570;&#38519;&#65292;&#24341;&#21457;&#24322;&#24120;&#38169;&#35823;
+2. yum update -y systemd &amp;&amp; systemctl daemon-reexec
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7b8660cf-a4cb-493f-8369-6bc57ce5637c" class="outline-3">
+<h3 id="h:7b8660cf-a4cb-493f-8369-6bc57ce5637c">状态码503</h3>
+<div class="outline-text-3" id="text-h:7b8660cf-a4cb-493f-8369-6bc57ce5637c">
+<p>
+现象：
+</p>
+
+<p>
+域名访问503，域名通过rancher路由配置代码后端
+</p>
+
+<p>
+原因：
+</p>
+
+<p>
+rancher使用了工作负载来代理后端，实际是由rancher维护的service(无头service)绑定后端工作负载。在rancher服务不可用时，ingress无法找到该service的和后端的关系导致503.
+</p>
+
+<p>
+解决：
+</p>
+
+<pre class="example" id="org8711ff2">
+方法1：
+启动rancher，关系自动找到，访问200
+方法2：
+路由改成目录为后端服务，即自身的service来访问pod
+</pre>
+
+
+<figure id="orgbfb92da">
+<img src="images/image-20210422172821008.png" alt="image-20210422172821008.png">
+
+<figcaption><span class="figure-number">Figure 4: </span>image-20210422172821008</figcaption>
+</figure>
+</div>
+</div>
+<div id="outline-container-h:2a2c61f1-5134-4ed0-a740-d5a5d08d817a" class="outline-3">
+<h3 id="h:2a2c61f1-5134-4ed0-a740-d5a5d08d817a">ephemeral-storage存储限制</h3>
+<div class="outline-text-3" id="text-h:2a2c61f1-5134-4ed0-a740-d5a5d08d817a">
+<p>
+问题描述
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">pod&#35774;&#32622;&#20020;&#26102;&#31354;&#38388;</span>
+ephemeral-storage:  8Gi
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#36164;&#28304;&#32039;&#24352;&#65292;Evicted </span>
+</pre>
+</div>
+
+<p>
+Pod ephemeral local storage usage exceeds the total limit of containers
+8Gi.
+</p>
+
+
+<figure id="org5ea5768">
+<img src="images/image-20210602102546327.png" alt="image-20210602102546327.png">
+
+<figcaption><span class="figure-number">Figure 5: </span>image-20210602102546327</figcaption>
+</figure>
+
+<p>
+问题小结：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#22914;&#26524;&#36816;&#34892;&#26102;&#25351;&#23450;&#20102;&#21035;&#30340;&#29420;&#31435;&#30340;&#20998;&#21306;&#65292;&#27604;&#22914;&#20462;&#25913;&#20102;docker&#30340;&#38236;&#20687;&#23618;&#21644;&#23481;&#22120;&#21487;&#20889;&#23618;&#30340;&#23384;&#20648;&#20301;&#32622;(&#40664;&#35748;&#26159;/var/lib/docker)&#25152;&#22312;&#30340;&#20998;&#21306;&#65292;&#23558;&#19981;&#20877;&#23558;&#20854;&#35745;&#20837;ephemeral-storage&#30340;&#28040;&#32791;&#12290;
+&#22312;&#23481;&#22120;&#20889;&#20837;&#36229;&#36807;&#23384;&#20648;&#38480;&#21046;&#26102;&#23601;&#20250;&#34987;&#39537;&#36880;&#25481;&#20102;
+</pre>
+</div>
+
+<p>
+<a href="https://v1-20.docs.kubernetes.io/docs/reference/generated/kubelet">Kubelet</a>
+主动监测和防止 计算资源的全面短缺。在资源短缺时， <code>kubelet</code>
+可以主动地结束一个或多个 Pod 以回收短缺的资源。 当 <code>kubelet</code> 结束一个
+Pod 时，它将终止 Pod 中的所有容器，而 Pod 的 <code>Phase</code> 将变为 =Failed=。
+如果被驱逐的 Pod 由 Deployment 管理，这个 Deployment 会创建另一个 Pod 给
+Kubernetes 来调度。
+</p>
+
+<p>
+参考：<a href="https://v1-20.docs.kubernetes.io/zh/docs/concepts/scheduling-eviction/eviction-policy/">https://v1-20.docs.kubernetes.io/zh/docs/concepts/scheduling-eviction/eviction-policy/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:ea98dff8-aac2-4486-a9f1-e77ed6c4eaa9" class="outline-3">
+<h3 id="h:ea98dff8-aac2-4486-a9f1-e77ed6c4eaa9">field is immutable</h3>
+<div class="outline-text-3" id="text-h:ea98dff8-aac2-4486-a9f1-e77ed6c4eaa9">
+<p>
+报错信息
+</p>
+
+<pre class="example" id="org44c5c4f">
+MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
+</pre>
+
+
+<p>
+原因：这个问题的本质原因是，两个相同的Deployment（一个已部署，一个要部署），但它们选择器不同。
+</p>
+
+<p>
+解决方式： 1： 可以将原先的deployment删除后再部署 2：
+修改deployment的名字，不要重名
+</p>
+
+<p>
+现象：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@iZ2zegdxx2xkt57v45rtl2Z ~]# kubectl apply -f /tmp/deploy.yaml 
+service/english-grammar-web created
+The Deployment <span style="color: #8b2252;">"english-grammar-web"</span> is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{<span style="color: #8b2252;">"app"</span>:<span style="color: #8b2252;">"english-grammar-web"</span>, <span style="color: #8b2252;">"release"</span>:<span style="color: #8b2252;">"qa"</span>}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutabl
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25105;&#36825;&#37324;&#20043;&#21069;release&#26159;pre</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ff3611e9-9da0-4f98-bf2a-e4155649f1ee" class="outline-3">
+<h3 id="h:ff3611e9-9da0-4f98-bf2a-e4155649f1ee">pod-亲和问题</h3>
+<div class="outline-text-3" id="text-h:ff3611e9-9da0-4f98-bf2a-e4155649f1ee">
+<p>
+现象：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">pod peding&#25253;&#38169;&#65306;0/92 nodes are available: 1 node(s) didn<span style="color: #8b2252;">'t match pod affinity/anti-affinity, 1 node(s) didn'</span>t satisfy existing pods anti-affinity rules, 14 Insufficient memory, 29 Insufficient cpu, 56 node(s) didn<span style="color: #8b2252;">'t match node selector.</span>
+
+<span style="color: #8b2252;">pod &#29366;&#24577;&#65306;</span>
+<span style="color: #8b2252;">NAME                                    READY   STATUS    RESTARTS   AGE</span>
+<span style="color: #8b2252;">callbreak-room-1-665d446596-hfrhk       0/1     Running   0          20d</span>
+<span style="color: #8b2252;">callbreak-room-1-6fdb565b8d-5dm2s       0/1     Pending   0          7m55s</span>
+</pre>
+</div>
+
+<p>
+原因跟踪： pod设置了pod反亲和，同一个room-1标签不在一个节点上存在。
+目前callbreak有3个节点，2个节点资源吃紧，1个节点有富余且存在 pod room-1
+发布新room-1时，只一个节点有资源，但不满足亲和规则，导致新发布pending
+</p>
+
+<p>
+解决： 1. 临时删除旧pod room-1 2.
+考虑优先加1节点，后期对pod资源限制做合理规划。
+</p>
+</div>
+</div>
+<div id="outline-container-h:088ae2d8-c051-475c-ae0c-c25dec0264f8" class="outline-3">
+<h3 id="h:088ae2d8-c051-475c-ae0c-c25dec0264f8">service-LoadBalancer模式下cluster策略获取用户真实IP</h3>
+<div class="outline-text-3" id="text-h:088ae2d8-c051-475c-ae0c-c25dec0264f8">
+<p>
+背景： 上面是网络采用flannel出现的问题，用terway不存在。
+</p>
+<ol class="org-ol">
+<li>Cluster模式限制 之前2个namespce间相互访问，ingress的service用的type:LoadBalancer模式，externalTrafficPolicy:Cluster外部流量策略Cluster。但这样一来用户真实ip无法显示了。</li>
+
+<li>Local模式限制</li>
+</ol>
+
+<p>
+因为在local模式下，kube-proxy限制，只有同节点的pod通过slb访问通。
+</p>
+
+
+<figure id="orgffd4859">
+<img src="images/image-20220205140033176.png" alt="image-20220205140033176.png">
+
+</figure>
+
+<ol class="org-ol">
+<li>真实IP获取途径</li>
+</ol>
+
+<p>
+"X-Forwarded-For", "X-Real-IP", "Proxy-Client-IP", "WL-Proxy-Client-IP",
+"HTTP_CLIENT_IP", "HTTP_X_FORWARDED_FOR"
+</p>
+
+
+<figure id="orgd2b60ca">
+<img src="images/image-20220205140057695.png" alt="image-20220205140057695.png">
+
+</figure>
+
+<p>
+参考： 更新应用时，如何实现K8s零中断滚动更新
+<a href="https://blog.csdn.net/alitech2017/article/details/106526418">https://blog.csdn.net/alitech2017/article/details/106526418</a>
+</p>
+
+<p>
+<b>解决：</b>
+</p>
+
+<p>
+flannel下，要用cluster外部流量策略
+flannel当前版本：v0.11.0.2-g6e46593e-aliyun
+</p>
+
+<ol class="org-ol">
+<li>pod的spec里面，加上 更新nginx ingress controller的yaml
+podip现在是节点的ip</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh">dnsPolicy: ClusterFirstWithHostNet
+hostNetwork: true
+</pre>
+</div>
+
+<p>
+参数解释 "ClusterFirstWithHostNet"：对于以 hostNetwork 方式运行的
+Pod，应显式设置其 DNS 策略 "ClusterFirstWithHostNet" 参考:
+<a href="https://kubernetes.io/zh/docs/concepts/services-networking/dns-pod-service/">https://kubernetes.io/zh/docs/concepts/services-networking/dns-pod-service/</a>
+</p>
+
+<ol class="org-ol">
+<li>service的metadata里面，加上 更新nginx ingress service yaml
+hostnetwork和eni是解决那个源ip问题 ENI 模式（阿里云特有模式）</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh">metadata:
+  annotations:
+    service.beta.kubernetes.io/backend-type: eni
+</pre>
+</div>
+
+<p>
+通过设置 service.beta.kubernetes.io/backend-type: "eni" annotation
+可以创建 ENI 模式的 SLB。ENI 模式下，pod会直接挂载到 SLB 后端，不经过
+kube-proxy，因此不存在服务中断的问题。请求直接转发到 pod，因此可以保留源
+IP 地址。
+</p>
+
+
+<figure id="org6a00987">
+<img src="images/image-20220205140153795.png" alt="image-20220205140153795.png">
+
+<figcaption><span class="figure-number">Figure 6: </span>image-20220205140153795</figcaption>
+</figure>
+
+<p>
+<b>nginx-ingress-controller.yml</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    component.revision: v5
+    component.version: v0.22.0
+    deployment.kubernetes.io/revision: <span style="color: #8b2252;">'3'</span>
+    field.cattle.io/publicEndpoints: &gt;-
+  creationTimestamp: <span style="color: #8b2252;">'2020-07-18T01:48:36Z'</span>
+  generation: 7
+  labels:
+    app: ingress-nginx
+  name: nginx-ingress-controller
+  namespace: kube-system
+  resourceVersion: <span style="color: #8b2252;">'793741697'</span>
+  selfLink: /apis/apps/v1/namespaces/kube-system/deployments/nginx-ingress-controller
+  uid: b77c8097-2d3b-4c6b-b33a-656b7a62f5eb
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: ingress-nginx
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    <span style="color: #483d8b;">type</span>: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        cattle.io/timestamp: <span style="color: #8b2252;">'2020-09-28T09:38:08Z'</span>
+        field.cattle.io/ports: &gt;-
+          [[{<span style="color: #8b2252;">"containerPort"</span>:80,<span style="color: #8b2252;">"dnsName"</span>:<span style="color: #8b2252;">"nginx-ingress-controller"</span>,<span style="color: #8b2252;">"hostPort"</span>:0,<span style="color: #8b2252;">"kind"</span>:<span style="color: #8b2252;">"ClusterIP"</span>,<span style="color: #8b2252;">"name"</span>:<span style="color: #8b2252;">"http"</span>,<span style="color: #8b2252;">"protocol"</span>:<span style="color: #8b2252;">"TCP"</span>,<span style="color: #8b2252;">"sourcePort"</span>:0},{<span style="color: #8b2252;">"containerPort"</span>:443,<span style="color: #8b2252;">"dnsName"</span>:<span style="color: #8b2252;">"nginx-ingress-controller"</span>,<span style="color: #8b2252;">"hostPort"</span>:0,<span style="color: #8b2252;">"kind"</span>:<span style="color: #8b2252;">"ClusterIP"</span>,<span style="color: #8b2252;">"name"</span>:<span style="color: #8b2252;">"https"</span>,<span style="color: #8b2252;">"protocol"</span>:<span style="color: #8b2252;">"TCP"</span>,<span style="color: #8b2252;">"sourcePort"</span>:0}]]
+        prometheus.io/port: <span style="color: #8b2252;">'10254'</span>
+        prometheus.io/scrape: <span style="color: #8b2252;">'true'</span>
+      labels:
+        app: ingress-nginx
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: NotIn
+                    values:
+                      - virtual-kubelet
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - ingress-nginx
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - args:
+            - /nginx-ingress-controller
+            - <span style="color: #8b2252;">'--configmap=$(</span><span style="color: #ff00ff;">POD_NAMESPACE</span><span style="color: #8b2252;">)/nginx-configuration'</span>
+            - <span style="color: #8b2252;">'--tcp-services-configmap=$(</span><span style="color: #ff00ff;">POD_NAMESPACE</span><span style="color: #8b2252;">)/tcp-services'</span>
+            - <span style="color: #8b2252;">'--udp-services-configmap=$(</span><span style="color: #ff00ff;">POD_NAMESPACE</span><span style="color: #8b2252;">)/udp-services'</span>
+            - <span style="color: #8b2252;">'--annotations-prefix=nginx.ingress.kubernetes.io'</span>
+            - <span style="color: #8b2252;">'--publish-service=$(</span><span style="color: #ff00ff;">POD_NAMESPACE</span><span style="color: #8b2252;">)/nginx-ingress-lb'</span>
+            - <span style="color: #8b2252;">'--v=2'</span>
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          image: &gt;-
+            registry-vpc.cn-beijing.aliyuncs.com/acs/aliyun-ingress-controller:v0.30.0.2-9597b3685-aliyun
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10254
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: nginx-ingress-controller
+          ports:
+            - containerPort: 80
+              hostPort: 80
+              name: http
+              protocol: TCP
+            - containerPort: 443
+              hostPort: 443
+              name: https
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10254
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 70Mi
+          securityContext:
+            capabilities:
+              add:
+                - NET_BIND_SERVICE
+              drop:
+                - ALL
+            runAsUser: 101
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: localtime
+              readOnly: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      initContainers:
+        - command:
+            - /bin/sh
+            - <span style="color: #8b2252;">'-c'</span>
+            - |-
+              mount -o remount rw /proc/sys
+              sysctl -w net.core.somaxconn=65535
+              sysctl -w net.ipv4.ip_local_port_range=<span style="color: #8b2252;">"1024 65535"</span>
+              sysctl -w fs.file-max=1048576
+              sysctl -w fs.inotify.max_user_instances=16384
+              sysctl -w fs.inotify.max_user_watches=524288
+              sysctl -w fs.inotify.max_queued_events=16384
+          image: <span style="color: #8b2252;">'registry-vpc.cn-beijing.aliyuncs.com/acs/busybox:v1.29.2'</span>
+          imagePullPolicy: IfNotPresent
+          name: init-sysctl
+          resources: {}
+          securityContext:
+            capabilities:
+              add:
+                - SYS_ADMIN
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: nginx-ingress-controller
+      serviceAccountName: nginx-ingress-controller
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - hostPath:
+            path: /etc/localtime
+            <span style="color: #483d8b;">type</span>: File
+          name: localtime
+status:
+  availableReplicas: 2
+  conditions:
+    - lastTransitionTime: <span style="color: #8b2252;">'2020-09-28T09:19:36Z'</span>
+      lastUpdateTime: <span style="color: #8b2252;">'2020-09-28T09:19:36Z'</span>
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: <span style="color: #8b2252;">'True'</span>
+      <span style="color: #483d8b;">type</span>: Available
+    - lastTransitionTime: <span style="color: #8b2252;">'2020-07-18T01:48:36Z'</span>
+      lastUpdateTime: <span style="color: #8b2252;">'2020-10-19T12:02:09Z'</span>
+      message: &gt;-
+        ReplicaSet <span style="color: #8b2252;">"nginx-ingress-controller-68bd54b66c"</span> has successfully
+        progressed.
+      reason: NewReplicaSetAvailable
+      status: <span style="color: #8b2252;">'True'</span>
+      <span style="color: #483d8b;">type</span>: Progressing
+  observedGeneration: 7
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+</pre>
+</div>
+
+<p>
+<b>nginx-ingress-lb.yml</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/alicloud-loadbalancer-address-type: internet
+    service.beta.kubernetes.io/backend-type: eni
+  creationTimestamp: <span style="color: #8b2252;">'2020-07-18T01:48:36Z'</span>
+  labels:
+    app: nginx-ingress-lb
+  name: nginx-ingress-lb
+  namespace: kube-system
+  resourceVersion: <span style="color: #8b2252;">'793911773'</span>
+  selfLink: /api/v1/namespaces/kube-system/services/nginx-ingress-lb
+  uid: db3fec56-e8ed-40b9-9d5f-cb8b38dba808
+spec:
+  clusterIP: 172.24.8.22
+  externalTrafficPolicy: Cluster
+  ports:
+    - name: http
+      nodePort: 31820
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    - name: https
+      nodePort: 31114
+      port: 443
+      protocol: TCP
+      targetPort: 443
+  selector:
+    app: ingress-nginx
+  sessionAffinity: None
+  <span style="color: #483d8b;">type</span>: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+      - ip: 39.105.75.81
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c1caf3a8-227e-4fd3-8e79-7377fe36fbbf" class="outline-3">
+<h3 id="h:c1caf3a8-227e-4fd3-8e79-7377fe36fbbf">k8s-删除名称空间卡住</h3>
+<div class="outline-text-3" id="text-h:c1caf3a8-227e-4fd3-8e79-7377fe36fbbf">
+<p>
+查看命名空间
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get ns</span>
+kubesphere&#8208;system Terminating 28m
+</pre>
+</div>
+
+<p>
+发现kubesphere-system一直处于Terminating 状态。无法删除命名空间！！
+</p>
+
+<p>
+解决方法
+</p>
+
+<p>
+查看kubesphere-system的namespace描述
+</p>
+
+<pre class="example" id="org2b8e327">
+kubectl get ns kubesphere‐system ‐o json &gt; kubesphere‐system.json
+</pre>
+
+<p>
+编辑json文件，删除spec字段的内存，因为k8s集群时需要认证的
+</p>
+
+<pre class="example" id="org0049023">
+# vi kubesphere‐system.json
+"spec": {
+"finalizers": [
+"kubernetes"
+ ]
+ },
+更改为：
+ "spec": {
+
+ },
+</pre>
+
+<p>
+新开一个窗口运行kubectl proxy跑一个API代理在本地的8081端口
+</p>
+
+<pre class="example" id="org4036ccb">
+# kubectl proxy ‐‐port=8081
+</pre>
+
+<p>
+最后运行curl命令进行删除
+</p>
+
+<pre class="example" id="orgdb0641e">
+curl ‐k ‐H "Content‐Type:application/json" ‐X PUT ‐‐data‐binary @kubesphe
+re‐system.json http://127.0.0.1:8081/api/v1/namespaces/kubesphere‐system/fi
+nalize
+</pre>
+
+<p>
+注意：命令中的kubesphere-system就是命名空间。
+</p>
+
+<p>
+本文参考链接： <a href="https://blog.csdn.net/tongzidane/article/details/88988542">https://blog.csdn.net/tongzidane/article/details/88988542</a>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:13ac10b2-9c02-4de7-954b-d510dbda3956" class="outline-2">
+<h2 id="h:13ac10b2-9c02-4de7-954b-d510dbda3956">rancher</h2>
+<div class="outline-text-2" id="text-h:13ac10b2-9c02-4de7-954b-d510dbda3956">
+</div>
+<div id="outline-container-h:75a701a3-32e9-4626-a787-5c587e9ef98e" class="outline-3">
+<h3 id="h:75a701a3-32e9-4626-a787-5c587e9ef98e">证书过期</h3>
+<div class="outline-text-3" id="text-h:75a701a3-32e9-4626-a787-5c587e9ef98e">
+<p>
+rancher 2.3.x到期无法使用问题 x509: certificate has expired or is not yet valid
+</p>
+
+<p>
+问题小结：
+</p>
+
+<p>
+参考：<a href="http://docs.rancher.cn/docs/rancher2/trending-topics/certificate-rotation/_index/">http://docs.rancher.cn/docs/rancher2/trending-topics/certificate-rotation/_index/</a>
+2.3 +
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#20462;&#25913;&#20027;&#26426;&#26102;&#38388;&#65292;&#21024;&#38500;crt&#25991;&#20214;</span>
+timedatectl set-ntp off
+date -s <span style="color: #8b2252;">"2020-10-16 09:03:00.000"</span>
+docker restart &lt;rancher_server_id&gt;
+docker exec -ti &lt;rancher_server_id&gt; mv /var/lib/rancher/k3s/server/tls /var/lib/rancher/k3s/server/tlsbak
+docker stop &lt;rancher_server_id&gt;
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#24674;&#22797;&#26102;&#38388; &#24182;&#35753;ran&#36718;&#25442;&#35777;&#20070;</span>
+systemctl start  ntpd
+docker exec -ti &lt;rancher_server_id&gt; mv /var/lib/rancher/k3s/server/tls /var/lib/rancher/k3s/server/tlsbak
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25191;&#34892;2&#27425;&#37325;&#21551;&#65292;&#31532;&#19968;&#27425;&#29992;&#20110;&#30003;&#35831;&#35777;&#20070;&#65292;&#31532;&#20108;&#27425;&#29992;&#20110;&#21152;&#36733;&#35777;&#20070;&#24182;&#21551;&#21160;</span>
+docker restart &lt;rancher_server_id&gt;
+</pre>
+</div>
+
+
+<p>
+参考：<a href="https://www.ziji.work/kubernetes/k8s-common-abnormal-events-and-solutions.html#NTP_service_is_not_running">K8S常见异常事件与解决方案</a> 
+</p>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer data-astro-cid-sz7xmlte data-turbo-permanent id=rootFooter>
+    <script>
+        const shuffle = e => e.map((e => ({
+            v: e,
+            sort: Math.random()
+        }))).sort(( (e, o) => e.sort - o.sort)).map(( ({v: e}) => e));
+        var songList = ["barbie-girl--stantough", "blue-da-ba-dee--cornelius-link", "hips-dont-lie--stantough", "i-want-it-that-way--stantough", "seven-nation-army--stantough", "smooth-criminal--stantough"]
+          , songOrder = songOrder ?? shuffle(songList).map((e => `/audio/music/${e}.opus`))
+          , song = new Audio(songOrder[0])
+          , nextSong = new Audio(songOrder[1])
+          , songIndex = 2
+          , musicWrapper = void 0
+          , arrow = void 0
+          , notes = void 0;
+        song.addEventListener("ended", next);
+        const toggle = () => song.paused ? play() : pause();
+        function play() {
+            song.play(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.add("shakeManHorse"),
+            notes.classList.remove("hideNotes")
+        }
+        function pause() {
+            song.pause(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.remove("shakeManHorse"),
+            notes.classList.add("hideNotes")
+        }
+        function next() {
+            song = nextSong,
+            play(),
+            songIndex === songOrder.length && (songIndex = 0),
+            nextSong = new Audio(songOrder[songIndex]),
+            songIndex += 1
+        }
+        function skip() {
+            pause(),
+            (arrow = arrow || document.getElementById("musicArrow")).classList.add("shootArrow");
+            new Audio("/audio/effects/ohno.m4a").play(),
+            arrow.addEventListener("animationend", arrowShootHandler, !1)
+        }
+        function arrowShootHandler() {
+            arrow.removeEventListener("animationend", arrowShootHandler, !1),
+            arrow.classList.remove("shootArrow");
+            new Audio("/audio/effects/heythathurt.m4a").play(),
+            next()
+        }
+    </script>
+    <div id=musicPlayer data-astro-cid-q7a5pyro>
+        <button class=skip data-astro-cid-q7a5pyro onclick=skip() title="Skip song">
+            <div id=skipWrapper data-astro-cid-q7a5pyro>
+                <img alt="Medieval drollery of a man/snail/bat/monkey shooting an arrow" class=archer decoding=async height=334 loading=lazy src=/images/archer-no-arrow.448ccd8b_Z1KfRYq.webp width=226 data-astro-cid-q7a5pyro>
+                <img alt="Arrow for archer" class="arrow complete" decoding=async height=23 loading=lazy src=/images/no-archer-full-arrow.87aa9971_Z2qL2KO.webp width=141 data-astro-cid-q7a5pyro id=musicArrow>
+            </div>
+        </button>
+        <button class=playPause data-astro-cid-q7a5pyro onclick=toggle() title="Play/pause song">
+            <div id=musicWrapper data-astro-cid-q7a5pyro>
+                <div class=hideNotes id=notesWrapper data-astro-cid-q7a5pyro>
+                    <div class=lyreNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                    <div class=fluteNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                </div>
+                <img alt="Medieval drollery of a man/horse playing a lyre and a horn" class=manHorse decoding=async height=665 loading=lazy src=/images/man-horse-band.e3a2efcf_q8FCa.webp width=531 data-astro-cid-q7a5pyro>
+            </div>
+        </button>
+    </div>
+    <hr data-astro-cid-sz7xmlte>
+    <div class=salutation data-astro-cid-gdmrbrho>
+        <p data-astro-cid-gdmrbrho>
+            <span class=flower2 data-astro-cid-gdmrbrho>A</span>
+            <span class=smallcap data-astro-cid-gdmrbrho>pax vobiscum</span>
+            <span class="flower2 wiggle" data-astro-cid-gdmrbrho id=leaf>a</span>
+        </p>
+    </div>
+    <script>
+        function animateLeafBlownHandler() {
+            leaf.removeEventListener("animationend", animateLeafBlownHandler, !1),
+            leaf.classList.remove("blownAway"),
+            leaf.classList.add("wiggle")
+        }
+        function animateLeaf() {
+            leaf = leaf ?? document.getElementById("leaf"),
+            leaf.classList.remove("wiggle"),
+            leaf.classList.add("blownAway"),
+            leaf.addEventListener("animationend", animateLeafBlownHandler, !1)
+        }
+        document.getElementById("leaf").onclick = animateLeaf
+    </script>
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2024 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+</footer>
+</footer>
+</body>
+</html>

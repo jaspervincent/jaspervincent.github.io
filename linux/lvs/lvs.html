@@ -1,0 +1,3240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 企业级调度器LVS</title>
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/drollery.e825b870.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="{className}" data-astro-cid-3ef6ksr2>
+  <div class=header-branding data-astro-cid-g2lrb5xm>
+      <span class=header-text data-astro-cid-g2lrb5xm>
+          <span class=dropcap data-astro-cid-g2lrb5xm aria-hidden=true>
+              <span class=actual data-astro-cid-g2lrb5xm>J</span>
+              <span class=rest data-astro-cid-g2lrb5xm>asper Hsu</span>
+              <span class=period data-astro-cid-g2lrb5xm>.</span>
+          </span>
+          <span class=sr-only data-astro-cid-g2lrb5xm>Drollery</span>
+      </span>
+      <img alt="Medieval drollery of a knight on a horse" class=spring decoding=async height=250 loading=lazy src=/images/knight-horse.a96eee7d_Z1WCOYs.webp width=68 data-astro-cid-g2lrb5xm>
+  </div>
+
+  <nav data-astro-cid-pux6a34n>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/jcodelog.html class=nobracket data-astro-cid-pux6a34n>技术</a>
+      <span class=flower2 data-astro-cid-pux6a34n>K</span>
+      <a href=/reading/index.html class=nobracket data-astro-cid-pux6a34n>阅读</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+      <a href=/lisp/jasper-emacs.html class=nobracket data-astro-cid-pux6a34n>我的Emacs配置</a>
+      <span class=flower2 data-astro-cid-pux6a34n>L</span>
+      <a href=/link/index.html class=nobracket data-astro-cid-pux6a34n>友链</a>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/about.html class=nobracket data-astro-cid-pux6a34n>关于</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+  </nav>
+
+
+  <div class="container" data-astro-cid-3ef6ksr2>
+    <p class="info" data-astro-cid-3ef6ksr2>
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+  <div id=borderArtWrapper class="tt1" data-astro-cid-5hce7sga data-turbo-permanent>
+      <script>
+          var man, shakeCount = 0, noSound = new Audio("/audio/effects/no.m4a"), screamSound = new Audio("/audio/effects/scream.m4a");
+          function animateManShakeHandler() {
+              man.removeEventListener("animationend", animateManShakeHandler, !1),
+              shakeCount += 1,
+              man.classList.remove("shakeMan")
+          }
+          function animateManFallHandler() {
+              man.removeEventListener("animationend", animateManFallHandler, !1),
+              man.classList.add("hide")
+          }
+          function animateMan() {
+              man = man ?? document.getElementById("borderMan"),
+              3 === shakeCount ? (man.classList.add("fallMan"),
+              screamSound.play(),
+              man.addEventListener("animationend", animateManFallHandler, !1)) : (man.classList.add("shakeMan"),
+              noSound.play(),
+              man.addEventListener("animationend", animateManShakeHandler, !1))
+          }
+      </script>
+      <div class=borderArt data-astro-cid-5dda5nwp id=articleBorder>
+          <img alt="flowery border with man falling" decoding=async height=620 loading=lazy src=/images/border-vines-no-man.b7d246cc_DRxSe.webp width=909 class=border data-astro-cid-5dda5nwp>
+          <div class=fallWrapper data-astro-cid-5dda5nwp>
+              <img alt="flowery border with man falling" decoding=async height=292 loading=lazy src=/images/man-no-vines.247a3187_Z2ioXNM.webp width=98 class=man data-astro-cid-5dda5nwp id=borderMan onclick=animateMan()>
+          </div>
+      </div>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Linux: 企业级调度器LVS</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:cee1dc80-cfc5-401d-918b-f08d9e56fd0a">1 集群和分布式</a>
+<ul>
+<li><a href="#h:97e643b3-c71d-4275-958a-34f49ee1133c">1.1 集群 Cluster</a></li>
+<li><a href="#h:dfcceadb-c2a2-44d1-b0e9-0fbd6b2eb385">1.2 分布式系统</a></li>
+<li><a href="#h:a000c7f3-61f6-4d0f-bf9c-5f8fb8ceeadb">1.3 集群和分布式</a></li>
+<li><a href="#h:13560c75-35f2-4d78-8e45-e8b4b4c086d1">1.4 集群设计原则</a></li>
+<li><a href="#h:e782ba4f-5435-484b-88fb-607d2c0d8c94">1.5 集群设计实现</a>
+<ul>
+<li><a href="#h:c5ba53df-005e-4ca5-a5c6-0f450a649feb">1.5.1 基础设施层面</a></li>
+<li><a href="#h:0d1d5b9c-bc29-49de-92c6-531e11c04dc4">1.5.2 业务层面</a></li>
+</ul>
+</li>
+<li><a href="#h:7043b93d-ad5b-4b26-8ec0-ce3c96bd8938">1.6 LB Cluster 负载均衡集群</a>
+<ul>
+<li><a href="#h:93df82ff-a29d-47e7-9181-4f032040afcd">1.6.1 按实现方式划分</a></li>
+<li><a href="#h:7912c0ee-0e3e-4dab-8d3d-8a3867531dba">1.6.2 基于工作的协议层次划分</a></li>
+<li><a href="#h:4cd2ad3e-0f53-4b02-b129-7309365ebe85">1.6.3 负载均衡的会话保持</a></li>
+</ul>
+</li>
+<li><a href="#h:290a9d8e-8e04-4eb0-a7a9-1aee487e18f5">1.7 HA 高可用集群实现</a></li>
+</ul>
+</li>
+<li><a href="#h:96386bf2-d471-4494-931b-3218434a9329">2 Linux Virtual Server简介</a>
+<ul>
+<li><a href="#h:7b3412f4-4d11-4b98-b90e-4adeb9e91f03">2.1 LVS介绍</a></li>
+<li><a href="#h:35f27d28-c4cd-44db-b584-3ad32c9c6173">2.2 LVS工作原理</a></li>
+<li><a href="#h:6f7590e8-4212-4139-b1ae-4026ca5ac1c3">2.3 LVS集群体系架构</a></li>
+<li><a href="#h:47237cd1-ef8b-4af8-a17f-6699bdf93328">2.4 LVS 功能及组织架构</a>
+<ul>
+<li><a href="#h:1c0b27c5-de86-49a4-a388-737ca70f99ac">2.4.1 应用于高访问量的业务</a></li>
+<li><a href="#h:e87616e0-7a50-41bb-874d-67731f667878">2.4.2 扩展应用程序</a></li>
+<li><a href="#h:3014369b-2d00-4969-ba16-93dbfb5a7e59">2.4.3 消除单点故障</a></li>
+<li><a href="#h:78bc520a-0050-4946-b782-9628ec8fbe93">2.4.4 同城容灾 （多可用区容灾）</a></li>
+<li><a href="#h:0f268283-8b78-49a0-8cac-8a571357fca3">2.4.5 跨地域容灾</a></li>
+</ul>
+</li>
+<li><a href="#h:a77dcd75-ee28-4fed-a923-00113e88cf18">2.5 LVS应用场景</a>
+<ul>
+<li><a href="#h:0f57f53c-2701-4775-81d8-a0efb35c5483">2.5.1 音视频大流量场景</a></li>
+<li><a href="#h:d69b1a71-fb5c-4f88-b239-26aec4968ef3">2.5.2 网络游戏动静分离场景</a></li>
+<li><a href="#h:39fc9395-3265-4aa0-afe2-1af9b2228a03">2.5.3 多层次容灾架构场景</a></li>
+<li><a href="#h:08e015be-8600-4435-8d82-988c12d71e15">2.5.4 海量访问流量分发场景</a></li>
+</ul>
+</li>
+<li><a href="#h:08382597-a5ff-480b-bf18-a12a7c4291e4">2.6 LVS集群类型中的术语</a></li>
+</ul>
+</li>
+<li><a href="#h:576fabeb-df05-4c47-8c5c-ada49fe3bae0">3 LVS 工作模式和相关命令</a>
+<ul>
+<li><a href="#h:484d9868-713f-4a26-a725-748609a31511">3.1 LVS集群的工作模式</a>
+<ul>
+<li><a href="#h:d4e4cc9b-e98b-45f1-840e-b7573811af76">3.1.1 LVS的NAT模式</a></li>
+<li><a href="#h:533d6330-5e07-4461-8787-3e5d6e84c10b">3.1.2 LVS的DR模式</a></li>
+<li><a href="#h:8f0b97a0-407e-4bf9-bf0d-34ba759d7f5f">3.1.3 LVS的TUN模式</a></li>
+<li><a href="#h:d8d249b7-f65d-45e0-90bc-12069519265b">3.1.4 LVS的FULLNAT模式</a></li>
+<li><a href="#h:95671119-878d-454b-b42c-fd457661bb4c">3.1.5 LVS工作模式总结和比较</a></li>
+</ul>
+</li>
+<li><a href="#h:dc5acb2a-0bbe-4d9e-b665-8e38b24eeff6">3.2 LVS 调试算法</a>
+<ul>
+<li><a href="#h:cc1b7cd3-bd70-4c05-9f64-cfc5c369ea75">3.2.1 静态方法</a></li>
+<li><a href="#h:84c717ac-7c50-4a49-baaa-73e136b07c01">3.2.2 动态方法</a></li>
+<li><a href="#h:26a71c2b-78ff-469c-94eb-b31469e5b7c1">3.2.3 内核版本 4.15 版本后新增调度算法：FO和OVF</a></li>
+</ul>
+</li>
+<li><a href="#h:9acf7260-ba06-422b-a2b3-7bbebc962610">3.3 LVS 相关软件</a>
+<ul>
+<li><a href="#h:fbf52af2-6259-472a-9060-f5ca9717bed9">3.3.1 程序包：ipvsadm</a></li>
+<li><a href="#h:60e32fd4-215f-4669-b738-4cecd9200708">3.3.2 ipvsadm 命令</a></li>
+</ul>
+</li>
+<li><a href="#h:9a0ac3d6-d327-4c20-8743-c5c3f371f450">3.4 防火墙标记</a></li>
+<li><a href="#h:cb703436-3c20-4755-9900-f33aa6d2df75">3.5 LVS 持久连接</a></li>
+</ul>
+</li>
+<li><a href="#h:2af2eaae-b435-4f66-82d7-f3a800dc6045">4 LVS实战案例</a>
+<ul>
+<li><a href="#h:cf47c34d-853b-4dc5-bb07-72f1aca353c1">4.1 LVS-NAT模式案例</a></li>
+<li><a href="#h:877b40df-0003-4efe-a246-e8fbef557a55">4.2 LVS-DR模式单网段案例</a>
+<ul>
+<li><a href="#h:715b89bf-d80b-41b9-900f-06f5378068a7">4.2.1 LVS的网络配置</a></li>
+<li><a href="#h:3da82c96-3106-4bbe-b4ec-17b9beed5dc0">4.2.2 后端RS的IPVS配置</a></li>
+<li><a href="#h:2b23a972-94e9-404b-b7f5-57f4cfa6a541">4.2.3 LVS主机的配置</a></li>
+<li><a href="#h:7dbcaa1c-5a6a-4b70-a75b-525770906dc3">4.2.4 测试访问</a></li>
+</ul>
+</li>
+<li><a href="#h:dca43abe-e6ca-42cf-9e19-39eb7115cf30">4.3 LVS-DR模式多网段案例</a></li>
+<li><a href="#h:97580b87-b7ea-43a1-9957-45c85c6c6fb0">4.4 LVS-TUNNEL隧道模式案例</a>
+<ul>
+<li><a href="#h:e26ff73d-e61d-4d3b-9fcd-05ae25d42609">4.4.1 LVS服务器配置</a></li>
+<li><a href="#h:8f4b2fb8-a7be-4922-a073-ad98eaaf02e2">4.4.2 RS服务器配置</a></li>
+<li><a href="#h:681aeff7-02bc-4afa-8a5b-d297963c6537">4.4.3 测试</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:78b3cc4e-b1f4-4570-abf5-fb95d432167c">5 LVS 高可用性实现</a>
+<ul>
+<li><a href="#h:17584e78-77a8-41c5-9707-f3de7c614acc">5.1 ldirectord软件</a></li>
+<li><a href="#h:ff3e6412-4d77-4ab7-861b-4f7ecd6818af">5.2 ldirectord配置文件示例</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a></li>
+</ul>
+
+
+
+<p>
+Linux Virtual Server
+</p>
+
+<p>
+本章内容
+</p>
+<ul class="org-ul">
+<li>集群概念</li>
+<li>LVS模型</li>
+<li>LVS调度算法</li>
+<li>LVS实现</li>
+<li>ldirectord</li>
+</ul>
+<section id="outline-container-h:cee1dc80-cfc5-401d-918b-f08d9e56fd0a" class="outline-2">
+<h2 id="h:cee1dc80-cfc5-401d-918b-f08d9e56fd0a">1 集群和分布式</h2>
+<div class="outline-text-2" id="text-h:cee1dc80-cfc5-401d-918b-f08d9e56fd0a">
+<p>
+系统性能扩展方式：
+</p>
+<ul class="org-ul">
+<li>ScaleUP：垂直扩展，向上扩展,增强，性能更强的计算机运行同样的服务</li>
+<li>ScaleOut：水平扩展，向外扩展,增加设备，并行地运行多个服务调度分配问题，Cluster</li>
+</ul>
+
+<p>
+垂直扩展不再提及：
+</p>
+
+<p>
+随着计算机性能的增长，其价格会成倍增长
+</p>
+
+<p>
+单台计算机的性能是有上限的，不可能无限制地垂直扩展
+</p>
+
+<p>
+多核CPU意味着即使是单台计算机也可以并行的。那么，为什么不一开始就并行化技术？
+</p>
+</div>
+<div id="outline-container-h:97e643b3-c71d-4275-958a-34f49ee1133c" class="outline-3">
+<h3 id="h:97e643b3-c71d-4275-958a-34f49ee1133c">1.1 集群 Cluster</h3>
+<div class="outline-text-3" id="text-h:97e643b3-c71d-4275-958a-34f49ee1133c">
+<p>
+Cluster：集群,为解决某个特定问题将多台计算机组合起来形成的单个系统
+</p>
+
+<p>
+Cluster分为三种类型：
+</p>
+
+<ul class="org-ul">
+<li>LB：Load Balancing，负载均衡，多个主机组成，每个主机只承担一部分访问请求</li>
+<li><p>
+HA：High Availiablity，高可用，避免SPOF（single Point Of failure）
+</p>
+
+<p>
+MTBF:Mean Time Between Failure 平均无故障时间，正常时间
+</p>
+
+<p>
+MTTR:Mean Time To Restoration（ repair）平均恢复前时间，故障时间
+</p>
+
+<p>
+A = MTBF/（MTBF+MTTR） (0,1)：99%,99.5%,99.9%,99.99%,99.999%
+</p>
+
+<p>
+<b>SLA</b> ：服务等级协议（简称：SLA，全称：service level agreement）。是
+在一定开销下为保障服务的性能和可用性，服务提供商与用户间定义的一种双
+方认可的协定。通常这个开销是驱动提供服务质量的主要因素。在常规的领域
+中，总是设定所谓的三个9，四个9来进行表示，当没有达到这种水平的时候，
+就会有一些列的惩罚措施，而运维，最主要的目标就是达成这种服务水平。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">1&#24180; = 365&#22825; = 8760&#23567;&#26102;
+90 = (1-90%)*<span style="color: #a0522d;">365</span>=36.5&#22825;
+99 = 8760 * 1% = 87.6&#23567;&#26102;
+99.9 = 8760 * 0.1% = 8760 * 0.001 = 8.76&#23567;&#26102;
+99.99 = 8760 * 0.0001 = 0.876&#23567;&#26102; = 0.876 * 60 = 52.6&#20998;&#38047;
+99.999 = 8760 * 0.00001 = 0.0876&#23567;&#26102; = 0.0876 * 60 = 5.26&#20998;&#38047;
+99.9999= (1-99.9999%)*365*24*60*<span style="color: #a0522d;">60</span>=31&#31186;
+</pre>
+</div>
+
+<p>
+停机时间又分为两种，一种是计划内停机时间，一种是计划外停机时间，而运维则主要关注计划外停机时间。
+</p></li>
+
+<li>HPC：High-performance computing，高性能 www.top500.org</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:dfcceadb-c2a2-44d1-b0e9-0fbd6b2eb385" class="outline-3">
+<h3 id="h:dfcceadb-c2a2-44d1-b0e9-0fbd6b2eb385">1.2 分布式系统</h3>
+<div class="outline-text-3" id="text-h:dfcceadb-c2a2-44d1-b0e9-0fbd6b2eb385">
+<p>
+分布式存储： Ceph，GlusterFS，FastDFS，MogileFS
+</p>
+
+<p>
+分布式计算：hadoop，Spark
+</p>
+
+<p>
+分布式常见应用
+</p>
+<ul class="org-ul">
+<li>分布式应用-服务按照功能拆分，使用微服务</li>
+<li>分布式静态资源&#x2013;静态资源放在不同的存储集群上</li>
+<li>分布式数据和存储&#x2013;使用key-value缓存系统</li>
+<li>分布式计算&#x2013;对特殊业务使用分布式计算，比如Hadoop集群</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:a000c7f3-61f6-4d0f-bf9c-5f8fb8ceeadb" class="outline-3">
+<h3 id="h:a000c7f3-61f6-4d0f-bf9c-5f8fb8ceeadb">1.3 集群和分布式</h3>
+<div class="outline-text-3" id="text-h:a000c7f3-61f6-4d0f-bf9c-5f8fb8ceeadb">
+<p>
+集群：同一个业务系统，部署在多台服务器上。集群中，每一台服务器实现的功能没有差别，数据和代码都是一样的
+</p>
+
+<p>
+分布式：一个业务被拆成多个子业务，或者本身就是不同的业务，部署在多台服务器上。分布式中，每一台服务器实现的功能是有差别的，数据和代码也是不一样的，分布式每台服务器功能加起来，才是完整的业务
+</p>
+
+<p>
+分布式是以缩短单个任务的执行时间来提升效率的，而集群则是通过提高单位时间内执行的任务数来提升效率。
+</p>
+
+<p>
+对于大型网站，访问用户很多，实现一个群集，在前面部署一个负载均衡服务器，后面几台服务器完成同一业务。如果有用户进行相应业务访问时，负载均衡器根据后端哪台服务器的负载情况，决定由给哪一台去完成响应，并且一台服务器垮了，其它的服务器可以顶上来。分布式的每一个节点，都完成不同的业务，如果一个节点垮了，那这个业务可能就会失败
+</p>
+</div>
+</div>
+<div id="outline-container-h:13560c75-35f2-4d78-8e45-e8b4b4c086d1" class="outline-3">
+<h3 id="h:13560c75-35f2-4d78-8e45-e8b4b4c086d1">1.4 集群设计原则</h3>
+<div class="outline-text-3" id="text-h:13560c75-35f2-4d78-8e45-e8b4b4c086d1">
+<p>
+可扩展性&#x2014;集群的横向扩展能力
+</p>
+
+<p>
+可用性&#x2014;无故障时间 (SLA service level agreement)
+</p>
+
+<p>
+性能&#x2014;访问响应时间
+</p>
+
+<p>
+容量&#x2014;单位时间内的最大并发吞吐量(C10K并发问题)
+</p>
+</div>
+</div>
+<div id="outline-container-h:e782ba4f-5435-484b-88fb-607d2c0d8c94" class="outline-3">
+<h3 id="h:e782ba4f-5435-484b-88fb-607d2c0d8c94">1.5 集群设计实现</h3>
+<div class="outline-text-3" id="text-h:e782ba4f-5435-484b-88fb-607d2c0d8c94">
+</div>
+<div id="outline-container-h:c5ba53df-005e-4ca5-a5c6-0f450a649feb" class="outline-4">
+<h4 id="h:c5ba53df-005e-4ca5-a5c6-0f450a649feb">1.5.1 基础设施层面</h4>
+<div class="outline-text-4" id="text-h:c5ba53df-005e-4ca5-a5c6-0f450a649feb">
+<p>
+提升硬件资源性能&#x2014;从入口防火墙到后端 web server
+均使用更高性能的硬件资源
+</p>
+
+<p>
+多域名&#x2014;DNS 轮询A记录解析
+</p>
+
+<p>
+多入口&#x2014;将A记录解析到多个公网IP入口
+</p>
+
+<p>
+多机房&#x2014;同城+异地容灾
+</p>
+
+<p>
+CDN(Content Delivery Network)&#x2014;基于GSLB(Global Server Load
+Balance)实现全局负载均衡，如：DNS
+</p>
+</div>
+</div>
+<div id="outline-container-h:0d1d5b9c-bc29-49de-92c6-531e11c04dc4" class="outline-4">
+<h4 id="h:0d1d5b9c-bc29-49de-92c6-531e11c04dc4">1.5.2 业务层面</h4>
+<div class="outline-text-4" id="text-h:0d1d5b9c-bc29-49de-92c6-531e11c04dc4">
+<p>
+分层：安全层、负载层、静态层、动态层、(缓存层、存储层)持久化与非持久化
+</p>
+
+<p>
+分割：基于功能分割大业务为小服务
+</p>
+
+<p>
+分布式：对于特殊场景的业务，使用分布式计算
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7043b93d-ad5b-4b26-8ec0-ce3c96bd8938" class="outline-3">
+<h3 id="h:7043b93d-ad5b-4b26-8ec0-ce3c96bd8938">1.6 LB Cluster 负载均衡集群</h3>
+<div class="outline-text-3" id="text-h:7043b93d-ad5b-4b26-8ec0-ce3c96bd8938">
+</div>
+<div id="outline-container-h:93df82ff-a29d-47e7-9181-4f032040afcd" class="outline-4">
+<h4 id="h:93df82ff-a29d-47e7-9181-4f032040afcd">1.6.1 按实现方式划分</h4>
+<div class="outline-text-4" id="text-h:93df82ff-a29d-47e7-9181-4f032040afcd">
+<ul class="org-ul">
+<li><p>
+硬件 F5 Big-IP
+</p>
+
+
+<figure id="org3691148">
+<img src="images/image-20210220170410332.png" alt="image-20210220170410332.png">
+
+</figure>
+
+<p>
+Citrix Netscaler A10 A10
+</p></li>
+
+<li><p>
+软件
+lvs：Linux Virtual Server，阿里四层 SLB (Server Load Balance)使用
+</p>
+
+<p>
+nginx：支持七层调度，阿里七层SLB使用 Tengine
+</p>
+
+<p>
+haproxy：支持七层调度
+</p>
+
+<p>
+ats：Apache Traffic Server，yahoo捐助给apache
+</p>
+
+<p>
+perlbal：Perl 编写
+</p>
+
+<p>
+pound
+</p></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:7912c0ee-0e3e-4dab-8d3d-8a3867531dba" class="outline-4">
+<h4 id="h:7912c0ee-0e3e-4dab-8d3d-8a3867531dba">1.6.2 基于工作的协议层次划分</h4>
+<div class="outline-text-4" id="text-h:7912c0ee-0e3e-4dab-8d3d-8a3867531dba">
+<ul class="org-ul">
+<li><p>
+传输层（通用）：DNAT 和 DPORT
+</p>
+
+<p>
+LVS：
+</p>
+
+<p>
+nginx：stream
+</p>
+
+<p>
+haproxy：mode tcp
+</p></li>
+
+<li><p>
+应用层（专用）：针对特定协议，常称为 proxy server
+</p>
+
+<p>
+http：nginx, httpd, haproxy(mode http), &#x2026;
+</p>
+
+<p>
+fastcgi：nginx, httpd, &#x2026;
+</p>
+
+<p>
+mysql：mysql-proxy, mycat&#x2026;
+</p></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:4cd2ad3e-0f53-4b02-b129-7309365ebe85" class="outline-4">
+<h4 id="h:4cd2ad3e-0f53-4b02-b129-7309365ebe85">1.6.3 负载均衡的会话保持</h4>
+<div class="outline-text-4" id="text-h:4cd2ad3e-0f53-4b02-b129-7309365ebe85">
+<ol class="org-ol">
+<li><p>
+session sticky：同一用户调度固定服务器
+</p>
+
+<p>
+Source IP：LVS sh算法（对某一特定服务而言）
+</p>
+
+<p>
+Cookie
+</p></li>
+
+<li><p>
+session replication：每台服务器拥有全部session
+</p>
+
+<p>
+session multicast cluster
+</p></li>
+
+<li><p>
+session server：专门的session服务器
+</p>
+
+<p>
+Memcached，Redis
+</p></li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-h:290a9d8e-8e04-4eb0-a7a9-1aee487e18f5" class="outline-3">
+<h3 id="h:290a9d8e-8e04-4eb0-a7a9-1aee487e18f5">1.7 HA 高可用集群实现</h3>
+<div class="outline-text-3" id="text-h:290a9d8e-8e04-4eb0-a7a9-1aee487e18f5">
+<p>
+keepalived：vrrp协议
+</p>
+
+<p>
+Ais：应用接口规范. heartbeat, cman+rgmanager(RHCS), coresync_pacemaker
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:96386bf2-d471-4494-931b-3218434a9329" class="outline-2">
+<h2 id="h:96386bf2-d471-4494-931b-3218434a9329">2 Linux Virtual Server简介</h2>
+<div class="outline-text-2" id="text-h:96386bf2-d471-4494-931b-3218434a9329">
+</div>
+<div id="outline-container-h:7b3412f4-4d11-4b98-b90e-4adeb9e91f03" class="outline-3">
+<h3 id="h:7b3412f4-4d11-4b98-b90e-4adeb9e91f03">2.1 LVS介绍</h3>
+<div class="outline-text-3" id="text-h:7b3412f4-4d11-4b98-b90e-4adeb9e91f03">
+<p>
+LVS：Linux Virtual Server，负载调度器，内核集成，章文嵩（花名 正明）,
+阿里的四层SLB(Server Load Balance)是基于LVS+keepalived实现
+</p>
+
+<p>
+LVS 官网：<a href="http://www.linuxvirtualserver.org/">http://www.linuxvirtualserver.org/</a>
+</p>
+
+<p>
+阿里SLB和LVS：
+</p>
+<ul class="org-ul">
+<li><a href="https://yq.aliyun.com/articles/1803">https://yq.aliyun.com/articles/1803</a></li>
+<li><a href="https://github.com/alibaba/LVS">https://github.com/alibaba/LVS</a></li>
+</ul>
+
+
+<figure id="org82a185d">
+<img src="images/image-20210220170427866.png" alt="image-20210220170427866.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:35f27d28-c4cd-44db-b584-3ad32c9c6173" class="outline-3">
+<h3 id="h:35f27d28-c4cd-44db-b584-3ad32c9c6173">2.2 LVS工作原理</h3>
+<div class="outline-text-3" id="text-h:35f27d28-c4cd-44db-b584-3ad32c9c6173">
+<p>
+LVS根据请求报文的目标IP和目标协议及端口将其调度转发至某RS，根据调度算法来挑选RS。LVS是内核级功能，工作在INPUT链的位置，将发往INPUT的流量进行”处理”
+</p>
+
+<p>
+范例：查看内核支持LVS
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#grep -i -C 10 ipvs /boot/config-4.18.0-147.el8.x86_64
+...&#65288;&#30465;&#30053;&#37096;&#20998;&#20869;&#23481;&#65289;...
+<span style="color: #a0522d;">CONFIG_NETFILTER_XT_MATCH_IPVS</span>=m
+<span style="color: #a0522d;">CONFIG_NETFILTER_XT_MATCH_POLICY</span>=m
+...&#65288;&#30465;&#30053;&#37096;&#20998;&#20869;&#23481;&#65289;...
+<span style="color: #b22222;">#</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">IPVS transport protocol load balancing support</span>
+<span style="color: #b22222;">#</span>
+<span style="color: #a0522d;">CONFIG_IP_VS_PROTO_TCP</span>=y
+<span style="color: #a0522d;">CONFIG_IP_VS_PROTO_UDP</span>=y
+<span style="color: #a0522d;">CONFIG_IP_VS_PROTO_AH_ESP</span>=y
+<span style="color: #a0522d;">CONFIG_IP_VS_PROTO_ESP</span>=y
+<span style="color: #a0522d;">CONFIG_IP_VS_PROTO_AH</span>=y
+<span style="color: #a0522d;">CONFIG_IP_VS_PROTO_SCTP</span>=y
+<span style="color: #b22222;">#</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">IPVS scheduler</span>
+<span style="color: #b22222;">#</span>
+<span style="color: #a0522d;">CONFIG_IP_VS_RR</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_WRR</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_LC</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_WLC</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_FO</span>=m     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26032;&#22686;</span>
+<span style="color: #a0522d;">CONFIG_IP_VS_OVF</span>=m     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26032;&#22686;</span>
+<span style="color: #a0522d;">CONFIG_IP_VS_LBLC</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_LBLCR</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_DH</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_SH</span>=m
+<span style="color: #b22222;"># </span><span style="color: #b22222;">CONFIG_IP_VS_MH is not set</span>
+<span style="color: #a0522d;">CONFIG_IP_VS_SED</span>=m
+<span style="color: #a0522d;">CONFIG_IP_VS_NQ</span>=m
+...&#65288;&#30465;&#30053;&#37096;&#20998;&#20869;&#23481;&#65289;...
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6f7590e8-4212-4139-b1ae-4026ca5ac1c3" class="outline-3">
+<h3 id="h:6f7590e8-4212-4139-b1ae-4026ca5ac1c3">2.3 LVS集群体系架构</h3>
+<div class="outline-text-3" id="text-h:6f7590e8-4212-4139-b1ae-4026ca5ac1c3">
+
+<figure id="orgdcdda2f">
+<img src="images/image-20210220170448435.png" alt="image-20210220170448435.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:47237cd1-ef8b-4af8-a17f-6699bdf93328" class="outline-3">
+<h3 id="h:47237cd1-ef8b-4af8-a17f-6699bdf93328">2.4 LVS 功能及组织架构</h3>
+<div class="outline-text-3" id="text-h:47237cd1-ef8b-4af8-a17f-6699bdf93328">
+<p>
+负载均衡的应用场景为高访问量的业务，提高应用程序的可用性和可靠性。
+</p>
+</div>
+<div id="outline-container-h:1c0b27c5-de86-49a4-a388-737ca70f99ac" class="outline-4">
+<h4 id="h:1c0b27c5-de86-49a4-a388-737ca70f99ac">2.4.1 应用于高访问量的业务</h4>
+<div class="outline-text-4" id="text-h:1c0b27c5-de86-49a4-a388-737ca70f99ac">
+<p>
+如果您的应用访问量很高，可以通过配置监听规则将流量分发到不同的云服务器
+ECS（Elastic Compute Service弹性计算服务）实例上。此外，可以使用会话保
+持功能将同一客户端的请求转发到同一台后端ECS
+</p>
+</div>
+</div>
+<div id="outline-container-h:e87616e0-7a50-41bb-874d-67731f667878" class="outline-4">
+<h4 id="h:e87616e0-7a50-41bb-874d-67731f667878">2.4.2 扩展应用程序</h4>
+<div class="outline-text-4" id="text-h:e87616e0-7a50-41bb-874d-67731f667878">
+<p>
+可以根据业务发展的需要，随时添加和移除ECS实例来扩展应用系统的服务能力，适用于各种Web服务器和App服务器。
+</p>
+</div>
+</div>
+<div id="outline-container-h:3014369b-2d00-4969-ba16-93dbfb5a7e59" class="outline-4">
+<h4 id="h:3014369b-2d00-4969-ba16-93dbfb5a7e59">2.4.3 消除单点故障</h4>
+<div class="outline-text-4" id="text-h:3014369b-2d00-4969-ba16-93dbfb5a7e59">
+<p>
+可以在负载均衡实例下添加多台ECS实例。当其中一部分ECS实例发生故障后，负载均衡会自动屏蔽故障的ECS实例，将请求分发给正常运行的ECS实例，保证应用系统仍能正常工作
+</p>
+</div>
+</div>
+<div id="outline-container-h:78bc520a-0050-4946-b782-9628ec8fbe93" class="outline-4">
+<h4 id="h:78bc520a-0050-4946-b782-9628ec8fbe93">2.4.4 同城容灾 （多可用区容灾）</h4>
+<div class="outline-text-4" id="text-h:78bc520a-0050-4946-b782-9628ec8fbe93">
+<p>
+为了提供更加稳定可靠的负载均衡服务，阿里云负载均衡已在各地域部署了多可用区以实现同地域容灾。当主可用区出现机房故障或不可用时，负载均衡仍然有能力在非常短的时间内（如：大约30s中断）切换到另外一个备可用区恢复服务能力；当主可用区恢复时，负载均衡同样会自动切换到主可用区提供服务。
+</p>
+
+<p>
+使用负载均衡时，您可以将负载均衡实例部署在支持多可用区的地域以实现同城容灾。此外，建议您结合自身的应用需要，综合考虑后端服务器的部署。如果您的每个可用区均至少添加了一台ECS实例，那么此种部署模式下的负载均衡服务的效率是最高的。
+</p>
+
+<p>
+如下图所示，在负载均衡实例下绑定不同可用区的ECS实例。正常情况下，用户访问流量将同时转至发主、备可用区内的ECS实例；当可用区A发生故障时，用户访问流量将只转发至备可用区内的ECS实例。此种部署既可以避免因为单个可用区的故障而导致对外服务的不可用，也可以通过不同产品间可用区的选择来降低延迟。
+</p>
+
+
+<figure id="orgd3cc8d0">
+<img src="images/image-20210220170515203.png" alt="image-20210220170515203.png">
+
+</figure>
+
+<p>
+如果采取如下图所示的部署方案，即在负载均衡实例的主可用区下绑定多台ECS实例，而在备可用区没有任何ECS实例。当主可用区发生故障时会造成业务中断，因为备可用区没有ECS实例来接收请求。这样的部署方式很明显是以牺牲高可用性为代价来获取低延时。
+</p>
+
+
+<figure id="org834797e">
+<img src="images/image-20210220170528942.png" alt="image-20210220170528942.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:0f268283-8b78-49a0-8cac-8a571357fca3" class="outline-4">
+<h4 id="h:0f268283-8b78-49a0-8cac-8a571357fca3">2.4.5 跨地域容灾</h4>
+<div class="outline-text-4" id="text-h:0f268283-8b78-49a0-8cac-8a571357fca3">
+<p>
+您可以在不同地域下部署负载均衡实例，并分别挂载相应地域内不同可用区的ECS。上层利用云解析做
+智能DNS，将域名解析到不同地域的负载均衡实例服务地址下，可实现全局负载均衡。当某个地域出现
+不可用时，暂停对应解析即可实现所有用户访问不受影响。
+</p>
+
+
+<figure id="org7843e04">
+<img src="images/image-20210220170559924.png" alt="image-20210220170559924.png">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a77dcd75-ee28-4fed-a923-00113e88cf18" class="outline-3">
+<h3 id="h:a77dcd75-ee28-4fed-a923-00113e88cf18">2.5 LVS应用场景</h3>
+<div class="outline-text-3" id="text-h:a77dcd75-ee28-4fed-a923-00113e88cf18">
+</div>
+<div id="outline-container-h:0f57f53c-2701-4775-81d8-a0efb35c5483" class="outline-4">
+<h4 id="h:0f57f53c-2701-4775-81d8-a0efb35c5483">2.5.1 音视频大流量场景</h4>
+<div class="outline-text-4" id="text-h:0f57f53c-2701-4775-81d8-a0efb35c5483">
+<p>
+对象存储(Object Storage
+Service,简称OSS),是阿里云对外提供的海量、安全和高可靠的云存储服务
+</p>
+
+<dl class="org-dl">
+<dt>音视频海量流量自动分发</dt><dd>音视频应用中由于用户与主播之间需要实时大量的互动，因此，用户的流量非常大，而直播业务的波峰波谷效应明显，这对整个系统的弹性、稳定性和可用性带来了巨大的挑战</dd>
+
+<dt>提高横向扩展能力</dt><dd>添加或删减负载均衡后端的服务器实时生效，可根据业务流量大小实时增减</dd>
+
+<dt>抵御海量流量</dt><dd>业务发展快，访问流量巨大，负载均衡可对多台云服务器进行流量分发服务</dd>
+
+<dt>提升应用可用性</dt><dd>负载均衡提供后端服务器的健康检查，实时屏蔽异常服务器，提升系统可用性</dd>
+</dl>
+</div>
+</div>
+<div id="outline-container-h:d69b1a71-fb5c-4f88-b239-26aec4968ef3" class="outline-4">
+<h4 id="h:d69b1a71-fb5c-4f88-b239-26aec4968ef3">2.5.2 网络游戏动静分离场景</h4>
+<div class="outline-text-4" id="text-h:d69b1a71-fb5c-4f88-b239-26aec4968ef3">
+<p>
+<b>动静请求分离，快速稳定交付</b>
+</p>
+
+<p>
+游戏业务有很多图片等静态资源需要加载，通过CDN实现全球用户访问静态资源的加速；当用户在游戏中有互动时，产生的访问流量非常大，此时为了保证互动实时性，需要使用负载均衡进行流量分发
+</p>
+
+<p>
+<b>动态请求流量分发</b>
+</p>
+
+<p>
+动态请求量大，采用多台云服务器计算处理，并利用负载均衡服务随时进行流量分发
+</p>
+
+<p>
+<b>静态请求快速加载</b>
+</p>
+
+<p>
+静态内容选择对象存储，接入CDN服务，进一步优化内容分发链路，让内容即刻加载
+</p>
+</div>
+</div>
+<div id="outline-container-h:39fc9395-3265-4aa0-afe2-1af9b2228a03" class="outline-4">
+<h4 id="h:39fc9395-3265-4aa0-afe2-1af9b2228a03">2.5.3 多层次容灾架构场景</h4>
+<div class="outline-text-4" id="text-h:39fc9395-3265-4aa0-afe2-1af9b2228a03">
+
+<figure id="org3554000">
+<img src="images/image-20210220170702811.png" alt="image-20210220170702811.png">
+
+</figure>
+
+<p>
+<b>跨地域跨可用区的容灾方案</b>
+</p>
+
+<p>
+用户业务遍布各地域，使用云解析DNS将不同地域用户智能解析访问到相应的业务系统内，使用负载均衡进行海量的访问流量分发，还可构建地域级、可用区级的多层容灾架构
+</p>
+
+<p>
+<b>智能解析</b>
+</p>
+
+<p>
+智能判断提供最佳的访问解析地址，使访问用户获得最快捷、最流畅的体验
+</p>
+
+<p>
+<b>流量分发</b>
+</p>
+
+<p>
+业务发展快，访问流量巨大，负载均衡可对多台云服务器进行流量分发服务
+</p>
+
+<p>
+<b>多层次容灾</b>
+</p>
+
+<p>
+云解析提供跨地域的高可用，负载均衡可实现可用区级的高可用
+</p>
+</div>
+</div>
+<div id="outline-container-h:08e015be-8600-4435-8d82-988c12d71e15" class="outline-4">
+<h4 id="h:08e015be-8600-4435-8d82-988c12d71e15">2.5.4 海量访问流量分发场景</h4>
+<div class="outline-text-4" id="text-h:08e015be-8600-4435-8d82-988c12d71e15">
+
+<figure id="org76fc6c9">
+<img src="images/image-20210220170727758.png" alt="image-20210220170727758.png">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:08382597-a5ff-480b-bf18-a12a7c4291e4" class="outline-3">
+<h3 id="h:08382597-a5ff-480b-bf18-a12a7c4291e4">2.6 LVS集群类型中的术语</h3>
+<div class="outline-text-3" id="text-h:08382597-a5ff-480b-bf18-a12a7c4291e4">
+<ul class="org-ul">
+<li>VS：Virtual Server，Director Server(DS), Dispatcher(调度器)，Load Balancer</li>
+<li>RS：Real Server(lvs), upstream server(nginx), backend server(haproxy)</li>
+<li>CIP：Client IP</li>
+<li>VIP：Virtual serve IP VS外网的IP</li>
+<li>DIP：Director IP VS内网的IP</li>
+<li>RIP：Real server IP</li>
+<li>访问流程：CIP &lt;&#x2013;&gt; VIP == DIP &lt;&#x2013;&gt; RIP</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:576fabeb-df05-4c47-8c5c-ada49fe3bae0" class="outline-2">
+<h2 id="h:576fabeb-df05-4c47-8c5c-ada49fe3bae0">3 LVS 工作模式和相关命令</h2>
+<div class="outline-text-2" id="text-h:576fabeb-df05-4c47-8c5c-ada49fe3bae0">
+</div>
+<div id="outline-container-h:484d9868-713f-4a26-a725-748609a31511" class="outline-3">
+<h3 id="h:484d9868-713f-4a26-a725-748609a31511">3.1 LVS集群的工作模式</h3>
+<div class="outline-text-3" id="text-h:484d9868-713f-4a26-a725-748609a31511">
+<ul class="org-ul">
+<li>lvs-nat：修改请求报文的目标IP,多目标IP的DNAT</li>
+<li>lvs-dr：操纵封装新的MAC地址</li>
+<li>lvs-tun：在原请求IP报文之外新加一个IP首部</li>
+<li>lvs-fullnat：修改请求报文的源和目标IP</li>
+</ul>
+</div>
+<div id="outline-container-h:d4e4cc9b-e98b-45f1-840e-b7573811af76" class="outline-4">
+<h4 id="h:d4e4cc9b-e98b-45f1-840e-b7573811af76">3.1.1 LVS的NAT模式</h4>
+<div class="outline-text-4" id="text-h:d4e4cc9b-e98b-45f1-840e-b7573811af76">
+
+<figure id="org1e4b72e">
+<img src="images/image-20210220170800529.png" alt="image-20210220170800529.png">
+
+</figure>
+
+<p>
+lvs-nat：本质是多目标IP的DNAT，通过将请求报文中的目标地址和目标端口修改为某挑出的RS的RIP和PORT实现转发
+</p>
+<ol class="org-ol">
+<li>RIP和DIP应在同一个IP网络，且应使用私网地址；RS的网关要指向DIP</li>
+<li>请求报文和响应报文都必须经由Director转发，Director易于成为系统瓶颈</li>
+<li>支持端口映射，可修改请求报文的目标PORT</li>
+<li>VS必须是Linux系统，RS可以是任意OS系统</li>
+</ol>
+
+
+<figure id="orgef472f0">
+<img src="images/image-20210220170819042.png" alt="image-20210220170819042.png">
+
+</figure>
+
+<p>
+lvs-nat
+</p>
+
+
+<figure id="org2c2915d">
+<img src="images/image-20210220170838299.png" alt="image-20210220170838299.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:533d6330-5e07-4461-8787-3e5d6e84c10b" class="outline-4">
+<h4 id="h:533d6330-5e07-4461-8787-3e5d6e84c10b">3.1.2 LVS的DR模式</h4>
+<div class="outline-text-4" id="text-h:533d6330-5e07-4461-8787-3e5d6e84c10b">
+
+<figure id="org20398fc">
+<img src="images/image-20210220170904123.png" alt="image-20210220170904123.png">
+
+</figure>
+
+<p>
+LVS-DR：Direct Routing，直接路由，LVS默认模式,应用最广泛,通过为请求报
+文重新封装一个MAC首部进行转发，源MAC是DIP所在的接口的MAC，目标MAC是某
+挑选出的RS的RIP所在接口的MAC地址；源IP/PORT，以及目标IP/PORT均保持不变
+</p>
+
+
+<figure id="org2442ee5">
+<img src="images/image-20210220170919044.png" alt="image-20210220170919044.png">
+
+</figure>
+
+
+<figure id="org39e09fb">
+<img src="images/image-20210220170936212.png" alt="image-20210220170936212.png">
+
+</figure>
+
+<p>
+<b>DR模式的特点：</b>
+</p>
+
+<ol class="org-ol">
+<li>Director和各RS都配置有VIP</li>
+<li><p>
+确保前端路由器将目标IP为VIP的请求报文发往Director
+</p>
+<ul class="org-ul">
+<li>在前端网关做静态绑定VIP和Director的MAC地址</li>
+<li>在RS上使用arptables工具</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">arptables -A IN -d $<span style="color: #a0522d;">VIP</span> -j DROP
+arptables -A OUT -s $<span style="color: #a0522d;">VIP</span> -j mangle --mangle-ip-s $<span style="color: #a0522d;">RIP</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>在RS上修改内核参数以限制arp通告及应答级别</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">/proc/sys/net/ipv4/conf/all/arp_ignore
+/proc/sys/net/ipv4/conf/all/arp_announce
+</pre>
+</div></li>
+
+<li>RS的RIP可以使用私网地址，也可以是公网地址；RIP与DIP在同一IP网络；RIP的网关不能指向DIP，以确保响应报文不会经由Director</li>
+<li>RS和Director要在同一个物理网络</li>
+<li>请求报文要经由Director，但响应报文不经由Director，而由RS直接发往Client</li>
+<li>不支持端口映射（端口不能修改）</li>
+<li>无需开启 ip_forward</li>
+<li>RS可使用大多数OS系统</li>
+</ol>
+
+
+<figure id="org7edbf4e">
+<img src="images/image-20210220170956426.png" alt="image-20210220170956426.png">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:8f0b97a0-407e-4bf9-bf0d-34ba759d7f5f" class="outline-4">
+<h4 id="h:8f0b97a0-407e-4bf9-bf0d-34ba759d7f5f">3.1.3 LVS的TUN模式</h4>
+<div class="outline-text-4" id="text-h:8f0b97a0-407e-4bf9-bf0d-34ba759d7f5f">
+
+<figure id="org79bca3b">
+<img src="images/image-20210220171027884.png" alt="image-20210220171027884.png">
+
+</figure>
+
+<p>
+转发方式：不修改请求报文的IP首部（源IP为CIP，目标IP为VIP），而在原IP报文之外再封装一个IP首部（源IP是DIP，目标IP是RIP），将报文发往挑选出的目标RS；RS直接响应给客户端（源IP是VIP，目标IP是CIP）
+</p>
+
+
+<figure id="org9c4fe62">
+<img src="images/image-20210220171043688.png" alt="image-20210220171043688.png">
+
+</figure>
+
+
+<figure id="orgf1333e0">
+<img src="images/image-20210220171053645.png" alt="image-20210220171053645.png">
+
+</figure>
+
+<p>
+TUN模式特点：
+</p>
+<ol class="org-ol">
+<li>RIP和DIP可以不处于同一物理网络中，RS的网关一般不能指向DIP,且RIP可以和公网通信。也就是说集群节点可以跨互联网实现。DIP,VIP, RIP可以是公网地址</li>
+<li>RealServer的tun接口上需要配置VIP地址，以便接收director转发过来的数据包，以及作为响应的报文源IP</li>
+<li>Director转发给RealServer时需要借助隧道，隧道外层的IP头部的源IP是DIP，目标IP是RIP，而RealServer响应给客户端的IP头部是根据隧道内层的IP头分析得到的，源IP是VIP，目标IP是CIP</li>
+<li>请求报文要经由Director，但响应不经由Director,响应由RealServer自己完成</li>
+<li>不支持端口映射 6. RS的OS须支持隧道功能</li>
+</ol>
+
+<p>
+应用场景:
+</p>
+
+<pre class="example" id="org5205668">
+一般来说，TUN模式常会用来负载调度缓存服务器组，这些缓存服务器一般放置
+在不同的网络环境，可以就近折返给客户端。在请求对象不在Cache服务器本地
+命中的情况下，Cache服务器要向源服务器发送请求，将结果取回，最后将结果
+返回给用户。
+
+LAN环境一般多采用DR模式，WAN环境虽然可以用TUN模式，但是一般在WAN环境下，
+请求转发更多的被haproxy/nginx/DNS等实现。因此，TUN模式实际应用的很少,
+跨机房的应用一般专线光纤连接或DNS调度
+</pre>
+</div>
+</div>
+<div id="outline-container-h:d8d249b7-f65d-45e0-90bc-12069519265b" class="outline-4">
+<h4 id="h:d8d249b7-f65d-45e0-90bc-12069519265b">3.1.4 LVS的FULLNAT模式</h4>
+<div class="outline-text-4" id="text-h:d8d249b7-f65d-45e0-90bc-12069519265b">
+
+<figure id="org8b21621">
+<img src="images/image-20210220171107801.png" alt="image-20210220171107801.png">
+
+</figure>
+
+<p>
+通过同时修改请求报文的源IP地址和目标IP地址进行转发
+</p>
+
+<pre class="example" id="orge2838b9">
+CIP --&gt; DIP
+VIP --&gt;RIP
+</pre>
+
+<p>
+fullnat模式特点：
+</p>
+<ol class="org-ol">
+<li>VIP是公网地址，RIP和DIP是私网地址，且通常不在同一IP网络；因此，RIP的网关一般不会指向DIP</li>
+<li>RS收到的请求报文源地址是DIP，因此，只需响应给DIP；但Director还要将其发往Client</li>
+<li>请求和响应报文都经由Director</li>
+<li>相对NAT模式，可以更好的实现LVS-RealServer间跨VLAN通讯</li>
+<li>支持端口映射</li>
+</ol>
+
+<p>
+注意：此类型kernel默认不支持
+</p>
+</div>
+</div>
+<div id="outline-container-h:95671119-878d-454b-b42c-fd457661bb4c" class="outline-4">
+<h4 id="h:95671119-878d-454b-b42c-fd457661bb4c">3.1.5 LVS工作模式总结和比较</h4>
+<div class="outline-text-4" id="text-h:95671119-878d-454b-b42c-fd457661bb4c">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">&#xa0;</th>
+<th scope="col" class="org-left">NAT</th>
+<th scope="col" class="org-left">TUN</th>
+<th scope="col" class="org-left">DR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Real Server</td>
+<td class="org-left">any</td>
+<td class="org-left">Tunneling</td>
+<td class="org-left">Non-arp device</td>
+</tr>
+
+<tr>
+<td class="org-left">Real server network</td>
+<td class="org-left">private</td>
+<td class="org-left">LAN/WAN</td>
+<td class="org-left">LAN</td>
+</tr>
+
+<tr>
+<td class="org-left">Real server number</td>
+<td class="org-left">low (10~20)</td>
+<td class="org-left">High (100)</td>
+<td class="org-left">High (100)</td>
+</tr>
+
+<tr>
+<td class="org-left">Real server gateway</td>
+<td class="org-left">load balancer</td>
+<td class="org-left">own router</td>
+<td class="org-left">Own router</td>
+</tr>
+
+<tr>
+<td class="org-left">优点</td>
+<td class="org-left">端口转换</td>
+<td class="org-left">WAN</td>
+<td class="org-left">性能最好</td>
+</tr>
+
+<tr>
+<td class="org-left">缺点</td>
+<td class="org-left">性能瓶颈</td>
+<td class="org-left">支持隧道</td>
+<td class="org-left">不支持跨网段</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+lvs-nat与lvs-fullnat：
+</p>
+<ul class="org-ul">
+<li>请求和响应报文都经由Director</li>
+<li>lvs-nat：RIP的网关要指向DIP</li>
+<li>lvs-fullnat：RIP和DIP未必在同一IP网络，但要能通信</li>
+</ul>
+
+<p>
+lvs-dr与lvs-tun：
+</p>
+<ul class="org-ul">
+<li>请求报文要经由Director，但响应报文由RS直接发往Client</li>
+<li>lvs-dr：通过封装新的MAC首部实现，通过MAC网络转发</li>
+<li>lvs-tun：通过在原IP报文外封装新IP头实现转发，支持远距离通信</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:dc5acb2a-0bbe-4d9e-b665-8e38b24eeff6" class="outline-3">
+<h3 id="h:dc5acb2a-0bbe-4d9e-b665-8e38b24eeff6">3.2 LVS 调试算法</h3>
+<div class="outline-text-3" id="text-h:dc5acb2a-0bbe-4d9e-b665-8e38b24eeff6">
+<p>
+ipvs scheduler：根据其调度时是否考虑各RS当前的负载状态
+</p>
+
+<p>
+分为两种：静态方法和动态方法
+</p>
+</div>
+<div id="outline-container-h:cc1b7cd3-bd70-4c05-9f64-cfc5c369ea75" class="outline-4">
+<h4 id="h:cc1b7cd3-bd70-4c05-9f64-cfc5c369ea75">3.2.1 静态方法</h4>
+<div class="outline-text-4" id="text-h:cc1b7cd3-bd70-4c05-9f64-cfc5c369ea75">
+<p>
+仅根据算法本身进行调度
+</p>
+<ol class="org-ol">
+<li>RR：roundrobin，轮询,较常用</li>
+<li>WRR：Weighted RR，加权轮询,较常用</li>
+<li>SH：Source Hashing，实现session sticky，源IP地址hash；将来自于同一
+个IP地址的请求始终发往第一次挑中的RS，从而实现会话绑定</li>
+<li>DH：Destination Hashing；目标地址哈希，第一次轮询调度至RS，后续将发
+往同一个目标地址的请求始终转发至第一次挑中的RS，典型使用场景是正向
+代理缓存场景中的负载均衡,如:Web缓存</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:84c717ac-7c50-4a49-baaa-73e136b07c01" class="outline-4">
+<h4 id="h:84c717ac-7c50-4a49-baaa-73e136b07c01">3.2.2 动态方法</h4>
+<div class="outline-text-4" id="text-h:84c717ac-7c50-4a49-baaa-73e136b07c01">
+<p>
+主要根据每RS当前的负载状态及调度算法进行调度Overhead=value
+较小的RS将被调度
+</p>
+
+<p>
+1、LC：least connections 适用于长连接应用
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">Overhead</span>=activeconns*256+inactiveconns
+</pre>
+</div>
+
+<p>
+2、WLC：Weighted LC，默认调度方法,较常用
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">Overhead</span>=(activeconns*256+inactiveconns)/weight
+</pre>
+</div>
+
+<p>
+3、SED：Shortest Expection Delay，初始连接高权重优先,只检查活动连接,而不考虑非活动连接
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a0522d;">Overhead</span>=(activeconns+1)*256/weight
+</pre>
+</div>
+
+<p>
+4、NQ：Never Queue，第一轮均匀分配，后续SED
+</p>
+
+<p>
+5、LBLC：Locality-Based LC，动态的DH算法，使用场景：根据负载状态实现正向代理,实现WebCache等
+</p>
+
+<p>
+6、LBLCR：LBLC with Replication，带复制功能的LBLC，解决LBLC负载不均衡问题，从负载重的复制到负载轻的RS,,实现Web Cache等
+</p>
+</div>
+</div>
+<div id="outline-container-h:26a71c2b-78ff-469c-94eb-b31469e5b7c1" class="outline-4">
+<h4 id="h:26a71c2b-78ff-469c-94eb-b31469e5b7c1">3.2.3 内核版本 4.15 版本后新增调度算法：FO和OVF</h4>
+<div class="outline-text-4" id="text-h:26a71c2b-78ff-469c-94eb-b31469e5b7c1">
+<p>
+FO（Weighted Fail Over）调度算法,在此FO算法中，遍历虚拟服务所关联的真实服务器链表，找到还未过载（未设置IP_VS_DEST_F_OVERLOAD标志）的且权重最高的真实服务器，进行调度
+</p>
+
+<p>
+OVF（Overflow-connection）调度算法，基于真实服务器的活动连接数量和权重
+值实现。将新连接调度到权重值最高的真实服务器，直到其活动连接数量超过权
+重值，之后调度到下一个权重值最高的真实服务器,在此OVF算法中，遍历虚拟服
+务相关联的真实服务器链表，找到权重值最高的可用真实服务器。
+</p>
+
+<p>
+一个可用的真实服务器需要同时满足以下条件：
+</p>
+<ul class="org-ul">
+<li>未过载（未设置IP_VS_DEST_F_OVERLOAD标志）</li>
+<li>真实服务器当前的活动连接数量小于其权重值</li>
+<li>其权重值不为零</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9acf7260-ba06-422b-a2b3-7bbebc962610" class="outline-3">
+<h3 id="h:9acf7260-ba06-422b-a2b3-7bbebc962610">3.3 LVS 相关软件</h3>
+<div class="outline-text-3" id="text-h:9acf7260-ba06-422b-a2b3-7bbebc962610">
+</div>
+<div id="outline-container-h:fbf52af2-6259-472a-9060-f5ca9717bed9" class="outline-4">
+<h4 id="h:fbf52af2-6259-472a-9060-f5ca9717bed9">3.3.1 程序包：ipvsadm</h4>
+<div class="outline-text-4" id="text-h:fbf52af2-6259-472a-9060-f5ca9717bed9">
+<p>
+Unit File: ipvsadm.service
+</p>
+
+<p>
+主程序：/usr/sbin/ipvsadm
+</p>
+
+<p>
+规则保存工具：/usr/sbin/ipvsadm-save
+</p>
+
+<p>
+规则重载工具：/usr/sbin/ipvsadm-restore
+</p>
+
+<p>
+配置文件：/etc/sysconfig/ipvsadm-config
+</p>
+
+<p>
+ipvs调度规则文件：/etc/sysconfig/ipvsadm
+</p>
+</div>
+</div>
+<div id="outline-container-h:60e32fd4-215f-4669-b738-4cecd9200708" class="outline-4">
+<h4 id="h:60e32fd4-215f-4669-b738-4cecd9200708">3.3.2 ipvsadm 命令</h4>
+<div class="outline-text-4" id="text-h:60e32fd4-215f-4669-b738-4cecd9200708">
+<p>
+ipvsadm核心功能： 
+</p>
+<ul class="org-ul">
+<li>集群服务管理：增、删、改</li>
+<li>集群服务的RS管理：增、删、改</li>
+<li>查看</li>
+</ul>
+
+<p>
+ipvsadm 工具用法：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#31649;&#29702;&#38598;&#32676;&#26381;&#21153;</span>
+ipvsadm -A|E -t|u|f service-address [-s scheduler] [-p [timeout]] [-M netmask]
+[--pe persistence_engine] [-b sched-flags]
+ipvsadm -D -t|u|f service-address <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21024;&#38500;</span>
+ipvsadm &#8211;C <span style="color: #b22222;">#</span><span style="color: #b22222;">&#28165;&#31354;</span>
+ipvsadm &#8211;R <span style="color: #b22222;">#</span><span style="color: #b22222;">&#37325;&#36733;,&#30456;&#24403;&#20110;ipvsadm-restore</span>
+ipvsadm -S [-n] <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20445;&#23384;,&#30456;&#24403;&#20110;ipvsadm-save</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#31649;&#29702;&#38598;&#32676;&#20013;&#30340;RS</span>
+ipvsadm -a|e -t|u|f service-address -r server-address [-g|i|m] [-w weight] 
+ipvsadm -d -t|u|f service-address -r server-address
+ipvsadm -L|l [options]
+ipvsadm -Z [-t|u|f service-address]
+</pre>
+</div>
+
+<p>
+<b>管理集群服务：增、改、删</b>
+</p>
+
+<p>
+<b>增、修改：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -A|E -t|u|f service-address [-s scheduler] [-p [timeout]]
+</pre>
+</div>
+
+<p>
+说明
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">service-address&#65306;
+-t|u|f&#65306;
+    -t: TCP&#21327;&#35758;&#30340;&#31471;&#21475;&#65292;VIP:TCP_PORT &#22914;: -t 10.0.0.100:80
+    -u: UDP&#21327;&#35758;&#30340;&#31471;&#21475;&#65292;VIP:UDP_PORT
+    -f&#65306;firewall MARK&#65292;&#26631;&#35760;&#65292;&#19968;&#20010;&#25968;&#23383;         
+[-s scheduler]&#65306;&#25351;&#23450;&#38598;&#32676;&#30340;&#35843;&#24230;&#31639;&#27861;&#65292;&#40664;&#35748;&#20026;wlc
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -A -t 10.0.0.100:80 -s wrr
+</pre>
+</div>
+
+<p>
+<b>删除：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -D -t|u|f service-address
+</pre>
+</div>
+
+<p>
+<b>管理集群上的RS：增、改、删</b>
+</p>
+
+<p>
+增、改：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -a|e -t|u|f service-address -r server-address [-g|i|m] [-w weight]
+</pre>
+</div>
+
+<p>
+删：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -d -t|u|f service-address -r server-address
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">server-address&#65306;
+        rip[:port] &#22914;&#30465;&#30053;port&#65292;&#19981;&#20316;&#31471;&#21475;&#26144;&#23556;
+&#36873;&#39033;&#65306;
+lvs&#31867;&#22411;&#65306;
+        -g: gateway, dr&#31867;&#22411;&#65292;&#40664;&#35748;
+        -i: ipip, tun&#31867;&#22411;
+        -m: masquerade, nat&#31867;&#22411;             
+-w weight&#65306;&#26435;&#37325;
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.8:8080 -m -w 3
+</pre>
+</div>
+
+<p>
+<b>清空定义的所有内容：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -C
+</pre>
+</div>
+
+<p>
+<b>清空计数器：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -Z [-t|u|f service-address]
+</pre>
+</div>
+
+<p>
+<b>查看：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -L|l [options]
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">--numeric, -n&#65306;&#20197;&#25968;&#23383;&#24418;&#24335;&#36755;&#20986;&#22320;&#22336;&#21644;&#31471;&#21475;&#21495;
+--exact&#65306;&#25193;&#23637;&#20449;&#24687;&#65292;&#31934;&#30830;&#20540;     
+--connection&#65292;-c&#65306;&#24403;&#21069;IPVS&#36830;&#25509;&#36755;&#20986;
+--stats&#65306;&#32479;&#35745;&#20449;&#24687;
+--rate &#65306;&#36755;&#20986;&#36895;&#29575;&#20449;&#24687;
+</pre>
+</div>
+
+<p>
+<b>ipvs规则：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">/proc/net/ip_vs
+</pre>
+</div>
+
+<p>
+<b>ipvs连接：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">/proc/net/ip_vs_conn
+</pre>
+</div>
+
+<p>
+<b>保存：建议保存至/etc/sysconfig/ipvsadm</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm-save &gt; /PATH/TO/IPVSADM_FILE
+ipvsadm -S &gt; /PATH/TO/IPVSADM_FILE
+systemctl stop ipvsadm.service     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20250;&#33258;&#21160;&#20445;&#23384;&#35268;&#21017;&#33267;/etc/sysconfig/ipvsadm</span>
+</pre>
+</div>
+
+<p>
+<b>重载：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm-restore &lt; /PATH/FROM/IPVSADM_FILE
+systemctl     start ipvsadm.service     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20250;&#33258;&#21160;&#21152;&#36733;/etc/sysconfig/ipvsadm&#20013;&#35268;&#21017;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9a0ac3d6-d327-4c20-8743-c5c3f371f450" class="outline-3">
+<h3 id="h:9a0ac3d6-d327-4c20-8743-c5c3f371f450">3.4 防火墙标记</h3>
+<div class="outline-text-3" id="text-h:9a0ac3d6-d327-4c20-8743-c5c3f371f450">
+<p>
+FWM：FireWall Mark
+</p>
+
+<p>
+MARK target 可用于给特定的报文打标记
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">--set-mark value <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20854;&#20013;&#65306;value &#21487;&#20026;0xffff&#26684;&#24335;&#65292;&#34920;&#31034;&#21313;&#20845;&#36827;&#21046;&#25968;&#23383;</span>
+</pre>
+</div>
+
+<p>
+借助于防火墙标记来分类报文，而后基于标记定义集群服务；可将多个不同的应用使用同一个集群服务进行调度
+</p>
+
+<p>
+实现方法： 在Director主机打标记：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">iptables -t mangle -A PREROUTING -d $<span style="color: #a0522d;">vip</span> -p $<span style="color: #a0522d;">proto</span> -m multiport --dports
+$<span style="color: #a0522d;">port1</span>,$<span style="color: #a0522d;">port2</span>,&#8230; -j MARK --set-mark NUMBER
+</pre>
+</div>
+
+<p>
+在Director主机基于标记定义集群服务：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -A -f NUMBER [options]
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@lvs ~]#iptables -t mangle -A PREROUTING -d 172.16.0.100 -p tcp -m
+multiport --dports 80,443 -j MARK --set-mark 10
+[root@lvs ~]#ipvsadm -C
+[root@lvs ~]#ipvsadm -A -f 10 -s rr
+[root@lvs ~]#ipvsadm -a -f 10 -r 10.0.0.7 -g
+[root@lvs ~]#ipvsadm -a -f 10 -r 10.0.0.17 -g
+[root@lvs ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+FWM     10 rr
+    -&gt; 10.0.0.7:0                                     Route     1             0                     0             
+    -&gt; 10.0.0.17:0                                 Route     1             0                     0             
+[root@lvs ~]#cat /proc/net/ip_vs
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port Forward Weight ActiveConn InActConn
+FWM 0000000A rr
+    -&gt; 0A000011:0000         Route     1             0                     9             
+    -&gt; 0A000007:0000         Route     1             0                     9
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@lvs ~]#ipvsadm -A -f 10
+[root@lvs ~]#ipvsadm -a -f 10 -r 10.0.0.7 -g
+[root@lvs ~]#ipvsadm -a -f 10 -r 10.0.0.17 -g
+[root@lvs ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+FWM     10 wlc
+    -&gt; 10.0.0.7:0                             Route     1             0                     0             
+    -&gt; 10.0.0.17:0                         Route     1             0                     0
+[root@LVS ~]#cat /proc/net/ip_vs
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port Forward Weight ActiveConn InActConn
+TCP AC14C8C8:0050 rr 
+    -&gt; 0A000011:0050         Masq         1             0                     0             
+    -&gt; 0A000007:0050         Masq         1             0                     0 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cb703436-3c20-4755-9900-f33aa6d2df75" class="outline-3">
+<h3 id="h:cb703436-3c20-4755-9900-f33aa6d2df75">3.5 LVS 持久连接</h3>
+<div class="outline-text-3" id="text-h:cb703436-3c20-4755-9900-f33aa6d2df75">
+<p>
+session 绑定：对共享同一组RS的多个集群服务，需要统一进行绑定，lvs
+sh算法无法实现 持久连接（ lvs persistence
+）模板：实现无论使用任何调度算法，在一段时间内（默认360s
+），能够实现将来自同一个地址的请求始终发往同一个RS
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ipvsadm -A|E -t|u|f service-address [-s scheduler] [-p [timeout]]
+</pre>
+</div>
+
+<p>
+持久连接实现方式：
+</p>
+<ul class="org-ul">
+<li>每端口持久（PPC）：每个端口定义为一个集群服务，每集群服务单独调度</li>
+<li>每防火墙标记持久（PFWMC）：基于防火墙标记定义集群服务；可实现将多个端口上的应用统一调度，即所谓的port Affinity</li>
+<li>每客户端持久（PCC）：基于0端口（表示所有服务）定义集群服务，即将客户端对所有应用的请求都调度至后端主机，必须定义为持久模式</li>
+</ul>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@lvs ~]#ipvsadm -E -f 10 -p
+[root@lvs ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+FWM     10 wlc persistent 360
+    -&gt; 10.0.0.7:0                             Route     1             0                     15             
+    -&gt; 10.0.0.17:0                         Route     1             0                     7             
+[root@lvs ~]#ipvsadm -E -f 10 -p 3600
+[root@lvs ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+FWM     10 wlc persistent 3600
+    -&gt; 10.0.0.7:0                             Route     1             0                     79             
+    -&gt; 10.0.0.17:0                         Route     1             0                     7
+
+[root@lvs ~]#cat /proc/net/ip_vs_conn
+Pro FromIP     FPrt ToIP         TPrt DestIP     DPrt State             Expires PEName PEData
+TCP C0A80006 C816 AC100064 01BB 0A000011 01BB FIN_WAIT                 67
+TCP C0A80006 C812 AC100064 01BB 0A000011 01BB FIN_WAIT                 67
+TCP C0A80006 9A36 AC100064 0050 0A000011 0050 FIN_WAIT                 65
+TCP C0A80006 C806 AC100064 01BB 0A000011 01BB FIN_WAIT                 65
+TCP C0A80006 9A3E AC100064 0050 0A000011 0050 FIN_WAIT                 66
+TCP C0A80006 C81A AC100064 01BB 0A000011 01BB FIN_WAIT                 67
+TCP C0A80006 C80A AC100064 01BB 0A000011 01BB FIN_WAIT                 66
+TCP C0A80006 9A3A AC100064 0050 0A000011 0050 FIN_WAIT                 66
+TCP C0A80006 9A4E AC100064 0050 0A000011 0050 FIN_WAIT                 68
+TCP C0A80006 9A42 AC100064 0050 0A000011 0050 FIN_WAIT                 67
+TCP C0A80006 9A46 AC100064 0050 0A000011 0050 FIN_WAIT                 67
+TCP C0A80006 C81E AC100064 01BB 0A000011 01BB FIN_WAIT                 68
+IP C0A80006 0000 0000000A 0000 0A000011 0000 NONE                         948
+TCP C0A80006 C80E AC100064 01BB 0A000011 01BB FIN_WAIT                 66
+TCP C0A80006 9A4A AC100064 0050 0A000011 0050 FIN_WAIT                 67
+
+[root@lvs ~]#ipvsadm -Lnc
+IPVS connection entries
+pro expire state             source                         virtual                     destination
+TCP 00:46 FIN_WAIT         192.168.10.6:51222     172.16.0.100:443     10.0.0.17:443
+TCP 00:46 FIN_WAIT         192.168.10.6:51218     172.16.0.100:443     10.0.0.17:443
+TCP 00:45 FIN_WAIT         192.168.10.6:39478     172.16.0.100:80         10.0.0.17:80
+TCP 00:45 FIN_WAIT         192.168.10.6:51206     172.16.0.100:443     10.0.0.17:443
+TCP 00:46 FIN_WAIT         192.168.10.6:39486     172.16.0.100:80         10.0.0.17:80
+TCP 00:47 FIN_WAIT         192.168.10.6:51226     172.16.0.100:443     10.0.0.17:443
+TCP 00:45 FIN_WAIT         192.168.10.6:51210     172.16.0.100:443     10.0.0.17:443
+TCP 00:45 FIN_WAIT         192.168.10.6:39482     172.16.0.100:80         10.0.0.17:80
+TCP 00:47 FIN_WAIT         192.168.10.6:39502     172.16.0.100:80         10.0.0.17:80
+TCP 00:46 FIN_WAIT         192.168.10.6:39490     172.16.0.100:80         10.0.0.17:80
+TCP 00:46 FIN_WAIT         192.168.10.6:39494     172.16.0.100:80         10.0.0.17:80
+TCP 00:47 FIN_WAIT         192.168.10.6:51230     172.16.0.100:443     10.0.0.17:443
+IP     15:27 NONE                 192.168.10.6:0             0.0.0.10:0                 10.0.0.17:0
+TCP 00:46 FIN_WAIT         192.168.10.6:51214     172.16.0.100:443     10.0.0.17:443
+TCP 00:47 FIN_WAIT         192.168.10.6:39498     172.16.0.100:80         10.0.0.17:80
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:2af2eaae-b435-4f66-82d7-f3a800dc6045" class="outline-2">
+<h2 id="h:2af2eaae-b435-4f66-82d7-f3a800dc6045">4 LVS实战案例</h2>
+<div class="outline-text-2" id="text-h:2af2eaae-b435-4f66-82d7-f3a800dc6045">
+</div>
+<div id="outline-container-h:cf47c34d-853b-4dc5-bb07-72f1aca353c1" class="outline-3">
+<h3 id="h:cf47c34d-853b-4dc5-bb07-72f1aca353c1">4.1 LVS-NAT模式案例</h3>
+<div class="outline-text-3" id="text-h:cf47c34d-853b-4dc5-bb07-72f1aca353c1">
+
+<figure id="org2fabaec">
+<img src="images/image-20210220171152618.png" alt="image-20210220171152618.png">
+
+</figure>
+
+<p>
+环境：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20849;&#22235;&#21488;&#20027;&#26426;
+&#19968;&#21488;&#65306; internet client&#65306;192.168.10.6/24     GW:&#26080; &#20165;&#20027;&#26426;
+
+&#19968;&#21488;&#65306;lvs 
+eth1 &#20165;&#20027;&#26426; 192.168.10.100/16
+eth0 NAT 10.0.0.8/24
+
+&#20004;&#21488;RS&#65306;
+RS1: 10.0.0.7/24 GW&#65306;10.0.0.8 NAT
+RS2: 10.0.0.17/24 GW&#65306;10.0.0.8 NAT
+</pre>
+</div>
+
+<p>
+配置过程：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@internet ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=192.168.10.6
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@lvs network-scripts]#cat ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.8
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@lvs network-scripts]#cat ifcfg-eth1
+<span style="color: #a0522d;">DEVICE</span>=eth1
+<span style="color: #a0522d;">NAME</span>=eth1
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=192.168.10.100
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@rs1 ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.7
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.8
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+[root@rs2 ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.17
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.8
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+[root@rs1 ~]#curl 10.0.0.7
+10.0.0.7 RS1
+[root@rs2 ~]#curl 10.0.0.17
+10.0.0.17 RS2
+
+[root@lvs-server ~]#vim /etc/sysctl.conf
+net.ipv4.ip_forward = 1
+[root@lvs-server ~]#sysctl -p
+net.ipv4.ip_forward = 1
+
+[root@lvs-server ~]#ipvsadm -A -t 192.168.10.100:80 -s wrr
+[root@lvs-server ~]#ipvsadm -a -t 192.168.10.100:80 -r 10.0.0.7:80 -m
+[root@lvs-server ~]#ipvsadm -a -t 192.168.10.100:80 -r 10.0.0.17:80 -m
+
+[root@lvs-server ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     192.168.10.100:80 wrr
+    -&gt; 10.0.0.7:80                                 Masq         1             1                     0             
+    -&gt; 10.0.0.17:80                                 Masq         1             0                     0 
+[root@internet ~]#while :;<span style="color: #a020f0;">do</span> curl 192.168.10.100;sleep 0.5;<span style="color: #a020f0;">done</span>
+rs1.me.org
+rs2.me.org
+rs1.me.org
+rs2.me.org
+rs1.me.org
+rs2.me.org
+[root@lvs-server ~]#ipvsadm -Ln --stats
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port                             Conns     InPkts OutPkts InBytes OutBytes
+    -&gt; RemoteAddress:Port
+TCP     192.168.10.100:80                                     67             405             255         32436         30092
+    -&gt; 10.0.0.7:80                                                 34             203             128         16244         15072
+    -&gt; 10.0.0.17:80                                             33             202             127         16192         15020
+[root@lvs-server ~]#cat /proc/net/ip_vs
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port Forward Weight ActiveConn InActConn
+
+TCP C0A80A64:0050 wrr 
+    -&gt; 0A000011:0050         Masq         1             0                     98             
+    -&gt; 0A000007:0050         Masq         1             0                     97 
+
+[root@lvs-server ~]#ipvsadm -Lnc
+IPVS connection entries
+pro expire state             source                         virtual                     destination
+TCP 01:55 TIME_WAIT     192.168.10.6:43486 192.168.10.100:80     10.0.0.17:80
+TCP 00:19 TIME_WAIT     192.168.10.6:43476 192.168.10.100:80     10.0.0.7:80
+TCP 01:58 TIME_WAIT     192.168.10.6:43500 192.168.10.100:80     10.0.0.7:80
+TCP 01:58 TIME_WAIT     192.168.10.6:43498 192.168.10.100:80     10.0.0.17:80
+TCP 01:59 TIME_WAIT     192.168.10.6:43502 192.168.10.100:80     10.0.0.17:80
+TCP 01:57 TIME_WAIT     192.168.10.6:43494 192.168.10.100:80     10.0.0.17:80
+TCP 01:57 TIME_WAIT     192.168.10.6:43496 192.168.10.100:80     10.0.0.7:80
+TCP 01:56 TIME_WAIT     192.168.10.6:43490 192.168.10.100:80     10.0.0.17:80
+TCP 00:20 TIME_WAIT     192.168.10.6:43480 192.168.10.100:80     10.0.0.7:80
+TCP 01:56 TIME_WAIT     192.168.10.6:43492 192.168.10.100:80     10.0.0.7:80
+TCP 01:55 TIME_WAIT     192.168.10.6:43488 192.168.10.100:80     10.0.0.7:80
+TCP 00:20 TIME_WAIT     192.168.10.6:43478 192.168.10.100:80     10.0.0.17:80
+TCP 01:59 TIME_WAIT     192.168.10.6:43504 192.168.10.100:80     10.0.0.7:80
+TCP 01:54 TIME_WAIT     192.168.10.6:43484 192.168.10.100:80     10.0.0.7:80
+TCP 01:54 TIME_WAIT     192.168.10.6:43482 192.168.10.100:80     10.0.0.17:80
+[root@lvs-server ~]#cat /proc/net/ip_vs_conn
+Pro FromIP     FPrt ToIP         TPrt DestIP     DPrt State             Expires PEName PEData
+TCP C0A80A06 A9DE C0A80A64 0050 0A000011 0050 TIME_WAIT                 72
+TCP C0A80A06 A9EC C0A80A64 0050 0A000007 0050 TIME_WAIT                 76
+TCP C0A80A06 AA64 C0A80A64 0050 0A000007 0050 TIME_WAIT             106
+TCP C0A80A06 AA0C C0A80A64 0050 0A000007 0050 TIME_WAIT                 84
+TCP C0A80A06 AA3A C0A80A64 0050 0A000011 0050 TIME_WAIT                 95
+TCP C0A80A06 AA86 C0A80A64 0050 0A000011 0050 TIME_WAIT             115
+TCP C0A80A06 AA78 C0A80A64 0050 0A000007 0050 TIME_WAIT             111
+TCP C0A80A06 AA06 C0A80A64 0050 0A000011 0050 TIME_WAIT                 82
+TCP C0A80A06 AA44 C0A80A64 0050 0A000007 0050 TIME_WAIT                 98
+TCP C0A80A06 AA2C C0A80A64 0050 0A000007 0050 TIME_WAIT                 92
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20445;&#23384;&#35268;&#21017;</span>
+[root@lvs-server ~]#ipvsadm -Sn &gt; /etc/sysconfig/ipvsadm
+[root@lvs-server ~]#systemctl enable --now ipvsadm.service
+</pre>
+</div>
+
+<p>
+范例2：
+</p>
+
+
+<figure id="org254535f">
+<img src="images/image-20210220171210964.png" alt="image-20210220171210964.png">
+
+</figure>
+
+<ol class="org-ol">
+<li>Director 服务器采用双网卡，一个是桥接网卡连接外网，一个是仅主机网卡与后端Web服务器相连</li>
+<li>Web服务器采用仅主机网卡与director相连</li>
+<li>Web服务器网关指向10.0.0.200</li>
+<li>后端web服务器不需要连接外网</li>
+</ol>
+
+<p>
+环境：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20849;&#22235;&#21488;&#20027;&#26426;
+&#19968;&#21488;&#65306; internet client &#65306;172.20.200.6/16     GW:&#26080;
+
+&#19968;&#21488;&#65306;lvs 
+eth1 &#26725;&#25509; 172.20.200.200/16
+eth0 NAT 10.0.0.200/24
+
+&#20004;&#21488;RS&#65306;
+RS1: 10.0.0.7/24 GW&#65306; 10.0.0.200
+RS2: 10.0.0.17/24 GW&#65306; 10.0.0.200
+</pre>
+</div>
+
+<p>
+配置过程
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">LVS&#21551;&#29992;IP_FORWORD&#21151;&#33021;</span>
+[root@lvs ~]#vim /etc/sysctl.conf
+net.ipv4.ip_forward = 1
+[root@LVS ~]#sysctl -p
+
+[root@lvs ~]#ipvsadm -A -t 172.20.200.200:80 -s rr
+[root@lvs ~]#ipvsadm -a -t 172.20.200.200:80 -r 10.0.0.7 -m
+[root@lvs ~]#ipvsadm -a -t 172.20.200.200:80 -r 10.0.0.17 -m
+
+[root@LVS ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     172.20.200.200:80 rr
+    -&gt; 10.0.0.7:80                                 Masq         1             0                     0             
+    -&gt; 10.0.0.17:80                                 Masq         1             0                     0 
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27979;&#35797;</span>
+[root@client ~]#curl 172.20.200.200
+RS2 Server on 10.0.0.17
+[root@client ~]#curl 172.20.200.200
+RS1 Server on 10.0.0.7
+[root@client ~]#curl 172.20.200.200
+RS2 Server on 10.0.0.17
+[root@client ~]#curl 172.20.200.200
+RS1 Server on 10.0.0.7
+
+[root@LVS ~]#cat /proc/net/ip_vs_conn
+Pro FromIP     FPrt ToIP         TPrt DestIP     DPrt State             Expires PEName PEData
+TCP AC14C806 BD6A AC14C8C8 0050 0A000011 0050 TIME_WAIT                 97
+TCP AC14C806 BD6C AC14C8C8 0050 0A000007 0050 TIME_WAIT                 97
+TCP AC14C806 BD66 AC14C8C8 0050 0A000011 0050 TIME_WAIT                 90
+TCP AC14C806 BD68 AC14C8C8 0050 0A000007 0050 TIME_WAIT                 92
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20445;&#23384;&#35268;&#21017;</span>
+[root@LVS ~]#ipvsadm -Sn &gt; /etc/sysconfig/ipvsadm
+[root@LVS ~]#cat /etc/sysconfig/ipvsadm
+-A -t 172.20.200.200:80 -s rr
+-a -t 172.20.200.200:80 -r 10.0.0.7:80 -m -w 1
+-a -t 172.20.200.200:80 -r 10.0.0.17:80 -m -w 1
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#28165;&#38500;&#35268;&#21017;</span>
+[root@LVS ~]#ipvsadm -C
+[root@LVS ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37325;&#26032;&#21152;&#36733;&#35268;&#21017;</span>
+[root@LVS ~]#ipvsadm -R &lt; /etc/sysconfig/ipvsadm
+[root@LVS ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     172.20.200.200:80 rr
+    -&gt; 10.0.0.7:80                                 Masq         1             0                     0             
+    -&gt; 10.0.0.17:80
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#24320;&#26426;&#21152;&#36733;ipvs&#35268;&#21017;</span>
+[root@LVS ~]#ipvsadm -C
+[root@LVS ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+[root@LVS ~]#systemctl enable --now ipvsadm.service
+[root@LVS ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     172.20.200.200:80 rr
+    -&gt; 10.0.0.7:80                                 Masq         1             0                     0             
+    -&gt; 10.0.0.17:80                                 Masq         1             0                     0
+[root@rs1 ~]#tail /var/log/httpd/access_log
+172.20.200.6 - - [24/Mar/2020:16:38:29 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 23 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+172.20.200.6 - - [24/Mar/2020:16:38:35 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 23 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+172.20.200.6 - - [24/Mar/2020:16:52:16 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 23 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+172.20.200.6 - - [24/Mar/2020:16:52:17 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 23 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+172.20.200.6 - - [24/Mar/2020:16:53:36 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 23 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+172.20.200.6 - - [24/Mar/2020:16:53:37 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 23 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20462;&#25913;&#35843;&#24230;&#31639;&#27861;&#20026; WRR &#21644;&#21518;&#31471;&#26381;&#21153;&#22120;&#30340;&#31471;&#21475;</span>
+[root@LVS ~]#ipvsadm -E -t 172.20.200.200:80 -s wrr
+[root@LVS ~]#ipvsadm -d -t 172.20.200.200:80 -r 10.0.0.7
+[root@LVS ~]#ipvsadm -a -t 172.20.200.200:80 -r 10.0.0.7:8080 -m -w 3
+[root@LVS ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     172.20.200.200:80 wrr
+    -&gt; 10.0.0.7:8080                             Masq         3             0                     0             
+    -&gt; 10.0.0.17:80                                 Masq         1             0                     1 
+
+[root@rs1 ~]#vim /etc/httpd/conf/httpd.conf
+Listen 8080
+[root@rs1 ~]#systemctl restart httpd
+
+[root@client ~]#curl 172.20.200.200
+RS1 Server on 10.0.0.7
+[root@client ~]#curl 172.20.200.200
+RS1 Server on 10.0.0.7
+[root@client ~]#curl 172.20.200.200
+RS1 Server on 10.0.0.7
+[root@client ~]#curl 172.20.200.200
+RS2 Server on 10.0.0.17
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:877b40df-0003-4efe-a246-e8fbef557a55" class="outline-3">
+<h3 id="h:877b40df-0003-4efe-a246-e8fbef557a55">4.2 LVS-DR模式单网段案例</h3>
+<div class="outline-text-3" id="text-h:877b40df-0003-4efe-a246-e8fbef557a55">
+<p>
+DR模型中各主机上均需要配置VIP，解决地址冲突的方式有三种：
+</p>
+<ol class="org-ol">
+<li>在前端网关做静态绑定</li>
+<li>在各RS使用arptables</li>
+<li>在各RS修改内核参数，来限制arp响应和通告的级别</li>
+</ol>
+
+<p>
+<b>限制响应级别：arp_ignore</b> *
+</p>
+<ul class="org-ul">
+<li>0：默认值，表示可使用本地任意接口上配置的任意地址进行响应</li>
+<li>1：仅在请求的目标IP配置在本地主机的接收到请求报文的接口上时，才给予响应</li>
+</ul>
+
+<p>
+<b>限制通告级别：arp_announce</b> *
+</p>
+<ul class="org-ul">
+<li>0：默认值，把本机所有接口的所有信息向每个接口的网络进行通告</li>
+<li>1：尽量避免将接口信息向非直接连接网络进行通告</li>
+<li><p>
+2：必须避免将接口信息向非本网络进行通告
+</p>
+
+<p>
+<b>配置要点</b>
+</p>
+<ol class="org-ol">
+<li>Director 服务器采用双IP桥接网络，一个是VIP，一个DIP</li>
+<li>Web服务器采用和DIP相同的网段和Director连接</li>
+<li>每个Web服务器配置VIP</li>
+<li>每个web服务器可以出外网</li>
+</ol></li>
+</ul>
+
+<p>
+范例:
+</p>
+
+
+<figure id="org908d021">
+<img src="images/image-20210220171233155.png" alt="image-20210220171233155.png">
+
+</figure>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#29615;&#22659;&#65306;&#20116;&#21488;&#20027;&#26426;
+&#19968;&#21488;&#65306;&#23458;&#25143;&#31471; eth0:&#20165;&#20027;&#26426; 192.168.10.6/24 GW:192.168.10.200
+
+&#19968;&#21488;&#65306;ROUTER
+eth0 :NAT     10.0.0.200/24
+eth1: &#20165;&#20027;&#26426; 192.168.10.200/24
+&#21551;&#29992; IP_FORWARD
+
+&#19968;&#21488;&#65306;LVS
+eth0:NAT:DIP:10.0.0.8/24 GW:10.0.0.200
+
+&#20004;&#21488;RS&#65306;
+RS1&#65306;eth0:NAT:10.0.0.7/24     GW&#65306;10.0.0.200
+RS2&#65306;eth0:NAT:10.0.0.17/24 GW&#65306;10.0.0.200
+</pre>
+</div>
+</div>
+<div id="outline-container-h:715b89bf-d80b-41b9-900f-06f5378068a7" class="outline-4">
+<h4 id="h:715b89bf-d80b-41b9-900f-06f5378068a7">4.2.1 LVS的网络配置</h4>
+<div class="outline-text-4" id="text-h:715b89bf-d80b-41b9-900f-06f5378068a7">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#25152;&#26377;&#20027;&#26426;&#31105;&#29992;iptables&#21644;SELinux</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">internet&#20027;&#26426;&#29615;&#22659;</span>
+[root@internet ~]#hostname
+internet
+[root@internet ~]#hostname -I
+192.168.10.6
+[root@internet ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+192.168.10.0         0.0.0.0                 255.255.255.0     U         1             0                 0 eth0
+0.0.0.0                 192.168.10.200     0.0.0.0                 UG         0             0                 0 eth0
+
+[root@internet ~]#ping 10.0.0.7 -c1
+PING 10.0.0.7 (10.0.0.7) 56(84) bytes of data.
+64 bytes from 10.0.0.7: <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=63 <span style="color: #a0522d;">time</span>=0.565 ms
+[root@internet ~]#ping 10.0.0.17 -c1
+PING 10.0.0.7 (10.0.0.17) 56(84) bytes of data.
+64 bytes from 10.0.0.17: <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=63 <span style="color: #a0522d;">time</span>=0.565 ms
+<span style="color: #b22222;">######################################################################################</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36335;&#30001;&#22120;&#30340;&#32593;&#32476;&#37197;&#32622;</span>
+[root@router ~]#echo <span style="color: #8b2252;">'net.ipv4.ip_forward=1'</span> &gt;&gt; /etc/sysctl.conf
+[root@router ~]#sysctl -p
+[root@router network-scripts]#pwd
+/etc/sysconfig/network-scripts
+[root@router network-scripts]#cat ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.200
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@router network-scripts]#cat ifcfg-eth1
+<span style="color: #a0522d;">DEVICE</span>=eth1
+<span style="color: #a0522d;">NAME</span>=eth1
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=192.168.10.200
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+<span style="color: #b22222;">######################################################################################</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">RS1&#30340;&#32593;&#32476;&#37197;&#32622;</span>
+[root@rs1 ~]#hostname
+rs1.me.org
+[root@rs1 ~]#hostname -I
+10.0.0.7
+[root@rs1 ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.7
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@rs1 ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         100         0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+[root@rs1 ~]#yum -y install httpd
+[root@rs1 ~]#systemctl enable --now httpd
+[root@rs1 ~]#hostname -I &gt; /var/www/html/index.html
+[root@rs1 ~]#ping 192.168.10.6 -c1
+PING 192.168.10.6 (192.168.10.6) 56(84) bytes of data.
+64 bytes from 192.168.10.6: <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=63 <span style="color: #a0522d;">time</span>=1.14 ms
+[root@rs1 ~]#curl 10.0.0.7
+10.0.0.7
+
+<span style="color: #b22222;">######################################################################################</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">RS2 &#30340;&#32593;&#32476;&#37197;&#32622;</span>
+[root@rs2 ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.17
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@rs2 ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         100         0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+[root@rs2 ~]#yum -y install httpd
+[root@rs2 ~]#systemctl enable --now httpd
+[root@rs2 ~]#hostname -I &gt; /var/www/html/index.html
+[root@rs2 ~]#curl 10.0.0.17
+10.0.0.17
+[root@rs1 ~]#ping 192.168.10.6 -c1
+PING 192.168.10.6 (192.168.10.6) 56(84) bytes of data.
+64 bytes from 192.168.10.6: <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=63 <span style="color: #a0522d;">time</span>=1.14 ms
+[root@rs2 ~]#curl 10.0.0.17
+10.0.0.17
+
+<span style="color: #b22222;">######################################################################################</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">LVS&#30340;&#32593;&#32476;&#37197;&#32622;</span>
+[root@lvs ~]#hostname
+lvs.me.org
+[root@lvs ~]#hostname -I
+10.0.0.8
+[root@lvs ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.8
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@lvs ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         100         0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+[root@lvs ~]#ping 192.168.10.6 -c1
+PING 192.168.10.6 (192.168.10.6) 56(84) bytes of data.
+64 bytes from 192.168.10.6: <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=63 <span style="color: #a0522d;">time</span>=2.32 ms
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3da82c96-3106-4bbe-b4ec-17b9beed5dc0" class="outline-4">
+<h4 id="h:3da82c96-3106-4bbe-b4ec-17b9beed5dc0">4.2.2 后端RS的IPVS配置</h4>
+<div class="outline-text-4" id="text-h:3da82c96-3106-4bbe-b4ec-17b9beed5dc0">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">RS1&#30340;IPVS&#37197;&#32622;</span>
+[root@rs1 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/all/arp_ignore
+[root@rs1 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/all/arp_announce
+[root@rs1 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/lo/arp_ignore
+[root@rs1 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/lo/arp_announce
+[root@rs1 ~]#ifconfig lo:1 10.0.0.100/32
+[root@rs1 ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet 10.0.0.100/0 scope global lo:1
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc pfifo_fast state UP
+group default qlen 1000
+    link/ether 00:0c:29:01:f9:48 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.7/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe01:f948/64 scope link
+            valid_lft forever preferred_lft forever
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">RS2&#30340;IPVS&#37197;&#32622;</span>
+[root@rs2 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/all/arp_ignore
+[root@rs2 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/lo/arp_ignore
+[root@rs2 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/all/arp_announce
+[root@rs2 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/lo/arp_announce
+[root@rs2 ~]#ifconfig lo:1 10.0.0.100/32
+[root@rs2 ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet 10.0.0.100/0 scope global lo:1
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc pfifo_fast state UP
+group default qlen 1000
+    link/ether 00:0c:29:94:1a:f6 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.17/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe94:1af6/64 scope link
+            valid_lft forever preferred_lft forever
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2b23a972-94e9-404b-b7f5-57f4cfa6a541" class="outline-4">
+<h4 id="h:2b23a972-94e9-404b-b7f5-57f4cfa6a541">4.2.3 LVS主机的配置</h4>
+<div class="outline-text-4" id="text-h:2b23a972-94e9-404b-b7f5-57f4cfa6a541">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;LVS&#19978;&#28155;&#21152;VIP</span>
+[root@lvs ~]#ifconfig lo:1 10.0.0.100/32
+[root@lvs ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet 10.0.0.100/0 scope global lo:1
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:8a:51:21 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.8/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23454;&#29616;LVS &#35268;&#21017;</span>
+[root@lvs ~]#dnf -y install ipvsadm
+[root@lvs ~]#ipvsadm -A -t 10.0.0.100:80 -s rr
+[root@lvs ~]#ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.7:80 -g
+[root@lvs ~]#ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.17:80 -g
+[root@lvs ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     10.0.0.100:80 rr
+    -&gt; 10.0.0.7:80                                 Route     1             0                     0             
+    -&gt; 10.0.0.17:80                                 Route     1             0                     0     
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7dbcaa1c-5a6a-4b70-a75b-525770906dc3" class="outline-4">
+<h4 id="h:7dbcaa1c-5a6a-4b70-a75b-525770906dc3">4.2.4 测试访问</h4>
+<div class="outline-text-4" id="text-h:7dbcaa1c-5a6a-4b70-a75b-525770906dc3">
+<div class="org-src-container">
+<pre class="src src-sh">[root@internet ~]#curl 10.0.0.100
+10.0.0.17
+[root@internet ~]#curl 10.0.0.100
+10.0.0.7
+[root@rs1 ~]#tail -f /var/log/httpd/access_log -n0
+192.168.10.6 - - [12/Jul/2020:10:36:21 +0800] <span style="color: #8b2252;">"GET / HTTP/1.1"</span> 200 10 <span style="color: #8b2252;">"-"</span>
+<span style="color: #8b2252;">"curl/7.19.7 (x86_64-redhat-linux-gnu) libcurl/7.19.7 NSS/3.27.1 zlib/1.2.3</span>
+<span style="color: #8b2252;">libidn/1.18 libssh2/1.4.2"</span>
+</pre>
+</div>
+
+
+<figure id="org2e2efbe">
+<img src="images/image-20210220171257875.png" alt="image-20210220171257875.png">
+
+</figure>
+
+<p>
+<b>范例：</b>
+</p>
+
+
+<figure id="org3c6ed7a">
+<img src="images/image-20210220171315859.png" alt="image-20210220171315859.png">
+
+</figure>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#29615;&#22659;&#65306;&#20116;&#21488;&#20027;&#26426;
+&#19968;&#21488;&#65306;&#23458;&#25143;&#31471; 172.20.200.6/16 GW:172.20.200.200
+&#19968;&#21488;&#65306;ROUTER
+eth0 :NAT 10.0.0.200/24 VIP
+eth1: &#26725;&#25509; 172.20.200.200/16
+&#21551;&#29992; IP_FORWARD
+&#19968;&#21488;&#65306;LVS
+eth0: 10.0.0.8/24 GW:10.0.0.200
+&#20004;&#21488;RS&#65306;
+RS1&#65306;10.0.0.7/24 GW&#65306;10.0.0.200
+RS2&#65306;10.0.0.17/24 GW&#65306;10.0.0.200
+</pre>
+</div>
+
+<p>
+配置：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@client ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=172.20.200.6
+<span style="color: #a0522d;">PREFIX</span>=16
+<span style="color: #a0522d;">GATEWAY</span>=172.20.200.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+[root@Router ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.200
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@Router ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth1
+<span style="color: #a0522d;">DEVICE</span>=eth1
+<span style="color: #a0522d;">NAME</span>=eth1
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=172.20.200.200
+<span style="color: #a0522d;">PREFIX</span>=16
+<span style="color: #a0522d;">ONBOOT</span>=yes
+[root@Router ~]#cat /etc/sysctl.conf
+net.ipv4.ip_forward=1
+[root@Router ~]#sysctl -p
+
+[root@rs1 ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.7
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+[root@rs1 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/all/arp_ignore
+[root@rs1 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/all/arp_announce
+[root@rs1 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/lo/arp_ignore
+[root@rs1 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/lo/arp_announce
+[root@rs1 ~]#ifconfig lo:1 10.0.0.100/32
+[root@rs1 ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet 10.0.0.100/0 scope global lo:1
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc pfifo_fast state UP
+group default qlen 1000
+    link/ether 00:0c:29:32:80:38 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.7/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe32:8038/64 scope link
+            valid_lft forever preferred_lft forever
+
+[root@rs2 ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.17
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+[root@rs2 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/all/arp_ignore
+[root@rs2 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/all/arp_announce
+[root@rs2 ~]#echo 1 &gt;     /proc/sys/net/ipv4/conf/lo/arp_ignore
+[root@rs2 ~]#echo 2 &gt;     /proc/sys/net/ipv4/conf/lo/arp_announce
+[root@rs2 ~]#ifconfig lo:1 10.0.0.100/32
+
+[root@LVS ~]#cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.8
+<span style="color: #a0522d;">PREFIX</span>=24
+<span style="color: #a0522d;">GATEWAY</span>=10.0.0.200
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+[root@LVS ~]#ifconfig lo:1 10.0.0.100/32
+[root@LVS ~]#ipvsadm -A -t 10.0.0.100:80 -s wrr
+[root@LVS ~]#ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.7 -g -w 3
+[root@LVS ~]#ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.17 -g
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:dca43abe-e6ca-42cf-9e19-39eb7115cf30" class="outline-3">
+<h3 id="h:dca43abe-e6ca-42cf-9e19-39eb7115cf30">4.3 LVS-DR模式多网段案例</h3>
+<div class="outline-text-3" id="text-h:dca43abe-e6ca-42cf-9e19-39eb7115cf30">
+
+<figure id="org88afa45">
+<img src="images/image-20210220171336923.png" alt="image-20210220171336923.png">
+
+</figure>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">internet&#20027;&#26426;&#30340;&#32593;&#32476;&#37197;&#32622;&#21644;4.2&#19968;&#26679;</span>
+[root@internet ~]#hostname -I
+192.168.10.6
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">router&#30340;&#32593;&#32476;&#37197;&#32622;&#22312;4.2&#22522;&#30784;&#19978;&#28155;&#21152;172.16.0.200/24&#30340;&#22320;&#22336;</span>
+[root@router ~]#ip addr add 172.16.0.200/24 dev eth0
+[root@router ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:ab:8f:2b brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.200/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet 172.16.0.200/24 brd 172.16.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:feab:8f2b/64 scope link tentative
+            valid_lft forever preferred_lft forever
+3: eth1: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:ab:8f:35 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.10200/24 brd 192.168.10255 scope global noprefixroute eth1
+             valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:feab:8f35/64 scope link
+            valid_lft forever preferred_lft forever
+[root@router ~]#hostname -I
+10.0.0.200 172.16.0.200 192.168.10200
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">LVS&#20027;&#26426;&#30340;&#32593;&#32476;&#37197;&#32622;&#21644;4.2&#19968;&#26679;</span>
+[root@lvs ~]#hostname -I
+10.0.0.8
+[root@lvs ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         0             0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+[root@rs1 ~]#hostname -I
+10.0.0.7
+[root@rs1 ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         100         0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">RS&#20027;&#26426;&#30340;&#32593;&#32476;&#37197;&#32622;&#21644;4.2&#19968;&#26679;</span>
+[root@rs2 ~]#hostname -I
+10.0.0.17
+[root@rs2 ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         100         0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;LVS&#20027;&#26426;&#36816;&#34892;&#30340;&#33050;&#26412;</span>
+[root@lvs ~]#cat lvs_dr_vs.sh
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Author:wang</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Date:2017-08-13</span>
+<span style="color: #a0522d;">vip</span>=<span style="color: #8b2252;">'172.16.0.100'</span>
+<span style="color: #a0522d;">iface</span>=<span style="color: #8b2252;">'lo:1'</span>
+<span style="color: #a0522d;">mask</span>=<span style="color: #8b2252;">'255.255.255.255'</span>
+<span style="color: #a0522d;">port</span>=<span style="color: #8b2252;">'80'</span>
+<span style="color: #a0522d;">rs1</span>=<span style="color: #8b2252;">'10.0.0.7'</span>
+<span style="color: #a0522d;">rs2</span>=<span style="color: #8b2252;">'10.0.0.17'</span>
+<span style="color: #a0522d;">scheduler</span>=<span style="color: #8b2252;">'wrr'</span>
+<span style="color: #a0522d;">type</span>=<span style="color: #8b2252;">'-g'</span>
+rpm -q ipvsadm &amp;&gt; /dev/null || yum -y install ipvsadm &amp;&gt; /dev/null
+<span style="color: #a020f0;">case</span> $<span style="color: #a0522d;">1</span><span style="color: #a020f0;"> in</span>
+start)
+    ifconfig $<span style="color: #a0522d;">iface</span> $<span style="color: #a0522d;">vip</span> netmask $<span style="color: #a0522d;">mask</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">broadcast $vip up</span>
+    iptables -F
+    ipvsadm -A -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -s $<span style="color: #a0522d;">scheduler</span>
+    ipvsadm -a -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -r ${<span style="color: #a0522d;">rs1</span>} $<span style="color: #a0522d;">type</span> -w 1
+    ipvsadm -a -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -r ${<span style="color: #a0522d;">rs2</span>} $<span style="color: #a0522d;">type</span> -w 1
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The VS Server is Ready!"</span>
+    ;;
+stop)
+    ipvsadm -C
+    ifconfig $<span style="color: #a0522d;">iface</span> down
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The VS Server is Canceled!"</span>
+    ;;
+*)
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Usage: $(</span><span style="color: #ff00ff;">basename $0</span><span style="color: #8b2252;">) start|stop"</span>
+        <span style="color: #a020f0;">exit</span> 1
+    ;;
+<span style="color: #a020f0;">esac</span>
+
+[root@lvs ~]#bash lvs_dr_vs.sh start
+The VS Server is Ready!
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;RS&#21518;&#31471;&#26381;&#21153;&#22120;&#36816;&#34892;&#30340;&#33050;&#26412;</span>
+[root@rs1 ~]#cat lvs_dr_rs.sh
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Author:wang</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Date:2017-08-13</span>
+<span style="color: #a0522d;">vip</span>=172.16.0.100
+<span style="color: #a0522d;">mask</span>=<span style="color: #8b2252;">'255.255.255.255'</span>
+<span style="color: #a0522d;">dev</span>=lo:1
+rpm -q httpd &amp;&gt; /dev/null || yum -y install httpd &amp;&gt;/dev/null
+service httpd start &amp;&gt; /dev/null &amp;&amp; <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The httpd Server is Ready!"</span>
+<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"`hostname -I`"</span> &gt; /var/www/html/index.html
+<span style="color: #a020f0;">case</span> $<span style="color: #a0522d;">1</span><span style="color: #a020f0;"> in</span>
+start)
+        <span style="color: #483d8b;">echo</span> 1 &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+        <span style="color: #483d8b;">echo</span> 1 &gt; /proc/sys/net/ipv4/conf/lo/arp_ignore
+        <span style="color: #483d8b;">echo</span> 2 &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+        <span style="color: #483d8b;">echo</span> 2 &gt; /proc/sys/net/ipv4/conf/lo/arp_announce
+    ifconfig $<span style="color: #a0522d;">dev</span> $<span style="color: #a0522d;">vip</span> netmask $<span style="color: #a0522d;">mask</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">broadcast $vip up</span>
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The RS Server is Ready!"</span>
+    ;;
+stop)
+    ifconfig $<span style="color: #a0522d;">dev</span> down
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/lo/arp_ignore
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/lo/arp_announce
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The RS Server is Canceled!"</span>
+    ;;
+*)
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Usage: $(</span><span style="color: #ff00ff;">basename $0</span><span style="color: #8b2252;">) start|stop"</span>
+        <span style="color: #a020f0;">exit</span> 1
+    ;;
+<span style="color: #a020f0;">esac</span>
+[root@rs1 ~]#bash lvs_dr_rs.sh start
+The RS Server is Ready!
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;RS&#21518;&#31471;&#26381;&#21153;&#22120;&#36816;&#34892;&#30340;&#33050;&#26412;&#21644;RS1&#26159;&#19968;&#26679;&#30340;</span>
+[root@rs2 ~]#bash lvs_dr_rs.sh start
+The RS Server is Ready!
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27979;&#35797;&#35775;&#38382;</span>
+[root@internet ~]#curl 172.16.0.100
+10.0.0.7
+[root@internet ~]#curl 172.16.0.100
+10.0.0.17
+</pre>
+</div>
+
+<p>
+范例:2
+</p>
+
+
+<figure id="orgf7443b6">
+<img src="images/image-20210220171412492.png" alt="image-20210220171412492.png">
+
+</figure>
+
+<p>
+<b>RS 的配置脚本</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/</span><span style="color: #a020f0;">bash</span>
+<span style="color: #a0522d;">vip</span>=10.0.0.100
+<span style="color: #a0522d;">mask</span>=<span style="color: #8b2252;">'255.255.255.255'</span>
+<span style="color: #a0522d;">dev</span>=lo:1
+<span style="color: #a020f0;">case</span> $<span style="color: #a0522d;">1</span><span style="color: #a020f0;"> in</span>
+start)
+        <span style="color: #483d8b;">echo</span> 1 &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+        <span style="color: #483d8b;">echo</span> 1 &gt; /proc/sys/net/ipv4/conf/lo/arp_ignore
+        <span style="color: #483d8b;">echo</span> 2 &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+        <span style="color: #483d8b;">echo</span> 2 &gt; /proc/sys/net/ipv4/conf/lo/arp_announce
+        ifconfig $<span style="color: #a0522d;">dev</span> $<span style="color: #a0522d;">vip</span> netmask $<span style="color: #a0522d;">You</span> can<span style="color: #8b2252;">'t use '</span>macro parameter character <span style="color: #b22222;">#</span><span style="color: #b22222;">' in</span>
+math modemask <span style="color: #b22222;">#</span><span style="color: #b22222;">broadcast $vip up</span>
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">route add -host $vip dev $dev</span>
+        ;;
+stop)
+        ifconfig $<span style="color: #a0522d;">dev</span> down
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/lo/arp_ignore
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/lo/arp_announce
+        ;;
+*)
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Usage: $(</span><span style="color: #ff00ff;">basename $0</span><span style="color: #8b2252;">) start|stop"</span>
+        <span style="color: #a020f0;">exit</span> 1
+        ;;
+<span style="color: #a020f0;">esac</span>
+</pre>
+</div>
+
+<p>
+<b>VS的配置脚本</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/</span><span style="color: #a020f0;">bash</span>
+<span style="color: #a0522d;">vip</span>=<span style="color: #8b2252;">'10.0.0.100'</span>
+<span style="color: #a0522d;">iface</span>=<span style="color: #8b2252;">'lo:1'</span>
+<span style="color: #a0522d;">mask</span>=<span style="color: #8b2252;">'255.255.255.255'</span>
+<span style="color: #a0522d;">port</span>=<span style="color: #8b2252;">'80'</span>
+<span style="color: #a0522d;">rs1</span>=<span style="color: #8b2252;">'192.168.8.101'</span>
+<span style="color: #a0522d;">rs2</span>=<span style="color: #8b2252;">'192.168.8.102'</span>
+<span style="color: #a0522d;">scheduler</span>=<span style="color: #8b2252;">'wrr'</span>
+<span style="color: #a0522d;">type</span>=<span style="color: #8b2252;">'-g'</span>
+<span style="color: #a020f0;">case</span> $<span style="color: #a0522d;">1</span><span style="color: #a020f0;"> in</span>
+start)
+ifconfig $<span style="color: #a0522d;">iface</span> $<span style="color: #a0522d;">vip</span> netmask $<span style="color: #a0522d;">mask</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">broadcast $vip up</span>
+iptables -F
+ipvsadm -A -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -s $<span style="color: #a0522d;">scheduler</span>
+ipvsadm -a -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -r ${<span style="color: #a0522d;">rs1</span>} $<span style="color: #a0522d;">type</span> -w 1
+ipvsadm -a -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -r ${<span style="color: #a0522d;">rs2</span>} $<span style="color: #a0522d;">type</span> -w 1
+;;
+stop)
+ipvsadm -C
+ifconfig $<span style="color: #a0522d;">iface</span> down
+;;
+*)
+<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Usage $(</span><span style="color: #ff00ff;">basename $0</span><span style="color: #8b2252;">) start|stop"</span>
+<span style="color: #a020f0;">exit</span> 1
+<span style="color: #a020f0;">esac</span>
+</pre>
+</div>
+
+<p>
+<b>范例3: 跨网段DR模型案例</b>
+</p>
+
+
+<figure id="org92ed99c">
+<img src="images/image-20210220171425900.png" alt="image-20210220171425900.png">
+
+</figure>
+
+<p>
+<b>配置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@rs1 ~]#cat lvs_dr_rs.sh
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Author:wang</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Date:2017-08-13</span>
+<span style="color: #a0522d;">vip</span>=192.168.10100
+<span style="color: #a0522d;">mask</span>=<span style="color: #8b2252;">'255.255.255.255'</span>
+<span style="color: #a0522d;">dev</span>=lo:1
+<span style="color: #b22222;">#</span><span style="color: #b22222;">rpm -q httpd &amp;&gt; /dev/null || yum -y install httpd &amp;&gt;/dev/null</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">service httpd start &amp;&gt; /dev/null &amp;&amp; echo "The httpd Server is Ready!"</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">echo "&lt;h1&gt;`hostname`&lt;/h1&gt;" &gt; /var/www/html/index.html</span>
+<span style="color: #a020f0;">case</span> $<span style="color: #a0522d;">1</span><span style="color: #a020f0;"> in</span>
+start)
+        <span style="color: #483d8b;">echo</span> 1 &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+        <span style="color: #483d8b;">echo</span> 1 &gt; /proc/sys/net/ipv4/conf/lo/arp_ignore
+        <span style="color: #483d8b;">echo</span> 2 &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+        <span style="color: #483d8b;">echo</span> 2 &gt; /proc/sys/net/ipv4/conf/lo/arp_announce
+    ifconfig $<span style="color: #a0522d;">dev</span> $<span style="color: #a0522d;">vip</span> netmask $<span style="color: #a0522d;">mask</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">broadcast $vip up</span>
+        <span style="color: #b22222;">#</span><span style="color: #b22222;">route add -host $vip dev $dev</span>
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The RS Server is Ready!"</span>
+    ;;
+stop)
+    ifconfig $<span style="color: #a0522d;">dev</span> down
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/lo/arp_ignore
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+        <span style="color: #483d8b;">echo</span> 0 &gt; /proc/sys/net/ipv4/conf/lo/arp_announce
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The RS Server is Canceled!"</span>
+    ;;
+*)
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Usage: $(</span><span style="color: #ff00ff;">basename $0</span><span style="color: #8b2252;">) start|stop"</span>
+        <span style="color: #a020f0;">exit</span> 1
+    ;;
+<span style="color: #a020f0;">esac</span>
+
+[root@rs1 ~]#bash lvs_dr_rs.sh start
+[root@rs2 ~]#bash lvs_dr_rs.sh start
+
+[root@LVS ~]#cat lvs_dr_vs.sh
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Author:wang</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Date:2017-08-13</span>
+<span style="color: #a0522d;">vip</span>=<span style="color: #8b2252;">'192.168.10100'</span>
+<span style="color: #a0522d;">iface</span>=<span style="color: #8b2252;">'lo:1'</span>
+<span style="color: #a0522d;">mask</span>=<span style="color: #8b2252;">'255.255.255.255'</span>
+<span style="color: #a0522d;">port</span>=<span style="color: #8b2252;">'80'</span>
+<span style="color: #a0522d;">rs1</span>=<span style="color: #8b2252;">'10.0.0.7'</span>
+<span style="color: #a0522d;">rs2</span>=<span style="color: #8b2252;">'10.0.0.17'</span>
+<span style="color: #a0522d;">scheduler</span>=<span style="color: #8b2252;">'wrr'</span>
+<span style="color: #a0522d;">type</span>=<span style="color: #8b2252;">'-g'</span>
+rpm -q ipvsadm &amp;&gt; /dev/null || yum -y install ipvsadm &amp;&gt; /dev/null
+<span style="color: #a020f0;">case</span> $<span style="color: #a0522d;">1</span><span style="color: #a020f0;"> in</span>
+start)
+    ifconfig $<span style="color: #a0522d;">iface</span> $<span style="color: #a0522d;">vip</span> netmask $<span style="color: #a0522d;">mask</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">broadcast $vip up</span>
+    iptables -F
+    ipvsadm -A -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -s $<span style="color: #a0522d;">scheduler</span>
+    ipvsadm -a -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -r ${<span style="color: #a0522d;">rs1</span>} $<span style="color: #a0522d;">type</span> -w 1
+    ipvsadm -a -t ${<span style="color: #a0522d;">vip</span>}:${<span style="color: #a0522d;">port</span>} -r ${<span style="color: #a0522d;">rs2</span>} $<span style="color: #a0522d;">type</span> -w 1
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The VS Server is Ready!"</span>
+    ;;
+stop)
+    ipvsadm -C
+    ifconfig $<span style="color: #a0522d;">iface</span> down
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"The VS Server is Canceled!"</span>
+    ;;
+*)
+        <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"Usage: $(</span><span style="color: #ff00ff;">basename $0</span><span style="color: #8b2252;">) start|stop"</span>
+        <span style="color: #a020f0;">exit</span> 1
+    ;;
+<span style="color: #a020f0;">esac</span>
+[root@LVS ~]#bash lvs_dr_vs.sh start
+
+[root@Router ~]#nmcli connection modify eth0 +ipv4.addresses 192.168.10200/24
+[root@Router ~]#nmcli connection reload
+[root@Router ~]#nmcli connection up eth0
+[root@Router ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:4d:ef:3e brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.200/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet 192.168.10200/24 brd 192.168.10255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe4d:ef3e/64 scope link
+            valid_lft forever preferred_lft forever
+3: eth1: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:4d:ef:48 brd ff:ff:ff:ff:ff:ff
+    inet 172.20.200.200/16 brd 172.20.255.255 scope global noprefixroute eth1
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe4d:ef48/64 scope link
+            valid_lft forever preferred_lft forever
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:97580b87-b7ea-43a1-9957-45c85c6c6fb0" class="outline-3">
+<h3 id="h:97580b87-b7ea-43a1-9957-45c85c6c6fb0">4.4 LVS-TUNNEL隧道模式案例</h3>
+<div class="outline-text-3" id="text-h:97580b87-b7ea-43a1-9957-45c85c6c6fb0">
+
+<figure id="org0eb3a05">
+<img src="images/image-20210220171444884.png" alt="image-20210220171444884.png">
+
+</figure>
+</div>
+<div id="outline-container-h:e26ff73d-e61d-4d3b-9fcd-05ae25d42609" class="outline-4">
+<h4 id="h:e26ff73d-e61d-4d3b-9fcd-05ae25d42609">4.4.1 LVS服务器配置</h4>
+<div class="outline-text-4" id="text-h:e26ff73d-e61d-4d3b-9fcd-05ae25d42609">
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:44:c3:fe brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.8/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe44:c3fe/64 scope link
+            valid_lft forever preferred_lft forever
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#24320;&#21551;tunnel&#32593;&#21345;&#24182;&#37197;&#32622;VIP</span>
+[root@centos8 ~]#ifconfig tunl0 10.0.0.100 netmask 255.255.255.255 up
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25110;&#32773;&#19979;&#38754;&#26041;&#27861;,&#27880;&#24847;&#35774;&#22791;&#21517;&#24517;&#39035;&#20026;tunl0</span>
+[root@centos8 ~]#ip addr add 10.0.0.100/32 dev tunl0
+[root@centos8 ~]#ip link set up tunl0
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#33258;&#21160;&#21152;&#36733;ipip&#27169;&#22359;</span>
+[root@centos8 ~]#lsmod |grep ipip
+ipip                                     16384     0
+tunnel4                                 16384     1 ipip
+ip_tunnel                             28672     1 ipip
+[root@centos8 ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP
+group default qlen 1000
+    link/ether 00:0c:29:44:c3:fe brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.8/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe44:c3fe/64 scope link
+            valid_lft forever preferred_lft forever
+3: tunl0@NONE: &lt;NOARP,UP,LOWER_UP&gt; mtu 1480 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/ipip 0.0.0.0 brd 0.0.0.0
+    inet 10.0.0.100/32 scope global tunl0
+            valid_lft forever preferred_lft forever
+
+[root@centos8 ~]#yum -y install ipvsadm
+[root@centos8 ~]#ipvsadm -A -t 10.0.0.100:80 -s rr
+[root@centos8 ~]#ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.7 -i
+[root@centos8 ~]#ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.17 -i
+[root@centos8 ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     10.0.0.100:80 rr
+    -&gt; 10.0.0.7:80                                 Tunnel     1             0                     0             
+    -&gt; 10.0.0.17:80                                 Tunnel     1             0                     0 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8f4b2fb8-a7be-4922-a073-ad98eaaf02e2" class="outline-4">
+<h4 id="h:8f4b2fb8-a7be-4922-a073-ad98eaaf02e2">4.4.2 RS服务器配置</h4>
+<div class="outline-text-4" id="text-h:8f4b2fb8-a7be-4922-a073-ad98eaaf02e2">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">RS&#26381;&#21153;&#22120;&#37197;&#32622;,RS1&#21644;RS2&#37197;&#32622;&#30456;&#21516;</span>
+[root@rs1 ~]#hostname
+rs1.me.org
+[root@rs1 ~]#hostname -I
+10.0.0.7
+
+[root@rs1 ~]#route -n
+Kernel IP routing table
+Destination         Gateway                 Genmask                 Flags Metric Ref     Use Iface
+0.0.0.0                 10.0.0.200             0.0.0.0                 UG         100         0                 0 eth0
+10.0.0.0                 0.0.0.0                 255.255.255.0     U         100         0                 0 eth0
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#24320;&#21551;tunnel&#32593;&#21345;&#24182;&#37197;&#32622;VIP</span>
+[root@rs1 ~]#ifconfig tunl0 10.0.0.100 netmask 255.255.255.255 up
+[root@rs1 ~]#ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+            valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc pfifo_fast state UP
+group default qlen 1000
+    link/ether 00:0c:29:01:f9:48 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.7/24 brd 10.0.0.255 scope global noprefixroute eth0
+            valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe01:f948/64 scope link
+            valid_lft forever preferred_lft forever
+3: tunl0@NONE: &lt;NOARP,UP,LOWER_UP&gt; mtu 1480 qdisc noqueue state UNKNOWN group
+default qlen 1000
+    link/ipip 0.0.0.0 brd 0.0.0.0
+    inet 10.0.0.100/32 scope global tunl0
+            valid_lft forever preferred_lft forever
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20462;&#25913;&#20869;&#26680;&#21442;&#25968; </span>
+[root@rs1 ~]#echo <span style="color: #8b2252;">"1"</span> &gt; /proc/sys/net/ipv4/conf/tunl0/arp_ignore             
+[root@rs1 ~]#echo <span style="color: #8b2252;">"2"</span> &gt; /proc/sys/net/ipv4/conf/tunl0/arp_announce
+[root@rs1 ~]#echo <span style="color: #8b2252;">"1"</span> &gt; /proc/sys/net/ipv4/conf/all/arp_ignore
+[root@rs1 ~]#echo <span style="color: #8b2252;">"2"</span> &gt; /proc/sys/net/ipv4/conf/all/arp_announce
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20197;&#19979;&#21442;&#25968;&#29992;&#26469;&#25511;&#21046;&#31995;&#32479;&#26159;&#21542;&#24320;&#21551;&#23545;&#25968;&#25454;&#21253;&#28304;&#22320;&#22336;&#30340;&#26657;&#39564;&#12290;0&#26631;&#31034;&#19981;&#24320;&#21551;&#22320;&#22336;&#26657;&#39564;&#65307;1&#34920;&#24320;&#21551;&#20005;&#26684;&#30340;&#21453;&#21521;&#36335;&#24452;&#26657;&#39564;&#12290;&#23545;&#27599;&#19968;&#20010;&#36827;&#34892;&#30340;&#25968;&#25454;&#21253;&#65292;&#26657;&#39564;&#20854;&#21453;&#21521;&#36335;&#24452;&#26159;&#21542;&#26159;&#26368;&#20339;&#36335;&#24452;&#12290;&#22914;&#26524;&#21453;&#21521;&#36335;&#24452;&#19981;&#26159;&#26368;&#20339;&#36335;&#24452;&#65292;&#21017;&#30452;&#25509;&#20002;&#24323;&#35813;&#25968;&#25454;&#21253;&#65307;2&#26631;&#31034;&#24320;&#21551;&#26494;&#25955;&#30340;&#21453;&#21521;&#36335;&#24452;&#26657;&#39564;&#65292;&#23545;&#27599;&#20010;&#36827;&#34892;&#30340;&#25968;&#25454;&#21253;&#65292;&#26657;&#39564;&#20854;&#28304;&#22320;&#22336;&#26159;&#21542;&#21487;&#20197;&#21040;&#36798;&#65292;&#21363;&#21453;&#21521;&#36335;&#24452;&#26159;&#21542;&#21487;&#20197;ping&#36890;&#65292;&#22914;&#21453;&#21521;&#36335;&#24452;&#19981;&#36890;&#65292;&#21017;&#30452;&#25509;&#20002;&#24323;&#35813;&#25968;&#25454;&#21253;&#12290;</span>
+[root@rs1 ~]#echo <span style="color: #8b2252;">"0"</span> &gt; /proc/sys/net/ipv4/conf/tunl0/rp_filter
+[root@rs1 ~]#echo <span style="color: #8b2252;">"0"</span> &gt; /proc/sys/net/ipv4/conf/all/rp_filter
+
+[root@rs1 ~]#yum -y install httpd
+[root@rs1 ~]#systemctl enable --now httpd
+[root@rs1 ~]#hostname &gt; /var/www/html/index.html
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:681aeff7-02bc-4afa-8a5b-d297963c6537" class="outline-4">
+<h4 id="h:681aeff7-02bc-4afa-8a5b-d297963c6537">4.4.3 测试</h4>
+<div class="outline-text-4" id="text-h:681aeff7-02bc-4afa-8a5b-d297963c6537">
+<div class="org-src-container">
+<pre class="src src-sh">[root@internet ~]#while :;<span style="color: #a020f0;">do</span> curl 10.0.0.100;sleep 0.3;<span style="color: #a020f0;">done</span>
+rs2.me.org
+rs1.me.org
+rs2.me.org
+rs1.me.org
+</pre>
+</div>
+
+
+<figure id="orgff61339">
+<img src="images/image-20210220171513623.png" alt="image-20210220171513623.png">
+
+</figure>
+
+
+<figure id="org7281273">
+<img src="images/image-20210220171523987.png" alt="image-20210220171523987.png">
+
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:78b3cc4e-b1f4-4570-abf5-fb95d432167c" class="outline-2">
+<h2 id="h:78b3cc4e-b1f4-4570-abf5-fb95d432167c">5 LVS 高可用性实现</h2>
+<div class="outline-text-2" id="text-h:78b3cc4e-b1f4-4570-abf5-fb95d432167c">
+<p>
+<b>LVS 不可用时：</b>
+</p>
+
+<p>
+Director不可用，整个系统将不可用；SPoF Single Point of Failure
+</p>
+
+<p>
+解决方案：高可用，keepalived、heartbeat/corosync
+</p>
+
+<p>
+<b>RS 不可用时：</b>
+</p>
+
+<p>
+某RS不可用时，Director依然会调度请求至此RS
+</p>
+
+<p>
+解决方案：
+由Director对各RS健康状态进行检查，失败时禁用，成功时启用
+</p>
+
+<p>
+常用解决方案：
+</p>
+<ul class="org-ul">
+<li>keepalived</li>
+<li>heartbeat/corosync</li>
+<li>ldirectord</li>
+</ul>
+
+<p>
+检测方式：
+</p>
+<ul class="org-ul">
+<li>网络层检测，icmp</li>
+<li>传输层检测，端口探测</li>
+<li>应用层检测，请求某关键资源</li>
+</ul>
+
+<p>
+RS全不用时：backup server, sorry server
+</p>
+</div>
+<div id="outline-container-h:17584e78-77a8-41c5-9707-f3de7c614acc" class="outline-3">
+<h3 id="h:17584e78-77a8-41c5-9707-f3de7c614acc">5.1 ldirectord软件</h3>
+<div class="outline-text-3" id="text-h:17584e78-77a8-41c5-9707-f3de7c614acc">
+<p>
+ldirectord：监控和控制LVS守护进程，可管理LVS规则
+</p>
+
+<p>
+包名：ldirectord-3.9.6-0rc1.1.1.x86_64.rpm
+</p>
+
+<p>
+下载：<a href="http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-7/x86_64/">http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-7/x86_64/</a>
+</p>
+
+<p>
+相关文件：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">/etc/ha.d/ldirectord.cf <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20027;&#37197;&#32622;&#25991;&#20214;</span>
+/usr/share/doc/ldirectord-3.9.6/ldirectord.cf <span style="color: #b22222;"># </span><span style="color: #b22222;">&#37197;&#32622;&#27169;&#29256;</span>
+/usr/lib/systemd/system/ldirectord.service <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26381;&#21153;</span>
+/usr/sbin/ldirectord <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20027;&#31243;&#24207;,Perl&#23454;&#29616;</span>
+/var/log/ldirectord.log <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26085;&#24535;</span>
+/var/run/ldirectord.ldirectord.pid <span style="color: #b22222;">#</span><span style="color: #b22222;">pid&#25991;&#20214;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ff3e6412-4d77-4ab7-861b-4f7ecd6818af" class="outline-3">
+<h3 id="h:ff3e6412-4d77-4ab7-861b-4f7ecd6818af">5.2 ldirectord配置文件示例</h3>
+<div class="outline-text-3" id="text-h:ff3e6412-4d77-4ab7-861b-4f7ecd6818af">
+<p>
+范例：DR模型的HTTP
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos7 ~]#vim /etc/ha.d/ldirectord.cf
+<span style="color: #a0522d;">checktimeout</span>=3
+<span style="color: #a0522d;">checkinterval</span>=1
+<span style="color: #a0522d;">autoreload</span>=yes
+<span style="color: #a0522d;">logfile</span>=<span style="color: #8b2252;">"/var/log/ldirectord.log"</span>
+<span style="color: #a0522d;">quiescent</span>=no         <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24403;RS down&#26102; yes&#23558;&#20462;&#25913;&#26435;&#37325;&#20026;0,&#27492;&#37197;&#32622;&#26377;bug &#65292;no&#20026;&#20174;&#35843;&#24230;&#21015;&#34920;&#20013;&#21024;&#38500;RS</span>
+<span style="color: #a0522d;">virtual</span>=10.0.0.100:80
+<span style="color: #a0522d;">real</span>=192.168.39.17 gate 1     <span style="color: #b22222;">#</span><span style="color: #b22222;">gate &#34920;&#31034;DR&#27169;&#24335;&#65292;1 &#34920;&#31034;weight</span>
+<span style="color: #a0522d;">real</span>=192.168.39.18 gate 2
+<span style="color: #a0522d;">fallback</span>=127.0.0.1:80 gate
+<span style="color: #a0522d;">service</span>=http
+<span style="color: #a0522d;">scheduler</span>=wrr
+<span style="color: #b22222;">#</span><span style="color: #b22222;">persistent=600</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">netmask=255.255.255.255</span>
+<span style="color: #a0522d;">protocol</span>=tcp
+<span style="color: #a0522d;">checktype</span>=negotiate
+<span style="color: #a0522d;">checkport</span>=80
+[root@lvs ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+    -&gt; RemoteAddress:Port                     Forward Weight ActiveConn InActConn
+TCP     10.0.0.100:80 wrr
+    -&gt; 192.168.39.17:80                         Route     1             0                     31             
+    -&gt; 192.168.39.18:80                         Route     2             0                     62
+</pre>
+</div>
+
+<p>
+范例：DR模型的FWM
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos7 ~]# /etc/ha.d/ldirectord.cf
+<span style="color: #a0522d;">checktimeout</span>=3
+<span style="color: #a0522d;">checkinterval</span>=1
+<span style="color: #a0522d;">autoreload</span>=yes
+<span style="color: #a0522d;">logfile</span>=<span style="color: #8b2252;">"/var/log/ldirectord.log"</span>         <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26085;&#24535;&#25991;&#20214;</span>
+<span style="color: #a0522d;">quiescent</span>=no                         <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24403;RS down&#26102; yes&#23558;&#20462;&#25913;&#26435;&#37325;&#20026;0,&#27492;&#37197;&#32622;&#26377;bug &#65292;no&#20026;&#20174;&#35843;&#24230;&#21015;&#34920;&#20013;&#21024;</span>
+&#38500;RS
+<span style="color: #a0522d;">virtual</span>=66                             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25351;&#23450;VS&#30340;FWM &#25110; IP:PORT</span>
+<span style="color: #a0522d;">real</span>=172.16.0.7:80 gate 2         <span style="color: #b22222;">#</span><span style="color: #b22222;">DR&#27169;&#22411;&#65292;&#26435;&#37325;&#20026; 2</span>
+<span style="color: #a0522d;">real</span>=172.16.0.8:80 gate 1
+<span style="color: #a0522d;">fallback</span>=127.0.0.1:80 gate     <span style="color: #b22222;">#</span><span style="color: #b22222;">sorry server</span>
+<span style="color: #a0522d;">service</span>=http
+<span style="color: #a0522d;">scheduler</span>=wrr
+<span style="color: #b22222;">#</span><span style="color: #b22222;">protocol=tcp         #&#22914;&#26524;FWM&#27169;&#24335;&#65292;&#27492;&#34892;&#24517;&#39035;&#27880;&#37322;&#25481;</span>
+<span style="color: #a0522d;">checktype</span>=negotiate
+<span style="color: #a0522d;">checkport</span>=80
+<span style="color: #a0522d;">request</span>=<span style="color: #8b2252;">"index.html"</span>
+<span style="color: #a0522d;">receive</span>=<span style="color: #8b2252;">"Test Ldirectord"</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer data-astro-cid-sz7xmlte data-turbo-permanent id=rootFooter>
+    <script>
+        const shuffle = e => e.map((e => ({
+            v: e,
+            sort: Math.random()
+        }))).sort(( (e, o) => e.sort - o.sort)).map(( ({v: e}) => e));
+        var songList = ["barbie-girl--stantough", "blue-da-ba-dee--cornelius-link", "hips-dont-lie--stantough", "i-want-it-that-way--stantough", "seven-nation-army--stantough", "smooth-criminal--stantough"]
+          , songOrder = songOrder ?? shuffle(songList).map((e => `/audio/music/${e}.opus`))
+          , song = new Audio(songOrder[0])
+          , nextSong = new Audio(songOrder[1])
+          , songIndex = 2
+          , musicWrapper = void 0
+          , arrow = void 0
+          , notes = void 0;
+        song.addEventListener("ended", next);
+        const toggle = () => song.paused ? play() : pause();
+        function play() {
+            song.play(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.add("shakeManHorse"),
+            notes.classList.remove("hideNotes")
+        }
+        function pause() {
+            song.pause(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.remove("shakeManHorse"),
+            notes.classList.add("hideNotes")
+        }
+        function next() {
+            song = nextSong,
+            play(),
+            songIndex === songOrder.length && (songIndex = 0),
+            nextSong = new Audio(songOrder[songIndex]),
+            songIndex += 1
+        }
+        function skip() {
+            pause(),
+            (arrow = arrow || document.getElementById("musicArrow")).classList.add("shootArrow");
+            new Audio("/audio/effects/ohno.m4a").play(),
+            arrow.addEventListener("animationend", arrowShootHandler, !1)
+        }
+        function arrowShootHandler() {
+            arrow.removeEventListener("animationend", arrowShootHandler, !1),
+            arrow.classList.remove("shootArrow");
+            new Audio("/audio/effects/heythathurt.m4a").play(),
+            next()
+        }
+    </script>
+    <div id=musicPlayer data-astro-cid-q7a5pyro>
+        <button class=skip data-astro-cid-q7a5pyro onclick=skip() title="Skip song">
+            <div id=skipWrapper data-astro-cid-q7a5pyro>
+                <img alt="Medieval drollery of a man/snail/bat/monkey shooting an arrow" class=archer decoding=async height=334 loading=lazy src=/images/archer-no-arrow.448ccd8b_Z1KfRYq.webp width=226 data-astro-cid-q7a5pyro>
+                <img alt="Arrow for archer" class="arrow complete" decoding=async height=23 loading=lazy src=/images/no-archer-full-arrow.87aa9971_Z2qL2KO.webp width=141 data-astro-cid-q7a5pyro id=musicArrow>
+            </div>
+        </button>
+        <button class=playPause data-astro-cid-q7a5pyro onclick=toggle() title="Play/pause song">
+            <div id=musicWrapper data-astro-cid-q7a5pyro>
+                <div class=hideNotes id=notesWrapper data-astro-cid-q7a5pyro>
+                    <div class=lyreNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                    <div class=fluteNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                </div>
+                <img alt="Medieval drollery of a man/horse playing a lyre and a horn" class=manHorse decoding=async height=665 loading=lazy src=/images/man-horse-band.e3a2efcf_q8FCa.webp width=531 data-astro-cid-q7a5pyro>
+            </div>
+        </button>
+    </div>
+    <hr data-astro-cid-sz7xmlte>
+    <div class=salutation data-astro-cid-gdmrbrho>
+        <p data-astro-cid-gdmrbrho>
+            <span class=flower2 data-astro-cid-gdmrbrho>A</span>
+            <span class=smallcap data-astro-cid-gdmrbrho>pax vobiscum</span>
+            <span class="flower2 wiggle" data-astro-cid-gdmrbrho id=leaf>a</span>
+        </p>
+    </div>
+    <script>
+        function animateLeafBlownHandler() {
+            leaf.removeEventListener("animationend", animateLeafBlownHandler, !1),
+            leaf.classList.remove("blownAway"),
+            leaf.classList.add("wiggle")
+        }
+        function animateLeaf() {
+            leaf = leaf ?? document.getElementById("leaf"),
+            leaf.classList.remove("wiggle"),
+            leaf.classList.add("blownAway"),
+            leaf.addEventListener("animationend", animateLeafBlownHandler, !1)
+        }
+        document.getElementById("leaf").onclick = animateLeaf
+    </script>
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2024 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+</footer>
+</footer>
+</body>
+</html>

@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 进阶篇-准入控制-策略</title>
+<meta name="description" content="计算机原理" />
+<meta name="keywords" content="计算机, 原理, 进制" />
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" type="text/css" href="/static/font.css"/>
+<link rel="stylesheet" type="text/css" href="/static/drollery.e825b870.css"/>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+</head>
+<body>
+<header id="preamble" class="status">
+<header class="{className}" data-astro-cid-3ef6ksr2>
+  <div class=header-branding data-astro-cid-g2lrb5xm>
+      <span class=header-text data-astro-cid-g2lrb5xm>
+          <span class=dropcap data-astro-cid-g2lrb5xm aria-hidden=true>
+              <span class=actual data-astro-cid-g2lrb5xm>J</span>
+              <span class=rest data-astro-cid-g2lrb5xm>asper Hsu</span>
+              <span class=period data-astro-cid-g2lrb5xm>.</span>
+          </span>
+          <span class=sr-only data-astro-cid-g2lrb5xm>Drollery</span>
+      </span>
+      <img alt="Medieval drollery of a knight on a horse" class=spring decoding=async height=250 loading=lazy src=/images/knight-horse.a96eee7d_Z1WCOYs.webp width=68 data-astro-cid-g2lrb5xm>
+  </div>
+
+  <nav data-astro-cid-pux6a34n>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/jcodelog.html class=nobracket data-astro-cid-pux6a34n>技术</a>
+      <span class=flower2 data-astro-cid-pux6a34n>K</span>
+      <a href=/reading/index.html class=nobracket data-astro-cid-pux6a34n>阅读</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+      <a href=/lisp/jasper-emacs.html class=nobracket data-astro-cid-pux6a34n>我的Emacs配置</a>
+      <span class=flower2 data-astro-cid-pux6a34n>L</span>
+      <a href=/link/index.html class=nobracket data-astro-cid-pux6a34n>友链</a>
+      <span class=flower2 data-astro-cid-pux6a34n>M</span>
+      <a href=/about.html class=nobracket data-astro-cid-pux6a34n>关于</a>
+      <span class=flower2 data-astro-cid-pux6a34n>J</span>
+  </nav>
+
+
+  <div class="container" data-astro-cid-3ef6ksr2>
+    <p class="info" data-astro-cid-3ef6ksr2>
+              🏆 欢迎来到本站：
+              <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
+              <strong>希望这里有你感兴趣的内容</strong>。
+            </p>
+  </div>
+  <div id=borderArtWrapper class="tt1" data-astro-cid-5hce7sga data-turbo-permanent>
+      <script>
+          var man, shakeCount = 0, noSound = new Audio("/audio/effects/no.m4a"), screamSound = new Audio("/audio/effects/scream.m4a");
+          function animateManShakeHandler() {
+              man.removeEventListener("animationend", animateManShakeHandler, !1),
+              shakeCount += 1,
+              man.classList.remove("shakeMan")
+          }
+          function animateManFallHandler() {
+              man.removeEventListener("animationend", animateManFallHandler, !1),
+              man.classList.add("hide")
+          }
+          function animateMan() {
+              man = man ?? document.getElementById("borderMan"),
+              3 === shakeCount ? (man.classList.add("fallMan"),
+              screamSound.play(),
+              man.addEventListener("animationend", animateManFallHandler, !1)) : (man.classList.add("shakeMan"),
+              noSound.play(),
+              man.addEventListener("animationend", animateManShakeHandler, !1))
+          }
+      </script>
+      <div class=borderArt data-astro-cid-5dda5nwp id=articleBorder>
+          <img alt="flowery border with man falling" decoding=async height=620 loading=lazy src=/images/border-vines-no-man.b7d246cc_DRxSe.webp width=909 class=border data-astro-cid-5dda5nwp>
+          <div class=fallWrapper data-astro-cid-5dda5nwp>
+              <img alt="flowery border with man falling" decoding=async height=292 loading=lazy src=/images/man-no-vines.247a3187_Z2ioXNM.webp width=98 class=man data-astro-cid-5dda5nwp id=borderMan onclick=animateMan()>
+          </div>
+      </div>
+  </div>
+</header>
+</header>
+<main class="container" id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 进阶篇-准入控制-策略</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org9b0cf89">QoS 服务质量</a>
+<ul>
+<li><a href="#orgf0820a8">生产可能性保障</a>
+<ul>
+<li><a href="#orgf3c7c3f">Resources 配置的重要性</a></li>
+<li><a href="#org2adb1e9">Resources 也并非万能</a></li>
+</ul>
+</li>
+<li><a href="#orgd9d3c42">服务质量QoS</a></li>
+<li><a href="#orgc39af56">范例</a>
+<ul>
+<li><a href="#org3b21aa1">实现QoS为Guaranteed的Pod</a></li>
+<li><a href="#org49523e5">实现QoS为Burstable的Pod</a></li>
+<li><a href="#orgb99bd4a">实现QoS为BestEffort的Pod</a></li>
+<li><a href="#orge8cc18b">java与Qos</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org893d156">ResourceQuota 资源配额</a>
+<ul>
+<li><a href="#orge5cc1ea">资源配额的重要性</a></li>
+<li><a href="#org171cf1b">ResourceQuota配置</a></li>
+<li><a href="#org04cff93">范例-ResourceQuot（对名称空间进行配置、限额）</a>
+<ul>
+<li><a href="#orgc5b51ec">配置内存和 CPU 配额</a>
+<ul>
+<li><a href="#org59ae657">创建 Pod</a></li>
+</ul>
+</li>
+<li><a href="#orgf4995ab">尝试创建第二个 Pod</a></li>
+<li><a href="#org741fb43">配置命名空间下 Pod 配额</a>
+<ul>
+<li><a href="#orgc87ff15">如何配置一个命名空间下可运行的 Pod 个数配额？</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org810b9a3">LimitRange 限制范围</a>
+<ul>
+<li><a href="#org7219876">为什么需要 LimitRange</a>
+<ul>
+<li><a href="#orgb275651">只有 ResourceQuota 是不够的</a></li>
+<li><a href="#org5789b00">LimitRange做了什么</a></li>
+</ul>
+</li>
+<li><a href="#org91177d0">LimitRange配置</a>
+<ul>
+<li><a href="#orgefc831d">LimitRange配置示例：默认的requests和limits</a></li>
+<li><a href="#org07e6950">LimitRange配置示例：requests和limits的范围</a></li>
+<li><a href="#orgca1a33a">LimitRange配置示例：限制申请存储空间的大小</a></li>
+</ul>
+</li>
+<li><a href="#org9d5da90">范例-LimitRange 的配置文件：</a></li>
+</ul>
+</li>
+<li><a href="#org2298846">NetworkPolicies 网络策略</a></li>
+<li><a href="#orgfe453f0">PodDisruptionBudgets 中断预算</a></li>
+<li><a href="#org084ac2b">PodSecurityPolicies 安全策略</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a></li>
+</ul>
+
+<p>
+高级调度-准入控制-策略
+</p>
+
+<p>
+<a href="https://kubernetes.io/docs/concepts/policy/">https://kubernetes.io/docs/concepts/policy/</a>
+</p>
+<section id="outline-container-org9b0cf89" class="outline-2">
+<h2 id="org9b0cf89">QoS 服务质量</h2>
+<div class="outline-text-2" id="text-org9b0cf89">
+<p>
+<a href="https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/">https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/</a>
+</p>
+</div>
+<div id="outline-container-orgf0820a8" class="outline-3">
+<h3 id="orgf0820a8">生产可能性保障</h3>
+<div class="outline-text-3" id="text-orgf0820a8">
+</div>
+<div id="outline-container-orgf3c7c3f" class="outline-4">
+<h4 id="orgf3c7c3f">Resources 配置的重要性</h4>
+<div class="outline-text-4" id="text-orgf3c7c3f">
+<p>
+如果 pod 没有配置 resources 资源限制，它是感知不到节点资源限制的，可以随意分配到一个节点上。如果节点上没有资源了，这个 pod 可能被驱逐。oom， cpu  过高。
+</p>
+</div>
+</div>
+<div id="outline-container-org2adb1e9" class="outline-4">
+<h4 id="org2adb1e9">Resources 也并非万能</h4>
+<div class="outline-text-4" id="text-org2adb1e9">
+<p>
+node01 4C8G： 
+</p>
+<ul class="org-ul">
+<li>pod1：request 2C4G, limit 2C4G  &#x2013;&gt; 2C3.8G</li>
+<li>pod2：request 1C2G, limit 2C4G  &#x2013;&gt; 2C3G</li>
+<li>pod3：request 1C2G, limit 2C4G  &#x2013;&gt; 1C4G</li>
+</ul>
+
+<p>
+节点上的 pod 运行一段时间资源使用量，可能 OOM
+</p>
+
+<p>
+如果节点上的资源不够了就按 Qos 服务质量来清理 pod。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orgd9d3c42" class="outline-3">
+<h3 id="orgd9d3c42">服务质量QoS</h3>
+<div class="outline-text-3" id="text-orgd9d3c42">
+<ul class="org-ul">
+<li>Guaranteed：最高服务质量，当宿主机内存不够时，会先 kill 掉 QoS 为 BestEffort 和 Burstable的Pod，如果内存还是不够，才会 kill 掉 QoS 为 Guaranteed，该级别 Pod 的资源占用量一般比较明确，即 requests 的 cpu 和 memory 和 limits 的 cpu 和 memory 配置的一致。</li>
+<li>Burstable： 服务质量低于 Guaranteed，当宿主机内存不够时，会先 kill 掉 QoS 为 BestEffort 的 Pod，如果内存还是不够之后就会 kill 掉 QoS 级别为 Burstable 的 Pod，用来保证 QoS 质量为 Guaranteed 的 Pod，该级别 Pod 一般知道最小资源使用量，但是当机器资源充足时，还是想尽可能的使用更多的资源，即 limits 字段的 cpu 和 memory 大于 requests 的 cpu 和 memory 的配置。</li>
+<li>BestEffort：尽力而为，当宿主机内存不够时，首先 kill 的就是该 QoS 的 Pod，用以保证 Burstable 和 Guaranteed 级别的 Pod 正常运行。</li>
+</ul>
+
+<p>
+如果对 pod 资源把握很好，request 和 limit 可以设置成不一样，如 request 100m/100Mi limit 2C/3G 可以让单个节点容纳更多 pod，这会省去部分节点成本。
+</p>
+</div>
+</div>
+<div id="outline-container-orgc39af56" class="outline-3">
+<h3 id="orgc39af56">范例</h3>
+<div class="outline-text-3" id="text-orgc39af56">
+</div>
+<div id="outline-container-org3b21aa1" class="outline-4">
+<h4 id="org3b21aa1">实现QoS为Guaranteed的Pod</h4>
+<div class="outline-text-4" id="text-org3b21aa1">
+<ul class="org-ul">
+<li>Pod中的每个容器必须指定limits.memory和requests.memory，并且两者需要相等；</li>
+<li>Pod中的每个容器必须指定limits.cpu和limits.memory，并且两者需要相等。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org49523e5" class="outline-4">
+<h4 id="org49523e5">实现QoS为Burstable的Pod</h4>
+<div class="outline-text-4" id="text-org49523e5">
+<ul class="org-ul">
+<li>Pod不符合Guaranteed的配置要求；</li>
+<li>Pod中至少有一个容器配置了requests.cpu或requests.memory。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgb99bd4a" class="outline-4">
+<h4 id="orgb99bd4a">实现QoS为BestEffort的Pod</h4>
+<div class="outline-text-4" id="text-orgb99bd4a">
+<ul class="org-ul">
+<li>不设置resources参数</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orge8cc18b" class="outline-4">
+<h4 id="orge8cc18b">java与Qos</h4>
+<div class="outline-text-4" id="text-orge8cc18b">
+<div class="org-src-container">
+<pre class="src src-sh">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: game
+spec:
+...
+  template:
+    metadata:
+    spec:
+      containers:
+      - args:
+        - -Dfile.encoding=utf-8
+        - -server
+        - -XX:+UnlockExperimentalVMOptions
+        - -XX:+UseG1GC
+        - -XX:+ExitOnOutOfMemoryError
+        - -XX:+HeapDumpOnOutOfMemoryError
+        - -XX:<span style="color: #a0522d;">InitialRAMPercentage</span>=75.0
+        - -XX:<span style="color: #a0522d;">MinRAMPercentage</span>=75.0
+        - -XX:<span style="color: #a0522d;">MaxRAMPercentage</span>=75.0
+        - -XX:<span style="color: #a0522d;">HeapDumpPath</span>=/opt/app/logs/
+        - -Xloggc:./logs/gc.log
+        - -Dserver.status=WORKING
+        - -jar
+        - rummy-game.jar
+        <span style="color: #483d8b;">command</span>:
+        - java
+        resources:
+          limits:
+            cpu: 1
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+</pre>
+</div>
+
+<p>
+在Kubernetes的Pod中，Java程序使用 -XX:InitialRAMPercentage、-XX:MinRAMPercentage 和 -XX:MaxRAMPercentage 参数时，这些参数是基于容器的内存限制（limits）来计算的，而不是基于请求（requests）。
+</p>
+
+<p>
+解释：
+-XX:InitialRAMPercentage：设置JVM启动时的初始堆内存占容器内存限制的百分比。
+-XX:MinRAMPercentage：设置JVM的最小堆内存占容器内存限制的百分比。
+-XX:MaxRAMPercentage：设置JVM的最大堆内存占容器内存限制的百分比.
+</p>
+
+<p>
+具体影响：
+</p>
+
+<p>
+内存限制（limits）：这些参数会根据Pod的内存限制来计算JVM的内存使用。例如，如果Pod的内存限制为2Gi（2048MB），并且设置了 -XX:MaxRAMPercentage=75.0，那么JVM的最大堆内存将被设置为2048MB的75%，即1536MB。
+</p>
+
+<p>
+内存请求（requests）：主要用于Kubernetes的调度和资源分配，但不会直接影响JVM的内存参数设置。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org893d156" class="outline-2">
+<h2 id="org893d156">ResourceQuota 资源配额</h2>
+<div class="outline-text-2" id="text-org893d156">
+<p>
+资源配额提供了限制每个命名空间的聚合资源消耗的约束。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/policy/resource-quotas/">https://kubernetes.io/docs/concepts/policy/resource-quotas/</a>
+</p>
+</div>
+<div id="outline-container-orge5cc1ea" class="outline-3">
+<h3 id="orge5cc1ea">资源配额的重要性</h3>
+<div class="outline-text-3" id="text-orge5cc1ea">
+<p>
+管理资源分配情况，避免资源不够和大量废弃资源不回收问题。对名称空间进行配置、限额。
+</p>
+</div>
+</div>
+<div id="outline-container-org171cf1b" class="outline-3">
+<h3 id="org171cf1b">ResourceQuota配置</h3>
+<div class="outline-text-3" id="text-org171cf1b">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resource-test
+  labels:
+    app: resourcequota
+spec:
+  hard:
+    pods: 50
+    requests.cpu: 0.5
+    requests.memory: 512Mi
+    limits.cpu: 5
+    limits.memory: 16Gi
+    configmaps: 20
+    requests.storage: 40Gi
+    persistentvolumeclaims: 20
+    replicationcontrollers: 20
+    secrets: 20
+    services: 50
+    services.loadbalancers: "2"
+    services.nodeports: "10"
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>pods：限制最多启动Pod的个数</li>
+<li>requests.cpu：限制最高CPU请求数</li>
+<li>requests.memory：限制最高内存的请求数</li>
+<li>limits.cpu：限制最高CPU的limit上限</li>
+<li>limits.memory：限制最高内存的limit上限</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org04cff93" class="outline-3">
+<h3 id="org04cff93">范例-ResourceQuot（对名称空间进行配置、限额）</h3>
+<div class="outline-text-3" id="text-org04cff93">
+</div>
+<div id="outline-container-orgc5b51ec" class="outline-4">
+<h4 id="orgc5b51ec">配置内存和 CPU 配额</h4>
+<div class="outline-text-4" id="text-orgc5b51ec">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#21019;&#24314;&#21629;&#21517;&#31354;&#38388;&#65292;&#20197;&#20415;&#26412;&#32451;&#20064;&#20013;&#21019;&#24314;&#30340;&#36164;&#28304;&#21644;&#38598;&#32676;&#30340;&#20854;&#20313;&#37096;&#20998;&#30456;&#38548;&#31163;&#12290;</span>
+[root@k8s-master01 ~]# kubectl create namespace quota-mem-cpu-example
+namespace/quota-mem-cpu-example created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#21019;&#24314; ResourceQuota </span>
+[root@k8s-master01 ~]# vim quota-mem-cpu.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mem-cpu-demo
+spec:
+  hard:
+    requests.cpu: <span style="color: #8b2252;">"1"</span>
+    requests.memory: 1Gi
+    limits.cpu: <span style="color: #8b2252;">"2"</span>
+    limits.memory: 2Gi
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#21019;&#24314; ResourceQuota</span>
+[root@k8s-master01 ~]# kubectl apply -f quota-mem-cpu.yaml -n quota-mem-cpu-example         
+resourcequota/mem-cpu-demo created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">4&#12289;&#26597;&#30475; ResourceQuota &#35814;&#24773;&#65306;</span>
+[root@k8s-master01 ~]# kubectl get resourcequota mem-cpu-demo --namespace=quota-mem-cpu-example --output=yaml
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#36319;&#25105;&#20204;&#37197;&#32622;&#30340;&#19968;&#26679;</span>
+spec:
+  hard:
+    limits.cpu: <span style="color: #8b2252;">"2"</span>
+    limits.memory: 2Gi
+    requests.cpu: <span style="color: #8b2252;">"1"</span>
+    requests.memory: 1Gi
+</pre>
+</div>
+
+<p>
+ResourceQuota 在 quota-mem-cpu-example 命名空间中设置了如下要求：
+</p>
+
+<ul class="org-ul">
+<li>每个容器必须有内存请求和限制，以及 CPU 请求和限制。</li>
+<li>所有容器的内存请求总和不能超过1 GiB。</li>
+<li>所有容器的内存限制总和不能超过2 GiB。</li>
+<li>所有容器的 CPU 请求总和不能超过1 cpu。</li>
+<li>所有容器的 CPU 限制总和不能超过2 cpu。</li>
+</ul>
+
+<p>
+也就是在名称空间 quota-mem-cpu-example种创建Pod，必须遵守我们在上面定义的要求
+</p>
+</div>
+<div id="outline-container-org59ae657" class="outline-5">
+<h5 id="org59ae657">创建 Pod</h5>
+<div class="outline-text-5" id="text-org59ae657">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; quota-mem-cpu-pod.yaml &lt;&lt; EFO
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Pod</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: quota-mem-cpu-demo</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  containers:</span>
+<span style="color: #ffa54f;">  - name: quota-mem-cpu-demo-ctr</span>
+<span style="color: #ffa54f;">    image: nginx</span>
+<span style="color: #ffa54f;">    resources:</span>
+<span style="color: #ffa54f;">      limits:</span>
+<span style="color: #ffa54f;">        memory: "800Mi"</span>
+<span style="color: #ffa54f;">        cpu: "800m"</span>
+<span style="color: #ffa54f;">      requests:</span>
+<span style="color: #ffa54f;">        memory: "600Mi"</span>
+<span style="color: #ffa54f;">        cpu: "400m"</span>
+<span style="color: #ffa54f;">EFO </span>
+<span style="color: #ffa54f;"># create Pod</span>
+<span style="color: #ffa54f;">kubectl apply -f quota-mem-cpu-pod.yaml --namespace=quota-mem-cpu-example</span>
+
+<span style="color: #ffa54f;"># &#26597;&#30475;&#37197;&#39069;&#65292;&#33021;&#30475;&#21040;&#29992;&#20102;&#22810;&#23569;</span>
+<span style="color: #ffa54f;">[root@k8s-master01 ~]# kubectl get resourcequota mem-cpu-demo --namespace=quota-mem-cpu-example --output=yaml</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  hard:</span>
+<span style="color: #ffa54f;">    limits.cpu: "2"</span>
+<span style="color: #ffa54f;">    limits.memory: 2Gi</span>
+<span style="color: #ffa54f;">    requests.cpu: "1"</span>
+<span style="color: #ffa54f;">    requests.memory: 1Gi</span>
+<span style="color: #ffa54f;">status:</span>
+<span style="color: #ffa54f;">  hard:</span>
+<span style="color: #ffa54f;">    limits.cpu: "2"</span>
+<span style="color: #ffa54f;">    limits.memory: 2Gi</span>
+<span style="color: #ffa54f;">    requests.cpu: "1"</span>
+<span style="color: #ffa54f;">    requests.memory: 1Gi</span>
+<span style="color: #ffa54f;">  used:</span>
+<span style="color: #ffa54f;">    limits.cpu: 800m</span>
+<span style="color: #ffa54f;">    limits.memory: 800Mi</span>
+<span style="color: #ffa54f;">    requests.cpu: 400m</span>
+<span style="color: #ffa54f;">    requests.memory: 600Mi</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgf4995ab" class="outline-4">
+<h4 id="orgf4995ab">尝试创建第二个 Pod</h4>
+<div class="outline-text-4" id="text-orgf4995ab">
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# cat  quota-mem-cpu-pod-2.yaml    
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quota-mem-cpu-demo-2
+spec:
+  containers:
+  - name: quota-mem-cpu-demo-2-ctr
+    image: redis
+    resources:
+      limits:
+        memory: <span style="color: #8b2252;">"1Gi"</span>
+        cpu: <span style="color: #8b2252;">"800m"</span>
+      requests:
+        memory: <span style="color: #8b2252;">"700Mi"</span>
+        cpu: <span style="color: #8b2252;">"400m"</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23581;&#35797;&#21019;&#24314;        </span>
+[root@k8s-master01 ~]# kubectl apply -f  quota-mem-cpu-pod-2.yaml --namespace=quota-mem-cpu-example
+Error from server (Forbidden): error when creating <span style="color: #8b2252;">"quota-mem-cpu-pod-2.yaml"</span>: pods <span style="color: #8b2252;">"quota-mem-cpu-demo-2"</span> is forbidden: exceeded quota: mem-cpu-demo, requested: requests.memory=700Mi, used: requests.memory=600Mi, limited: requests.memory=1Gi
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#31532;&#20108;&#20010; Pod &#19981;&#33021;&#34987;&#21019;&#24314;&#25104;&#21151;&#12290;&#36755;&#20986;&#32467;&#26524;&#26174;&#31034;&#21019;&#24314;&#31532;&#20108;&#20010; Pod &#20250;&#23548;&#33268;&#20869;&#23384;&#35831;&#27714;&#24635;&#37327;&#36229;&#36807;&#20869;&#23384;&#35831;&#27714;&#37197;&#39069;&#12290;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21024;&#38500;&#20320;&#30340;&#21629;&#21517;&#31354;&#38388;&#65306;</span>
+kubectl delete namespace quota-mem-cpu-example
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org741fb43" class="outline-4">
+<h4 id="org741fb43">配置命名空间下 Pod 配额</h4>
+<div class="outline-text-4" id="text-org741fb43">
+</div>
+<div id="outline-container-orgc87ff15" class="outline-5">
+<h5 id="orgc87ff15">如何配置一个命名空间下可运行的 Pod 个数配额？</h5>
+<div class="outline-text-5" id="text-orgc87ff15">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#21019;&#24314;&#19968;&#20010;&#21629;&#21517;&#31354;&#38388; </span>
+kubectl create namespace quota-pod-example
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#21019;&#24314; ResourceQuota&#65292;&#25351;&#23450;&#25913;ns&#21482;&#21487;&#20197;&#21019;&#24314;2&#20010;pod</span>
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: pod-demo
+spec:
+  hard:
+    pods: <span style="color: #8b2252;">"2"</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;apply ResourceQuota</span>
+kubectl apply -f quota-pod.yaml --namespace=quota-pod-example
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">4&#12289;&#26597;&#30475;&#36164;&#28304;&#37197;&#39069;&#30340;&#35814;&#32454;&#20449;&#24687;&#65306;</span>
+kubectl get resourcequota pod-demo --namespace=quota-pod-example --output=yaml
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">5&#12289;&#21019;&#24314;Deployment&#65292;&#19988;replicas&#26159;3&#65292;&#37027;&#20040;&#32943;&#23450;&#21482;&#26377;2&#20010;Pod&#33021;&#27491;&#24120;&#36816;&#34892;&#65281;&#33258;&#24049;&#21435;&#35797;&#35797;&#21543;</span>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-quota-demo
+spec:
+  selector:
+    matchLabels:
+      purpose: quota-demo
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        purpose: quota-demo
+    spec:
+      containers:
+      - name: pod-quota-demo
+        image: nginx
+</pre>
+</div>
+
+<p>
+中文官网文档：<a href="https://kubernetes.io/zh/docs/concepts/policy/limit-range/">https://kubernetes.io/zh/docs/concepts/policy/limit-range/</a>
+</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org810b9a3" class="outline-2">
+<h2 id="org810b9a3">LimitRange 限制范围</h2>
+<div class="outline-text-2" id="text-org810b9a3">
+<p>
+LimitRange 是一种用于限制命名空间中(到容器组或容器的)资源分配的策略。
+</p>
+
+<p>
+官方文档: <a href="https://kubernetes.io/docs/concepts/policy/limit-range/">https://kubernetes.io/docs/concepts/policy/limit-range/</a>
+</p>
+</div>
+<div id="outline-container-org7219876" class="outline-3">
+<h3 id="org7219876">为什么需要 LimitRange</h3>
+<div class="outline-text-3" id="text-org7219876">
+</div>
+<div id="outline-container-orgb275651" class="outline-4">
+<h4 id="orgb275651">只有 ResourceQuota 是不够的</h4>
+<div class="outline-text-4" id="text-orgb275651">
+
+<figure id="org139a566">
+<img src="./images/Snipaste_2022-09-28_16-28-45.png" alt="Snipaste_2022-09-28_16-28-45.png">
+
+</figure>
+
+<p>
+只有 ResourceQuota 限制资源使用量，如果 pod 没有配置 resources 是没用的，永远达不到资源配额。
+</p>
+</div>
+</div>
+<div id="outline-container-org5789b00" class="outline-4">
+<h4 id="org5789b00">LimitRange做了什么</h4>
+<div class="outline-text-4" id="text-org5789b00">
+
+<figure id="org73c71e3">
+<img src="./images/Snipaste_2022-09-28_16-30-22.png" alt="Snipaste_2022-09-28_16-30-22.png">
+
+</figure>
+
+<p>
+如果 pod cpu 和内存没限制可以自动添加 LimitRange 的默认值。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org91177d0" class="outline-3">
+<h3 id="org91177d0">LimitRange配置</h3>
+<div class="outline-text-3" id="text-org91177d0">
+<p>
+一个 LimitRange（限制范围） 对象提供的限制能够做到：
+</p>
+
+<ul class="org-ul">
+<li>在一个命名空间中实施对每个 Pod 或 Container 最小和最大的资源使用量的限制。</li>
+<li>在一个命名空间中实施对每个 PersistentVolumeClaim 能申请的最小和最大的存储空间大小的限制。</li>
+<li>在一个命名空间中实施对一种资源的申请值和限制值的比值的控制。</li>
+<li>设置一个命名空间中对计算资源的默认申请/限制值，并且自动的在运行时注入到多个 Container 中。</li>
+</ul>
+
+<p>
+对新启动的 pod 生效。不更改 deployment 这类而更改 pod。
+</p>
+</div>
+<div id="outline-container-orgefc831d" class="outline-4">
+<h4 id="orgefc831d">LimitRange配置示例：默认的requests和limits</h4>
+<div class="outline-text-4" id="text-orgefc831d">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-mem-limit-range
+spec:
+  limits:
+  - default:
+      cpu: 1
+      memory: 512Mi
+    defaultRequest:
+      cpu: 0.5
+      memory: 256Mi
+    type: Container
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>default：默认limits配置</li>
+<li>defaultRequest：默认requests配置</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org07e6950" class="outline-4">
+<h4 id="org07e6950">LimitRange配置示例：requests和limits的范围</h4>
+<div class="outline-text-4" id="text-org07e6950">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-mem-min-max-demo-lr
+spec:
+  limits:
+  - max:
+      cpu: "800m"
+      memory: 1Gi
+    min:
+      cpu: "200m"
+      memory: 500Mi
+    type: Container
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>max：内存CPU的最大配置</li>
+<li>min：内存CPU的最小配置</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgca1a33a" class="outline-4">
+<h4 id="orgca1a33a">LimitRange配置示例：限制申请存储空间的大小</h4>
+<div class="outline-text-4" id="text-orgca1a33a">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: storagelimits
+spec:
+  limits:
+  - type: PersistentVolumeClaim
+    max:
+      storage: 2Gi
+    min:
+      storage: 1Gi
+</pre>
+</div>
+<ul class="org-ul">
+<li>max：最大PVC的空间</li>
+<li>min：最小PVC的空间</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-org9d5da90" class="outline-3">
+<h3 id="org9d5da90">范例-LimitRange 的配置文件：</h3>
+<div class="outline-text-3" id="text-org9d5da90">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-min-max-demo-lr
+spec:
+  limits:
+  - max:
+      cpu: "800m"
+    min:
+      cpu: "200m"
+    type: Container
+  - type: PersistentVolumeClaim
+    max:
+      storage: 2Gi
+    min:
+      storage: 1Gi
+#  输出结果显示 CPU 的最小和最大限制符合预期。但需要注意的是，尽管你在 LimitRange 的配置文件中你没有声明默认值，默认值也会被自动创建。
+limits:
+- default:
+    cpu: 800m
+  defaultRequest:
+    cpu: 800m
+  max:
+    cpu: 800m
+  min:
+    cpu: 200m
+  type: Container
+- type: PersistentVolumeClaim
+  max:
+    storage: 2Gi
+  min:
+    storage: 1Gi
+</pre>
+</div>
+
+<p>
+现在不管什么时候在 constraints-cpu-example 命名空间中创建容器，Kubernetes 都会执行下面这些步骤：
+</p>
+
+<ul class="org-ul">
+<li>如果容器没有声明自己的 CPU 请求和限制，将为容器指定默认 CPU 请求和限制。</li>
+<li>核查容器声明的 CPU 请求确保其大于或者等于 200 millicpu。</li>
+<li>核查容器声明的 CPU 限制确保其小于或者等于 800 millicpu。</li>
+</ul>
+
+<p>
+说明：当创建 LimitRange 对象时，你也可以声明大页面和 GPU 的限制。 当这些资源同时声明了 'default' 和 'defaultRequest' 参数时，两个参数值必须相同。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-org2298846" class="outline-2">
+<h2 id="org2298846">NetworkPolicies 网络策略</h2>
+<div class="outline-text-2" id="text-org2298846">
+<p>
+网络策略是允许 pod 组相互通信以及与其他网络端点通信的规范。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">https://kubernetes.io/docs/concepts/services-networking/network-policies/</a>
+</p>
+</div>
+</section>
+<section id="outline-container-orgfe453f0" class="outline-2">
+<h2 id="orgfe453f0">PodDisruptionBudgets 中断预算</h2>
+<div class="outline-text-2" id="text-orgfe453f0">
+<p>
+Pod 中断预算可让应用程序拥有者为复制的应用程序创建对象，以确保一定数量或百分比的已分配标签 Pod 在任何时候都不会被自愿驱逐。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/tasks/run-application/configure-pdb/">https://kubernetes.io/docs/tasks/run-application/configure-pdb/</a>
+</p>
+</div>
+</section>
+<section id="outline-container-org084ac2b" class="outline-2">
+<h2 id="org084ac2b">PodSecurityPolicies 安全策略</h2>
+<div class="outline-text-2" id="text-org084ac2b">
+<p>
+Pod 安全策略允许对 Pod 创建和更新进行精细授权。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/security/pod-security-policy/">https://kubernetes.io/docs/concepts/security/pod-security-policy/</a>
+</p>
+</div>
+</section>
+</main class="container">
+<footer id="postamble" class="status">
+<footer data-astro-cid-sz7xmlte data-turbo-permanent id=rootFooter>
+    <script>
+        const shuffle = e => e.map((e => ({
+            v: e,
+            sort: Math.random()
+        }))).sort(( (e, o) => e.sort - o.sort)).map(( ({v: e}) => e));
+        var songList = ["barbie-girl--stantough", "blue-da-ba-dee--cornelius-link", "hips-dont-lie--stantough", "i-want-it-that-way--stantough", "seven-nation-army--stantough", "smooth-criminal--stantough"]
+          , songOrder = songOrder ?? shuffle(songList).map((e => `/audio/music/${e}.opus`))
+          , song = new Audio(songOrder[0])
+          , nextSong = new Audio(songOrder[1])
+          , songIndex = 2
+          , musicWrapper = void 0
+          , arrow = void 0
+          , notes = void 0;
+        song.addEventListener("ended", next);
+        const toggle = () => song.paused ? play() : pause();
+        function play() {
+            song.play(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.add("shakeManHorse"),
+            notes.classList.remove("hideNotes")
+        }
+        function pause() {
+            song.pause(),
+            musicWrapper = musicWrapper || document.getElementById("musicWrapper"),
+            notes = notes || document.getElementById("notesWrapper"),
+            musicWrapper.classList.remove("shakeManHorse"),
+            notes.classList.add("hideNotes")
+        }
+        function next() {
+            song = nextSong,
+            play(),
+            songIndex === songOrder.length && (songIndex = 0),
+            nextSong = new Audio(songOrder[songIndex]),
+            songIndex += 1
+        }
+        function skip() {
+            pause(),
+            (arrow = arrow || document.getElementById("musicArrow")).classList.add("shootArrow");
+            new Audio("/audio/effects/ohno.m4a").play(),
+            arrow.addEventListener("animationend", arrowShootHandler, !1)
+        }
+        function arrowShootHandler() {
+            arrow.removeEventListener("animationend", arrowShootHandler, !1),
+            arrow.classList.remove("shootArrow");
+            new Audio("/audio/effects/heythathurt.m4a").play(),
+            next()
+        }
+    </script>
+    <div id=musicPlayer data-astro-cid-q7a5pyro>
+        <button class=skip data-astro-cid-q7a5pyro onclick=skip() title="Skip song">
+            <div id=skipWrapper data-astro-cid-q7a5pyro>
+                <img alt="Medieval drollery of a man/snail/bat/monkey shooting an arrow" class=archer decoding=async height=334 loading=lazy src=/images/archer-no-arrow.448ccd8b_Z1KfRYq.webp width=226 data-astro-cid-q7a5pyro>
+                <img alt="Arrow for archer" class="arrow complete" decoding=async height=23 loading=lazy src=/images/no-archer-full-arrow.87aa9971_Z2qL2KO.webp width=141 data-astro-cid-q7a5pyro id=musicArrow>
+            </div>
+        </button>
+        <button class=playPause data-astro-cid-q7a5pyro onclick=toggle() title="Play/pause song">
+            <div id=musicWrapper data-astro-cid-q7a5pyro>
+                <div class=hideNotes id=notesWrapper data-astro-cid-q7a5pyro>
+                    <div class=lyreNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                    <div class=fluteNotes data-astro-cid-6gcrueho>
+                        <div class=note1 data-astro-cid-6gcrueho>&#9835;&#9833;</div>
+                        <div class=note2 data-astro-cid-6gcrueho>&#9833;</div>
+                        <div class=note3 data-astro-cid-6gcrueho>&#9839;&#9834;</div>
+                        <div class=note4 data-astro-cid-6gcrueho>&#9834;</div>
+                    </div>
+                </div>
+                <img alt="Medieval drollery of a man/horse playing a lyre and a horn" class=manHorse decoding=async height=665 loading=lazy src=/images/man-horse-band.e3a2efcf_q8FCa.webp width=531 data-astro-cid-q7a5pyro>
+            </div>
+        </button>
+    </div>
+    <hr data-astro-cid-sz7xmlte>
+    <div class=salutation data-astro-cid-gdmrbrho>
+        <p data-astro-cid-gdmrbrho>
+            <span class=flower2 data-astro-cid-gdmrbrho>A</span>
+            <span class=smallcap data-astro-cid-gdmrbrho>pax vobiscum</span>
+            <span class="flower2 wiggle" data-astro-cid-gdmrbrho id=leaf>a</span>
+        </p>
+    </div>
+    <script>
+        function animateLeafBlownHandler() {
+            leaf.removeEventListener("animationend", animateLeafBlownHandler, !1),
+            leaf.classList.remove("blownAway"),
+            leaf.classList.add("wiggle")
+        }
+        function animateLeaf() {
+            leaf = leaf ?? document.getElementById("leaf"),
+            leaf.classList.remove("wiggle"),
+            leaf.classList.add("blownAway"),
+            leaf.addEventListener("animationend", animateLeafBlownHandler, !1)
+        }
+        document.getElementById("leaf").onclick = animateLeaf
+    </script>
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2024 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+</footer>
+</footer>
+</body>
+</html>

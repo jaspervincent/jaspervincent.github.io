@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 进阶篇-持久化存储</title>
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 进阶篇-持久化存储</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:f5e296f2-9387-4aee-a93c-9d4f02c677aa">k8s基础篇-持久化存储</a>
+<ul>
+<li><a href="#h:39913076-d454-434d-b7bb-655a8c363ff1">Volumes</a>
+<ul>
+<li><a href="#h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20">介绍</a>
+<ul>
+<li><a href="#h:3fe7d4be-da74-427e-aea1-631e22c301e5">背景</a></li>
+<li><a href="#h:4920ad83-8488-4d14-9f8b-f7a27496ad4f">卷的类型</a></li>
+</ul>
+</li>
+<li><a href="#h:6a45e227-9301-410f-9804-7beb787db1f4">emptyDir</a></li>
+<li><a href="#h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed">hostPath 挂载宿主机路径</a>
+<ul>
+<li><a href="#h:f4dab3ff-8da3-4888-b366-989002e14d1a">hostPath 的一些用法有</a></li>
+<li><a href="#h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d">支持类型</a></li>
+</ul>
+</li>
+<li><a href="#h:f6310502-2d5d-401e-b267-ddc3d9aa98cd">挂载 NFS 至容器</a>
+<ul>
+<li><a href="#h:b4772bc2-e804-4b43-8017-b9a7793f08da">安装 nfs 服务</a></li>
+<li><a href="#h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e">volume nfs</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:21925a77-be3e-4920-8d2f-986f018374dc">PV&amp;PVC</a>
+<ul>
+<li><a href="#h:3258d4f5-25ed-49d0-b546-9503f4a9b046">为什么要引入 PV 和 PVC</a></li>
+<li><a href="#h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">PV、PVC图解</a></li>
+<li><a href="#h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc">PV</a>
+<ul>
+<li><a href="#h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e">PV 访问和回收策略</a></li>
+<li><a href="#h:2f1478ee-e718-46bb-ab64-abb56f66454f">文件存储、块存储、对象存储区别</a></li>
+<li><a href="#h:260d5061-2931-479a-91b8-efadfce2c699">创建 NAS  或 NFS 类型的 PV</a></li>
+<li><a href="#h:333e72d4-4ca9-4a89-a427-ee366d7f7243">PV 状态</a></li>
+<li><a href="#h:2f513651-8123-4ed1-8a30-d255db599472">创建 hostPath 类型的 PV</a></li>
+</ul>
+</li>
+<li><a href="#h:5cab6f6a-f294-4a09-baff-40e064b283ff">PVC</a>
+<ul>
+<li><a href="#h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">PVC 如何绑定到 PV</a></li>
+<li><a href="#h:21e372ef-a130-48ac-87de-c41ed8128770">PVC 挂载示例</a></li>
+<li><a href="#h:60831fb1-bac2-4bd4-8b64-7b8419099e65">PVC 创建和挂载处理 Pending 的原因</a></li>
+</ul>
+</li>
+<li><a href="#h:cd448add-22b2-442a-a54c-6bfea0e331ed">改变默认存储类</a></li>
+<li><a href="#h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9">使用NFS做为PVC</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:f5e296f2-9387-4aee-a93c-9d4f02c677aa" class="outline-2">
+<h2 id="h:f5e296f2-9387-4aee-a93c-9d4f02c677aa">k8s基础篇-持久化存储</h2>
+<div class="outline-text-2" id="text-h:f5e296f2-9387-4aee-a93c-9d4f02c677aa">
+</div>
+<div id="outline-container-h:39913076-d454-434d-b7bb-655a8c363ff1" class="outline-3">
+<h3 id="h:39913076-d454-434d-b7bb-655a8c363ff1">Volumes</h3>
+<div class="outline-text-3" id="text-h:39913076-d454-434d-b7bb-655a8c363ff1">
+</div>
+<div id="outline-container-h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20" class="outline-4">
+<h4 id="h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20">介绍</h4>
+<div class="outline-text-4" id="text-h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20">
+<p>
+官方：
+</p>
+
+<p>
+<a href="http://docs.kubernetes.org.cn/429.html">http://docs.kubernetes.org.cn/429.html</a>
+</p>
+
+<p>
+<a href="https://kubernetes.io/zh/docs/concepts/storage/volumes/">https://kubernetes.io/zh/docs/concepts/storage/volumes/</a>
+</p>
+
+<p>
+默认情况下容器中的磁盘文件是非持久化的，对于运行在容器中的应用来说面临两个问题，第一：当容器挂掉 kubelet 将重启启动它时，文件将会丢失；第二：当 Pod 中同时运行多个容器，容器之间需要共享文件时。Kubernetes 的 Volume 解决了这两个问题。
+</p>
+
+<p>
+一些需要持久化数据的程序才会用到 Volumes，或者一些需要共享数据的容器需要 Volumes。
+</p>
+
+<p>
+如
+</p>
+<ul class="org-ul">
+<li>redis-cluster 的 node.conf 的 ip 会变的，不能用 configmap，需要用 volumes 存储。</li>
+<li>日志收集的需要：需要的应用程序的容器里加一个 sidecar，这个容器是一个收集日志的容器，如 filebeat，它通过 volumes 共享应用程序的日志文件目录。</li>
+</ul>
+</div>
+<div id="outline-container-h:3fe7d4be-da74-427e-aea1-631e22c301e5" class="outline-5">
+<h5 id="h:3fe7d4be-da74-427e-aea1-631e22c301e5">背景</h5>
+<div class="outline-text-5" id="text-h:3fe7d4be-da74-427e-aea1-631e22c301e5">
+<p>
+在Docker中也有一个 <a href="https://docs.docker.com/userguide/dockervolumes/">docker Volume</a> 的概念 ，Docker的Volume只是磁盘中的一个目录，生命周期不受管理。当然Docker现在也提供Volume将数据持久化存储，但支持功能比较少（例如，对于Docker 1.7，每个容器只允许挂载一个Volume，并且不能将参数传递给Volume）。
+</p>
+
+<p>
+另一方面，Kubernetes Volume具有明确的生命周期 - 与pod相同。因此，Volume的生命周期比Pod中运行的任何容器要持久，在容器重新启动时能可以保留数据，当然，当Pod被删除不存在时，Volume也将消失。注意，Kubernetes支持许多类型的Volume，Pod可以同时使用任意类型/数量的Volume。
+</p>
+
+<p>
+内部实现中，一个Volume只是一个目录，目录中可能有一些数据，pod的容器可以访问这些数据。至于这个目录是如何产生的、支持它的介质、其中的数据内容是什么，这些都由使用的特定Volume类型来决定。
+</p>
+
+<p>
+要使用Volume，pod需要指定Volume的类型和内容（spec.volumes字段），和映射到容器的位置（spec.containers.volumeMounts字段）。
+</p>
+</div>
+</div>
+<div id="outline-container-h:4920ad83-8488-4d14-9f8b-f7a27496ad4f" class="outline-5">
+<h5 id="h:4920ad83-8488-4d14-9f8b-f7a27496ad4f">卷的类型</h5>
+<div class="outline-text-5" id="text-h:4920ad83-8488-4d14-9f8b-f7a27496ad4f">
+<p>
+Kubernetes支持Volume类型有：
+</p>
+<ul class="org-ul">
+<li>configMap</li>
+<li>secret</li>
+<li>emptyDir</li>
+<li>hostPath</li>
+<li>nfs</li>
+<li>persistentVolumeClaim</li>
+<li>local</li>
+<li>projected</li>
+<li>csi</li>
+<li>iscsi</li>
+<li>rbd</li>
+<li>cephfs</li>
+<li>fc (fibre channel)</li>
+<li>downwardAPI</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6a45e227-9301-410f-9804-7beb787db1f4" class="outline-4">
+<h4 id="h:6a45e227-9301-410f-9804-7beb787db1f4">emptyDir</h4>
+<div class="outline-text-4" id="text-h:6a45e227-9301-410f-9804-7beb787db1f4">
+<p>
+使用emptyDir，当Pod分配到 Node 上时，将会创建emptyDir，并且只要Node上的Pod一直运行，Volume就会一直存。当Pod（不管任何原因）从Node上被删除时，emptyDir也同时会删除，存储的数据也将永久删除。注：删除容器不影响emptyDir。
+</p>
+
+
+<p>
+默认情况下，emptyDir卷支持节点上的任何介质，可能是SSD、磁盘或网络存储，具体取决于自身的环境。可以将emptyDir.medium字段设置为Memory，让Kubernetes使用tmpfs（内存支持的文件系统），虽然tmpfs非常快，但是tmpfs在节点重启时，数据同样会被清除，并且设置的大小会被计入到Container的内存限制当中。
+</p>
+
+<p>
+示例，直接指定 emptyDir 为{}即可：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /opt
+          name: share-volume
+      - image: busybox
+        name: busybox
+        command: ["/bin/sh", "-c", "sleep 3600"]
+        volumeMounts:
+        - mountPath: /mnt
+          name: share-volume
+      volumes:
+      - name: share-volume
+        emptyDir: {}
+          #medium: Memory
+</pre>
+</div>
+
+<p>
+启动pod，并查看状态
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl apply -f pod_emptydir.yaml
+kubectl get pod -owide
+</pre>
+</div>
+
+<p>
+emptyDir验证
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[jasper.xu@ip-10-204-9-241 j]$ kubectl  exec -it nginx-785b5bf7-65r4w -c nginx -- bash
+root@nginx-785b5bf7-65r4w:/# df -hT
+Filesystem     Type     Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1 xfs      100G   29G   72G  29% /opt
+
+root@nginx-785b5bf7-65r4w:/# touch /opt/123
+root@nginx-785b5bf7-65r4w:/# exit
+<span style="color: #a020f0;">exit</span>
+
+[jasper.xu@ip-10-204-9-241 j]$ kubectl  exec -it nginx-785b5bf7-65r4w -c busybox -- sh
+/ <span style="color: #b22222;"># </span><span style="color: #b22222;">df -hT</span>
+Filesystem           Type            Size      Used Available Use% Mounted on
+/dev/nvme0n1p1       xfs           100.0G     28.6G     71.4G  29% /mnt
+/ <span style="color: #b22222;"># </span><span style="color: #b22222;">ls /mnt/</span>
+123
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed" class="outline-4">
+<h4 id="h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed">hostPath 挂载宿主机路径</h4>
+<div class="outline-text-4" id="text-h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed">
+<p>
+hostPath允许挂载Node上的文件系统到Pod里面去。如果Pod需要使用Node上的文件，可以使用hostPath。
+</p>
+
+<p>
+警告：
+</p>
+<ul class="org-ul">
+<li>hostPath 卷存在许多安全风险，最佳做法是尽可能避免使用 HostPath。 当必须使用 hostPath 卷时，它的范围应仅限于所需的文件或目录，并以只读方式挂载。</li>
+<li>如果通过 AdmissionPolicy 限制 hostPath 对特定目录的访问，则必须要求 volumeMounts 使用 readOnly 挂载以使策略生效。</li>
+</ul>
+
+<p>
+示例
+</p>
+</div>
+<div id="outline-container-h:f4dab3ff-8da3-4888-b366-989002e14d1a" class="outline-5">
+<h5 id="h:f4dab3ff-8da3-4888-b366-989002e14d1a">hostPath 的一些用法有</h5>
+<div class="outline-text-5" id="text-h:f4dab3ff-8da3-4888-b366-989002e14d1a">
+<ul class="org-ul">
+<li>运行一个需要访问 Docker 引擎内部机制的容器；请使用 hostPath 挂载 /var/lib/docker 路径。</li>
+<li>在容器中运行 cAdvisor 时，以 hostPath 方式挂载 /sys。</li>
+<li>允许 Pod 指定给定的 hostPath 在运行 Pod 之前是否应该存在，是否应该创建以及应该以什么方式存在。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d" class="outline-5">
+<h5 id="h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d">支持类型</h5>
+<div class="outline-text-5" id="text-h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d">
+<p>
+除了必需的 path 属性之外，用户可以选择性地为 hostPath 卷指定 type。支持的 type 值如下：
+</p>
+
+<ul class="org-ul">
+<li>空字符串（默认）用于向后兼容，这意味着在安装 hostPath 卷之前不会执行任何检查。</li>
+<li>DirectoryOrCreate 如果在给定路径上什么都不存在，那么将根据需要创建空目录，权限设置为 0755，具有与 kubelet 相同的组和属主信息。</li>
+<li>Directory         在给定路径上必须存在的目录。</li>
+<li>FileOrCreate   如果在给定路径上什么都不存在，那么将在那里根据需要创建空文件，权限设置为 0644，具有与 kubelet 相同的组和所有权。【前提：文件所在目录必须存在；目录不存在则不能创建文件】</li>
+<li>File                  在给定路径上必须存在的文件。</li>
+<li>Socket            在给定路径上必须存在的 UNIX 套接字。</li>
+<li>CharDevice    在给定路径上必须存在的字符设备。</li>
+<li>BlockDevice   在给定路径上必须存在的块设备。</li>
+</ul>
+
+<p>
+范例： 挂载印度时区
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /etc/localtime
+          name: time
+      volumes:
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+          type: ""
+        name: time
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f6310502-2d5d-401e-b267-ddc3d9aa98cd" class="outline-4">
+<h4 id="h:f6310502-2d5d-401e-b267-ddc3d9aa98cd">挂载 NFS 至容器</h4>
+<div class="outline-text-4" id="text-h:f6310502-2d5d-401e-b267-ddc3d9aa98cd">
+</div>
+<div id="outline-container-h:b4772bc2-e804-4b43-8017-b9a7793f08da" class="outline-5">
+<h5 id="h:b4772bc2-e804-4b43-8017-b9a7793f08da">安装 nfs 服务</h5>
+<div class="outline-text-5" id="text-h:b4772bc2-e804-4b43-8017-b9a7793f08da">
+<p>
+NFS 是Network File System的缩写，即网络文件系统。Kubernetes中通过简单地配置就可以挂载NFS到Pod中，而NFS中的数据是可以永久保存的，同时NFS支持同时写操作。Pod被删除时，Volume被卸载，内容被保留。这就意味着NFS能够允许我们提前对数据进行处理，而且这些数据可以在Pod之间相互传递。
+</p>
+
+<p>
+所有节点
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">yum install nfs-utils -y
+</pre>
+</div>
+
+<p>
+安装nfs服务, node01
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">systemctl start nfs
+sudo systemctl enable nfs
+
+mkdir -p /data/nfs
+
+vim /etc/exports
+/data/nfs 10.4.0.0/24(rw,sync,no_subtree_check,no_root_squash)
+
+exportfs -r
+
+systemctl reload nfs-server
+</pre>
+</div>
+
+<p>
+master01
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">mount -t nfs 192.168.0.204:/data/nfs /mnt/
+<span style="color: #483d8b;">cd</span> /mnt/
+touch 123
+
+unmount /mnt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e" class="outline-5">
+<h5 id="h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e">volume nfs</h5>
+<div class="outline-text-5" id="text-h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e">
+<p>
+范例：volume nfs
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /opt
+          name: nfs-volume
+      volumes:
+      - nfs:
+          server: 192.168.0.204
+          path: /data/nfs/test-dp
+        name: nfs-volume
+</pre>
+</div>
+
+<p>
+volumes挂载
+</p>
+
+<p>
+案例<a href="https://www.cnblogs.com/xiajq/p/11395211.html">https://www.cnblogs.com/xiajq/p/11395211.html</a>
+</p>
+
+<p>
+生产环境不用nfs，也不直接用NFS，用PV来连接。可以用云服务商的来存储
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:21925a77-be3e-4920-8d2f-986f018374dc" class="outline-3">
+<h3 id="h:21925a77-be3e-4920-8d2f-986f018374dc">PV&amp;PVC</h3>
+<div class="outline-text-3" id="text-h:21925a77-be3e-4920-8d2f-986f018374dc">
+</div>
+<div id="outline-container-h:3258d4f5-25ed-49d0-b546-9503f4a9b046" class="outline-4">
+<h4 id="h:3258d4f5-25ed-49d0-b546-9503f4a9b046">为什么要引入 PV 和 PVC</h4>
+<div class="outline-text-4" id="text-h:3258d4f5-25ed-49d0-b546-9503f4a9b046">
+<p>
+只有 Volume 无法满足生产需求
+</p>
+
+
+<figure id="orgb7ae6a1">
+<img src="./images/Snipaste_2022-09-15_22-54-35.png" alt="Snipaste_2022-09-15_22-54-35.png" width="50%">
+
+</figure>
+
+<ul class="org-ul">
+<li>当某个数据卷不再被挂载使用时，里面的数据如何处理？</li>
+<li>如果想要实现只读挂载如何处理？</li>
+<li>如果想要只能一个Pod挂载如何处理？</li>
+<li>如何只允许某个Pod使用10G的空间？</li>
+</ul>
+
+<p>
+PersistentVolume：简称PV，是由Kubernetes管理员设置的存储，可以配置Ceph、NFS、GlusterFS等常用存储配置，相对于Volume配置，提供了更多的功能，比如生命周期的管理、大小的限制。PV分为静态和动态（StorageClass）。
+</p>
+
+<p>
+PersistentVolumeClaim：简称PVC，是对存储PV的请求，表示需要什么类型的PV，需要存储的技术人员只需要配置PVC即可使用存储，或者Volume配置PVC的名称即可。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">https://kubernetes.io/docs/concepts/storage/persistent-volumes/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:504cfaf4-2ad2-4978-a0c5-07fdded7840f" class="outline-4">
+<h4 id="h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">PV、PVC图解</h4>
+<div class="outline-text-4" id="text-h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">
+
+<figure id="org9e0922f">
+<img src="./images/Snipaste_2022-09-15_23-05-56.png" alt="Snipaste_2022-09-15_23-05-56.png" width="50%">
+
+</figure>
+
+<p>
+一些概念：
+</p>
+<ul class="org-ul">
+<li>PV： 没有名称空间限制，PV分为静态（手动创建）和动态（StorageClass）</li>
+<li>PVC：绑定名称空间，pod 指定 pvc 的名称进行挂载</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  template:
+    spec:
+      containers:
+      - name: task-center-job
+        volumeMounts:
+        - name: logs
+          mountPath: /opt/task-center-job/logs
+          subPath: taskcenter/job
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: efs-taskcenter-logs-claim
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc" class="outline-4">
+<h4 id="h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc">PV</h4>
+<div class="outline-text-4" id="text-h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc">
+</div>
+<div id="outline-container-h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e" class="outline-5">
+<h5 id="h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e">PV 访问和回收策略</h5>
+<div class="outline-text-5" id="text-h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e">
+<p>
+PV 回收策略：
+</p>
+<ul class="org-ul">
+<li>Retain：保留，该策略允许手动回收资源，当删除PVC时，PV仍然存在，PV被视为已释放，管理员可以手动回收卷。</li>
+<li>Recycle：（已被废弃）回收，如果Volume插件支持，Recycle策略会对卷执行 <code>rm -rf</code> 清理该PV，并使其可用于下一个新的PVC，但是本策略已弃用，旧的版本只有NFS和HostPath支持该策略。</li>
+<li>Delete：删除，如果Volume插件支持，删除PVC时会同时删除PV，动态卷默认为Delete，目前支持Delete的存储后端包括AWS EBS, GCE PD, Azure Disk, or OpenStack Cinder等。</li>
+<li>可以通过persistentVolumeReclaimPolicy: Recycle字段配置</li>
+</ul>
+
+<p>
+PV 回收策略文档：<a href="https://kubernetes.io/zh-cn/docs/concepts/storage/persistent-volumes/#reclaim-policy">https://kubernetes.io/zh-cn/docs/concepts/storage/persistent-volumes/#reclaim-policy</a>
+</p>
+
+
+<p>
+PV 访问策略：
+</p>
+<ul class="org-ul">
+<li>ReadWriteOnce：可以被单节点以读写模式挂载，命令行中可以被缩写为RWO。</li>
+<li>ReadOnlyMany：可以被多个节点以只读模式挂载，命令行中可以被缩写为ROX。</li>
+<li>ReadWriteMany：可以被多个节点以读写模式挂载，命令行中可以被缩写为RWX。</li>
+<li>ReadWriteOncePod ：只允许被单个Pod访问，需要K8s 1.22+以上版本，并且是 CSI 创建的PV才可使用</li>
+</ul>
+
+<p>
+PV 访问策略官方文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes">https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:2f1478ee-e718-46bb-ab64-abb56f66454f" class="outline-5">
+<h5 id="h:2f1478ee-e718-46bb-ab64-abb56f66454f">文件存储、块存储、对象存储区别</h5>
+<div class="outline-text-5" id="text-h:2f1478ee-e718-46bb-ab64-abb56f66454f">
+<p>
+存储的分类：
+</p>
+<ul class="org-ul">
+<li>文件存储：一些数据可能需要被多个节点使用，比如用户的头像、用户上传的文件等，实现方式：NFS、NAS、FTP、CephFS等。</li>
+<li>块存储：一些数据只能被一个节点使用，或者是需要将一块裸盘整个挂载使用，比如数据库、Redis等，实现方式：Ceph、GlusterFS、公有云。</li>
+<li>对象存储：由程序代码直接实现的一种存储方式，云原生应用无状态化常用的实现方式，实现方式：一般是符合 S3 协议的云存储，比如AWS的S3存储、Minio、七牛云等。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:260d5061-2931-479a-91b8-efadfce2c699" class="outline-5">
+<h5 id="h:260d5061-2931-479a-91b8-efadfce2c699">创建 NAS  或 NFS 类型的 PV</h5>
+<div class="outline-text-5" id="text-h:260d5061-2931-479a-91b8-efadfce2c699">
+<p>
+NFS
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs
+  labels:
+    type: business-a
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: nfs-slow # 这个名字是PVC创建的时候要对应的名字
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /tmp
+    server: 10.103.236.205
+</pre>
+</div>
+
+<p>
+参数说明：
+</p>
+<ul class="org-ul">
+<li>capacity：容量配置</li>
+<li>volumeMode：卷的模式，目前支持Filesystem（文件系统） 和 Block（块），其中Block类型需要后端存储支持，默认为文件系统</li>
+<li>accessModes：该PV的访问模式</li>
+<li>storageClassName：PV的类，一个特定类型的PV只能绑定到特定类别的PVC； storageClassName 值与 PVC 设置相同的 PV 卷 才行，PVC 申领不必一定要请求某个类。如果 PVC 的 storageClassName 属性值设置为 ""， 则被视为要请求的是没有设置存储类的 PV 卷.</li>
+<li>persistentVolumeReclaimPolicy：回收策略</li>
+<li>mountOptions：非必须，新版本中已弃用</li>
+<li>nfs：NFS服务配置，包括以下两个选项
+<ul class="org-ul">
+<li>path：NFS上的共享目录</li>
+<li>server：NFS的IP地址</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:333e72d4-4ca9-4a89-a427-ee366d7f7243" class="outline-5">
+<h5 id="h:333e72d4-4ca9-4a89-a427-ee366d7f7243">PV 状态</h5>
+<div class="outline-text-5" id="text-h:333e72d4-4ca9-4a89-a427-ee366d7f7243">
+<ul class="org-ul">
+<li>Available：可用，没有被PVC绑定的空闲资源。</li>
+<li>Bound：已绑定，已经被PVC绑定。</li>
+<li>Released：已释放，PVC被删除，但是资源还未被重新使用。</li>
+<li>Failed：失败，自动回收失败。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2f513651-8123-4ed1-8a30-d255db599472" class="outline-5">
+<h5 id="h:2f513651-8123-4ed1-8a30-d255db599472">创建 hostPath 类型的 PV</h5>
+<div class="outline-text-5" id="text-h:2f513651-8123-4ed1-8a30-d255db599472">
+<div class="org-src-container">
+<pre class="src src-yaml">kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: task-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: hostpath
+  capacity:
+    storage: 10Gi
+  accessModes: - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+</pre>
+</div>
+
+<p>
+说明：
+</p>
+<ul class="org-ul">
+<li>hostPath：hostPath服务配置
+<ul class="org-ul">
+<li>path：宿主机路径</li>
+</ul></li>
+</ul>
+
+<p>
+一般 pod 是不推荐固定到某 1 个节点的。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5cab6f6a-f294-4a09-baff-40e064b283ff" class="outline-4">
+<h4 id="h:5cab6f6a-f294-4a09-baff-40e064b283ff">PVC</h4>
+<div class="outline-text-4" id="text-h:5cab6f6a-f294-4a09-baff-40e064b283ff">
+</div>
+<div id="outline-container-h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665" class="outline-5">
+<h5 id="h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">PVC 如何绑定到 PV</h5>
+<div class="outline-text-5" id="text-h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">
+
+<figure id="orga945f0c">
+<img src="./images/Snipaste_2022-09-16_10-54-37.png" alt="Snipaste_2022-09-16_10-54-37.png" width="50%">
+
+</figure>
+
+
+<ul class="org-ul">
+<li>PVC 的 StorageClassName 没有和 PV 的一致</li>
+<li>PVC 的 accessModes 和 PV 的一致</li>
+<li>设置置<a href="https://kubernetes.io/zh-cn/docs/concepts/overview/working-with-objects/labels/#label-selectors">标签选择算符</a>来进一步过滤卷集合
+<ul class="org-ul">
+<li>matchLabels</li>
+<li>matchExpressions</li>
+</ul></li>
+<li>PV 设置 claimRef 指定某个 PVC</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-yaml">cat &lt;&lt;\EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: dbench-pv-0
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 500Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: dbench-pv-claim
+    namespace: gitlab-test-xcw
+  mountOptions:
+  - hard
+  - nfsvers=3
+  - nolock
+  nfs:
+    path: /nvxa7jnu/tmp-test/gitaly
+    server: 10.22.0.29
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+EOF
+
+#nfs-pvc
+cat &lt;&lt;\EOF |kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dbench-pv-claim
+  namespace: gitlab-test-xcw
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  volumeMode: Filesystem
+  volumeName: dbench-pv-0
+EOF
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:21e372ef-a130-48ac-87de-c41ed8128770" class="outline-5">
+<h5 id="h:21e372ef-a130-48ac-87de-c41ed8128770">PVC 挂载示例</h5>
+<div class="outline-text-5" id="text-h:21e372ef-a130-48ac-87de-c41ed8128770">
+</div>
+<ul class="org-ul">
+<li><a id="h:008c0e74-7084-48af-9553-36c5c47ece03"></a>deployment pvc<br>
+<div class="outline-text-6" id="text-h:008c0e74-7084-48af-9553-36c5c47ece03">
+<p>
+创建 PVC
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc-claim   # PVC的名字，可自取
+spec:
+  accessModes:
+    - ReadWriteMany  # 访问策略和 pv 一致
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 2Gi  # 一定要小于等于 pv
+  storageClassName: nfs-slow  #  挂载哪种类型的 pv
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">create PVC</span>
+kubectl create -f  test-pvc.yaml  
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;PVC</span>
+[root@k8s-master01 app]# kubectl get pvc
+NAME      STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+myclaim   Bound    pv0001   5Gi        RWX            nfs-slow       34s
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20877;&#27425;&#26597;&#30475;PV&#65292;&#21487;&#30475;&#21040;&#29366;&#24577;&#24050;&#32463;&#21457;&#29983;&#25913;&#21464;</span>
+[root@k8s-master01 app]# kubectl get pv
+NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM             STORAGECLASS   REASON   AGE
+pv0001   5Gi        RWX            Recycle          Bound    default/myclaim   nfs-slow                13m
+</pre>
+</div>
+
+<p>
+deployment pod 配置 Volumes  使用类型  persistentVolumeClaim
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">cat  nginx.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: task-pv-container
+      volumes:
+      - PersistentVolumeClaim:
+          claimNmae: nfs-pvc-claim
+        name: task-pv-storage
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26356;&#25913;&#21518;&#30340;yaml&#65292;&#22312;&#23545;&#24212;&#20301;&#32622;&#21152;&#19978;&#20197;&#19979;&#21442;&#25968;&#35843;&#29992;PVC</span>
+volumeMounts:
+- mountPath: /opt/pvc
+  name: mypd
+
+volumes:
+   - name: mypd
+     persistentVolumeClaim:
+       claimName: myclaim
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#28982;&#21518;&#36827;&#20837;&#23481;&#22120;&#26597;&#30475;&#26159;&#21542;&#25346;&#36733;&#25104;&#21151;</span>
+[root@k8s-master01 app]# kubectl exec -it nginx-5bb6d88dfb-w78k8 -c nginx2 -- bash
+root@nginx-5bb6d88dfb-w78k8:/# df -h
+Filesystem               Size  Used Avail Use% Mounted on
+overlay                   37G  4.3G   33G  12% /
+tmpfs                     64M     0   64M   0% /dev
+tmpfs                    985M     0  985M   0% /sys/fs/cgroup
+/dev/mapper/centos-root   37G  4.3G   33G  12% /mnt
+192.168.1.104:/data/nfs   37G  3.0G   35G   9% /opt/pvc   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#36825;&#23601;&#26159;&#21018;&#21018;&#25346;&#36733;&#30340;PVC</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25991;&#20214;&#33021;&#20849;&#20139;</span>
+root@nginx-5bb6d88dfb-w78k8:/opt/pvc# ls 
+pvc  qqq  test
+root@nginx-5bb6d88dfb-w78k8:/opt/pvc# echo 11 &gt; test 
+root@nginx-5bb6d88dfb-w78k8:/opt/pvc# cat test       
+11
+</pre>
+</div>
+</div>
+</li>
+<li><a id="h:44504c73-84af-46f4-9783-883197b69981"></a>statfulset pvc<br>
+<div class="outline-text-6" id="text-h:44504c73-84af-46f4-9783-883197b69981">
+<div class="org-src-container">
+<pre class="src src-yaml">cat &gt; nginx-sts.yaml &lt;&lt; EFO
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  #updateStrategy:
+  #  rollingUpdate:
+  #    partition: 0
+  #  type: RollingUpdate
+  selector:
+    matchLabels:
+      app: nginx # 必须匹配 .spec.template.metadata.labels
+  serviceName: "nginx"
+  replicas: 3 # 默认值是 1
+  # minReadySeconds: 10 # 默认值是 0 ，v1.22 版本才有
+  template:
+    metadata:
+      labels:
+        app: nginx # 必须匹配 .spec.selector.matchLabels
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: nginx
+        image: registry.k8s.io/nginx-slim:0.8
+        ports:
+        - containerPort: 80
+          name: web
+        volumeMounts:
+        - name: www
+          mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+  - metadata:
+      name: www
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "nfs-slow"
+      resources:
+        requests:
+          storage: 1Gi
+EFO
+</pre>
+</div>
+
+<p>
+根据 pvc 模板自动创建 pvc
+</p>
+
+<p>
+需要提前准备好与 pvc 相同的类（storageClassName）的 pv。
+</p>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:60831fb1-bac2-4bd4-8b64-7b8419099e65" class="outline-5">
+<h5 id="h:60831fb1-bac2-4bd4-8b64-7b8419099e65">PVC 创建和挂载处理 Pending 的原因</h5>
+<div class="outline-text-5" id="text-h:60831fb1-bac2-4bd4-8b64-7b8419099e65">
+<p>
+创建 PVC 之后，一直绑定不上 PV（Pending）：
+</p>
+<ul class="org-ul">
+<li>PVC 的空间申请大小大于 PV 的大小</li>
+<li>PVC 的 StorageClassName 没有和 PV 的一致</li>
+<li>PVC 的 accessModes 和 PV 的不一致</li>
+</ul>
+
+
+<p>
+创建挂载了 PVC 的 Pod 之后，一直处于 Pending 状态：
+</p>
+<ul class="org-ul">
+<li>PVC 没有被创建成功，或者被创建</li>
+<li>PVC 和 Pod 不在同一个 Namespace</li>
+</ul>
+
+<p>
+删除PVC后, k8s会创建一个用于回收的Pod, 根据PV的回收策略进行pv的回收, 回收完以后PV的状态就会变成可被绑定的状态也就是空闲状态, 其他的Pending状态的PVC如果匹配到了这个PV，他就能和这个PV进行绑定。
+</p>
+
+
+<p>
+PV文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">https://kubernetes.io/docs/concepts/storage/persistent-volumes/</a>
+</p>
+
+<p>
+<a href="https://kubernetes.io/zh/docs/concepts/storage/persistent-volumes/">https://kubernetes.io/zh/docs/concepts/storage/persistent-volumes/</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cd448add-22b2-442a-a54c-6bfea0e331ed" class="outline-4">
+<h4 id="h:cd448add-22b2-442a-a54c-6bfea0e331ed">改变默认存储类</h4>
+<div class="outline-text-4" id="text-h:cd448add-22b2-442a-a54c-6bfea0e331ed">
+<p>
+所有未设置 storageClassName 的 PVC 都只能绑定到隶属于默认存储类的 PV 卷。 
+</p>
+
+<p>
+设置默认 StorageClass 的工作是通过将对应 StorageClass 对象的注解 storageclass.kubernetes.io/is-default-class 赋值为 true 来完成的。
+</p>
+
+<p>
+官方参考：<a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/change-default-storage-class/">https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/change-default-storage-class/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9" class="outline-4">
+<h4 id="h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9">使用NFS做为PVC</h4>
+<div class="outline-text-4" id="text-h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9">
+<p>
+安装NFS服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">apt install nfs-server
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#20849;&#20139;&#25968;&#25454;&#30446;&#24405;</span>
+mkdir -pv /data/nfs-share
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25480;&#26435;</span>
+cat &lt;&lt;\EOF &gt;&gt; /etc/exports
+<span style="color: #ffa54f;">/data/nfs-share *(rw,no_root_squash)</span>
+<span style="color: #ffa54f;">EOF</span>
+
+systemctl restart nfs-server
+</pre>
+</div>
+
+<p>
+部署 NFS驱动
+</p>
+
+<p>
+准备文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; rback.yaml
+<span style="color: #ffa54f;">kind: ClusterRole</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner-runner</span>
+<span style="color: #ffa54f;">rules:</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["persistentvolumes"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "create", "delete"]</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["persistentvolumeclaims"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "update"]</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["endpoints"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "create", "update", "patch"]</span>
+<span style="color: #ffa54f;">- apiGroups: ["storage.k8s.io"]</span>
+<span style="color: #ffa54f;">  resources: ["storageclasses"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch"]</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["events"]</span>
+<span style="color: #ffa54f;">  verbs: ["create", "update", "patch"]</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: ClusterRoleBinding</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: run-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">subjects:</span>
+<span style="color: #ffa54f;">- kind: ServiceAccount</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  namespace: default</span>
+<span style="color: #ffa54f;">roleRef:</span>
+<span style="color: #ffa54f;">  kind: ClusterRole</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner-runner</span>
+<span style="color: #ffa54f;">  apiGroup: rbac.authorization.k8s.io</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: Role</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: leader-locking-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">rules:</span>
+<span style="color: #ffa54f;">- apiGroups: [""]</span>
+<span style="color: #ffa54f;">  resources: ["endpoints"]</span>
+<span style="color: #ffa54f;">  verbs: ["get", "list", "watch", "create", "update", "patch"]</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: RoleBinding</span>
+<span style="color: #ffa54f;">apiVersion: rbac.authorization.k8s.io/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: leader-locking-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">subjects:</span>
+<span style="color: #ffa54f;">- kind: ServiceAccount</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  # replace with namespace where provisioner is deployed</span>
+<span style="color: #ffa54f;">  namespace: default</span>
+<span style="color: #ffa54f;">roleRef:</span>
+<span style="color: #ffa54f;">  kind: Role</span>
+<span style="color: #ffa54f;">  name: leader-locking-nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  apiGroup: rbac.authorization.k8s.io</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; deployment.yaml
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: ServiceAccount</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">kind: Deployment</span>
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  replicas: 1</span>
+<span style="color: #ffa54f;">  strategy:</span>
+<span style="color: #ffa54f;">    type: Recreate</span>
+<span style="color: #ffa54f;">  selector:</span>
+<span style="color: #ffa54f;">    matchLabels:</span>
+<span style="color: #ffa54f;">      app: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      serviceAccount: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">        - name: nfs-client-provisioner</span>
+<span style="color: #ffa54f;">          image: quay.io/external_storage/nfs-client-provisioner:latest</span>
+<span style="color: #ffa54f;">          volumeMounts:</span>
+<span style="color: #ffa54f;">            - name: nfs-client-root</span>
+<span style="color: #ffa54f;">              mountPath: /persistentvolumes</span>
+<span style="color: #ffa54f;">          env:</span>
+<span style="color: #ffa54f;">            - name: PROVISIONER_NAME</span>
+<span style="color: #ffa54f;">              value: fuseim.pri/ifs</span>
+<span style="color: #ffa54f;">            - name: NFS_SERVER</span>
+<span style="color: #ffa54f;">              value: 172.17.79.3</span>
+<span style="color: #ffa54f;">            - name: NFS_PATH</span>
+<span style="color: #ffa54f;">              value: /data/nfs-share</span>
+<span style="color: #ffa54f;">      volumes:</span>
+<span style="color: #ffa54f;">        - name: nfs-client-root</span>
+<span style="color: #ffa54f;">          nfs:</span>
+<span style="color: #ffa54f;">            server: 172.17.79.3</span>
+<span style="color: #ffa54f;">            path: /data/nfs-share</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &lt;&lt;\EOF&gt; class.yaml
+<span style="color: #ffa54f;">apiVersion: storage.k8s.io/v1</span>
+<span style="color: #ffa54f;">kind: StorageClass</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nfs-csi</span>
+<span style="color: #ffa54f;">provisioner: fuseim.pri/ifs</span>
+<span style="color: #ffa54f;">reclaimPolicy: Retain #PV&#30340;&#21024;&#38500;&#31574;&#30053;&#65292;&#40664;&#35748;&#20026;delete&#65292;&#21024;&#38500;&#21518;PV&#31435;&#21363;&#21024;&#38500;NFS server&#30340;&#25968;&#25454;</span>
+<span style="color: #ffa54f;">mountOptions:</span>
+<span style="color: #ffa54f;">  - noatime #&#35775;&#38382;&#25991;&#20214;&#26102;&#19981;&#26356;&#26032;&#25991;&#20214;inode&#20013;&#30340;&#26102;&#38388;&#25139;</span>
+<span style="color: #ffa54f;">parameters:</span>
+<span style="color: #ffa54f;">  archiveOnDelete: "true"  #true&#20026;&#21024;&#38500;pod&#26102;&#20445;&#30041;pod&#25968;&#25454;&#12290;false &#21024;&#38500;&#26102;&#19981;&#20445;&#30041;&#25968;&#25454;</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#35282;&#33394;</span>
+kubectl create -f rbac.yaml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314; ServiceAccount &#21644;&#37096;&#32626; NFS-Client Provisioner</span>
+kubectl create -f deployment.yaml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314; NFS StorageClass</span>
+kubectl create -f class.yaml
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;NFS&#37096;&#32626;&#25104;&#21151;</span>
+kubectl get pod -l <span style="color: #a0522d;">app</span>=nfs-client-provisioner
+</pre>
+</div>
+
+<p>
+动态创建pvc
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; sts.yaml
+
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">kind: StatefulSet</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nacos</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">...</span>
+<span style="color: #ffa54f;">  serviceName: nacos-headless</span>
+<span style="color: #ffa54f;">  replicas: 3</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nacos</span>
+<span style="color: #ffa54f;">...</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">        - name: nacos</span>
+<span style="color: #ffa54f;">          imagePullPolicy: Always</span>
+<span style="color: #ffa54f;">          image: nacos/nacos-server:latest</span>
+<span style="color: #ffa54f;">          volumeMounts:</span>
+<span style="color: #ffa54f;">            - name: data</span>
+<span style="color: #ffa54f;">              mountPath: /home/nacos/data</span>
+<span style="color: #ffa54f;">              subPath: data</span>
+<span style="color: #ffa54f;">  volumeClaimTemplates:</span>
+<span style="color: #ffa54f;">    - metadata:</span>
+<span style="color: #ffa54f;">        name: data</span>
+<span style="color: #ffa54f;">      spec:</span>
+<span style="color: #ffa54f;">        storageClassName: nfs-csi</span>
+<span style="color: #ffa54f;">        accessModes: [ "ReadWriteMany" ]</span>
+<span style="color: #ffa54f;">        resources:</span>
+<span style="color: #ffa54f;">          requests:</span>
+<span style="color: #ffa54f;">            storage: 10Gi</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

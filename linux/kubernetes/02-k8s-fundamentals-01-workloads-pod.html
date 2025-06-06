@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 基础概念</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 基础概念</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:ac15e7a8-8026-495e-adbc-eda644d2d35c">docker基础</a>
+<ul>
+<li><a href="#h:13480b74-a8dd-4bc9-9b9f-5b97b3d310b6">多阶段小镜像</a></li>
+<li><a href="#h:41b68869-16a0-4207-b655-145834de3eff">scratch镜像</a></li>
+<li><a href="#h:deba88bd-c886-4108-8c72-ade6a05cfd23">通过docker overlay2 目录名查找对应容器名</a></li>
+</ul>
+</li>
+<li><a href="#h:252df1ad-f4a6-400d-8291-8a0fce6f7357">为什么选择 k8s</a>
+<ul>
+<li><a href="#h:9eedd62e-9f60-489d-942a-b825109a819b">裸容器的问题</a></li>
+<li><a href="#h:46259a7b-6c0f-4ebf-830f-3654dcd86af2">容器编排应运而生</a></li>
+</ul>
+</li>
+<li><a href="#h:ef966b6c-7c45-459f-9b47-7b6c50d52cc1">k8s基础</a>
+<ul>
+<li><a href="#h:8de35a6b-c07b-4e3d-a5fb-1cf491b78f7f">k8s介绍</a></li>
+<li><a href="#h:0497c53f-4d5d-4c81-8286-a70a0800249b">基础组件概述</a>
+<ul>
+<li><a href="#h:53c6627d-7e37-4805-8d00-23ee2e62120b">Master节点组件</a>
+<ul>
+<li><a href="#h:3bbc68e6-d213-4ead-baab-d190031acd09">控制节点的状态</a></li>
+</ul>
+</li>
+<li><a href="#h:691835df-ca87-4cb0-bad6-0d2cd6aa0e13">Node节点组件</a></li>
+</ul>
+</li>
+<li><a href="#h:84d94595-2312-4d96-b73e-d54fe1e1083a">Pod</a>
+<ul>
+<li><a href="#h:a8fb3e09-962b-4b69-91ce-e58ac9024bb2">什么是Pod</a></li>
+<li><a href="#h:c5ab3ec1-9c92-43c1-85ca-7cb31f1153d4">为什么要引入 pod</a></li>
+<li><a href="#h:c6614949-3470-4537-9a1d-799c1da3054b">定义一个 Pod</a>
+<ul>
+<li><a href="#h:d16f89a1-7af9-465f-8568-66045c0bff7b">一份比较完整的yaml文件介绍</a></li>
+<li><a href="#h:5be433f7-b4f2-47be-a634-7d8cbaf0b5ec">创建一个容器（maser01上）</a></li>
+</ul>
+</li>
+<li><a href="#h:d678f42c-bbdb-41ac-9b0d-f42609da038f">修改 pod 内容器启动命令</a></li>
+<li><a href="#h:b895d90a-489f-4007-9126-31addbcd29e3">pod 状态及问题排查方法</a></li>
+<li><a href="#h:704706b9-8626-4e29-b058-d46d6dcbcac9">Pod 拉取镜像策略</a></li>
+<li><a href="#h:babfae4b-b503-4bc4-891e-d9dd5ce5d21e">Pod 重启策略</a></li>
+<li><a href="#h:f319b7a5-9f3c-4147-9216-e3270fa00642">零宕机服务发布</a>
+<ul>
+<li><a href="#h:dba4234a-4490-4f5b-8719-1ef4cc253e36">Pod 三种探针</a></li>
+<li><a href="#h:19c08ce4-8ca1-4ad4-b169-8afeec827a21">livenessProbe 和 readinessProbe</a></li>
+<li><a href="#h:6062f7f8-ba5e-4844-ab94-0427956f65c6">配置 startupProbe</a></li>
+<li><a href="#h:a12212bd-8f31-4e69-8202-e7094c067388">preStop 和 preStart</a></li>
+<li><a href="#h:2ca1b662-2153-4d95-9a82-1e77efbe4e9b">gRPC 探测（1.24默认开启）</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:ac15e7a8-8026-495e-adbc-eda644d2d35c" class="outline-2">
+<h2 id="h:ac15e7a8-8026-495e-adbc-eda644d2d35c">docker基础</h2>
+<div class="outline-text-2" id="text-h:ac15e7a8-8026-495e-adbc-eda644d2d35c">
+<p>
+具体的参考，docker篇，这里只是补充
+</p>
+</div>
+<div id="outline-container-h:13480b74-a8dd-4bc9-9b9f-5b97b3d310b6" class="outline-3">
+<h3 id="h:13480b74-a8dd-4bc9-9b9f-5b97b3d310b6">多阶段小镜像</h3>
+<div class="outline-text-3" id="text-h:13480b74-a8dd-4bc9-9b9f-5b97b3d310b6">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#32534;&#35793;&#29615;&#22659;&#65292;&#29983;&#25104;&#20108;&#36827;&#21046;&#25991;&#20214;</span>
+FROM golang:1.14.2-alpine3.11 as builder
+MAINTAINER jett <a href="mailto:jettjia%40qq.com">&lt;jettjia@qq.com&gt;</a>
+ENV <span style="color: #a0522d;">GO111MODULE</span>=on
+RUN apk update &amp;&amp; <span style="color: #8b2252;">\</span>
+    apk upgrade &amp;&amp; <span style="color: #8b2252;">\</span>
+    apk add git gcc libc-dev linux-headers
+RUN go get -ldflags <span style="color: #8b2252;">"-X main.VERSION=$(</span><span style="color: #ff00ff;">date -u +%Y%m%d</span><span style="color: #8b2252;">) -s -w"</span> github.com/xtaci/kcptun/client &amp;&amp; go get -ldflags <span style="color: #8b2252;">"-X main.VERSION=$(</span><span style="color: #ff00ff;">date -u +%Y%m%d</span><span style="color: #8b2252;">) -s -w"</span> github.com/xtaci/kcptun/server
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21482;&#25335;&#36125;&#25152;&#38656;&#35201;&#30340;&#20108;&#36827;&#21046;&#25991;&#20214;</span>
+FROM alpine:3.11
+RUN apk add --no-cache iptables
+COPY --from=builder /go/bin /bin
+EXPOSE 29900/udp
+EXPOSE 12948
+</pre>
+</div>
+
+<p>
+这个例子，是以golang 1.14 进行打包的，其实主要命令就是go get 会生成文件到GOPATH="/home/chunk/go"，比如以上dockerfile的go get会生成两个文件到GOPATH的bin
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">ls /home/chunk/go/bin/
+client  server
+</pre>
+</div>
+
+<p>
+多阶段构建的目的只要就是缩小docker容器的体积，最终打出来的镜像以FROM alpine:3.11为准，关键在于
+ COPY &#x2013;from=builder /go/bin /bin， 只拷贝了/go/bin 整个目录到/bin，即系client和server这个两个二进制文件，从而避免把git gcc libc-dev linux-headers这些包也打入镜像，从而达到最小镜像。
+</p>
+
+
+
+<p>
+如何运行这个镜像
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">docker run -d -p 1505:1505 -p 29900:29900 xtaci/kcptun client -r xxx.xxx.xxx.xxx:29900 -l :1505 -key test -mtu 1400 -mode fast3
+</pre>
+</div>
+
+<p>
+<a href="https://www.cnblogs.com/csnd/p/12061840.html">https://www.cnblogs.com/csnd/p/12061840.html</a>
+</p>
+
+<p>
+<a href="https://www.jianshu.com/p/f92000f6cba6">https://www.jianshu.com/p/f92000f6cba6</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:41b68869-16a0-4207-b655-145834de3eff" class="outline-3">
+<h3 id="h:41b68869-16a0-4207-b655-145834de3eff">scratch镜像</h3>
+<div class="outline-text-3" id="text-h:41b68869-16a0-4207-b655-145834de3eff">
+<p>
+更小的镜像，但是如果有依赖的话，尽量少用。可以用alpine
+</p>
+</div>
+</div>
+<div id="outline-container-h:deba88bd-c886-4108-8c72-ade6a05cfd23" class="outline-3">
+<h3 id="h:deba88bd-c886-4108-8c72-ade6a05cfd23">通过docker overlay2 目录名查找对应容器名</h3>
+<div class="outline-text-3" id="text-h:deba88bd-c886-4108-8c72-ade6a05cfd23">
+<div class="org-src-container">
+<pre class="src src-shell">
+<span style="color: #483d8b;">cd</span> /var/lib/docker/overlay2/
+du -s ./* | sort -rn | more
+
+<span style="color: #a0522d;">oid</span>=<span style="color: #8b2252;">"40235d8989bfbc6b95cdb5c28c1224728138ce746f0c81ca68a9ef1782f33541"</span>
+docker ps -q | xargs docker inspect --format <span style="color: #8b2252;">'{{.State.Pid}}, {{.Id}}, {{.Name}}, {{.GraphDriver.Data.WorkDir}}'</span> | grep $<span style="color: #a0522d;">oid</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#36755;&#20986;&#20381;&#27425;&#20026;&#65292;&#36827;&#31243;pid&#12289;&#23481;&#22120;ID&#12289;&#23481;&#22120;&#21517;&#12289;&#23384;&#20648;work&#36335;&#24452;&#65292;&#21363;&#21487;&#30830;&#23450;&#26159;&#21738;&#20010;&#23481;&#22120;&#12290;</span>
+
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">diff &#23545;&#24212; &#23481;&#22120;</span>
+[root@ip-172-21-39-111 root]# pwd
+/var/lib/docker/overlay2/40235d8989bfbc6b95cdb5c28c1224728138ce746f0c81ca68a9ef1782f33541/diff/root
+[root@ip-172-21-39-111 root]# du -sh *
+1.9G    logs
+24K     nacos
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23545;&#24212;&#23481;&#22120;&#20013;</span>
+bash-4.2# cd /root/
+bash-4.2# du -sh *
+1.9G    logs
+24K     nacos
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:252df1ad-f4a6-400d-8291-8a0fce6f7357" class="outline-2">
+<h2 id="h:252df1ad-f4a6-400d-8291-8a0fce6f7357">为什么选择 k8s</h2>
+<div class="outline-text-2" id="text-h:252df1ad-f4a6-400d-8291-8a0fce6f7357">
+</div>
+<div id="outline-container-h:9eedd62e-9f60-489d-942a-b825109a819b" class="outline-3">
+<h3 id="h:9eedd62e-9f60-489d-942a-b825109a819b">裸容器的问题</h3>
+<div class="outline-text-3" id="text-h:9eedd62e-9f60-489d-942a-b825109a819b">
+<ul class="org-ul">
+<li>宿主机宕机容器无法自动恢复</li>
+<li>程序级健康检查依旧不到位</li>
+<li>程序的扩容、部署、回滚和更新依旧不够灵活</li>
+<li>端口问题并未得到解决，容器多时不好管理并存在端口冲突问题</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:46259a7b-6c0f-4ebf-830f-3654dcd86af2" class="outline-3">
+<h3 id="h:46259a7b-6c0f-4ebf-830f-3654dcd86af2">容器编排应运而生</h3>
+<div class="outline-text-3" id="text-h:46259a7b-6c0f-4ebf-830f-3654dcd86af2">
+<ul class="org-ul">
+<li>轻松管理成千上万的业务容器</li>
+<li>全自动容灾机制</li>
+<li>全自动扩缩容、回滚</li>
+<li>原生服务发布、负载均衡</li>
+<li>更加灵活方便的健康检查</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:ef966b6c-7c45-459f-9b47-7b6c50d52cc1" class="outline-2">
+<h2 id="h:ef966b6c-7c45-459f-9b47-7b6c50d52cc1">k8s基础</h2>
+<div class="outline-text-2" id="text-h:ef966b6c-7c45-459f-9b47-7b6c50d52cc1">
+</div>
+<div id="outline-container-h:8de35a6b-c07b-4e3d-a5fb-1cf491b78f7f" class="outline-3">
+<h3 id="h:8de35a6b-c07b-4e3d-a5fb-1cf491b78f7f">k8s介绍</h3>
+<div class="outline-text-3" id="text-h:8de35a6b-c07b-4e3d-a5fb-1cf491b78f7f">
+<p>
+k8s是一个全新的基于容器技术的分布式架构解决方案，并且是一个一站式的完备的分布式系统开发和支撑平台。 
+</p>
+
+<p>
+使用架构
+</p>
+</div>
+</div>
+<div id="outline-container-h:0497c53f-4d5d-4c81-8286-a70a0800249b" class="outline-3">
+<h3 id="h:0497c53f-4d5d-4c81-8286-a70a0800249b">基础组件概述</h3>
+<div class="outline-text-3" id="text-h:0497c53f-4d5d-4c81-8286-a70a0800249b">
+</div>
+<div id="outline-container-h:53c6627d-7e37-4805-8d00-23ee2e62120b" class="outline-4">
+<h4 id="h:53c6627d-7e37-4805-8d00-23ee2e62120b">Master节点组件</h4>
+<div class="outline-text-4" id="text-h:53c6627d-7e37-4805-8d00-23ee2e62120b">
+<p>
+Master节点：整个集群的控制中枢。 组件有：kube-apiserver、kube-controller-manager、kube-scheduler
+</p>
+
+<ul class="org-ul">
+<li>kube-apiserver: 集群的控制中枢，各个模块之间信息交互都需要经过 kube-apiserver，并将集群状态和信息存储到分布式键-值存储系统 etcd 集群中。同时它也是集群管理、资源配置、整个集群安全机制的入口，为集群各类资源对象提供增删改查以及 watch 的 REST API 接口。</li>
+<li>kube-scheduler：集群 pod 的调度中心，主要是通过调试算法将 pod 分配到最佳的 node 节点，它通完 apiserver 监听所有 pod 的状态，一旦发现新的未被调试到任何 node 节点的 pod （PodSpec.NodeName  为空），就会根据一系列策略选择最佳节点进行调度。</li>
+<li>kube-controller-manager: 集群的状态管理器，保证 Pod 或其他资源到达期望值。当集群中某个 pod 副本数或其它资源因故障和错误导致无法正常运行，没有达到设定的值时， Controller Manager 会尝试自动修复并使其达到期望状态。</li>
+<li>etcd：键值数据库，保存一些集群的信息。生产环境部署奇数个节点，3个以上，推荐使用ssd磁盘。</li>
+</ul>
+</div>
+<div id="outline-container-h:3bbc68e6-d213-4ead-baab-d190031acd09" class="outline-5">
+<h5 id="h:3bbc68e6-d213-4ead-baab-d190031acd09">控制节点的状态</h5>
+<div class="outline-text-5" id="text-h:3bbc68e6-d213-4ead-baab-d190031acd09">
+<p>
+apiserver 是无状态的。
+</p>
+
+<p>
+scheduler 和 controller manager 是有选主机制的，都是有状态的服务。主从信息保存在
+</p>
+<ul class="org-ul">
+<li>1.20 以前是在 kube-system 的 ep 中注释了的主节点信息。`kubectl get ep -oyaml -n kube-system`</li>
+<li>1.20 之后是在 kube-system 的 leases 中。`kubectl get leases -n kube-system`</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[jasper.xu@ip-172-21-39-120 ~]$ kubectl get leases -n kube-system
+
+NAME                                  HOLDER                                                                             AGE
+cloud-controller-manager              ip-10-0-100-120.ap-south-1.compute.internal_d235d047-c662-490a-bba7-9930f8e15b49   42d
+cloud-provider-extraction-migration   ip-10-0-100-120.ap-south-1.compute.internal_a07c8151-deae-4d3e-9616-583c073290a2   34d
+cluster-autoscaler                    cluster-autoscaler-66cffcc58c-rnk94                                                55d
+kube-controller-manager               ip-10-0-100-120.ap-south-1.compute.internal_a07c8151-deae-4d3e-9616-583c073290a2   594d
+kube-scheduler                        ip-10-0-100-120.ap-south-1.compute.internal_73c79638-c5ea-46c8-95aa-adb511ded71f   594d
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:691835df-ca87-4cb0-bad6-0d2cd6aa0e13" class="outline-4">
+<h4 id="h:691835df-ca87-4cb0-bad6-0d2cd6aa0e13">Node节点组件</h4>
+<div class="outline-text-4" id="text-h:691835df-ca87-4cb0-bad6-0d2cd6aa0e13">
+<p>
+Worker、Node节点、Minion节点，Node节点组件是指运行在Node节点上，负责具体 Pod 运行时环境的组件。
+</p>
+
+<ul class="org-ul">
+<li>kubelet: 负责与 Master 节点通信，并管理节点上的 Pod，对容器进行健康检查及监控，同时负责上报节点和节点上面 pod 状态。</li>
+<li>kube-proxy: 负责 Pod 之间的通信和负载均衡，将指定的流量分发到后端正确的机器上。</li>
+<li>Runtime：负责容器管理</li>
+<li>CoreDNS：用于 k8s 集群内部 Service 解析，可以让 pod 把 Service 名称解析成 Service 的 ip，然后通过 Service 的 IP 地址进行连接到对应的应用上。</li>
+<li>Calico：符合 CNI  标准的一个网络插件，它负责给每个 pod 分配一个不会重复的 Ip，并且把每个节点当做一个"路由器"，这样一个节点的 pod 就可以通过 IP 地址访问到节点的 pod。</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# netstat -lntp | grep kube-proxy
+tcp        0      0 0.0.0.0:31204           0.0.0.0:*               LISTEN      1261/kube-proxy
+tcp        0      0 127.0.0.1:10249         0.0.0.0:*               LISTEN      1261/kube-proxy
+tcp6       0      0 :::10256                :::*                    LISTEN      1261/kube-proxy
+[root@k8s-master01 ~]# curl 127.0.0.1:10249/proxyMode
+ipvs
+</pre>
+</div>
+
+<p>
+ipvs：监听 Master 节点增加和删除 service 以及 endpoint 的消息，调用 Netlink 接口创建相应的 IPVS 规则。通过IPVS规则，将流量转发至相应的Pod上。
+</p>
+
+<p>
+iptables: 监听 Master 节点增加和删除 service 以及 endpoint 的消息，对于每一个 Service，他都会创建一个 iptables规则，将 service 的 clusterIP 代理到后端对应的 Pod。
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">ipvs&#20013;&#65292;dashboard&#30340;&#28436;&#31034;.</span>
+[root@k8s-master01 ~]# ipvsadm -ln
+IP Virtual Server version 1.2.1 (<span style="color: #a0522d;">size</span>=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -&gt; RemoteAddress:Port           Forward Weight ActiveConn InActConn
+TCP  172.17.0.1:31204 rr
+  -&gt; 172.169.244.196:8443         Masq    1      0          0
+TCP  172.169.244.192:31204 rr
+  -&gt; 172.169.244.196:8443         Masq    1      0          0
+TCP  10.4.7.107:31204 rr
+  -&gt; 172.169.244.196:8443         Masq    1      0          0
+TCP  10.4.7.236:31204 rr
+  -&gt; 172.169.244.196:8443         Masq    1      1          0
+TCP  10.96.0.1:443 rr
+  -&gt; 10.4.7.107:6443              Masq    1      0          0
+  -&gt; 10.4.7.108:6443              Masq    1      0          0
+  -&gt; 10.4.7.109:6443              Masq    1      1          0
+TCP  10.96.0.10:53 rr
+  -&gt; 172.161.125.4:53             Masq    1      0          0
+TCP  10.96.0.10:9153 rr
+  -&gt; 172.161.125.4:9153           Masq    1      0          0
+TCP  10.98.15.94:443 rr
+  -&gt; 172.169.244.196:8443         Masq    1      0          0
+TCP  10.102.175.175:443 rr
+  -&gt; 172.171.14.195:4443          Masq    1      3          0
+TCP  10.108.133.81:8000 rr
+  -&gt; 172.169.92.67:8000           Masq    1      0          0
+TCP  127.0.0.1:31204 rr
+  -&gt; 172.169.244.196:8443         Masq    1      0          0
+UDP  10.96.0.10:53 rr
+  -&gt; 172.161.125.4:53             Masq    1      0          0
+[root@k8s-master01 ~]# kubectl get svc -n kubernetes-dashboard
+NAME                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)         AGE
+dashboard-metrics-scraper   ClusterIP   10.108.133.81   &lt;none&gt;        8000/TCP        12h
+kubernetes-dashboard        NodePort    10.98.15.94     &lt;none&gt;        443:31204/TCP   12h
+[root@k8s-master01 ~]# kubectl get po -n kubernetes-dashboard -owide
+NAME                                         READY   STATUS    RESTARTS   AGE   IP                NODE           NOMINATED NODE   READINESS GATES
+dashboard-metrics-scraper-7645f69d8c-6ckjn   1/1     Running   2          12h   172.169.92.67     k8s-master02   &lt;none&gt;           &lt;none&gt;
+kubernetes-dashboard-78cb679857-lrjkb        1/1     Running   2          12h   172.169.244.196   k8s-master01   &lt;none&gt;           &lt;none&gt;
+
+</pre>
+</div>
+
+<p>
+其它组件：
+</p>
+
+<ul class="org-ul">
+<li>Calico: 符合 CNI标准的网络插件，给每个 Pod 生成一个唯一的IP地址，并且把每个节点当作一个路由器。</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl get po -n kube-system -owide
+NAME                                       READY   STATUS    RESTARTS   AGE   IP               NODE           NOMINATED NODE   READINESS GATES
+calico-kube-controllers-5f6d4b864b-rnw7z   1/1     Running   2          13h   10.4.7.109       k8s-master03   &lt;none&gt;           &lt;none&gt;
+calico-node-78fgh                          1/1     Running   2          13h   10.4.7.111       k8s-node02     &lt;none&gt;           &lt;none&gt;
+calico-node-bmm4m                          1/1     Running   2          13h   10.4.7.110       k8s-node01     &lt;none&gt;           &lt;none&gt;
+calico-node-lz5pw                          1/1     Running   2          13h   10.4.7.109       k8s-master03   &lt;none&gt;           &lt;none&gt;
+calico-node-ndhdr                          1/1     Running   2          13h   10.4.7.107       k8s-master01   &lt;none&gt;           &lt;none&gt;
+calico-node-pqd7s                          1/1     Running   2          13h   10.4.7.108       k8s-master02   &lt;none&gt;           &lt;none&gt;
+coredns-867d46bfc6-h9j7n                   1/1     Running   2          13h   172.161.125.4    k8s-node01     &lt;none&gt;           &lt;none&gt;
+metrics-server-595f65d8d5-gzwxf            1/1     Running   2          13h   172.171.14.195   k8s-node02     &lt;none&gt;           &lt;none&gt;
+
+route -n
+</pre>
+</div>
+
+<p>
+Cilium 插件引入了 eBPF 机制可以原生的替换 kube-proxy
+</p>
+
+<ul class="org-ul">
+<li>CoreDNS: 用于kubernetes集群内部 service的解析，可以让 Pod 把service 名称解析成IP地址，然后通过 service的IP地址进行链接到对应的应用上。</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl get svc -n kube-system
+NAME             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE
+kube-dns         ClusterIP   10.96.0.10       &lt;none&gt;        53/UDP,53/TCP,9153/TCP   13h
+metrics-server   ClusterIP   10.102.175.175   &lt;none&gt;        443/TCP                  13h
+
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>Docker: 容器引擎，负责对容器的管理。</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:84d94595-2312-4d96-b73e-d54fe1e1083a" class="outline-3">
+<h3 id="h:84d94595-2312-4d96-b73e-d54fe1e1083a">Pod</h3>
+<div class="outline-text-3" id="text-h:84d94595-2312-4d96-b73e-d54fe1e1083a">
+</div>
+<div id="outline-container-h:a8fb3e09-962b-4b69-91ce-e58ac9024bb2" class="outline-4">
+<h4 id="h:a8fb3e09-962b-4b69-91ce-e58ac9024bb2">什么是Pod</h4>
+<div class="outline-text-4" id="text-h:a8fb3e09-962b-4b69-91ce-e58ac9024bb2">
+<p>
+Pod 是 Kubernetes 中最小的单元，它由一组、一个或多个容器组成，每个 Pod 还包含了一个 Pause 容器。
+</p>
+
+<p>
+Pause 容器是 Pod 的父容器，主要负责僵尸进程的回收管理，同时通过 Pause 容器可以使同一个 Pod 里面的多个容器共享存储、网络、PID、IPC 等，容器之间可以使用 localhost:port 相互访问，可以使用 volume 等实现数据共享。根据 docker 的构造，pod 可被建模为一组具有共享名称空间、卷、ip 地址和 port 端口的容器。
+</p>
+
+<p>
+说明：Pod 一般不直接操作，通过 Deployment、StatefulSet、DaemonSet 控制。
+</p>
+
+<p>
+查看 pod
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get po -n kube-system <span style="color: #b22222;"># </span><span style="color: #b22222;">po &#26159;&#31616;&#20889;&#65292;&#36824;&#21487;&#20197;&#20889;&#25104; pod &#25110; pods</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25110;&#32773;&#29992; containd &#24037;&#20855;</span>
+ctr -n k8s.io c ls
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c5ab3ec1-9c92-43c1-85ca-7cb31f1153d4" class="outline-4">
+<h4 id="h:c5ab3ec1-9c92-43c1-85ca-7cb31f1153d4">为什么要引入 pod</h4>
+<div class="outline-text-4" id="text-h:c5ab3ec1-9c92-43c1-85ca-7cb31f1153d4">
+<ul class="org-ul">
+<li>强依赖的服务需要部署在一起</li>
+<li>多个服务需要协同工作</li>
+<li>兼容其它 CRI 标准的运行时</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c6614949-3470-4537-9a1d-799c1da3054b" class="outline-4">
+<h4 id="h:c6614949-3470-4537-9a1d-799c1da3054b">定义一个 Pod</h4>
+<div class="outline-text-4" id="text-h:c6614949-3470-4537-9a1d-799c1da3054b">
+</div>
+<div id="outline-container-h:d16f89a1-7af9-465f-8568-66045c0bff7b" class="outline-5">
+<h5 id="h:d16f89a1-7af9-465f-8568-66045c0bff7b">一份比较完整的yaml文件介绍</h5>
+<div class="outline-text-5" id="text-h:d16f89a1-7af9-465f-8568-66045c0bff7b">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1  # 必选，API的版本号
+kind: Pod       # 必选，类型Pod
+metadata:       # 必选，元数据
+  name: nginx   # 必选，符合RFC 1035规范的Pod名称
+  namespace: default # 可选，Pod所在的命名空间，不指定默认为default，可以使用-n 指定namespace 
+  labels:       # 可选，标签选择器，一般用于过滤和区分Pod
+    app: nginx
+    role: frontend # 可以写多个
+  annotations:  # 可选，注释列表，可以写多个
+    app: nginx
+spec:   # 必选，用于定义容器的详细信息
+  initContainers: # 初始化容器，在容器启动之前执行的一些初始化操作
+  - command:
+    - sh
+    - -c
+    - echo "I am InitContainer for init some configuration"
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    name: init-container
+  containers:   # 必选，容器列表
+  - name: nginx # 必选，符合RFC 1035规范的容器名称
+    image: nginx:latest         # 必选，容器所用的镜像的地址
+    imagePullPolicy: Always     # 可选，镜像拉取策略, IfNotPresent: 如果宿主机有这个镜像，那就不需要拉取了. Always: 总是拉取, Never: 不管是否存储都不拉去
+    command: # 可选，容器启动执行的命令，相当于 docker 里的 ENTRYPOINT。args 相当于 cmd
+    - nginx 
+    - -g
+    - "daemon off;"
+    workingDir: /usr/share/nginx/html       # 可选，容器的工作目录
+    volumeMounts:   # 可选，存储卷配置，可以配置多个
+    - name: webroot # 存储卷名称
+      mountPath: /usr/share/nginx/html # 挂载目录
+      readOnly: true        # 只读
+    ports:  # 可选，容器需要暴露的端口号列表
+    - name: http    # 端口名称
+      containerPort: 80     # 端口号
+      protocol: TCP # 端口协议，默认TCP
+    env:    # 可选，环境变量配置列表
+    - name: TZ      # 变量名
+      value: Asia/Shanghai # 变量的值
+    - name: LANG
+      value: en_US.utf8
+    resources:      # 可选，资源限制和资源请求限制
+      limits:       # 最大限制设置
+        cpu: 1000m
+        memory: 1024Mi
+      requests:     # 启动所需的资源
+        cpu: 100m
+        memory: 512Mi
+#    startupProbe: # 可选，检测容器内进程是否完成启动。注意三种检查方式同时只能使用一种。
+#      httpGet:      # httpGet检测方式，生产环境建议使用httpGet实现接口级健康检查，健康检查由应用程序提供。
+#            path: /api/successStart # 检查路径
+#            port: 80
+    readinessProbe: # 可选，健康检查。注意三种检查方式同时只能使用一种。
+      httpGet:      # httpGet检测方式，生产环境建议使用httpGet实现接口级健康检查，健康检查由应用程序提供。
+            path: / # 检查路径
+            port: 80        # 监控端口
+    livenessProbe:  # 可选，健康检查
+      #exec:        # 执行容器命令检测方式
+            #command: 
+            #- cat
+            #- /health
+    #httpGet:       # httpGet检测方式
+    #   path: /_health # 检查路径
+    #   port: 8080
+    #   httpHeaders: # 检查的请求头
+    #   - name: end-user
+    #     value: Jason 
+      tcpSocket:    # 端口检测方式
+            port: 80
+      initialDelaySeconds: 60       # 初始化时间
+      timeoutSeconds: 2     # 超时时间
+      periodSeconds: 5      # 检测间隔
+      successThreshold: 1 # 检查成功为2次表示就绪
+      failureThreshold: 2 # 检测失败1次表示未就绪
+    lifecycle:
+      postStart: # 容器创建完成后执行的指令, 可以是exec httpGet TCPSocket
+        exec:
+          command:
+          - sh
+          - -c
+          - 'mkdir /data/ '
+      preStop:
+        httpGet:      
+              path: /
+              port: 80
+      #  exec:
+      #    command:
+      #    - sh
+      #    - -c
+      #    - sleep 9
+  restartPolicy: Always   # 可选，默认为Always，容器故障或者没有启动成功，那就自动该容器，Onfailure: 容器以不为0的状态终止，自动重启该容器, Never:
+  #nodeSelector: # 可选，指定Node节点
+  #      region: subnet7
+  imagePullSecrets:     # 可选，拉取镜像使用的secret，可以配置多个
+  - name: default-dockercfg-86258
+  hostNetwork: false    # 可选，是否为主机模式，如是，会占用主机端口
+  volumes:      # 共享存储卷列表
+  - name: webroot # 名称，与上述对应
+    emptyDir: {}    # 挂载目录
+        #hostPath:              # 挂载本机目录
+        #  path: /etc/hosts
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5be433f7-b4f2-47be-a634-7d8cbaf0b5ec" class="outline-5">
+<h5 id="h:5be433f7-b4f2-47be-a634-7d8cbaf0b5ec">创建一个容器（maser01上）</h5>
+<div class="outline-text-5" id="text-h:5be433f7-b4f2-47be-a634-7d8cbaf0b5ec">
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# cat &gt; pod.yaml &lt;&lt; EOF  
+<span style="color: #ffa54f;">apiVersion: v1 # &#24517;&#36873;&#65292;API&#30340;&#29256;&#26412;&#21495;</span>
+<span style="color: #ffa54f;">kind: Pod       # &#24517;&#36873;&#65292;&#31867;&#22411;Pod</span>
+<span style="color: #ffa54f;">metadata:       # &#24517;&#36873;&#65292;&#20803;&#25968;&#25454;</span>
+<span style="color: #ffa54f;">  name: nginx   # &#24517;&#36873;&#65292;&#31526;&#21512;RFC 1035&#35268;&#33539;&#30340;Pod&#21517;&#31216;</span>
+<span style="color: #ffa54f;">  # namespace: default # &#21487;&#36873;&#65292;Pod&#25152;&#22312;&#30340;&#21629;&#21517;&#31354;&#38388;&#65292;&#19981;&#25351;&#23450;&#40664;&#35748;&#20026;default&#65292;&#21487;&#20197;&#20351;&#29992;-n &#25351;&#23450;namespace </span>
+<span style="color: #ffa54f;">  labels:       # &#21487;&#36873;&#65292;&#26631;&#31614;&#36873;&#25321;&#22120;&#65292;&#19968;&#33324;&#29992;&#20110;&#36807;&#28388;&#21644;&#21306;&#20998;Pod</span>
+<span style="color: #ffa54f;">    app: nginx</span>
+<span style="color: #ffa54f;">    role: frontend # &#21487;&#20197;&#20889;&#22810;&#20010;</span>
+<span style="color: #ffa54f;">  annotations:  # &#21487;&#36873;&#65292;&#27880;&#37322;&#21015;&#34920;&#65292;&#21487;&#20197;&#20889;&#22810;&#20010;</span>
+<span style="color: #ffa54f;">    app: nginx</span>
+<span style="color: #ffa54f;">spec:   # &#24517;&#36873;&#65292;&#29992;&#20110;&#23450;&#20041;&#23481;&#22120;&#30340;&#35814;&#32454;&#20449;&#24687;</span>
+<span style="color: #ffa54f;">  containers:   # &#24517;&#36873;&#65292;&#23481;&#22120;&#21015;&#34920;</span>
+<span style="color: #ffa54f;">  - name: nginx # &#24517;&#36873;&#65292;&#31526;&#21512;RFC 1035&#35268;&#33539;&#30340;&#23481;&#22120;&#21517;&#31216;</span>
+<span style="color: #ffa54f;">    image: nginx:1.15.2    # &#24517;&#36873;&#65292;&#23481;&#22120;&#25152;&#29992;&#30340;&#38236;&#20687;&#30340;&#22320;&#22336;</span>
+<span style="color: #ffa54f;">    imagePullPolicy: IfNotPresent     # &#21487;&#36873;&#65292;&#38236;&#20687;&#25289;&#21462;&#31574;&#30053;, IfNotPresent: &#22914;&#26524;&#23487;&#20027;&#26426;&#26377;&#36825;&#20010;&#38236;&#20687;&#65292;&#37027;&#23601;&#19981;&#38656;&#35201;&#25289;&#21462;&#20102;. Always: &#24635;&#26159;&#25289;&#21462;, Never: &#19981;&#31649;&#26159;&#21542;&#23384;&#20648;&#37117;&#19981;&#25289;&#21435;</span>
+<span style="color: #ffa54f;">    command: # &#21487;&#36873;&#65292;&#23481;&#22120;&#21551;&#21160;&#25191;&#34892;&#30340;&#21629;&#20196; ENTRYPOINT, args --&gt; cmd</span>
+<span style="color: #ffa54f;">    - nginx </span>
+<span style="color: #ffa54f;">    - -g</span>
+<span style="color: #ffa54f;">    - "daemon off;"</span>
+<span style="color: #ffa54f;">    workingDir: /usr/share/nginx/html       # &#21487;&#36873;&#65292;&#23481;&#22120;&#30340;&#24037;&#20316;&#30446;&#24405;</span>
+<span style="color: #ffa54f;">    ports:  # &#21487;&#36873;&#65292;&#23481;&#22120;&#38656;&#35201;&#26292;&#38706;&#30340;&#31471;&#21475;&#21495;&#21015;&#34920;</span>
+<span style="color: #ffa54f;">    - name: http    # &#31471;&#21475;&#21517;&#31216;</span>
+<span style="color: #ffa54f;">      containerPort: 80     # &#31471;&#21475;&#21495;</span>
+<span style="color: #ffa54f;">      protocol: TCP # &#31471;&#21475;&#21327;&#35758;&#65292;&#40664;&#35748;TCP</span>
+<span style="color: #ffa54f;">    env:    # &#21487;&#36873;&#65292;&#29615;&#22659;&#21464;&#37327;&#37197;&#32622;&#21015;&#34920;</span>
+<span style="color: #ffa54f;">    - name: TZ      # &#21464;&#37327;&#21517;</span>
+<span style="color: #ffa54f;">      value: Asia/Shanghai # &#21464;&#37327;&#30340;&#20540;</span>
+<span style="color: #ffa54f;">    - name: LANG</span>
+<span style="color: #ffa54f;">      value: en_US.utf8</span>
+<span style="color: #ffa54f;">  restartPolicy: Always   # &#21487;&#36873;&#65292;&#40664;&#35748;&#20026;Always&#65292;&#23481;&#22120;&#25925;&#38556;&#25110;&#32773;&#27809;&#26377;&#21551;&#21160;&#25104;&#21151;&#65292;&#37027;&#23601;&#33258;&#21160;&#35813;&#23481;&#22120;&#65292;Onfailure: &#23481;&#22120;&#20197;&#19981;&#20026;0&#30340;&#29366;&#24577;&#32456;&#27490;&#65292;&#33258;&#21160;&#37325;&#21551;&#35813;&#23481;&#22120;, Never:</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#19968;&#20010;pod</span>
+[root@k8s-master01 ~]# kubectl create -f pod.yaml 
+pod/nginx created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#21018;&#21018;&#21019;&#24314;&#30340;Pod</span>
+[root@k8s-master01 ~]# kubectl  get po
+NAME      READY   STATUS    RESTARTS   AGE
+busybox   1/1     Running   4          17h
+nginx     1/1     Running   0          5m24s
+
+[root@k8s-master01 ~]# kubectl  get po --show-labels
+NAME      READY   STATUS              RESTARTS   AGE   LABELS
+busybox   1/1     Running             4          16h   &lt;none&gt;
+nginx     0/1     Running             0          90s   <span style="color: #a0522d;">app</span>=nginx,<span style="color: #a0522d;">role</span>=frontend
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21024;&#38500;&#19968;&#20010;po</span>
+[root@k8s-master01 ~]# kubectl delete po nginx
+pod <span style="color: #8b2252;">"nginx"</span> deleted
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#21040;&#25351;&#23450;&#30340;&#21629;&#21517;&#31354;&#38388;</span>
+[root@k8s-master01 ~]# kubectl create -f pod.yaml  -n kube-public
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#21629;&#21517;&#31354;&#38388;</span>
+kubectl create ns ns_name
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d678f42c-bbdb-41ac-9b0d-f42609da038f" class="outline-4">
+<h4 id="h:d678f42c-bbdb-41ac-9b0d-f42609da038f">修改 pod 内容器启动命令</h4>
+<div class="outline-text-4" id="text-h:d678f42c-bbdb-41ac-9b0d-f42609da038f">
+<p>
+查看语法用：kubectl explain pod.spec.containers
+</p>
+
+<p>
+command 用来覆盖容器启动执行的命令 ENTRYPOINT, args 覆盖容器的 cmd
+</p>
+</div>
+</div>
+<div id="outline-container-h:b895d90a-489f-4007-9126-31addbcd29e3" class="outline-4">
+<h4 id="h:b895d90a-489f-4007-9126-31addbcd29e3">pod 状态及问题排查方法</h4>
+<div class="outline-text-4" id="text-h:b895d90a-489f-4007-9126-31addbcd29e3">
+<p>
+<a href="https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/pod-lifecycle/">https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/pod-lifecycle/</a>
+</p>
+
+<p>
+取值	描述
+</p>
+<ul class="org-ul">
+<li>Pending（挂起）	Pod 已被 Kubernetes 系统接受，但有一个或者多个容器尚未创建亦未运行。此阶段包括等待 Pod 被调度的时间和通过网络下载镜像的时间。可以通过 `kubectl describe` 查看处于 Pending 状态的原因。</li>
+<li>RunningPending（运行中）	Pod 已经绑定到了某个节点，Pod 中所有的容器都已被创建。至少有一个容器仍在运行，或者正处于启动或重启状态。可以使用 `kubectl logs` 查看 pod 的日志。pod 可用必须是 READY前后一致且 STATUS 是 Running。</li>
+<li>Succeeded（成功）	Pod 中的所有容器都已成功终止，并且不会再重启。可以使用 `kubectl logs` 查看 pod 的日志。</li>
+<li>Failed（失败）	Pod 中的所有容器都已终止，并且至少有一个容器是因为失败终止。也就是说，容器以非 0 状态退出或者被系统终止。</li>
+<li>Unknown（未知）	因为某些原因无法取得 Pod 的状态。这种情况通常是因为与 Pod 所在主机通信失败。</li>
+<li>ImagePullBackOff  镜像拉取失败，一般是由于镜像不存在、网络不通或者需要登录认证引起的，可以使用 `describe` 命令查看原因。</li>
+<li>ErrImagePull  同上</li>
+<li>CrashLoopBackOff  容器启动失败，可以通过 `logs` 命令查看原因，一般为启动命令不正解，健康检查不过等。</li>
+<li>OOMKilled     容器内存溢出，一般是容器的内存 Limit 设置过小，或者程序本身有内存溢出，可以通过 `logs` 查看程序日志。
+<ul class="org-ul">
+<li>Jvm 中堆内存和堆外内存大于 Limit 值。</li>
+</ul></li>
+<li>Terminating  Pod 正在被删除，可以通过 `describe` 查看状态</li>
+<li>SysctlForbidden  Pod 我自定义了内核配置，但 kubelet 没有添加内核配置或者配置的内核参数不支持，可以通过 `describe` 查看具体原因。</li>
+<li>Completed   容器内部进程主动退出，一般计划任务执行结束会显示该状态，此时可以通过 `logs` 查看容器日志。</li>
+<li>ContainerCreating  Pod 正在创建，一般为正在下载镜像，或者有配置不当的地方，可能通过 `describe` 查看原因。</li>
+</ul>
+
+<p>
+PS: Pod 的 phase 字段只有  Pending、Pending、Succeeded、Failed、Unknown，其余的为处于上述状态的原因，可以通过 <code>kubectl get po xxx -lyaml</code> 查看。
+</p>
+</div>
+</div>
+<div id="outline-container-h:704706b9-8626-4e29-b058-d46d6dcbcac9" class="outline-4">
+<h4 id="h:704706b9-8626-4e29-b058-d46d6dcbcac9">Pod 拉取镜像策略</h4>
+<div class="outline-text-4" id="text-h:704706b9-8626-4e29-b058-d46d6dcbcac9">
+<p>
+通过 <code>spec.containers[].imagePullPolicy</code> 参数可以指定镜像的拉取策略，目前支持策略如下：
+</p>
+<ul class="org-ul">
+<li>Always  总是拉取，当镜像 tag 为 latest 时，且 imagePullPolicy 未设置，默认为 Always</li>
+<li>Nerver  不管是否存在都不会拉取</li>
+<li>IfNotPresent  镜像不存在时拉取镜像，如果 tag 为非 latest，且 imagePullPolicy 未设置，默认为 IfNotPresent</li>
+</ul>
+
+<p>
+更改镜像拉取策略为 IfNotPresent
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1 # 必选，API的版本号
+kind: Pod       # 必选，类型Pod
+metadata:       # 必选，元数据
+  name: nginx   # 必选，符合RFC 1035规范的Pod名称
+  # namespace: default # 可选，Pod所在的命名空间，不指定默认为default，可以使用-n 指定namespace
+  labels:       # 可选，标签选择器，一般用于过滤和区分Pod
+    app: nginx
+    role: frontend # 可以写多个
+  annotations:  # 可选，注释列表，可以写多个
+    app: nginx
+spec:   # 必选，用于定义容器的详细信息
+  containers:   # 必选，容器列表
+  - name: nginx # 必选，符合RFC 1035规范的容器名称
+    image: nginx:1.15.12    # 必选，容器所用的镜像的地址
+    imagePullPolicy: IfNotPresent     # 可选，镜像拉取策略, IfNotPresent: 如果宿主机有这个镜像，那就不需要拉取了. Always: 总是拉取, Never: 不管是否存储都不拉去
+    ports:
+    - containerPort: 80 # 端口
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:babfae4b-b503-4bc4-891e-d9dd5ce5d21e" class="outline-4">
+<h4 id="h:babfae4b-b503-4bc4-891e-d9dd5ce5d21e">Pod 重启策略</h4>
+<div class="outline-text-4" id="text-h:babfae4b-b503-4bc4-891e-d9dd5ce5d21e">
+<p>
+可以使用 spec.restartPolicy 指定容器的重启策略
+</p>
+<ul class="org-ul">
+<li>Always  默认策略。容器失效时，自动重启容器。</li>
+<li>OnFailure  容器以不为 0 的状态码终止，自动重启容器。如果是计划任务可以使用这个配置。</li>
+<li>Never  无论何种状态，都不会重启。很少用</li>
+</ul>
+
+<p>
+使用 `kubectl describe po` 查看重启状态
+</p>
+</div>
+</div>
+<div id="outline-container-h:f319b7a5-9f3c-4147-9216-e3270fa00642" class="outline-4">
+<h4 id="h:f319b7a5-9f3c-4147-9216-e3270fa00642">零宕机服务发布</h4>
+<div class="outline-text-4" id="text-h:f319b7a5-9f3c-4147-9216-e3270fa00642">
+</div>
+<div id="outline-container-h:dba4234a-4490-4f5b-8719-1ef4cc253e36" class="outline-5">
+<h5 id="h:dba4234a-4490-4f5b-8719-1ef4cc253e36">Pod 三种探针</h5>
+<div class="outline-text-5" id="text-h:dba4234a-4490-4f5b-8719-1ef4cc253e36">
+<p>
+官方参考：配置存活、就绪和启动探测器 <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/</a>
+</p>
+
+<p>
+为了确保容器在部署后确实处在正常运行状态，Kubernetes 提供了探针（Probe）来探测容器的状态
+</p>
+
+<ul class="org-ul">
+<li>startupProbe: 启动探针。k8s 1.16版本后新加的探测方式，用于判断容器内应用程序是否启动。如果配置了startupProbe,就会先禁止其他的探测，直到他成功为止。如果探测失败，kubelet 会杀死容器，之后根据重启策略进行处理，如果探测成功，或者没有配置 startProbe，则状态为成功，之后将不会再进行探测。</li>
+<li>livenessProbe： 存活探针。用于探测容器是否运行，如果探测失败，kubelet 会根据配置的重启策略进行相应的处理。如果没有配置，默认就是success</li>
+<li>readinessProbe：就绪探针。 一般用于探测容器内的程序是否健康， 即判断容器是否为就绪（Ready） 状态。如果是，则可以处理请求，反之 Endpoints Controller 将所有的 Service 的 Endpoints 中删除此容器所在 Pod 的 IP  地址。如果 未指定，将默认为 Success。</li>
+</ul>
+
+<p>
+PS：startupProbe 在启动比较慢的 pod 上应用。
+</p>
+</div>
+<ul class="org-ul">
+<li><a id="h:90a4de97-04cd-46e4-8d72-737459e672d2"></a>Pod探针的4种实现方式<br>
+<div class="outline-text-6" id="text-h:90a4de97-04cd-46e4-8d72-737459e672d2">
+<p>
+<a href="https://kubernetes.io/fr/docs/concepts/workloads/pods/pod-lifecycle/#sondes-du-conteneur">https://kubernetes.io/fr/docs/concepts/workloads/pods/pod-lifecycle/#sondes-du-conteneur</a>
+</p>
+
+<ul class="org-ul">
+<li>ExecAction：在容器内执行一个命令，如果返回值为0，则认为容器健康</li>
+<li>TCPSocketAction：通过TCP连接检查容器内的端口是否是通的，如果是通的就认为容器健康</li>
+<li>HTTPGetAction：对指定的 URL 进行 Get 请求，如果<a href="https://en.wikipedia.org/wiki/List_of_HTTP_status_codes">状态码</a>在 [200,400) 之间则认为容器健康。生产推荐</li>
+</ul>
+
+
+<p>
+1.24 有 grpc 探测
+</p>
+
+<p>
+<a href="https://kubernetes.io/fr/docs/concepts/workloads/pods/pod-lifecycle/#sondes-du-conteneur">https://kubernetes.io/fr/docs/concepts/workloads/pods/pod-lifecycle/#sondes-du-conteneur</a>
+</p>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:19c08ce4-8ca1-4ad4-b169-8afeec827a21" class="outline-5">
+<h5 id="h:19c08ce4-8ca1-4ad4-b169-8afeec827a21">livenessProbe 和 readinessProbe</h5>
+<div class="outline-text-5" id="text-h:19c08ce4-8ca1-4ad4-b169-8afeec827a21">
+<p>
+创建一个没有探针的 pod：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF |kubectl create -f -
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Pod</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nginx</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  restartPolicy: Never</span>
+<span style="color: #ffa54f;">  containers:</span>
+<span style="color: #ffa54f;">  - name: nginx</span>
+<span style="color: #ffa54f;">    image: nginx:1.15.12</span>
+<span style="color: #ffa54f;">    imagePullPolicy: IfNotPresent</span>
+<span style="color: #ffa54f;">    command:</span>
+<span style="color: #ffa54f;">    - sh</span>
+<span style="color: #ffa54f;">    - -c</span>
+<span style="color: #ffa54f;">    - sleep 10; nginx -g "daemon off;"</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">    - containerPort: 80</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+配置
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF |kubectl create -f -
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Pod</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nginx</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  restartPolicy: Always</span>
+<span style="color: #ffa54f;">  containers:</span>
+<span style="color: #ffa54f;">  - name: nginx</span>
+<span style="color: #ffa54f;">    image: nginx:1.15.12</span>
+<span style="color: #ffa54f;">    imagePullPolicy: IfNotPresent</span>
+<span style="color: #ffa54f;">    command:</span>
+<span style="color: #ffa54f;">    - sh</span>
+<span style="color: #ffa54f;">    - -c</span>
+<span style="color: #ffa54f;">    - sleep 30; nginx -g "daemon off;"</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">    - containerPort: 80</span>
+<span style="color: #ffa54f;">    readinessProbe:  # &#21487;&#36873;&#65292;&#20581;&#24247;&#26816;&#26597;&#12290;&#27880;&#24847; 4 &#31181;&#25506;&#27979;&#26041;&#24335;&#21482;&#33021;&#21516;&#26102;&#29992;&#19968;&#31181;</span>
+<span style="color: #ffa54f;">      failureThreshold: 3  # &#26816;&#26597;&#22833;&#36133; 3 &#27425; &#34920;&#31034;&#26410;&#23601;&#32490;</span>
+<span style="color: #ffa54f;">      httpGet:  # &#25509;&#21475;&#26816;&#27979;&#26041;&#24335;</span>
+<span style="color: #ffa54f;">        path: /index.html  # &#26816;&#26597;&#36335;&#24452;</span>
+<span style="color: #ffa54f;">        port: 80</span>
+<span style="color: #ffa54f;">        scheme: HTTP  # HTTP or HTTPS</span>
+<span style="color: #ffa54f;">        #httpHeaders: # &#21487;&#36873;&#65292;&#26816;&#26597;&#30340;&#35831;&#27714;&#22836;</span>
+<span style="color: #ffa54f;">        #- name: end-uer</span>
+<span style="color: #ffa54f;">        #  value: Jason</span>
+<span style="color: #ffa54f;">      initialDelaySeconds: 10 # &#21021;&#22987;&#21270;&#26102;&#38388;&#65292;&#20581;&#24247;&#26816;&#26597;&#24310;&#36831;&#25191;&#34892;&#26102;&#38388;</span>
+<span style="color: #ffa54f;">      periodSeconds: 5  # &#26816;&#27979;&#38388;&#38548;</span>
+<span style="color: #ffa54f;">      successThreshold: 1  # &#26816;&#26597;&#25104;&#21151;&#20026; 1 &#27425;&#34920;&#31034;&#23601;&#32490;</span>
+<span style="color: #ffa54f;">      timeoutSeconds: 2 # &#36229;&#26102;&#26102;&#38388;</span>
+<span style="color: #ffa54f;">    livenessProbe:</span>
+<span style="color: #ffa54f;">      failureThreshold: 3  # &#26816;&#26597;&#22833;&#36133; 3 &#27425; &#34920;&#31034;&#26410;&#23601;&#32490;</span>
+<span style="color: #ffa54f;">      tcpSocket:  # &#31471;&#21475;&#26816;&#27979;&#26041;&#24335;</span>
+<span style="color: #ffa54f;">        port: 80</span>
+<span style="color: #ffa54f;">      initialDelaySeconds: 10 # &#21021;&#22987;&#21270;&#26102;&#38388;&#65292;&#20581;&#24247;&#26816;&#26597;&#24310;&#36831;&#25191;&#34892;&#26102;&#38388;</span>
+<span style="color: #ffa54f;">      periodSeconds: 5  # &#26816;&#27979;&#38388;&#38548;</span>
+<span style="color: #ffa54f;">      successThreshold: 1  # &#26816;&#26597;&#25104;&#21151;&#20026; 1 &#27425;&#34920;&#31034;&#23601;&#32490;</span>
+<span style="color: #ffa54f;">      timeoutSeconds: 2 # &#36229;&#26102;&#26102;&#38388;</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6062f7f8-ba5e-4844-ab94-0427956f65c6" class="outline-5">
+<h5 id="h:6062f7f8-ba5e-4844-ab94-0427956f65c6">配置 startupProbe</h5>
+<div class="outline-text-5" id="text-h:6062f7f8-ba5e-4844-ab94-0427956f65c6">
+<p>
+使用启动探测器保护慢启动容器
+</p>
+
+<p>
+有时候，会有一些现有的应用程序在启动时需要较多的初始化时间。 要不影响对引起探测死锁的快速响应，这种情况下，设置存活探测参数是要技巧的。 技巧就是使用一个命令来设置启动探测，针对HTTP 或者 TCP 检测，可以通过设置 `failureThreshold * periodSeconds` 参数来保证有足够长的时间应对糟糕情况下的启动时间。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">ports:
+- name: liveness-port
+  containerPort: 8080
+  hostPort: 8080
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: liveness-port
+  failureThreshold: 1
+  periodSeconds: 10
+
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: liveness-port
+  failureThreshold: 30
+  periodSeconds: 10
+</pre>
+</div>
+
+<p>
+幸亏有启动探测，应用程序将会有最多 5 分钟(30 * 10 = 300s) 的时间来完成它的启动。 一旦启动探测成功一次，存活探测任务就会接管对容器的探测，对容器死锁可以快速响应。 如果启动探测一直没有成功，容器会在 300 秒后被杀死，并且根据 `restartPolicy` 来设置 Pod 状态
+</p>
+</div>
+<ul class="org-ul">
+<li><a id="h:47e561f7-3b18-4894-8c07-e016a80476fa"></a>探针检查参数配置<br>
+<div class="outline-text-6" id="text-h:47e561f7-3b18-4894-8c07-e016a80476fa">
+<div class="org-src-container">
+<pre class="src src-sh">initialDelaySeconds: 60       <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21021;&#22987;&#21270;&#26102;&#38388;&#12290;&#23481;&#22120;&#21551;&#21160;&#21518;&#35201;&#31561;&#24453;&#22810;&#23569;&#31186;&#21518;&#23384;&#27963;&#21644;&#23601;&#32490;&#25506;&#27979;&#22120;&#25165;&#34987;&#21021;&#22987;&#21270;&#65292;&#40664;&#35748;&#26159; 0 &#31186;&#65292;&#26368;&#23567;&#20540;&#26159; 0&#12290;</span>
+timeoutSeconds: 2             <span style="color: #b22222;"># </span><span style="color: #b22222;">&#36229;&#26102;&#26102;&#38388;&#12290;&#40664;&#35748;&#20540;&#26159; 1 &#31186;&#12290;&#26368;&#23567;&#20540;&#26159; 1&#12290;</span>
+periodSeconds: 5              <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26816;&#27979;&#38388;&#38548;&#12290;&#40664;&#35748;&#26159; 10 &#31186;&#12290;&#26368;&#23567;&#20540;&#26159; 1&#12290;</span>
+successThreshold: 1           <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26816;&#26597;&#25104;&#21151;&#20026;1&#27425;&#34920;&#31034;&#23601;&#32490;&#12290;&#40664;&#35748;&#20540;&#26159; 1&#12290; &#23384;&#27963;&#21644;&#21551;&#21160;&#25506;&#27979;&#30340;&#36825;&#20010;&#20540;&#24517;&#39035;&#26159; 1&#12290;&#26368;&#23567;&#20540;&#26159; 1&#12290;</span>
+failureThreshold: 5           <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26816;&#27979;&#22833;&#36133;5&#27425;&#34920;&#31034;&#26410;&#23384;&#27963;&#37325;&#21551;&#23481;&#22120;&#25110;&#26410;&#23601;&#32490;&#12290;&#40664;&#35748;&#20540;&#26159; 3&#12290;&#26368;&#23567;&#20540;&#26159; 1&#12290;</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#24050;&#26377;&#30340;&#37197;&#32622;</span>
+[root@k8s-master01 ~]# kubectl get deployment -n kube-system
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+calico-kube-controllers   1/1     1            1           16h
+coredns                   1/1     1            1           16h
+metrics-server            1/1     1            1           16h
+[root@k8s-master01 ~]#
+[root@k8s-master01 ~]# kubectl edit deploy coredns -n kube-system
+
+</pre>
+</div>
+
+<p>
+livenessProbe 定义了容器重启间隔：
+</p>
+
+<p>
+每次检查的间隔是10秒，最长超时时间是5秒，也就是单次检查应该是10 + 5 = 15秒（periodSeconds + timeoutSeconds），并不是10 * 5，所以最长的重启时间为（10 + 5）* 5  = 75秒（periodSeconds + timeoutSeconds） * failureThreshold
+</p>
+
+<p>
+此时又分为了两种情况：
+</p>
+<ol class="org-ol">
+<li>首次启动时：最长重启时间需要加上initialDelaySeconds，因为需要等待initialDelaySeconds秒后才会执行健康检查。最长重启时间：（periodSeconds + timeoutSeconds） * failureThreshold + initialDelaySeconds</li>
+<li>程序启动完成后：此时不需要计入initialDelaySeconds，最长重启时间：（periodSeconds + timeoutSeconds） * failureThreshold</li>
+</ol>
+
+<p>
+startupProbe 启动探针没有 initialDelaySeconds 初始化时间。
+</p>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:a12212bd-8f31-4e69-8202-e7094c067388" class="outline-5">
+<h5 id="h:a12212bd-8f31-4e69-8202-e7094c067388">preStop 和 preStart</h5>
+<div class="outline-text-5" id="text-h:a12212bd-8f31-4e69-8202-e7094c067388">
+</div>
+<ul class="org-ul">
+<li><a id="h:7d48cde2-e0e7-4a35-bb2b-685b20fcad88"></a>pod 启动过程<br>
+<div class="outline-text-6" id="text-h:7d48cde2-e0e7-4a35-bb2b-685b20fcad88">
+
+<figure id="org9168f3f">
+<img src="./images/Snipaste_2022-08-31_17-03-16.png" alt="Snipaste_2022-08-31_17-03-16.png" width="40%">
+
+</figure>
+</div>
+</li>
+<li><a id="h:cb2d75f4-769c-43ee-92d0-aabe4c4cca46"></a>Pod 平滑退出<br>
+<div class="outline-text-6" id="text-h:cb2d75f4-769c-43ee-92d0-aabe4c4cca46">
+
+<figure id="org420851a">
+<img src="./images/Snipaste_2022-08-31_17-06-44.png" alt="Snipaste_2022-08-31_17-06-44.png" width="40%">
+
+</figure>
+
+<p>
+Prestop：先去请求eureka接口，把自己的IP地址和端口号，进行下线，eureka从注册表中删除该应用的IP地址。然后容器进行sleep 90；kill `pgrep java`
+</p>
+
+<p>
+这个时间不一定是90s
+</p>
+
+<p>
+官方参考：为容器的生命周期事件设置处理函数 <a href="https://kubernetes.io/docs/tasks/configure-pod-container/attach-handler-lifecycle-event/">https://kubernetes.io/docs/tasks/configure-pod-container/attach-handler-lifecycle-event/</a>
+</p>
+</div>
+</li>
+<li><a id="h:7ebe5203-4e33-4a79-b39c-6705e4864cc9"></a>preStop 和 preStart  使用<br>
+<div class="outline-text-6" id="text-h:7ebe5203-4e33-4a79-b39c-6705e4864cc9">
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF |kubectl create -f -
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Pod</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nginx</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  restartPolicy: Always</span>
+<span style="color: #ffa54f;">  containers:</span>
+<span style="color: #ffa54f;">  - name: nginx</span>
+<span style="color: #ffa54f;">    image: nginx:1.15.12</span>
+<span style="color: #ffa54f;">    imagePullPolicy: IfNotPresent</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">    - containerPort: 80</span>
+<span style="color: #ffa54f;">    lifecycle:</span>
+<span style="color: #ffa54f;">      postStart: # &#23481;&#22120;&#21019;&#24314;&#23436;&#25104;&#21518;&#25191;&#34892;&#30340;&#25351;&#20196;, &#21487;&#20197;&#26159; exec httpGet TCPSocket</span>
+<span style="color: #ffa54f;">        exec:</span>
+<span style="color: #ffa54f;">          command:</span>
+<span style="color: #ffa54f;">          - sh</span>
+<span style="color: #ffa54f;">          - -c </span>
+<span style="color: #ffa54f;">          - 'mkdir /data/'</span>
+<span style="color: #ffa54f;">      preStop:</span>
+<span style="color: #ffa54f;">        exec:</span>
+<span style="color: #ffa54f;">          command:</span>
+<span style="color: #ffa54f;">          - sh</span>
+<span style="color: #ffa54f;">          - -c </span>
+<span style="color: #ffa54f;">          - sleep 10</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<p>
+其它配置
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ cat conf/app-config.yaml
+apiVersion: v1
+data:
+  TZ: Asia/Calcutta
+  APP_NAMESPACE: ludo-prd
+  APP_ENV: prod
+  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:<span style="color: #a0522d;">InitialRAMPercentage</span>=75.0
+    -XX:<span style="color: #a0522d;">MinRAMPercentage</span>=75.0
+    -XX:<span style="color: #a0522d;">MaxRAMPercentage</span>=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:<span style="color: #a0522d;">HeapDumpPath</span>=/opt/logs/
+  PreStop.sh: |-
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">! /bin/bash</span>
+    sleep 5
+    curl --connect-timeout 5 --max-time 5 -s -i <span style="color: #8b2252;">"http://localhost:8080/admin/maintain"</span>
+    sleep 40
+    curl  --connect-timeout 5 --max-time 5 -s -i -H <span style="color: #8b2252;">"Content-Type: application/json"</span> -X POST  http://localhost:8099/actuator/shutdown
+    sleep 60
+  PreStop_task.sh: |-
+    <span style="color: #b22222;">#</span><span style="color: #b22222;">! /bin/bash</span>
+    sleep 5
+    curl --connect-timeout 5 --max-time 5 -s -i <span style="color: #8b2252;">"http://localhost:8080/admin/maintain"</span>
+    sleep 40
+    curl --connect-timeout 5 --max-time 5 -s -i <span style="color: #8b2252;">"http://localhost:8080/xxljob/shutdown"</span>
+    sleep 20
+    curl --connect-timeout 5 --max-time 5 -s -i -H <span style="color: #8b2252;">"Content-Type: application/json"</span> -X POST  http://localhost:8099/actuator/shutdown
+    sleep 40
+  app-config.yml: |-
+    - type: log
+      scan_frequency: 10s
+      paths:
+        - <span style="color: #8b2252;">"/data/logs/dc*.log"</span>
+      fields:
+        service: ${<span style="color: #a0522d;">SERVICE_NAME</span>}
+        kafka_topic: ${<span style="color: #a0522d;">KAFKA_TOPIC_NAME</span>}
+        LOG_TYPE: <span style="color: #8b2252;">'dc'</span>
+        POD_IP: <span style="color: #8b2252;">'${POD_IP}'</span>
+        POD_NAME: <span style="color: #8b2252;">'${POD_NAME}'</span>
+        NODE_NAME: <span style="color: #8b2252;">'${NODE_NAME}'</span>
+        POD_NAMESPACE: <span style="color: #8b2252;">'${POD_NAMESPACE}'</span>
+      json.overwrite_keys: true
+      json.keys_under_root: true
+      force_close_files: true
+      fields_under_root: true
+      ignore_older: 24h  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#24573;&#30053;1&#22825;&#21069;&#30340;&#26085;&#24535;</span>
+      clean_inactive: 25h
+      close_inactive: 20m
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">exclude_lines: ['DEBUG']</span>
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">exclude_files: ['.gz$', 'gc.log']</span>
+      tags: [<span style="color: #8b2252;">'ludo'</span>]
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">multiline.pattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]*[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}[[:space:]]*\[)'</span>
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">multiline.negate: true</span>
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">multiline.match: after</span>
+    - type: log
+      scan_frequency: 10s
+      paths:
+        - <span style="color: #8b2252;">"/data/logs/*.error.log"</span>
+      fields:
+        service: ${<span style="color: #a0522d;">SERVICE_NAME</span>}
+        kafka_topic: ${<span style="color: #a0522d;">KAFKA_TOPIC_NAME</span>}
+        LOG_TYPE: <span style="color: #8b2252;">'error'</span>
+        POD_IP: <span style="color: #8b2252;">'${POD_IP}'</span>
+        POD_NAME: <span style="color: #8b2252;">'${POD_NAME}'</span>
+        NODE_NAME: <span style="color: #8b2252;">'${NODE_NAME}'</span>
+        POD_NAMESPACE: <span style="color: #8b2252;">'${POD_NAMESPACE}'</span>
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">json.overwrite_keys: true</span>
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">json.keys_under_root: true</span>
+      force_close_files: true
+      fields_under_root: true
+      ignore_older: 24h  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#24573;&#30053;1&#22825;&#21069;&#30340;&#26085;&#24535;</span>
+      clean_inactive: 25h
+      close_inactive: 20m
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">exclude_lines: ['DEBUG']</span>
+      <span style="color: #b22222;">#</span><span style="color: #b22222;">exclude_files: ['.gz$', 'gc.log']</span>
+      tags: [<span style="color: #8b2252;">'ludo'</span>]
+      multiline.pattern: <span style="color: #8b2252;">'^([0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]][0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}[[:space:]]\[)'</span>
+      multiline.negate: true
+      multiline.match: after
+  filebeat.yml: |-
+    filebeat.config.inputs:
+      path: ${<span style="color: #a0522d;">path</span>.config}/conf.d/app-config.yml
+      <span style="color: #483d8b;">enable</span>: true
+      reload.enabled: true
+      reload.period: 10s
+      max_bytes: 20480  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21333;&#26465;&#26085;&#24535;&#38480;&#21046;20kb</span>
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">============================== Filebeat modules ==============================</span>
+    filebeat.config.modules:
+      path: ${<span style="color: #a0522d;">path</span>.config}/modules.d/*.yml
+      reload.enabled: false
+      reload.period: 10s
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">=================================== Filebeat output ===================================</span>
+    output.kafka:
+      enabled: true
+      hosts: [<span style="color: #8b2252;">"prod-kafka.xxx.com:9094"</span>]
+      topic: <span style="color: #8b2252;">'%{[kafka_topic]}'</span>
+      partition.round_robin:
+        reachable_only: false
+      required_acks: 1
+      compression: gzip
+      max_message_bytes: 1000000
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">=================================== Queue ===================================</span>
+    max_procs: 1
+    queue.mem:
+      events: 2048
+      flush.min_events: 1024
+      flush.timeout: 2s
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: ludo
+
+
+$ cat ludo-user/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ludo-user
+  name: ludo-user
+  namespace: ludo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ludo-user
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    <span style="color: #483d8b;">type</span>: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /prometheus
+        prometheus.io/pathjvm: /actuator/prometheus
+        prometheus.io/port: <span style="color: #8b2252;">"8080"</span>
+        prometheus.io/portjvm: <span style="color: #8b2252;">"8099"</span>
+        prometheus.io/scrape: <span style="color: #8b2252;">"true"</span>
+        prometheus.io/scrapejvm: <span style="color: #8b2252;">"true"</span>
+      labels:
+        app: ludo-user
+        department: ludo
+    spec:
+      nodeSelector:
+        <span style="color: #483d8b;">type</span>: prod-app
+      terminationGracePeriodSeconds: 150
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: ludo-user
+              namespaces:
+              - ludo
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      initContainers:
+      - image: harbor.xxx.com/devops/skywalking-agent:v8.7.0
+        name: skywalking-sidecar
+        imagePullPolicy: Always
+        <span style="color: #483d8b;">command</span>: [<span style="color: #8b2252;">'sh'</span>]
+        args: [<span style="color: #8b2252;">'-c'</span>, <span style="color: #8b2252;">'mkdir -p /skywalking &amp;&amp; /bin/cp -rf /opt/skywalking/gateway-agent /skywalking'</span>]
+        volumeMounts:
+        - mountPath: /skywalking
+          name: skywalking
+      containers:
+      - args:
+        - -javaagent:/opt/skywalking/gateway-agent/skywalking-agent.jar
+        - -Dfile.encoding=utf-8
+        - -server
+        - -XX:+UseG1GC
+        - -XX:+ExitOnOutOfMemoryError
+        - -XX:<span style="color: #a0522d;">InitialRAMPercentage</span>=75.0
+        - -XX:<span style="color: #a0522d;">MinRAMPercentage</span>=75.0
+        - -XX:<span style="color: #a0522d;">MaxRAMPercentage</span>=75.0
+        - -XX:+HeapDumpOnOutOfMemoryError
+        - -XX:<span style="color: #a0522d;">HeapDumpPath</span>=/opt/logs/
+        - -Dspring.profiles.active=prod
+        - -jar
+        - ludo-user.jar
+        <span style="color: #483d8b;">command</span>:
+        - java
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: SW_AGENT_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SW_AGENT_NAME
+          value: <span style="color: #8b2252;">"ludo-prd-ludo-user"</span>
+        - name: SW_LOGGING_DIR
+          value: <span style="color: #8b2252;">"/opt/skywalking/logs"</span>
+        - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+          value: <span style="color: #8b2252;">"ops-public-skywalking:11800"</span>
+        image: ops-harbor.xxx.com/ludo/ludo-user:rc_20220818_150237
+        imagePullPolicy: IfNotPresent
+        name: ludo-user
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        lifecycle:
+          preStop:
+            <span style="color: #a020f0;">exec</span>:
+              <span style="color: #483d8b;">command</span>:
+              - bash
+              - -c
+              - /opt/PreStop.sh
+        readinessProbe:
+          httpGet:
+            port: 8099
+            path: /actuator/health
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 5
+          initialDelaySeconds: 15
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        startupProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: 8099
+            scheme: HTTP
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: <span style="color: #8b2252;">"3"</span>
+            memory: 6Gi
+          requests:
+            cpu: <span style="color: #8b2252;">"2"</span>
+            memory: 6Gi
+        volumeMounts:
+        - mountPath: /etc/localtime
+          name: time
+        - mountPath: /opt/logs
+          name: logs
+        - mountPath: /opt/PreStop.sh
+          name: app-config
+          subPath: PreStop.sh
+        - mountPath: /opt/skywalking
+          name: skywalking
+      - env:
+        - name: TZ
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: TZ
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: KAFKA_TOPIC_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SERVICE_NAME
+          value: <span style="color: #8b2252;">"ludo-user"</span>
+        image: docker.elastic.co/beats/filebeat:7.10.2
+        imagePullPolicy: IfNotPresent
+        name: filebeat-sidecar
+        resources:
+          limits:
+            cpu: 100m
+            memory: 200Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /data/logs
+          name: logs
+        - mountPath: /usr/share/filebeat/filebeat.yml
+          name: filebeat-config
+          subPath: filebeat.yml
+        - mountPath: /usr/share/filebeat/conf.d/
+          name: filebeat-config
+      imagePullSecrets:
+      - name: docker-secret
+      securityContext:
+        runAsUser: 0
+      volumes:
+      - configMap:
+          defaultMode: 511
+          name: app-config
+        name: app-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: filebeat.yml
+            path: filebeat.yml
+          - key: app-config.yml
+            path: app-config.yml
+          name: app-config
+        name: filebeat-config
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+        name: time
+      - emptyDir: {}
+        name: logs
+      - emptyDir: {}
+        name: skywalking
+
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:2ca1b662-2153-4d95-9a82-1e77efbe4e9b" class="outline-5">
+<h5 id="h:2ca1b662-2153-4d95-9a82-1e77efbe4e9b">gRPC 探测（1.24默认开启）</h5>
+<div class="outline-text-5" id="text-h:2ca1b662-2153-4d95-9a82-1e77efbe4e9b">
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF |kubectl create -f -
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Pod</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: etcd</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  restartPolicy: Always</span>
+<span style="color: #ffa54f;">  containers:</span>
+<span style="color: #ffa54f;">  - name: etcd</span>
+<span style="color: #ffa54f;">    image: registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.5.1-0</span>
+<span style="color: #ffa54f;">    imagePullPolicy: IfNotPresent</span>
+<span style="color: #ffa54f;">    command: [ "/usr/local/bin/etcd", "--data-dir", "/var/lib/etcd", "--listen-client-urls", "http://0.0.0.0:2379", "--advertise-client-urls", "http://127.0.0.1:2379", "--log-level", "debug"]</span>
+<span style="color: #ffa54f;">    ports:</span>
+<span style="color: #ffa54f;">    - containerPort: 2379</span>
+<span style="color: #ffa54f;">    livenessProbe:</span>
+<span style="color: #ffa54f;">      grpc:</span>
+<span style="color: #ffa54f;">        port: 2379</span>
+<span style="color: #ffa54f;">      initialDelaySeconds: 10</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 基础篇-工作负载</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 基础篇-工作负载</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:553b63b2-ef0c-42a0-8f97-dd15edfeee1e">k8s基础篇-工作负载</a>
+<ul>
+<li><a href="#h:afcbb0f3-7077-46ad-a15b-0b96dc19da1b">Replication Controller 和 ReplicaSet</a>
+<ul>
+<li><a href="#h:9b38a2f8-4fe8-4912-9b85-5fd4d5b7b365">Replication Controller</a></li>
+<li><a href="#h:3feb2766-25b5-42ba-9314-d85868edbd1a">ReplicaSet</a></li>
+</ul>
+</li>
+<li><a href="#h:e896df40-8975-4417-9a99-32cff54a3141">Deployment</a>
+<ul>
+<li><a href="#h:3bfa6cde-c546-4f25-8cf1-df704db6bc56">无状态资源管理 Deployment</a>
+<ul>
+<li><a href="#h:b5687237-b107-4c00-855d-29676446c4ef">Deployment 部署过程</a></li>
+</ul>
+</li>
+<li><a href="#h:e6957203-7e55-4aae-9dbd-7f0884058919">创建一个Deployment</a>
+<ul>
+<li><a href="#h:a6aa93c6-b794-47da-9fce-180f507cf448">手动创建</a></li>
+<li><a href="#h:05ab50fb-ccaa-4a56-8963-6e7ea4e424de">使用文件创建</a></li>
+<li><a href="#h:5f02ab01-3a4b-4c93-87ea-3c6bdb404d7f">状态解析</a></li>
+</ul>
+</li>
+<li><a href="#h:5f17792d-ba36-473d-b5d1-39a25b0cf897">Deployment的更新</a>
+<ul>
+<li><a href="#h:44b814e6-ce95-4b28-86a5-8da63c6cb81c">更新方式：</a></li>
+<li><a href="#h:5ded415e-735e-45ed-8ec2-a0538e8f83e2">查看更新过程</a></li>
+</ul>
+</li>
+<li><a href="#h:1662b37b-8ea3-4f40-a4b6-3fc35d950d12">Deployment 的回滚</a>
+<ul>
+<li><a href="#h:ae6e7aa1-a349-4600-8f9d-dbd0f7f66ab5">回滚到上一个版本</a></li>
+<li><a href="#h:d2003ff1-b5fb-4a27-8372-3c9fedc6a387">回滚到指定版本</a></li>
+<li><a href="#h:206bb027-d9ee-478a-8845-621257014d7f">在kubernetes中滚动重启pod常用方法：</a></li>
+</ul>
+</li>
+<li><a href="#h:98877720-e504-4e4f-b21b-8b5403dfc542">Deployment的扩容与缩容</a></li>
+<li><a href="#h:dca2bd0c-a99b-4199-8fab-24da1ece75b4">Deployment的暂停和恢复</a>
+<ul>
+<li><a href="#h:65fdc7c1-896c-40e7-9516-02067743d893">Deployment 暂停功能</a></li>
+<li><a href="#h:d10d9845-ba10-4368-8b42-20045d54d9b5">Deployment 恢复功能</a></li>
+</ul>
+</li>
+<li><a href="#h:8b5d87aa-a24d-477f-9e8c-ac931efdb41f">Deployment注意事项</a></li>
+</ul>
+</li>
+<li><a href="#h:41cb2b56-7efe-49d5-a808-607b9b066ee4">StatefulSet</a>
+<ul>
+<li><a href="#h:3a4efd91-ef31-4f90-b3a4-404f9454bb7c">什么是StatefulSet</a>
+<ul>
+<li><a href="#h:d0436413-4e82-4a4a-8f83-98b78f348c03">StatefuSet 部署过程</a></li>
+</ul>
+</li>
+<li><a href="#h:3bb80720-ce96-4271-827f-3f6c5e61d5f9">Headless Service</a>
+<ul>
+<li><a href="#h:0615344e-ea68-410e-9992-f4fe51db0994">StatefulSet注意事项</a></li>
+</ul>
+</li>
+<li><a href="#h:de7fdbea-d98f-449a-9eb8-14551afe7316">定义一个StatefulSet资源文件</a>
+<ul>
+<li><a href="#h:6e5456da-6683-471b-b25d-b2f364ad9be6">定义一个简单的StatefulSet的示例</a></li>
+<li><a href="#h:623cf635-8738-425e-bb1a-9652dc510a8e">创建一个StatefulSet</a></li>
+</ul>
+</li>
+<li><a href="#h:0aa1ff21-f62e-4cd0-ae22-b07b67f0e872">StatefulSet 创建 Pod 流程</a></li>
+<li><a href="#h:b04f7d0c-0418-4e53-b85c-35ed638c3cf6">Headless Service 通信原理</a></li>
+<li><a href="#h:c36aa36d-7ebd-4cde-946d-bfba3b4dfe5c">StatefulSet的扩容和缩容</a>
+<ul>
+<li><a href="#h:9df5602b-936e-4c9c-8992-31ef8f80f9ea">扩容</a></li>
+<li><a href="#h:80ed9584-2280-4975-9f2e-1f014140794a">StatefulSet的缩容</a></li>
+</ul>
+</li>
+<li><a href="#h:2c8a820f-42e1-4578-8fd7-340848fcbbe3">StatefulSet更新策略</a>
+<ul>
+<li><a href="#h:fc63f3f7-fdd6-4a66-a605-99d430f85c6c">On Delete策略</a></li>
+<li><a href="#h:01edaac2-d185-4135-a88b-ab793d7b7834">RollingUpdate策略</a></li>
+</ul>
+</li>
+<li><a href="#h:bed1ba9a-8f07-4ef6-86af-f6f6dd972ff1">分段更新（partition）</a></li>
+<li><a href="#h:b58c533e-6c7c-46e3-8e89-48c141409a50">删除StatefulSet</a>
+<ul>
+<li><a href="#h:de702519-3acf-43fc-a945-03ab6f4ad871">非级联删除</a></li>
+<li><a href="#h:2eb1cb8b-aa3b-4107-9df2-0f03efdd22ca">级联删除</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:9dccb0c6-d663-44ab-857e-599e30a51459">DaemonSet</a>
+<ul>
+<li><a href="#h:d81fb0f1-b0e6-4f4a-9f5e-195c319187e2">什么是DaemonSet</a></li>
+<li><a href="#h:4069551a-0b6c-4cbc-91f3-68c1e0e8d258">DaemonSet 部署赛程</a></li>
+<li><a href="#h:c6b19a85-c6d8-44c4-9afc-98c6dfa22fd0">定义一个 DaemonSet</a>
+<ul>
+<li><a href="#h:92aa9fa0-72c1-4fdc-a551-a97b55e2961c">创建一个DaemonSet</a></li>
+<li><a href="#h:db2cdabf-ceb3-4683-9aea-517639fe4e5b">更新和回滚 DaemonSet</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:c3f3d09d-9a8d-4522-b6d8-10f13da9dce5">自动扩缩容HPA</a>
+<ul>
+<li><a href="#h:a0b6cf61-163a-411b-8c24-6b15e77eb356">什么是HPA</a>
+<ul>
+<li><a href="#h:0affe84c-3adc-4a9e-824e-858b2f72bfdd">HPA 接口类型</a></li>
+</ul>
+</li>
+<li><a href="#h:5b5bf366-3263-45e8-99e8-7a4b7e6842b4">HPA原理</a>
+<ul>
+<li><a href="#h:5cf87ae4-2b5a-455a-ba1f-16467da1821d">为什么要使用HPA</a></li>
+<li><a href="#h:494a4ffe-5fe4-435b-b777-3643bedbd456">HPA中一些细节的处理</a></li>
+<li><a href="#h:dc5bc9c0-f2ff-497f-a60f-bce5fe8bb751">原理</a></li>
+</ul>
+</li>
+<li><a href="#h:8df01f85-6963-40a5-8d6b-12908c586e48">实现一个Web服务器的自动伸缩特性</a></li>
+</ul>
+</li>
+<li><a href="#h:f9601f82-ee86-49b3-a27f-4131fa1d8828">PriorityClasses 优先级和抢占</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:553b63b2-ef0c-42a0-8f97-dd15edfeee1e" class="outline-2">
+<h2 id="h:553b63b2-ef0c-42a0-8f97-dd15edfeee1e">k8s基础篇-工作负载</h2>
+<div class="outline-text-2" id="text-h:553b63b2-ef0c-42a0-8f97-dd15edfeee1e">
+</div>
+<div id="outline-container-h:afcbb0f3-7077-46ad-a15b-0b96dc19da1b" class="outline-3">
+<h3 id="h:afcbb0f3-7077-46ad-a15b-0b96dc19da1b">Replication Controller 和 ReplicaSet</h3>
+<div class="outline-text-3" id="text-h:afcbb0f3-7077-46ad-a15b-0b96dc19da1b">
+<p>
+Replication Controller（复制控制器，RC）和 ReplicaSet （复制集，RS） 是两种简单部署 Pod 的方式。因为在生产环境中，主要使用更高级的 Deployment 等方式进行 Pod 的管理和部署，所以只需要了解就行。
+</p>
+</div>
+<div id="outline-container-h:9b38a2f8-4fe8-4912-9b85-5fd4d5b7b365" class="outline-4">
+<h4 id="h:9b38a2f8-4fe8-4912-9b85-5fd4d5b7b365">Replication Controller</h4>
+<div class="outline-text-4" id="text-h:9b38a2f8-4fe8-4912-9b85-5fd4d5b7b365">
+<p>
+Replication Controller（简称 RC）可确保 Pod 副本数达到期望值，也就是 RC 定义的数量。换句话说，Replication Controller 可确保一个 Pod 或一组同类 Pod 总是可用。
+</p>
+
+<p>
+如果存在的 Pod 大于设定的值，则 Replication Controller 将终止额外的 Pod。如果太小，Replication Controller 将启动更多的 Pod 用于保证达到期望值。与手动创建 Pod 不同的是，用Replication Controller 维护的 Pod 在失败、删除或终止时会自动替换。因此即使应用程序只需要一个 Pod，也应该使用 Replication Controller 或其他方式管理。Replication Controller 类似于进程管理程序，但是 Replication Controller 不是监视单个节点上的各个进程，而是监视多个节点上的多个 Pod。
+</p>
+
+<p>
+定义一个 Replication Controller 的示例如下。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nginx
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3feb2766-25b5-42ba-9314-d85868edbd1a" class="outline-4">
+<h4 id="h:3feb2766-25b5-42ba-9314-d85868edbd1a">ReplicaSet</h4>
+<div class="outline-text-4" id="text-h:3feb2766-25b5-42ba-9314-d85868edbd1a">
+<p>
+ReplicaSet 是支持基于集合的 <b>标签</b> 选择器的下一代 Replication Controller，它主要用作Deployment 协调创建、删除和更新 Pod，和 Replication Controller 唯一的区别是，ReplicaSet 支持标签选择器。在实际应用中，虽然 ReplicaSet 可以单独使用，但是一般建议使用 Deployment 来自动管理 ReplicaSet，除非自定义的 Pod 不需要更新或有其他编排等。
+</p>
+
+<p>
+定义一个 ReplicaSet 的示例如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: frontend
+  labels:
+  app: guestbook
+  tier: frontend
+spec:
+  # modify replicas according to your case
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: frontend
+    matchExpressions:
+    - {key: tier, operator: In, values: [frontend]}
+  template:
+    metadata:
+      labels:
+      app: guestbook
+      tier: frontend
+    spec:
+      containers:
+      - name: php-redis
+        image: gcr.io/google_samples/gb-frontend:v3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+        # If your cluster config does not include a dns service, then to
+        # instead access environment variables to find service host
+        # info, comment out the 'value: dns' line above, and uncomment the
+        # line below.
+        # value: env
+        ports:
+        - containerPort: 80
+</pre>
+</div>
+
+<p>
+Replication Controller 和 ReplicaSet 的创建删除和 Pod 并无太大区别，Replication Controller 目前几乎已经不在生产环境中使用，ReplicaSet 也很少单独被使用，都是使用更高级的资源 Deployment、DaemonSet、StatefulSet 进行管理 Pod。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e896df40-8975-4417-9a99-32cff54a3141" class="outline-3">
+<h3 id="h:e896df40-8975-4417-9a99-32cff54a3141">Deployment</h3>
+<div class="outline-text-3" id="text-h:e896df40-8975-4417-9a99-32cff54a3141">
+</div>
+<div id="outline-container-h:3bfa6cde-c546-4f25-8cf1-df704db6bc56" class="outline-4">
+<h4 id="h:3bfa6cde-c546-4f25-8cf1-df704db6bc56">无状态资源管理 Deployment</h4>
+<div class="outline-text-4" id="text-h:3bfa6cde-c546-4f25-8cf1-df704db6bc56">
+<p>
+用于部署无状态的服务，这个最常用的控制器，因为企业内部现在都是以微服务为主，而微服务实现无状态化是最佳实践，可以利用 Deployment 的高级功能做无缝迁移、自动扩缩容、自动灾难恢复、一键回滚等功能。       
+</p>
+</div>
+<div id="outline-container-h:b5687237-b107-4c00-855d-29676446c4ef" class="outline-5">
+<h5 id="h:b5687237-b107-4c00-855d-29676446c4ef">Deployment 部署过程</h5>
+<div class="outline-text-5" id="text-h:b5687237-b107-4c00-855d-29676446c4ef">
+
+<figure id="org85de699">
+<img src="./images/Snipaste_2022-09-01_10-18-00.png" alt="Snipaste_2022-09-01_10-18-00.png" width="50%">
+
+</figure>
+
+<p>
+3 副本 deployment 提交给 apiserver
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e6957203-7e55-4aae-9dbd-7f0884058919" class="outline-4">
+<h4 id="h:e6957203-7e55-4aae-9dbd-7f0884058919">创建一个Deployment</h4>
+<div class="outline-text-4" id="text-h:e6957203-7e55-4aae-9dbd-7f0884058919">
+</div>
+<div id="outline-container-h:a6aa93c6-b794-47da-9fce-180f507cf448" class="outline-5">
+<h5 id="h:a6aa93c6-b794-47da-9fce-180f507cf448">手动创建</h5>
+<div class="outline-text-5" id="text-h:a6aa93c6-b794-47da-9fce-180f507cf448">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create deploy nginx --image=nginx:1.15.12 --replicas=2 -oyaml --dry-run=client &gt;nginx-deploy.yaml 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:05ab50fb-ccaa-4a56-8963-6e7ea4e424de" class="outline-5">
+<h5 id="h:05ab50fb-ccaa-4a56-8963-6e7ea4e424de">使用文件创建</h5>
+<div class="outline-text-5" id="text-h:05ab50fb-ccaa-4a56-8963-6e7ea4e424de">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#25163;&#21160;&#21019;&#24314;&#30340;nginx&#30340;yaml&#25991;&#20214;,&#28982;&#21518;&#25226;f&#24320;&#22836;&#30340;&#21024;&#20102;,&#19988;&#21024;&#20102;&#26368;&#21518;&#30340;status&#26631;&#31614;&#30340;&#20869;&#23481;&#65292;&#24471;&#21040;&#19979;&#38754;&#30340;yaml&#25991;&#20214;</span>
+[root@k8s-master01 ~]# kubectl  get deployment nginx -o yaml &gt; nginx-deploy.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; nginx-deploy.yaml &lt;&lt; EFO
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">kind: Deployment</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  labels:</span>
+<span style="color: #ffa54f;">    app: nginx</span>
+<span style="color: #ffa54f;">  name: nginx</span>
+<span style="color: #ffa54f;">  namespace: default</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  progressDeadlineSeconds: 600</span>
+<span style="color: #ffa54f;">  replicas: 2</span>
+<span style="color: #ffa54f;">  revisionHistoryLimit: 10</span>
+<span style="color: #ffa54f;">  selector:</span>
+<span style="color: #ffa54f;">    matchLabels:</span>
+<span style="color: #ffa54f;">      app: nginx</span>
+<span style="color: #ffa54f;">  strategy:</span>
+<span style="color: #ffa54f;">    rollingUpdate:</span>
+<span style="color: #ffa54f;">      maxSurge: 25%</span>
+<span style="color: #ffa54f;">      maxUnavailable: 25%</span>
+<span style="color: #ffa54f;">    type: RollingUpdate</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nginx</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">      - image: nginx:1.15.12</span>
+<span style="color: #ffa54f;">        imagePullPolicy: IfNotPresent</span>
+<span style="color: #ffa54f;">        name: nginx</span>
+<span style="color: #ffa54f;">        ports:</span>
+<span style="color: #ffa54f;">        - containerPort: 80</span>
+<span style="color: #ffa54f;">      restartPolicy: Always</span>
+<span style="color: #ffa54f;">      terminationGracePeriodSeconds: 30</span>
+<span style="color: #ffa54f;">EFO</span>
+</pre>
+</div>
+
+
+<p>
+PS: 从 Kubernetes 1.16 版本开始，彻底废弃了其他的 APIVersion，只能使用 apps/v1，1.16 以下的版本可以使用 extension 等。
+</p>
+
+<p>
+示例解析：
+</p>
+<ul class="org-ul">
+<li>nginx：Deployment 的名称；</li>
+<li>replicas： 创建 Pod 的副本数；</li>
+<li>selector：定义 Deployment 如何找到要管理的Pod，与 template 的 label（标签）对应，apiVersion 为apps/v1 必须指定该字段；</li>
+<li>template 字段包含以下字段：
+<ul class="org-ul">
+<li>app：nginx 使用 label（标签）标记 Pod；</li>
+<li>spec：表示 Pod 运行一个名字为 nginx 的容器；</li>
+<li>image：运行此 Pod 使用的镜像；</li>
+<li>ports：容器用于发送和接收流量的端口。</li>
+</ul></li>
+<li>revisionHistoryLimit: 10  历史记录保留的个数</li>
+<li>terminationGracePeriodSeconds: deployment 更新时 pod 被 Terminating 时等待时间。</li>
+</ul>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#20351;&#29992;&#20197;&#19979;&#21629;&#20196;&#21435;&#26032;&#24314;&#19968;&#20010;deployment</span>
+[root@k8s-master01 ~]# kubectl replace -f nginx-deploy.yaml 
+deployment.apps/nginx replaced
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22312;&#32447;&#26356;&#25913;yaml&#65292;&#31649;&#29702;deployment    ---&#25226;&#21103;&#26412;&#25968;&#25913;&#20026;2</span>
+[root@k8s-master01 ~]# kubectl edit deploy  nginx 
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#26159;&#21542;&#29983;&#25104;2&#20010;&#21103;&#26412;</span>
+[root@k8s-master01 ~]# kubectl get po
+NAME                     READY   STATUS             RESTARTS   AGE
+nginx-66bbc9fdc5-c6l6t   1/1     Running            0          57s
+nginx-66bbc9fdc5-hsv4d   1/1     Running          0          34m
+</pre>
+</div>
+
+<p>
+Deployment启动后会启动ReplicaSet，ReplicaSet的名称是temple模板的哈希值，而基于ReplicaSet启动的Pod资源的名称是ReplicaSet名称+随机数。
+</p>
+</div>
+</div>
+<div id="outline-container-h:5f02ab01-3a4b-4c93-87ea-3c6bdb404d7f" class="outline-5">
+<h5 id="h:5f02ab01-3a4b-4c93-87ea-3c6bdb404d7f">状态解析</h5>
+<div class="outline-text-5" id="text-h:5f02ab01-3a4b-4c93-87ea-3c6bdb404d7f">
+<p>
+使用 kubectl get 或者 kubectl describe 查看此 Deployment 的状态：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl get deploy
+NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+nginx   0/2     2             0          8s
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>NAME：集群中Deployment的名称；</li>
+<li>READY：Pod就绪个数和总副本数；</li>
+<li>UP-TO-DATE：显示已达到期望状态的被更新的副本数；</li>
+<li>AVAILABLE：显示用户可以使用的应用程序副本数，当前为0，说明目前还没有达到期望的Pod；</li>
+<li>AGE：显示应用程序运行的时间。</li>
+</ul>
+
+<p>
+可以使用 rollout 命令查看整个 Deployment 创建的状态:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$  kubectl rollout status deployment/nginx
+deployment <span style="color: #8b2252;">"nginx"</span> successfully rolled out
+</pre>
+</div>
+
+<p>
+当 rollout 结束时，再次查看此 Deployment，可以看到 AVAILABLE 的数量和 yaml 文件中
+定义的 replicas 相同：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl  get deploy
+NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+nginx   2/2     2            2           17m
+</pre>
+</div>
+
+<p>
+查看此 Deployment 当前对应的 ReplicaSet：
+</p>
+<div class="org-src-container">
+<pre class="src src-nil">$ kubectl get rs -l app=nginx
+NAME              DESIRED   CURRENT   READY   AGE
+nginx-74695fdcd   2         2         2       21m
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>DESIRED：应用程序副本数；</li>
+<li>CURRENT：当前正在运行的副本数；</li>
+</ul>
+
+<p>
+当 Deployment 有过更新，对应的 RS 可能不止一个，可以通过 <code>-o yaml</code> 获取当前对应的 RS 是哪个，其余的 RS 为保留的历史版本，用于回滚等操作。
+</p>
+
+<p>
+查看此 Deployment 创建的 Pod，可以看到 Pod 的 hash 值 和上述 Deployment 对应的 ReplicaSet 的 hash 值一致：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl get pods --show-labels
+NAME                    READY   STATUS    RESTARTS   AGE   LABELS
+nginx-74695fdcd-kkx89   1/1     Running   0          23m   <span style="color: #a0522d;">app</span>=nginx,pod-template-hash=74695fdcd
+nginx-74695fdcd-sp2tk   1/1     Running   0          23m   <span style="color: #a0522d;">app</span>=nginx,pod-template-hash=74695fdcd
+</pre>
+</div>
+
+
+<p>
+-owide 获得更多的状态
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl get po -owide
+NAME                                   READY   STATUS        RESTARTS   AGE     IP              NODE                                           NOMINATED NODE   READINESS GATES
+ludo-game-server-68484555bd-tjcx2      2/2     Running       0          13d     10.204.55.22    ip-10-204-54-46.ap-south-1.compute.internal    &lt;none&gt;           &lt;none&gt;
+ludo-gateway-5fddb7cb85-n98pt          2/2     Running       0          15d     10.204.41.106   ip-10-204-45-143.ap-south-1.compute.internal   &lt;none&gt;           1/1
+ludo-gateway-5fddb7cb85-s27rf          2/2     Running       0          15d     10.204.55.113   ip-10-204-54-46.ap-south-1.compute.internal    &lt;none&gt;           1/1
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5f17792d-ba36-473d-b5d1-39a25b0cf897" class="outline-4">
+<h4 id="h:5f17792d-ba36-473d-b5d1-39a25b0cf897">Deployment的更新</h4>
+<div class="outline-text-4" id="text-h:5f17792d-ba36-473d-b5d1-39a25b0cf897">
+</div>
+<div id="outline-container-h:44b814e6-ce95-4b28-86a5-8da63c6cb81c" class="outline-5">
+<h5 id="h:44b814e6-ce95-4b28-86a5-8da63c6cb81c">更新方式：</h5>
+<div class="outline-text-5" id="text-h:44b814e6-ce95-4b28-86a5-8da63c6cb81c">
+<p>
+当且仅当 Deployment 的 Pod 模板（即.spec.template）更改时，才会触发 Deployment 更新，例如更改内存、CPU 配置或者容器的 image。
+</p>
+
+
+<p>
+假如更新 Nginx Pod 的 image 使用 nginx:latest，并使用 <code>--record</code> 记录当前更改的参数，后期回滚时可以查看到对应的信息：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl set image deployment nginx <span style="color: #a0522d;">nginx</span>=nginx:1.9.1 --record
+deployment.extensions/nginx-deployment image updated
+</pre>
+</div>
+
+<p>
+也可以使用 edit 命令直接编辑 Deployment，效果相同：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl edit deployment.v1.apps/nginx
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5ded415e-735e-45ed-8ec2-a0538e8f83e2" class="outline-5">
+<h5 id="h:5ded415e-735e-45ed-8ec2-a0538e8f83e2">查看更新过程</h5>
+<div class="outline-text-5" id="text-h:5ded415e-735e-45ed-8ec2-a0538e8f83e2">
+<p>
+更新过程：新建 RS ，根据更新策略更新，旧 pod 缩减，新 pod 扩容。
+</p>
+
+<p>
+可以使用 kubectl rollout status 查看更新过程：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl rollout status deploy nginx
+Waiting for deployment <span style="color: #8b2252;">"nginx"</span> rollout to finish: 1 out of 3 new replicas have been updated...
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25110;&#32773;&#20351;&#29992;describe&#26597;&#30475;</span>
+[root@k8s-master01 ~]# kubectl describe deploy nginx 
+</pre>
+</div>
+
+<p>
+rollout 中可以看出更新过程为新旧交替更新，首先新建一个 Pod，当 Pod 状态为 Running 时，删除一个旧的 Pod，同时再创建一个新的 Pod。当触发一个更新后，会有新的 ReplicaSet 产生，旧的ReplicaSet 会被保存，查看此时 ReplicaSet，可以从 AGE 或 READY 看出来新旧 ReplicaSet：
+</p>
+
+<p>
+在 describe 中可以看出，第一次创建时，它创建了一个名为 nginx-xxxx 的 ReplicaSet，并直接将其扩展为 2 个副本。更新部署时，它创建了一个新的 ReplicaSet，命名为 nginx-xxxxx，并将其副本数扩展为 1，然后将旧的 ReplicaSet 缩小为 1，这样至少可以有 1 个 Pod 可用，最多创建了 3 个 Pod。以此类推，使用相同的滚动更新策略向上和向下扩展新旧 ReplicaSet，最终新的 ReplicaSet 可以拥有 2 个副本，并将旧的 ReplicaSet 缩小为 0。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1662b37b-8ea3-4f40-a4b6-3fc35d950d12" class="outline-4">
+<h4 id="h:1662b37b-8ea3-4f40-a4b6-3fc35d950d12">Deployment 的回滚</h4>
+<div class="outline-text-4" id="text-h:1662b37b-8ea3-4f40-a4b6-3fc35d950d12">
+</div>
+<div id="outline-container-h:ae6e7aa1-a349-4600-8f9d-dbd0f7f66ab5" class="outline-5">
+<h5 id="h:ae6e7aa1-a349-4600-8f9d-dbd0f7f66ab5">回滚到上一个版本</h5>
+<div class="outline-text-5" id="text-h:ae6e7aa1-a349-4600-8f9d-dbd0f7f66ab5">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#20363;&#22914;&#38169;&#35823;&#30340;&#26356;&#26032;&#21040;&#20102;&#19968;&#20010;xxx&#29256;&#26412;</span>
+[root@k8s-master01 ~]# kubectl set image deploy nginx <span style="color: #a0522d;">nginx</span>=nginx:xxx --record   
+deployment.apps/nginx image updated
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20351;&#29992; kubectl rollout history &#26597;&#30475;&#26356;&#26032;&#21382;&#21490;&#65306;</span>
+[root@k8s-master01 ~]# kubectl rollout history deploy nginx 
+deployment.apps/nginx 
+REVISION  CHANGE-CAUSE
+1         &lt;none&gt;
+2         kubectl set image deploy nginx <span style="color: #a0522d;">nginx</span>=nginx:1.15.3 --record=true
+3         kubectl set image deploy nginx <span style="color: #a0522d;">nginx</span>=nginx:xxx --record=true
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475; Deployment &#26576;&#27425;&#26356;&#26032;&#30340;&#35814;&#32454;&#20449;&#24687;&#65292;&#20351;&#29992;--revision &#25351;&#23450;&#26576;&#27425;&#26356;&#26032;&#29256;&#26412;&#21495;&#65306;</span>
+kubectl rollout history deployment/nginx --revision=3
+
+[root@k8s-master01 ~]# kubectl rollout history deploy nginx --revision=4
+deployment.apps/nginx with revision <span style="color: #b22222;">#</span><span style="color: #b22222;">4</span>
+Pod Template:
+  Labels:       <span style="color: #a0522d;">app</span>=nginx
+        pod-template-hash=5dfc8689c6
+  Annotations:  kubernetes.io/change-cause: kubectl set image deploy nginx <span style="color: #a0522d;">nginx</span>=nginx:1.15.3 --record=true
+  Containers:
+   nginx:
+    Image:      nginx:1.15.3
+    Port:       &lt;none&gt;
+    Host Port:  &lt;none&gt;
+    Environment:        &lt;none&gt;
+    Mounts:     &lt;none&gt;
+  Volumes:      &lt;none&gt;
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22238;&#28378;&#21040;&#19978;&#19968;&#20010;&#29256;&#26412;</span>
+[root@k8s-master01 ~]# kubectl rollout undo deploy nginx
+deployment.apps/nginx rolled back
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d2003ff1-b5fb-4a27-8372-3c9fedc6a387" class="outline-5">
+<h5 id="h:d2003ff1-b5fb-4a27-8372-3c9fedc6a387">回滚到指定版本</h5>
+<div class="outline-text-5" id="text-h:d2003ff1-b5fb-4a27-8372-3c9fedc6a387">
+<p>
+如果要回滚到指定版本，使用 &#x2013;to-revision 参数：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#22238;&#28378;&#21040;&#25351;&#23450;&#29256;&#26412;</span>
+[root@k8s-master01 ~]# kubectl rollout undo deploy nginx --to-revision=4
+deployment.apps/nginx rolled back
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:206bb027-d9ee-478a-8845-621257014d7f" class="outline-5">
+<h5 id="h:206bb027-d9ee-478a-8845-621257014d7f">在kubernetes中滚动重启pod常用方法：</h5>
+<div class="outline-text-5" id="text-h:206bb027-d9ee-478a-8845-621257014d7f">
+<p>
+1.直接修改pod的yaml部署文件，apply滚动更新（基于yaml文件）
+通过 "kubectl apply -f *.yaml" 命令触发pod的滚动更新。前提是pod的yaml部署文件内容必须是有所更新的，否则执行kubectl apply命令不会触发pod的滚动更新。
+</p>
+
+<p>
+2.通过set image命令滚动更新（基于image镜像）
+如果不想直接修改pod的yaml文件内容，就通过 "kubectl set image deployment deployment_name pod_name=new_image_name" 命令来滚动更新重启pod。
+</p>
+
+<p>
+3.rollout restart方式滚动更新
+1）在 k8s v1.15 版本之前，通过修改 annotations 的变量值可实现滚动重启 Pod ，当然这个方法其实更改了 yaml 文件，不过是更改的自定义变量字段通过时间戳的方式来设置值，一般不会对 Pod 主要内容有影响：
+#+end_src bash
+</p>
+
+<p>
+  "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"date\":\"`date +'%s'`\"}}}}}"
+#+end_src
+</p>
+
+<p>
+2）在 k8s v1.15 版本之后，通过 kubectl rollout restart 命令来滚动重启pod：
+#+end_srcbash
+</p>
+
+<p>
+#+end_src
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:98877720-e504-4e4f-b21b-8b5403dfc542" class="outline-4">
+<h4 id="h:98877720-e504-4e4f-b21b-8b5403dfc542">Deployment的扩容与缩容</h4>
+<div class="outline-text-4" id="text-h:98877720-e504-4e4f-b21b-8b5403dfc542">
+<p>
+使用 <code>kubectl scale</code> 动态调整 Pod 的副本数
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">Deployment&#30340;&#25193;&#23481;&#19982;&#32553;&#23481;&#65292;&#19981;&#20250;&#29983;&#25104;&#26032;&#30340;rs</span>
+$ kubectl  scale  --replicas=4  deploy nginx 
+deployment.apps/nginx scaled
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>&#x2013;replicas 指定副本数</li>
+</ul>
+
+<p>
+查看 pod
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl get pod
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:dca2bd0c-a99b-4199-8fab-24da1ece75b4" class="outline-4">
+<h4 id="h:dca2bd0c-a99b-4199-8fab-24da1ece75b4">Deployment的暂停和恢复</h4>
+<div class="outline-text-4" id="text-h:dca2bd0c-a99b-4199-8fab-24da1ece75b4">
+<p>
+大多数情况下可能需要针对一个资源文件更改多处地方，而并不需要多次触发更新，此时可以使用 Deployment 暂停功能，临时禁用更新操作，对 Deployment 进行多次修改后在进行更新。
+</p>
+
+<ul class="org-ul">
+<li>deployment可以在线edit更改（可以一次性更改多个）</li>
+<li>也可以用kubectl set image更改（也可以一次性更改多个，但是需要使用到Deployment的暂停和恢复功能）</li>
+</ul>
+</div>
+<div id="outline-container-h:65fdc7c1-896c-40e7-9516-02067743d893" class="outline-5">
+<h5 id="h:65fdc7c1-896c-40e7-9516-02067743d893">Deployment 暂停功能</h5>
+<div class="outline-text-5" id="text-h:65fdc7c1-896c-40e7-9516-02067743d893">
+<p>
+使用 <code>kubectl rollout pause</code> 命令即可暂停 Deployment 更新：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26242;&#20572;</span>
+[root@k8s-master01 ~]# kubectl rollout pause deployment nginx
+deployment.apps/nginx paused
+</pre>
+</div>
+
+<p>
+然后对 Deployment 进行相关更新操作，比如先更新镜像，然后对其资源进行限制（如果使用的是 kubectl edit 命令，可以直接进行多次修改，无需暂停更新，kubectlset 命令一般会集成在CICD 流水线中）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#26356;&#26032;</span>
+[root@k8s-master01 ~]# kubectl set image deploy nginx <span style="color: #a0522d;">nginx</span>=nginx:1.15.4 --record
+deployment.apps/nginx image updated
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#31532;&#20108;&#27425;&#26356;&#26032;&#12289;&#28155;&#21152;&#20869;&#23384;&#12289;CPU</span>
+[root@k8s-master01 ~]# kubectl set resources deploy nginx -c nginx --limits=<span style="color: #a0522d;">cpu</span>=200m,<span style="color: #a0522d;">memory</span>=128Mi --requests=<span style="color: #a0522d;">cpu</span>=10m,<span style="color: #a0522d;">memory</span>=16Mi
+deployment.apps/nginx resource requirements updated
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#34987;&#26356;&#25913;&#20197;&#21518;&#30340;nginx&#38236;&#20687;&#30340;deployment</span>
+[root@k8s-master01 ~]# kubectl get deploy nginx -oyaml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d10d9845-ba10-4368-8b42-20045d54d9b5" class="outline-5">
+<h5 id="h:d10d9845-ba10-4368-8b42-20045d54d9b5">Deployment 恢复功能</h5>
+<div class="outline-text-5" id="text-h:d10d9845-ba10-4368-8b42-20045d54d9b5">
+<p>
+进行完最后一处配置更改后，使用 <code>kubectl rollout resume</code> 恢复 Deployment 更新：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26356;&#26032;&#23436;&#24819;&#26356;&#26032;&#30340;&#20869;&#23481;&#21518;&#65292;&#28982;&#21518;&#24674;&#22797;&#38236;&#20687;</span>
+[root@k8s-master01 ~]# kubectl rollout resume deploy nginx 
+deployment.apps/nginx resumed
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;rs&#65292;&#30475;&#21040;&#26377;&#26032;&#30340;</span>
+[root@k8s-master01 ~]# kubectl get rs
+NAME                DESIRED   CURRENT   READY   AGE
+nginx-5b6bc78b67    1         1         0       41s
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8b5d87aa-a24d-477f-9e8c-ac931efdb41f" class="outline-4">
+<h4 id="h:8b5d87aa-a24d-477f-9e8c-ac931efdb41f">Deployment注意事项</h4>
+<div class="outline-text-4" id="text-h:8b5d87aa-a24d-477f-9e8c-ac931efdb41f">
+<ul class="org-ul">
+<li>历史版本清理策略：
+<ul class="org-ul">
+<li>在默认情况下，revision 保留 10 个旧的 ReplicaSet，其余的将在后台进行垃圾回收，可以在.spec.revisionHistoryLimit 设置保留 ReplicaSet 的个数。当设置为 0 时，不保留历史记录。</li>
+</ul></li>
+
+<li>更新策略：
+<ul class="org-ul">
+<li>.spec.strategy.type==Recreate，表示重建，先删掉旧的Pod再创建新的Pod；</li>
+<li>.spec.strategy.type==RollingUpdate， 默认，表示滚动更新，可以指定maxUnavailable和maxSurge</li>
+</ul></li>
+</ul>
+<p>
+来控制滚动更新过程；
+</p>
+<ul class="org-ul">
+<li>.spec.strategy.rollingUpdate.maxUnavailable，指定在回滚更新时最大不可用的Pod数量，可选字段，默认为25%，可以设置为数字或百分比，如果maxSurge为0，则该值不能为0；</li>
+<li>.spec.strategy.rollingUpdate.maxSurge 可以超过期望值的最大Pod数，可选字段，默认为25%，可以设置成数字或百分比，如果maxUnavailable为0，则该值不能为0。</li>
+</ul>
+
+<ul class="org-ul">
+<li>Ready 策略：
+<ul class="org-ul">
+<li>.spec.minReadySeconds 是可选参数，指定新创建的 Pod 应该在没有任何容器崩溃的情况下视为 Ready（就绪）状态的最小秒数，默认为 0，即一旦被创建就视为可用，通常和容器探针连用。</li>
+</ul></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:41cb2b56-7efe-49d5-a808-607b9b066ee4" class="outline-3">
+<h3 id="h:41cb2b56-7efe-49d5-a808-607b9b066ee4">StatefulSet</h3>
+<div class="outline-text-3" id="text-h:41cb2b56-7efe-49d5-a808-607b9b066ee4">
+</div>
+<div id="outline-container-h:3a4efd91-ef31-4f90-b3a4-404f9454bb7c" class="outline-4">
+<h4 id="h:3a4efd91-ef31-4f90-b3a4-404f9454bb7c">什么是StatefulSet</h4>
+<div class="outline-text-4" id="text-h:3a4efd91-ef31-4f90-b3a4-404f9454bb7c">
+<p>
+StatefulSet（有状态集，缩写为sts）常用于部署有状态的且需要有序启动的应用程序，比如在进行SpringCloud项目容器化时，Eureka的部署是比较适合用StatefulSet部署方式的，可以给每个Eureka实例创建一个唯一且固定的标识符，并且每个Eureka实例无需配置多余的Service，其余Spring Boot应用可以直接通过Eureka的Headless Service即可进行注册。
+</p>
+
+<ul class="org-ul">
+<li>Eureka 集群</li>
+<li>MongoDB</li>
+<li>ElasticSearch</li>
+<li>Redis</li>
+<li>Kafka</li>
+<li>其它需要具有状态的服务</li>
+
+<li>需要稳定的独一无二的网络标识符</li>
+<li>需要持久化数据</li>
+<li>需要有序的、优雅的部署和扩展</li>
+<li>需要有序的自动滚动更新</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">Eureka&#30340;statefulset&#30340;&#36164;&#28304;&#21517;&#31216;&#26159;eureka&#65292;eureka-0 eureka-1 eureka-2
+Service&#65306;headless service&#65292;&#27809;&#26377;ClusterIP  eureka-svc
+Eureka-0.eureka-svc.NAMESPACE_NAME  eureka-1.eureka-svc
+</pre>
+</div>
+</div>
+<div id="outline-container-h:d0436413-4e82-4a4a-8f83-98b78f348c03" class="outline-5">
+<h5 id="h:d0436413-4e82-4a4a-8f83-98b78f348c03">StatefuSet 部署过程</h5>
+<div class="outline-text-5" id="text-h:d0436413-4e82-4a4a-8f83-98b78f348c03">
+
+<figure id="org7212058">
+<img src="./images/Snipaste_2022-09-01_16-30-32.png" alt="Snipaste_2022-09-01_16-30-32.png" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3bb80720-ce96-4271-827f-3f6c5e61d5f9" class="outline-4">
+<h4 id="h:3bb80720-ce96-4271-827f-3f6c5e61d5f9">Headless Service</h4>
+<div class="outline-text-4" id="text-h:3bb80720-ce96-4271-827f-3f6c5e61d5f9">
+<p>
+和Deployment类似，一个StatefulSet也同样管理着基于相同容器规范的Pod。不同的是，StatefulSet为每个Pod维护了一个粘性标识。
+  这些Pod是根据相同的规范创建的，但是不可互换，每个Pod都有一个持久的标识符，在重新调度时也会保留，一般格式为StatefulSetName-Number。比如定义一个名字是Redis-Sentinel的StatefulSet，指定创建三个Pod，那么创建出来的Pod名字就为Redis-Sentinel-0、Redis-Sentinel-1、Redis-Sentinel-2。
+</p>
+
+<p>
+而 StatefulSet 创建的 Pod 一般使用 Headless Service（无头服务）进行通信，和普通的Service的区别在于 Headless Service 没有 ClusterIP，它使用的是Endpoint进行互相通信，Headless一般的格式为：
+</p>
+<ul class="org-ul">
+<li>statefulSetName-{0..N-1}.serviceName.namespace.svc.cluster.local。</li>
+</ul>
+
+<p>
+说明：Headless Service 需要提前创建
+</p>
+<ul class="org-ul">
+<li>serviceName为Headless Service的名字，创建StatefulSet时，必须指定Headless Service名称；</li>
+<li>0..N-1为Pod所在的序号，从0开始到N-1；</li>
+<li>statefulSetName为StatefulSet的名字；</li>
+<li>namespace为服务所在的命名空间；</li>
+<li>cluster.local为Cluster Domain（集群域）。</li>
+</ul>
+
+<p>
+假如公司某个项目需要在Kubernetes中部署一个主从模式的Redis，此时使用StatefulSet部署就极为合适，因为StatefulSet启动时，只有当前一个容器完全启动时，后一个容器才会被调度，并且每个容器的标识符是固定的，那么就可以通过标识符来断定当前Pod的角色。
+</p>
+
+<p>
+比如用一个名为redis-ms的StatefulSet部署主从架构的Redis，第一个容器启动时，它的标识符为redis-ms-0，并且Pod内主机名也为redis-ms-0，此时就可以根据主机名来判断，当主机名为redis-ms-0的容器作为Redis的主节点，其余从节点，那么Slave连接Master主机配置就可以使用不会更改的Master的Headless Service，此时Redis从节点（Slave）配置文件如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">port 6379
+slaveof redis-ms-0.redis-ms.public-service.svc.cluster.local 6379
+tcp-backlog 511
+timeout 0
+tcp-keepalive 0
+...
+</pre>
+</div>
+
+<p>
+其中redis-ms-0.redis-ms.public-service.svc.cluster.local是Redis Master的Headless Service，在同一命名空间下只需要写redis-ms-0.redis-ms即可，后面的public-service.svc.cluster.local可以省略。
+</p>
+</div>
+<div id="outline-container-h:0615344e-ea68-410e-9992-f4fe51db0994" class="outline-5">
+<h5 id="h:0615344e-ea68-410e-9992-f4fe51db0994">StatefulSet注意事项</h5>
+<div class="outline-text-5" id="text-h:0615344e-ea68-410e-9992-f4fe51db0994">
+<p>
+一般StatefulSet用于有以下一个或者多个需求的应用程序：
+</p>
+<ul class="org-ul">
+<li>需要稳定的独一无二的网络标识符</li>
+<li>需要持久化数据</li>
+<li>需要有序的、优雅的部署和扩展</li>
+<li><p>
+需要有序的自动滚动更新
+</p>
+
+<p>
+如果应用程序不需要任何稳定的标识符或者有序的部署、删除或者扩展，应该使用无状态的控制器部署应用程序，比如Deployment或者ReplicaSet
+</p></li>
+</ul>
+
+<p>
+StatefulSet是Kubernetes 1.9版本之前的beta资源，在1.5版本之前的任何Kubernetes版本都没有
+</p>
+
+<p>
+Pod所用的存储必须由PersistentVolume Provisioner（持久化卷配置器）根据请求配置StorageClass，或者由管理员预先配置，当然也可以不配置存储
+  为了确保数据安全，删除和缩放StatefulSet不会删除与StatefulSet关联的卷，可以手动选择性地删除PVC和PV
+</p>
+
+<p>
+StatefulSet目前使用Headless Service（无头服务）负责Pod的网络身份和通信，需要提前创建此服务
+    删除一个StatefulSet时，不保证对Pod的终止，要在StatefulSet中实现Pod的有序和正常终止，可以在删除之前将StatefulSet的副本缩减为0
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:de7fdbea-d98f-449a-9eb8-14551afe7316" class="outline-4">
+<h4 id="h:de7fdbea-d98f-449a-9eb8-14551afe7316">定义一个StatefulSet资源文件</h4>
+<div class="outline-text-4" id="text-h:de7fdbea-d98f-449a-9eb8-14551afe7316">
+</div>
+<div id="outline-container-h:6e5456da-6683-471b-b25d-b2f364ad9be6" class="outline-5">
+<h5 id="h:6e5456da-6683-471b-b25d-b2f364ad9be6">定义一个简单的StatefulSet的示例</h5>
+<div class="outline-text-5" id="text-h:6e5456da-6683-471b-b25d-b2f364ad9be6">
+<p>
+官方文档：<a href="https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/statefulset/">https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/statefulset/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; nginx-sts.yaml &lt;&lt; EFO
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Service</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: nginx</span>
+<span style="color: #ffa54f;">  labels:</span>
+<span style="color: #ffa54f;">    app: nginx</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  ports:</span>
+<span style="color: #ffa54f;">  - port: 80</span>
+<span style="color: #ffa54f;">    name: web</span>
+<span style="color: #ffa54f;">  clusterIP: None</span>
+<span style="color: #ffa54f;">  selector:</span>
+<span style="color: #ffa54f;">    app: nginx</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">kind: StatefulSet</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: web</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  #updateStrategy:</span>
+<span style="color: #ffa54f;">  #  rollingUpdate:</span>
+<span style="color: #ffa54f;">  #    partition: 0</span>
+<span style="color: #ffa54f;">  #  type: RollingUpdate</span>
+<span style="color: #ffa54f;">  selector:</span>
+<span style="color: #ffa54f;">    matchLabels:</span>
+<span style="color: #ffa54f;">      app: nginx # &#24517;&#39035;&#21305;&#37197; .spec.template.metadata.labels</span>
+<span style="color: #ffa54f;">  serviceName: "nginx"</span>
+<span style="color: #ffa54f;">  replicas: 3 # &#40664;&#35748;&#20540;&#26159; 1</span>
+<span style="color: #ffa54f;">  # minReadySeconds: 10 # &#40664;&#35748;&#20540;&#26159; 0 &#65292;v1.22 &#29256;&#26412;&#25165;&#26377;</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nginx # &#24517;&#39035;&#21305;&#37197; .spec.selector.matchLabels</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      terminationGracePeriodSeconds: 10</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">      - name: nginx</span>
+<span style="color: #ffa54f;">        image: registry.k8s.io/nginx-slim:0.8</span>
+<span style="color: #ffa54f;">        ports:</span>
+<span style="color: #ffa54f;">        - containerPort: 80</span>
+<span style="color: #ffa54f;">          name: web</span>
+<span style="color: #ffa54f;">#        volumeMounts:</span>
+<span style="color: #ffa54f;">#        - name: www</span>
+<span style="color: #ffa54f;">#          mountPath: /usr/share/nginx/html</span>
+<span style="color: #ffa54f;">#  volumeClaimTemplates:</span>
+<span style="color: #ffa54f;">#  - metadata:</span>
+<span style="color: #ffa54f;">#      name: www</span>
+<span style="color: #ffa54f;">#    spec:</span>
+<span style="color: #ffa54f;">#      accessModes: [ "ReadWriteOnce" ]</span>
+<span style="color: #ffa54f;">#      storageClassName: "my-storage-class"</span>
+<span style="color: #ffa54f;">#      resources:</span>
+<span style="color: #ffa54f;">#        requests:</span>
+<span style="color: #ffa54f;">#          storage: 1Gi</span>
+<span style="color: #ffa54f;">EFO</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#27492;&#31034;&#20363;&#27809;&#26377;&#28155;&#21152;&#23384;&#20648;&#37197;&#32622;&#65292;&#21518;&#38754;&#30340;&#31456;&#33410;&#20250;&#21333;&#29420;&#35762;&#35299;&#23384;&#20648;&#30456;&#20851;&#30340;&#30693;&#35782;&#28857;</span>
+</pre>
+</div>
+
+<p>
+上述例子中：
+</p>
+<ul class="org-ul">
+<li>名为 nginx 的 Headless Service 用来控制网络域名。</li>
+<li>名为 web 的 StatefulSet 有一个 Spec，它表明将在独立的 3 个 Pod 副本中启动 nginx 容器。</li>
+
+<li>kind: Service定义了一个名字为Nginx的Headless Service，创建的Service格式为nginx-0.nginx.default.svc.cluster.local，其他的类似，因为没有指定Namespace（命名空间），所以默认部署在default； - kind: StatefulSet定义了一个名字为web的StatefulSet，replicas表示部署Pod的副本数，本实例为3。
+<ul class="org-ul">
+<li>在 StatefulSet 中 必 须 设 置 Pod 选择器（ .spec.selector ） 用 来 匹 配 其 标 签（.spec.template.metadata.labels）。在 1.8 版本之前，如果未配置该字段（.spec.selector），将被设置为默认值，在 1.8 版本之后，如果未指定匹配 Pod Selector，则会导致StatefulSet 创建错误。</li>
+</ul></li>
+
+<li>volumeClaimTemplates 将通过 PersistentVolume 制备程序所准备的 PersistentVolumes 来提供稳定的存储。</li>
+</ul>
+
+<p>
+当 StatefulSet 控制器创建 Pod 时，它会添加一个标签 statefulset.kubernetes.io/pod-name，该标签的值为 Pod 的名称，用于匹配 Service。
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl --show-labels
+NAME          READY   STATUS    RESTARTS   AGE     LABELS
+web-0         1/1     Running   0          5m1s    <span style="color: #a0522d;">app</span>=nginx,controller-revision-hash=web-7fbd8f8f7c,statefulset.kubernetes.io/pod-name=web-0
+web-1         1/1     Running   0          4m54s   <span style="color: #a0522d;">app</span>=nginx,controller-revision-hash=web-7fbd8f8f7c,statefulset.kubernetes.io/pod-name=web-1
+web-2         1/1     Running   0          4m49s   <span style="color: #a0522d;">app</span>=nginx,controller-revision-hash=web-7fbd8f8f7c,statefulset.kubernetes.io/pod-name=web-2
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:623cf635-8738-425e-bb1a-9652dc510a8e" class="outline-5">
+<h5 id="h:623cf635-8738-425e-bb1a-9652dc510a8e">创建一个StatefulSet</h5>
+<div class="outline-text-5" id="text-h:623cf635-8738-425e-bb1a-9652dc510a8e">
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl create -f nginx-sts.yaml
+service/nginx created
+statefulset.apps/web created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;svc&#20449;&#24687;</span>
+[root@k8s-master01 ~]# kubectl get svc
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+nginx        ClusterIP   None         &lt;none&gt;        80/TCP    24s
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;pod&#20449;&#24687;</span>
+[root@k8s-master01 ~]# kubectl get po -w <span style="color: #b22222;">#  </span><span style="color: #b22222;">&#30417;&#25511; pod &#29366;&#24577;</span>
+NAME                        READY   STATUS              RESTARTS   AGE
+web-0                       1/1     Running             0          113s
+web-1                       0/1     ContainerCreating   0          111s
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;sts</span>
+[root@k8s-master01 ~]# kubectl get sts
+NAME   READY   AGE
+web    2/2     2m42s
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0aa1ff21-f62e-4cd0-ae22-b07b67f0e872" class="outline-4">
+<h4 id="h:0aa1ff21-f62e-4cd0-ae22-b07b67f0e872">StatefulSet 创建 Pod 流程</h4>
+<div class="outline-text-4" id="text-h:0aa1ff21-f62e-4cd0-ae22-b07b67f0e872">
+<p>
+StatefulSet 管理的 Pod 部署和扩展规则如下：
+</p>
+<ul class="org-ul">
+<li>对于具有N个副本的StatefulSet，将按顺序从0到N-1开始创建Pod；</li>
+<li>当删除Pod时，将按照N-1到0的反顺序终止；</li>
+<li>在缩放Pod之前，必须保证当前的Pod是Running（运行中）或者Ready（就绪）；</li>
+<li>在终止Pod之前，它所有的继任者必须是完全关闭状态。</li>
+</ul>
+
+<p>
+StatefulSet 的 pod.Spec.TerminationGracePeriodSeconds（终止 Pod 的等待时间）不应该指定为 0，设置为 0 对 StatefulSet 的 Pod 是极其不安全的做法，优雅地删除 StatefulSet 的 Pod 是非常有必要的，而且是安全的，因为它可以确保在 Kubelet 从 APIServer 删除之前，让 Pod 正常关闭。
+</p>
+
+<p>
+当创建上面的 Nginx 实例时，Pod 将按 web-0、web-1、web-2 的顺序部署 3 个 Pod。在 web- 0 处于 Running 或者 Ready 之前，web-1 不会被部署，相同的，web-2 在 web-1 未处于 Running和 Ready 之前也不会被部署。如果在 web-1 处于 Running 和 Ready 状态时，web-0 变成 Failed（失败）状态，那么 web-2 将不会被启动，直到 web-0 恢复为 Running 和 Ready 状态。
+</p>
+
+<p>
+如果用户将 StatefulSet 的 replicas 设置为 1，那么 web-2 将首先被终止，在完全关闭并删除web-2 之前，不会删除 web-1。如果 web-2 终止并且完全关闭后，web-0 突然失败，那么在 web- 0 未恢复成 Running 或者 Ready 时，web-1 不会被删除。
+</p>
+
+<p>
+如果不想 pod 一个个创建，可以配置并行创建
+.spec.podManagementPolicy：
+</p>
+<ul class="org-ul">
+<li>OrderedReady Pod 管理是 StatefulSet 的默认设置。</li>
+<li>Parallel Pod 管理让 StatefulSet 控制器并行的启动或终止所有的 Pod。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:b04f7d0c-0418-4e53-b85c-35ed638c3cf6" class="outline-4">
+<h4 id="h:b04f7d0c-0418-4e53-b85c-35ed638c3cf6">Headless Service 通信原理</h4>
+<div class="outline-text-4" id="text-h:b04f7d0c-0418-4e53-b85c-35ed638c3cf6">
+<p>
+Headless一般的格式为：
+</p>
+<ul class="org-ul">
+<li><code>statefulSetName-{0..N-1}.serviceName.namespace.svc.cluster.local</code></li>
+</ul>
+
+<p>
+完整地址：
+</p>
+<ul class="org-ul">
+<li>web-0.nginx.default.svc.cluster.local</li>
+</ul>
+
+<p>
+同名称空间下访问地址：
+</p>
+<ul class="org-ul">
+<li>web-0.nginx</li>
+</ul>
+
+<p>
+不同名称空间下访问地址：
+</p>
+<ul class="org-ul">
+<li>web-0.nginx.default</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c36aa36d-7ebd-4cde-946d-bfba3b4dfe5c" class="outline-4">
+<h4 id="h:c36aa36d-7ebd-4cde-946d-bfba3b4dfe5c">StatefulSet的扩容和缩容</h4>
+<div class="outline-text-4" id="text-h:c36aa36d-7ebd-4cde-946d-bfba3b4dfe5c">
+<p>
+和 Deployment 类似，可以通过更新 replicas 字段扩容/缩容 StatefulSet，也可以使用 kubectl scale、kubectl edit 和 kubectl patch 来扩容/缩容一个 StatefulSet。
+</p>
+</div>
+<div id="outline-container-h:9df5602b-936e-4c9c-8992-31ef8f80f9ea" class="outline-5">
+<h5 id="h:9df5602b-936e-4c9c-8992-31ef8f80f9ea">扩容</h5>
+<div class="outline-text-5" id="text-h:9df5602b-936e-4c9c-8992-31ef8f80f9ea">
+<p>
+将上述创建的 sts 副本增加到 3 个：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl scale --replicas=3 sts web
+statefulset.apps/web scaled
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;pod&#12289;&#21457;&#29616;&#21517;&#23383;&#26159;&#22266;&#23450;&#22686;&#38271;&#30340;</span>
+[root@k8s-master01 ~]# kubectl get pod
+NAME                        READY   STATUS              RESTARTS   AGE
+web-0                       1/1     Running             0          4m48s
+web-1                       1/1     Running             0          4m46s
+web-2                       0/1     ContainerCreating   0          28s
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20063;&#21487;&#20351;&#29992;&#20197;&#19979;&#21629;&#20196;&#21160;&#24577;&#26597;&#30475;&#65306;</span>
+kubectl get pods -w -l <span style="color: #a0522d;">app</span>=nginx
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:80ed9584-2280-4975-9f2e-1f014140794a" class="outline-5">
+<h5 id="h:80ed9584-2280-4975-9f2e-1f014140794a">StatefulSet的缩容</h5>
+<div class="outline-text-5" id="text-h:80ed9584-2280-4975-9f2e-1f014140794a">
+<p>
+首先打开另一个终端动态查看缩容的流程：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get pods -w -l <span style="color: #a0522d;">app</span>=nginx
+</pre>
+</div>
+
+<p>
+在另一个终端将副本数改为 2（此处演示的为 patch 命令，patch 比 edit 和 scale 稍复杂）：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl patch sts web -p <span style="color: #8b2252;">'{"spec":{"replicas":2}}'</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20808;&#21024;&#26368;&#21518;&#19968;&#20010;</span>
+[root@k8s-master01 ~]# kubectl get pod              
+NAME                        READY   STATUS        RESTARTS   AGE
+web-0                       1/1     Running       0          12m
+web-1                       1/1     Running       0          12m
+web-2                       0/1     Terminating   0          7m45s
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2c8a820f-42e1-4578-8fd7-340848fcbbe3" class="outline-4">
+<h4 id="h:2c8a820f-42e1-4578-8fd7-340848fcbbe3">StatefulSet更新策略</h4>
+<div class="outline-text-4" id="text-h:2c8a820f-42e1-4578-8fd7-340848fcbbe3">
+</div>
+<div id="outline-container-h:fc63f3f7-fdd6-4a66-a605-99d430f85c6c" class="outline-5">
+<h5 id="h:fc63f3f7-fdd6-4a66-a605-99d430f85c6c">On Delete策略</h5>
+<div class="outline-text-5" id="text-h:fc63f3f7-fdd6-4a66-a605-99d430f85c6c">
+<p>
+OnDelete更新策略实现了传统（1.7版本之前）的行为，它也是默认的更新策略。当我们选择这个更新策略并修改StatefulSet的.spec.template字段时，StatefulSet控制器不会自动更新Pod，我们必须手动删除Pod才能使控制器创建新的Pod。
+</p>
+</div>
+</div>
+<div id="outline-container-h:01edaac2-d185-4135-a88b-ab793d7b7834" class="outline-5">
+<h5 id="h:01edaac2-d185-4135-a88b-ab793d7b7834">RollingUpdate策略</h5>
+<div class="outline-text-5" id="text-h:01edaac2-d185-4135-a88b-ab793d7b7834">
+<p>
+RollingUpdate（滚动更新）更新策略会更新一个StatefulSet中所有的Pod，采用与序号索引相反的顺序进行滚动更新
+</p>
+
+<p>
+比如Patch一个名称为web的StatefulSet来执行RollingUpdate更新：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl patch statefulset web -p <span style="color: #8b2252;">'{"spec":{"updateStrategy":{"type":"RollingUpdate"}}}'</span>
+</pre>
+</div>
+
+
+<p>
+查看更改后的StatefulSet：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get sts web -o yaml | grep -A 1 "updateStrategy"</span>
+  updateStrategy:
+    <span style="color: #483d8b;">type</span>: RollingUpdate
+</pre>
+</div>
+
+
+<p>
+然后改变容器的镜像触发滚动更新（此处使用的 jsonPath 的方式更改的资源配置，可以使用 set 或 edit 减少复杂度）：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl patch statefulset web --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value":"dotbalo/canary:v1"}]'</span>
+statefulset.apps/web patched
+</pre>
+</div>
+
+
+<p>
+如上所述，StatefulSet里的Pod采用和序号相反的顺序更新。在更新下一个Pod前，StatefulSet控制器会终止每一个Pod并等待它们变成Running和Ready状态。在当前顺序变成Running和Ready状态之前，StatefulSet控制器不会更新下一个Pod，但它仍然会重建任何在更新过程中发生故障的Pod，使用它们当前的版本。已经接收到请求的Pod将会被恢复为更新的版本，没有收到请求的Pod则会被恢复为之前的版本
+</p>
+
+<p>
+在更新过程中可以使用 <code>kubectl rollout status sts/&lt;name&gt;</code> 来查看滚动更新的状态：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl rollout status sts/web
+</pre>
+</div>
+
+<p>
+查看更新后的镜像：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #a020f0;">for</span> p<span style="color: #a020f0;"> in</span> 0 1 2; <span style="color: #a020f0;">do</span> kubectl get po web-$<span style="color: #a0522d;">p</span> --template <span style="color: #8b2252;">'{{range $i, $c := .spec.containers}}{{$c.image}}{{end}}'</span>; <span style="color: #483d8b;">echo</span>; <span style="color: #a020f0;">done</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:bed1ba9a-8f07-4ef6-86af-f6f6dd972ff1" class="outline-4">
+<h4 id="h:bed1ba9a-8f07-4ef6-86af-f6f6dd972ff1">分段更新（partition）</h4>
+<div class="outline-text-4" id="text-h:bed1ba9a-8f07-4ef6-86af-f6f6dd972ff1">
+
+<figure id="orgaf8215a">
+<img src="./images/Snipaste_2022-09-04_19-58-10.png" alt="Snipaste_2022-09-04_19-58-10.png" width="50%">
+
+</figure>
+
+<p>
+比如我们定义一个分区"partition":3，可以使用 patch 或 edit 直接对 StatefulSet 进行设置：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl patch statefulset web -p '{"spec":{"updateStrategy":{"type":"RollingUpdate","rollingUpdate":{"partition":3}}}}'</span>
+statefulset.apps/web patched
+</pre>
+</div>
+
+<p>
+然后再次patch改变容器的镜像:
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl patch statefulset web --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value":"k8s.gcr.io/nginx-slim:0.7"}]'</span>
+statefulset.apps/web patched
+</pre>
+</div>
+
+<p>
+删除Pod触发更新
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl delete po web-2</span>
+</pre>
+</div>
+
+<p>
+此时，因为 Pod web-2 的序号小于分区 3，所以 Pod 不会被更新，还是会使用以前的容器恢复 Pod。
+</p>
+
+<p>
+将分区改为 2，此时会自动更新 web-2（因为之前更改了更新策略），但是不会更新 web-0 和 web-1：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl patch statefulset web -p <span style="color: #8b2252;">'{"spec":{"updateStrategy":{"type":"RollingUpdate","rollingUpdate":{"partition":2}}}}'</span>
+</pre>
+</div>
+
+<p>
+按照上述方式，可以实现分阶段更新，类似于灰度/金丝雀发布。查看最终的结果如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">for p in 0 1 2; do kubectl get po web-$p --template '{{range $i, $c := .spec.containers}}{{$c.image}}{{end}}'; echo; done</span>
+dotbalo/canary:v1
+dotbalo/canary:v1
+dotbalo/canary:v2
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b58c533e-6c7c-46e3-8e89-48c141409a50" class="outline-4">
+<h4 id="h:b58c533e-6c7c-46e3-8e89-48c141409a50">删除StatefulSet</h4>
+<div class="outline-text-4" id="text-h:b58c533e-6c7c-46e3-8e89-48c141409a50">
+<p>
+删除StatefulSet有两种方式，即级联删除和非级联删除。使用非级联方式删除 StatefulSet时，StatefulSet 的 Pod 不会被删除；使用级联删除时，StatefulSet 和它的 Pod 都会被删除。
+</p>
+</div>
+<div id="outline-container-h:de702519-3acf-43fc-a945-03ab6f4ad871" class="outline-5">
+<h5 id="h:de702519-3acf-43fc-a945-03ab6f4ad871">非级联删除</h5>
+<div class="outline-text-5" id="text-h:de702519-3acf-43fc-a945-03ab6f4ad871">
+<p>
+使用 <code>kubectl delete sts xxx</code> 删除 StatefulSet 时，只需提供&#x2013;cascade=false 参数，就会采用非级联删除，此时删除 StatefulSet 不会删除它的 Pod：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get po </span>
+NAME          READY   STATUS    RESTARTS   AGE
+web-0         1/1     Running   0          21h
+web-1         1/1     Running   0          21h
+web-2         1/1     Running   0          21h
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl delete statefulset web --cascade=false # &#37319;&#29992;&#38750;&#32423;&#32852;&#21024;&#38500;&#21024;&#38500;sts</span>
+statefulset.apps <span style="color: #8b2252;">"web"</span> deleted
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get sts # &#26597;&#30475;&#27492;&#26102; sts &#24050;&#32463;&#34987;&#21024;&#38500;</span>
+No resources found.
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get po # &#35813; StatefulSet &#31649;&#29702;&#30340; Pod &#24182;&#26410;&#34987;&#21024;&#38500;</span>
+NAME          READY   STATUS    RESTARTS   AGE
+web-0         1/1     Running   0          21h
+web-1         1/1     Running   0          21h
+web-2         1/1     Running   0          21h
+</pre>
+</div>
+
+<p>
+由于此时删除了 StatefulSet，它管理的 Pod 变成了“孤儿”Pod，因此单独删除 Pod 时，该Pod 不会被重建：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl get po</span>
+NAME          READY   STATUS    RESTARTS   AGE
+web-0         1/1     Running   0          21h
+web-1         1/1     Running   0          21h
+web-2         1/1     Running   0          21h
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl delete po web-0</span>
+pod <span style="color: #8b2252;">"web-0"</span> deleted
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl  get po</span>
+NAME          READY   STATUS    RESTARTS   AGE
+web-1         1/1     Running   0          21h
+web-2         1/1     Running   0          21h
+</pre>
+</div>
+
+<p>
+再次创建 sts：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl apply -f nginx-sts.yaml</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl  get po</span>
+NAME          READY   STATUS    RESTARTS   AGE
+web-0         1/1     Running   0          32s
+web-1         1/1     Running   0          21h
+web-2         1/1     Running   0          21h
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2eb1cb8b-aa3b-4107-9df2-0f03efdd22ca" class="outline-5">
+<h5 id="h:2eb1cb8b-aa3b-4107-9df2-0f03efdd22ca">级联删除</h5>
+<div class="outline-text-5" id="text-h:2eb1cb8b-aa3b-4107-9df2-0f03efdd22ca">
+<p>
+省略 <code>--cascade=false</code> 参数即为级联删除
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl delete statefulset web
+statefulset.apps <span style="color: #8b2252;">"web"</span> deleted
+</pre>
+</div>
+
+<p>
+也可以使用-f 指定创建 StatefulSet 和 Service 的 yaml 文件，直接删除 StatefulSet 和 Service（此文件将 StatefulSet 和 Service 写在了一起）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl delete -f nginx-sts.yaml 
+service <span style="color: #8b2252;">"nginx"</span> deleted
+Error from server (NotFound): error when deleting <span style="color: #8b2252;">"nginx-sts.yaml"</span>: statefulsets.apps <span style="color: #8b2252;">"web"</span> not found  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#22240;&#20026; StatefulSet &#24050;&#32463;&#34987;&#21024;&#38500;&#65292;&#25152;&#20197;&#20250;&#25552;&#31034;&#35813;StatefulSet &#19981;&#23384;&#22312;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9dccb0c6-d663-44ab-857e-599e30a51459" class="outline-3">
+<h3 id="h:9dccb0c6-d663-44ab-857e-599e30a51459">DaemonSet</h3>
+<div class="outline-text-3" id="text-h:9dccb0c6-d663-44ab-857e-599e30a51459">
+</div>
+<div id="outline-container-h:d81fb0f1-b0e6-4f4a-9f5e-195c319187e2" class="outline-4">
+<h4 id="h:d81fb0f1-b0e6-4f4a-9f5e-195c319187e2">什么是DaemonSet</h4>
+<div class="outline-text-4" id="text-h:d81fb0f1-b0e6-4f4a-9f5e-195c319187e2">
+<p>
+DaemonSet（守护进程集）和守护进程类似，它在符合匹配条件的节点上均部署一个Pod。当有新节点加入集群时，也会为它们新增一个 Pod，当节点从集群中移除时，这些 Pod 也会被回收，删除 DaemonSet 将会删除它创建的所有 Pod。
+</p>
+
+<p>
+使用DaemonSet的一些典型用法：
+</p>
+<ul class="org-ul">
+<li>运行集群存储daemon（守护进程），例如在每个节点上运行Glusterd、Ceph等</li>
+<li>在每个节点运行日志收集daemon，例如Fluentd、Logstash</li>
+<li>在每个节点运行监控daemon，比如Prometheus Node Exporter、Collectd、Datadog代理、New Relic代理或 Ganglia gmond</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:4069551a-0b6c-4cbc-91f3-68c1e0e8d258" class="outline-4">
+<h4 id="h:4069551a-0b6c-4cbc-91f3-68c1e0e8d258">DaemonSet 部署赛程</h4>
+<div class="outline-text-4" id="text-h:4069551a-0b6c-4cbc-91f3-68c1e0e8d258">
+
+<figure id="org101e94c">
+<img src="./images/Snipaste_2022-09-04_21-21-28.png" alt="Snipaste_2022-09-04_21-21-28.png" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:c6b19a85-c6d8-44c4-9afc-98c6dfa22fd0" class="outline-4">
+<h4 id="h:c6b19a85-c6d8-44c4-9afc-98c6dfa22fd0">定义一个 DaemonSet</h4>
+<div class="outline-text-4" id="text-h:c6b19a85-c6d8-44c4-9afc-98c6dfa22fd0">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; nginx-ds.yaml  &lt;&lt; EFO
+<span style="color: #ffa54f;">apiVersion: apps/v1</span>
+<span style="color: #ffa54f;">kind: DaemonSet</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  labels:</span>
+<span style="color: #ffa54f;">    app: nginx</span>
+<span style="color: #ffa54f;">  name: nginx</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  selector:</span>
+<span style="color: #ffa54f;">    matchLabels:</span>
+<span style="color: #ffa54f;">      app: nginx</span>
+<span style="color: #ffa54f;">  template:</span>
+<span style="color: #ffa54f;">    metadata:</span>
+<span style="color: #ffa54f;">      labels:</span>
+<span style="color: #ffa54f;">        app: nginx</span>
+<span style="color: #ffa54f;">    spec:</span>
+<span style="color: #ffa54f;">      containers:</span>
+<span style="color: #ffa54f;">      - image: nginx:1.15.12</span>
+<span style="color: #ffa54f;">        imagePullPolicy: IfNotPresent</span>
+<span style="color: #ffa54f;">        name: nginx</span>
+<span style="color: #ffa54f;">EFO</span>
+</pre>
+</div>
+
+<p>
+和 Deployment 没有太大的区别。
+</p>
+
+<ol class="org-ol">
+<li>必需字段
+<ul class="org-ul">
+<li>和其他所有 Kubernetes 配置一样，DaemonSet 需要 apiVersion、kind 和 metadata 字段，同时也需要一个.spec 配置段。</li>
+</ul></li>
+<li>Pod 模板
+<ul class="org-ul">
+<li>.spec 唯一需要的字段是.spec.template。.spec.template 是一个 Pod 模板，它与 Pod 具有相同的配置方式，但它不具有 apiVersion 和 kind 字段。</li>
+<li>除了 Pod 必需的字段外，在 DaemonSet 中的 Pod 模板必须指定合理的标签。</li>
+</ul></li>
+<li>Pod Selector
+<ul class="org-ul">
+<li>.spec.selector 字段表示 Pod Selector，它与其他资源的.spec.selector 的作用相同。</li>
+<li>.spec.selector 表示一个对象，它由如下两个字段组成：</li>
+</ul></li>
+<li>指定节点部署 Pod
+<ul class="org-ul">
+<li>如果指定了.spec.template.spec.nodeSelector，DaemonSet Controller 将在与 Node Selector（节点选择器）匹配的节点上创建 Pod，比如部署在磁盘类型为 ssd 的节点上（需要提前给节点定义标签 Label）：</li>
+</ul></li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  nodeSelector:
+    disktype: ssd
+</pre>
+</div>
+</div>
+<div id="outline-container-h:92aa9fa0-72c1-4fdc-a551-a97b55e2961c" class="outline-5">
+<h5 id="h:92aa9fa0-72c1-4fdc-a551-a97b55e2961c">创建一个DaemonSet</h5>
+<div class="outline-text-5" id="text-h:92aa9fa0-72c1-4fdc-a551-a97b55e2961c">
+<p>
+创建一个ds
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f nginx-ds.yaml 
+</pre>
+</div>
+
+<p>
+此时会在每个节点创建一个 Pod：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get po -owide
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:db2cdabf-ceb3-4683-9aea-517639fe4e5b" class="outline-5">
+<h5 id="h:db2cdabf-ceb3-4683-9aea-517639fe4e5b">更新和回滚 DaemonSet</h5>
+<div class="outline-text-5" id="text-h:db2cdabf-ceb3-4683-9aea-517639fe4e5b">
+<p>
+如果添加了新节点或修改了节点标签（Label），DaemonSet 将立刻向新匹配上的节点添加Pod，同时删除不能匹配的节点上的 Pod。 
+</p>
+
+<p>
+在 Kubernetes 1.6 以后的版本中，可以在 DaemonSet 上执行滚动更新，未来的 Kubernetes 版本将支持节点的可控更新。
+</p>
+
+<p>
+DaemonSet 滚动更新可参考：<a href="https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/#updating-a-daemonset">https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/#updating-a-daemonset</a>
+</p>
+
+<p>
+DaemonSet 更新策略和 StatefulSet 类似，也有 OnDelete 和 RollingUpdate 两种方式。 如果是比较重要的可以使用 OnDelete.
+</p>
+
+<p>
+查看上一节创建的 DaemonSet 更新方式：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get ds nginx-ds -o go-template=<span style="color: #8b2252;">'{{.spec.updateStrategy.type}}{{"\n"}}'</span>
+</pre>
+</div>
+
+<p>
+命令式更新，和之前 Deployment、StatefulSet 方式一致
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl edit ds/&lt;daemonset-name&gt;
+kubectl patch ds/&lt;daemonset-name&gt; -p=&lt;strategic-merge-patch&gt;
+</pre>
+</div>
+
+<p>
+更新镜像
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl set image ds/&lt;daemonset-name&gt;&lt;container-name&gt;= &lt;container-newimage&gt; --record=true
+</pre>
+</div>
+
+<p>
+查看更新状态
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl rollout status ds/&lt;daemonset-name&gt;
+</pre>
+</div>
+
+<p>
+列出所有修订版本
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl rollout history daemonset &lt;daemonset-name&gt;
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#29256;&#26412;&#20445;&#23384;&#22312;</span>
+kubectl  get controllerrevisions
+</pre>
+</div>
+
+<p>
+回滚到指定 revision
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl rollout undo daemonset &lt;daemonset-name&gt; --to-revision=&lt;revision&gt;
+DaemonSet &#30340;&#26356;&#26032;&#21644;&#22238;&#28378;&#19982; Deployment &#31867;&#20284;&#65292;&#27492;&#22788;&#19981;&#20877;&#28436;&#31034;&#12290;
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c3f3d09d-9a8d-4522-b6d8-10f13da9dce5" class="outline-3">
+<h3 id="h:c3f3d09d-9a8d-4522-b6d8-10f13da9dce5">自动扩缩容HPA</h3>
+<div class="outline-text-3" id="text-h:c3f3d09d-9a8d-4522-b6d8-10f13da9dce5">
+</div>
+<div id="outline-container-h:a0b6cf61-163a-411b-8c24-6b15e77eb356" class="outline-4">
+<h4 id="h:a0b6cf61-163a-411b-8c24-6b15e77eb356">什么是HPA</h4>
+<div class="outline-text-4" id="text-h:a0b6cf61-163a-411b-8c24-6b15e77eb356">
+<p>
+HPA（Horizontal Pod Autoscaler，水平Pod自动伸缩器）可根据观察到的CPU、内存使用率或自定义度量标准来自动扩展或缩容Pod的数量。HPA不适用于无法缩放的对象，比如DaemonSet
+</p>
+
+<p>
+HPA控制器会定期调整RC或Deployment的副本数，以使观察到的平均CPU利用率与用户指定的目标相匹配
+</p>
+
+<p>
+HPA需要metrics-server（项目地址：<a href="https://github.com/kubernetes-incubator/metrics-server">https://github.com/kubernetes-incubator/metrics-server</a>）获取度量指标，由于在高可用集群安装中已经安装了metrics-server，所以本节的实践部分无须再次安装
+</p>
+</div>
+<div id="outline-container-h:0affe84c-3adc-4a9e-824e-858b2f72bfdd" class="outline-5">
+<h5 id="h:0affe84c-3adc-4a9e-824e-858b2f72bfdd">HPA 接口类型</h5>
+<div class="outline-text-5" id="text-h:0affe84c-3adc-4a9e-824e-858b2f72bfdd">
+<ul class="org-ul">
+<li>HPA v1 为稳定版自动水平伸缩，只支持 CPU 指标</li>
+<li>v2 为 beta 版本，分为 v2beta1(支持 CPU、内存和自定义指标)</li>
+<li>v2beta2（支持 CPU、内存、自定义指标 Custom 和额外指标 ExternalMetrics）</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl  get apiservices|grep autosca
+v1.autoscaling                         Local                        True        191d
+v2beta1.autoscaling                    Local                        True        191d
+v2beta2.autoscaling                    Local                        True        191d
+</pre>
+</div>
+
+<p>
+自定义指标：生产环境推荐。如业务服务上报指标给 prometheus，从 prometheus 中获取，500状态增加来扩容。
+</p>
+
+<p>
+ExternalMetrics:  公有云厂商提供的指标
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5b5bf366-3263-45e8-99e8-7a4b7e6842b4" class="outline-4">
+<h4 id="h:5b5bf366-3263-45e8-99e8-7a4b7e6842b4">HPA原理</h4>
+<div class="outline-text-4" id="text-h:5b5bf366-3263-45e8-99e8-7a4b7e6842b4">
+</div>
+<div id="outline-container-h:5cf87ae4-2b5a-455a-ba1f-16467da1821d" class="outline-5">
+<h5 id="h:5cf87ae4-2b5a-455a-ba1f-16467da1821d">为什么要使用HPA</h5>
+<div class="outline-text-5" id="text-h:5cf87ae4-2b5a-455a-ba1f-16467da1821d">
+<p>
+在生产环境中，总会有一些意想不到的事情发生，比如公司网站流量突然升高，此时之前创建的Pod已不足以撑住所有的访问，而运维人员也不可能24小时守着业务服务，这时就可以通过配置HPA，实现负载过高的情况下自动扩容Pod副本数以分摊高并发的流量，当流量恢复正常后，HPA会自动缩减Pod的数量
+</p>
+</div>
+</div>
+<div id="outline-container-h:494a4ffe-5fe4-435b-b777-3643bedbd456" class="outline-5">
+<h5 id="h:494a4ffe-5fe4-435b-b777-3643bedbd456">HPA中一些细节的处理</h5>
+<div class="outline-text-5" id="text-h:494a4ffe-5fe4-435b-b777-3643bedbd456">
+<ul class="org-ul">
+<li>噪声处理：
+<ul class="org-ul">
+<li>通过上面的公式可以发现，Target的数目很大程度上会影响最终的结果，而在Kubernetes中，无论是变更或者升级，都更倾向于使用Recreate而不是Restart的方式进行处理。这就导致了在Deployment的生命周期中，可能会出现某一个时间，Target会由于计算了Starting或者Stopping的的Pod而变得很大。这就会给HPA的计算带来非常大的噪声，在HPA Controller的计算中，如果发现当前的对象存在Starting或者Stopping的Pod会直接跳过当前的计算周期，等待状态都变为Running再进行计算。</li>
+</ul></li>
+
+<li>冷却周期：
+<ul class="org-ul">
+<li>在弹性伸缩中，冷却周期是不能逃避的一个话题，很多时候我们期望快速弹出与快速回收，而另一方面，我们又不希望集群震荡，所以一个弹性伸缩活动冷却周期的具体数值是多少，一直被开发者所挑战。在HPA中，默认的扩容冷却周期是3分钟，缩容冷却周期是5分钟。</li>
+</ul></li>
+
+<li>边界值计算：
+<ul class="org-ul">
+<li>我们回到刚才的计算公式，第一次我们算出需要弹出的容器数目是5，此时扩容后整体的负载是42%，但是我们似乎忽略了一个问题，一个全新的Pod启动会不会自己就占用了部分资源？此外，8%的缓冲区是否就能够缓解整体的负载情况，要知道当一次弹性扩容完成后，下一次扩容要最少等待3分钟才可以继续扩容。为了解决这些问题，HPA引入了边界值△，目前在计算边界条件时，会自动加入10%的缓冲，这也是为什么在刚才的例子中最终的计算结果为6的原因</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:dc5bc9c0-f2ff-497f-a60f-bce5fe8bb751" class="outline-5">
+<h5 id="h:dc5bc9c0-f2ff-497f-a60f-bce5fe8bb751">原理</h5>
+<div class="outline-text-5" id="text-h:dc5bc9c0-f2ff-497f-a60f-bce5fe8bb751">
+<p>
+通过集群内的资源监控系统（metrics-server），来获取集群中资源的使用状态。
+</p>
+
+<p>
+根据CPU、内存、以及用户自定义的资源指标数据的使用量或连接数为参考依据，来制定一个临界点，一旦超出这个点，HPA就会自动创建出pod副本
+</p>
+
+<p>
+HPA通过定期（定期轮询的时间通过–horizontal-pod-autoscaler-sync-period选项来设置，默认的时间为30秒）通过Status.PodSelector来查询pods的状态，获得pod的CPU使用率。然后，通过现有pods的CPU使用率的平均值（计算方式是最近的pod使用量（最近一分钟的平均值，从metrics-serve中获得）
+</p>
+
+<p>
+除以设定的每个Pod的CPU使用率限额）跟目标使用率进行比较，并且在扩容时，还要遵循预先设定的副本数限制：MinReplicas &lt;= Replicas &lt;= MaxReplicas。
+</p>
+
+<p>
+计算扩容后Pod的个数：sum(最近一分钟内某个Pod的CPU使用率/量的平均值)/CPU使用上限的整数+1
+</p>
+
+<p>
+流程
+1、创建HPA资源，设定目标CPU使用率限额，以及最大、最小实例数
+2、收集一组中（PodSelector）每个Pod最近一分钟内的CPU使用率，并计算平均值
+3、读取HPA中设定的CPU使用限额
+4、计算：平均值之和/限额，求出目标调整的实例个数
+5、目标调整的实例数不能超过1中设定的最大、最小实例数，如果没有超过，则扩容；超过，则扩容至最大的实例个数
+6、回到2，不断循环
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8df01f85-6963-40a5-8d6b-12908c586e48" class="outline-4">
+<h4 id="h:8df01f85-6963-40a5-8d6b-12908c586e48">实现一个Web服务器的自动伸缩特性</h4>
+<div class="outline-text-4" id="text-h:8df01f85-6963-40a5-8d6b-12908c586e48">
+<p>
+使HPA生效前提：
+</p>
+<ul class="org-ul">
+<li>必须安装 metrics-server 或其他自定义 metrics-server</li>
+<li>必须定义 requests 参数</li>
+<li>不能扩容无法缩放的对象，比如 DaemonSet</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#36816;&#34892; pod &#36164;&#28304;&#65292;&#21517;&#31216;&#20026;php-apache&#65292;&#24182;&#35774;&#32622;&#35831;&#27714;CPU&#30340;&#36164;&#28304;&#20026;200m&#24182;&#26292;&#38706;&#19968;&#20010;80&#31471;&#21475;</span>
+kubectl run php-apache --image=mirrorgooglecontainers/hpa-example --requests=<span style="color: #a0522d;">cpu</span>=200m --expose --port=80
+service/php-apache created
+pod/php-apache created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#24403;hpa&#36164;&#28304;&#30340;deployment&#36164;&#28304;&#23545;&#35937;&#30340;CPU&#20351;&#29992;&#29575;&#36798;&#21040;20%&#26102;&#65292;&#23601;&#36827;&#34892;&#25193;&#23481;&#65292;&#26368;&#22810;&#21487;&#20197;&#25193;&#23481;&#21040;5&#20010;</span>
+kubectl autoscale deployment php-apache --cpu-percent=20 --min=1 --max=5
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#30830;&#23450;&#24403;&#21069;&#30340;pod&#27491;&#24120;&#36816;&#34892;</span>
+kubectl get pod | grep php-apa    
+php-apache-867f97c8cb-9mpd6   1/1     Running   0          44m
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">4 &#26597;&#30475;&#36164;&#28304;&#20351;&#29992;&#24773;&#20917;</span>
+kubectl top pod
+kubectl get hpa
+</pre>
+</div>
+<p>
+PS: 要保证 pod 标签是唯一的不和其它 deployment 冲突，不然 TARGETS 中值一直为0%。
+</p>
+
+<p>
+模拟消耗php-apache的资源，并验证pod是否会自动扩容与缩容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;">#  </span><span style="color: #b22222;">&#26032;&#24320;&#21551;&#22810;&#20010;&#32456;&#31471;&#65288;&#20063;&#21487;&#20351;&#29992;node&#33410;&#28857;&#65289;&#65292;&#23545;php-apache&#30340;pod&#36827;&#34892;&#27515;&#24490;&#29615;&#35831;&#27714;&#65292;&#22914;&#19979;&#65288;&#22914;&#26524;&#20320;&#30340;&#31995;&#32479;&#36164;&#28304;&#27604;&#36739;&#20805;&#36275;&#65292;&#21487;&#20197;&#36873;&#25321;&#24320;&#21551;&#22810;&#20010;&#32456;&#31471;&#65292;&#23545;pod&#36827;&#34892;&#27515;&#24490;&#29615;&#35831;&#27714;</span>
+<span style="color: #a020f0;">while</span> true; <span style="color: #a020f0;">do</span> wget -q -O- 10.97.45.108; <span style="color: #a020f0;">done</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#28982;&#21518;&#26597;&#30475;&#25968;&#37327;</span>
+[root@master ~]# kubectl get pod
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#24403;&#20572;&#27490;&#27515;&#24490;&#29615;&#35831;&#27714;&#21518;&#65292;&#20063;&#24182;&#19981;&#20250;&#31435;&#21363;&#20943;&#23569;pod&#25968;&#37327;&#65292;&#20250;&#31561;&#19968;&#27573;&#26102;&#38388;&#21518;&#20943;&#23569;pod&#25968;&#37327;&#65292;&#38450;&#27490;&#27969;&#37327;&#20877;&#27425;&#28608;&#22686;&#12290;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#33267;&#27492;&#65292;HPA&#23454;&#29616;pod&#21103;&#26412;&#25968;&#37327;&#30340;&#33258;&#21160;&#25193;&#23481;&#19982;&#32553;&#23481;&#23601;&#23454;&#29616;&#20102;&#12290;</span>
+</pre>
+</div>
+
+<p>
+示例 hpa
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: task-center-web
+  namespace: taskcenter
+spec:
+  maxReplicas: 6
+  minReplicas: 4
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: task-center-web
+  targetCPUUtilizationPercentage: 70
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: xxl-job
+  namespace: taskcenter
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: xxl-job
+  minReplicas: 2
+  maxReplicas: 100
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 70
+</pre>
+</div>
+
+<p>
+根据不同业务场景调节 HPA 扩缩容灵敏度
+</p>
+
+<p>
+<a href="https://cloud.tencent.com/document/product/457/50660">https://cloud.tencent.com/document/product/457/50660</a>
+</p>
+
+<p>
+自定义hpa
+</p>
+
+<p>
+<a href="https://keda.sh/">https://keda.sh/</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f9601f82-ee86-49b3-a27f-4131fa1d8828" class="outline-3">
+<h3 id="h:f9601f82-ee86-49b3-a27f-4131fa1d8828">PriorityClasses 优先级和抢占</h3>
+<div class="outline-text-3" id="text-h:f9601f82-ee86-49b3-a27f-4131fa1d8828">
+<p>
+Pod 优先级和抢占是没有命名空间的对象，它定义了从优先级类名称到优先级整数值的映射。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/">https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/</a>
+</p>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

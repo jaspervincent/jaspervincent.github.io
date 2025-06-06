@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 进阶篇-细粒度权限控制</title>
+<meta name="description" content="kubernetes" />
+<meta name="keywords" content="kubernetes" />
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 进阶篇-细粒度权限控制</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:932a87a0-b836-48c0-b4ba-a457238b0889">RBAC</a>
+<ul>
+<li><a href="#h:715647f9-4387-445f-a201-d0671f875261">什么是RBAC？</a></li>
+<li><a href="#h:04b24686-a46a-4393-94aa-8c553282d248">RBAC分类介绍（API 对象）</a>
+<ul>
+<li><a href="#h:45dbe48a-8234-4154-af85-e5aaec9e2b6b">RBAC有4种顶级资源</a></li>
+<li><a href="#h:81622154-a7b9-43bc-bb7f-39fdf93d5db2">资源介绍</a></li>
+</ul>
+</li>
+<li><a href="#h:ff321369-b7ea-474a-ac55-a669e4fbb032">范例</a>
+<ul>
+<li><a href="#h:f9cf94fe-497b-4833-a161-2e8b082bbafa">Role 示例</a></li>
+<li><a href="#h:47af253b-b2ee-4c29-abf1-de1ef723c755">ClusterRole 示例</a></li>
+<li><a href="#h:e282006e-025b-40c4-8fd7-e0db7d85045e">RoleBinding 示例</a>
+<ul>
+<li><a href="#h:177abf71-d26b-4acd-9854-4ac5cce0e628">RoleBinding 引用 ClusterRole</a></li>
+</ul>
+</li>
+<li><a href="#h:deac2ba9-c736-4700-a464-5d14dd0b956e">ClusterRoleBinding 示例</a></li>
+</ul>
+</li>
+<li><a href="#h:dac54b4c-d187-4a7e-b8cc-297bb954f051">聚合的 ClusterRole</a></li>
+<li><a href="#h:3d151571-bd68-4e69-b729-53fc043c6717">RBAC 企业实战</a>
+<ul>
+<li><a href="#h:ab50ae1b-ac9b-43cf-a79a-d40ea481fd21">如何管理权限和用户</a></li>
+<li><a href="#h:c95b21c3-404e-4d7e-b6c7-30bd3edcb8ce">不同用户不同权限</a>
+<ul>
+<li><a href="#h:b1bf1e1a-6de7-4415-82d2-5b6ab3c78bf5">创建通用权限</a></li>
+<li><a href="#h:2d9c3cc6-1861-4153-a9bc-bc929aafc37b">创建用户</a></li>
+<li><a href="#h:f857ceb0-55aa-458c-8cba-c0f191d60b69">绑定权限</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:f6505929-98c6-463b-bbb7-d544ba418ba7">Dashboard使用用户名密码形式登录</a>
+<ul>
+<li><a href="#h:0d578873-1947-44c9-aa2b-0f42206beb8c">1、基本说明</a></li>
+<li><a href="#h:c30a5c09-6bd0-49ff-9f86-ea7444ab6cfc">2、更改Dashboard认证方式</a></li>
+<li><a href="#h:a9d702c2-6019-40df-9046-74c1f0a066ca">3、添加默认权限</a></li>
+<li><a href="#h:0c837ba2-3b7d-426a-a871-8c1e45e67f68">4、配置权限</a>
+<ul>
+<li><a href="#h:2b203536-faf7-4192-989d-ec98c870f661">方式1</a></li>
+<li><a href="#h:5147c8c0-ad3b-4a70-9ff2-519b7d9470e4">方式2</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:7b77bf90-4a6e-4cc6-a3ab-39ff8ee5ba77">Ratel 工具图形化管理多 k8s 集群</a>
+<ul>
+<li><a href="#h:3252e050-081a-4743-8419-dd053369ccbc">Ratel 介绍</a></li>
+<li><a href="#h:04904efd-762c-46fb-afa0-c09815d3008e">安装Ratel</a>
+<ul>
+<li><a href="#h:eae30af7-603e-4851-a4b4-a4afa9af4fd5">安装说明</a>
+<ul>
+<li><a href="#h:d8d67f7e-1f84-4e3b-a274-ae9b5699fa66">创建Secret</a></li>
+</ul>
+</li>
+<li><a href="#h:7d8340d7-338f-4ffe-a1ce-3b4559fec32e">创建RBAC</a></li>
+<li><a href="#h:5ed2f0eb-3a45-4ee9-a4c8-6a56f361722b">部署ratel</a></li>
+<li><a href="#h:94210348-549d-472e-911f-614343e09210">Service和Ingress配置</a></li>
+<li><a href="#h:ce85f518-c358-4473-b2ad-e71f3078f82a">访问ratel</a></li>
+<li><a href="#h:9b297427-09ff-4160-a7ad-9410cdeecf18">资源列表</a></li>
+</ul>
+</li>
+<li><a href="#h:a31bb6b9-c64c-406c-b581-4a7c85b77649">图形化管理多租户权限</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+
+<p>
+进阶-细粒度权限控制
+</p>
+<section id="outline-container-h:932a87a0-b836-48c0-b4ba-a457238b0889" class="outline-2">
+<h2 id="h:932a87a0-b836-48c0-b4ba-a457238b0889">RBAC</h2>
+<div class="outline-text-2" id="text-h:932a87a0-b836-48c0-b4ba-a457238b0889">
+<p>
+文档：<a href="https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/">https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/</a>
+</p>
+</div>
+<div id="outline-container-h:715647f9-4387-445f-a201-d0671f875261" class="outline-3">
+<h3 id="h:715647f9-4387-445f-a201-d0671f875261">什么是RBAC？</h3>
+<div class="outline-text-3" id="text-h:715647f9-4387-445f-a201-d0671f875261">
+<p>
+RBAC 全称Role-based access control  即基于角色（Role）的访问控制，它是一种基于组织中用户的角色来调节控制对 计算机或网络资源的访问的方法。
+</p>
+
+<p>
+RBAC 鉴权机制使用 rbac.authorization.k8s.io API 组 来驱动鉴权决定，允许你通过 Kubernetes API 动态配置策略。
+</p>
+
+<p>
+要启用 RBAC，在启动 API 服务器 时将 &#x2013;authorization-mode 参数设置为一个逗号分隔的列表并确保其中包含 RBAC。
+</p>
+</div>
+</div>
+<div id="outline-container-h:04b24686-a46a-4393-94aa-8c553282d248" class="outline-3">
+<h3 id="h:04b24686-a46a-4393-94aa-8c553282d248">RBAC分类介绍（API 对象）</h3>
+<div class="outline-text-3" id="text-h:04b24686-a46a-4393-94aa-8c553282d248">
+</div>
+<div id="outline-container-h:45dbe48a-8234-4154-af85-e5aaec9e2b6b" class="outline-4">
+<h4 id="h:45dbe48a-8234-4154-af85-e5aaec9e2b6b">RBAC有4种顶级资源</h4>
+<div class="outline-text-4" id="text-h:45dbe48a-8234-4154-af85-e5aaec9e2b6b">
+
+<figure id="orgad77451">
+<img src="./images/Snipaste_2022-09-29_10-19-22.png" alt="Snipaste_2022-09-29_10-19-22.png" width="50%">
+
+</figure>
+
+<ul class="org-ul">
+<li>Role</li>
+<li>ClusterRole</li>
+<li>RoleBinding</li>
+<li>ClusterRoleBinding</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:81622154-a7b9-43bc-bb7f-39fdf93d5db2" class="outline-4">
+<h4 id="h:81622154-a7b9-43bc-bb7f-39fdf93d5db2">资源介绍</h4>
+<div class="outline-text-4" id="text-h:81622154-a7b9-43bc-bb7f-39fdf93d5db2">
+<p>
+Role：角色，包含一组权限的规则。没有拒绝规则，只是附加允许。Namespace隔离，只作用于命名空间内！
+</p>
+
+<p>
+ClusterRole：集群角色，和Role一样。和Role的区别，Role是只作用于命名空间内，ClusterRole作用于整个集群！
+</p>
+
+<p>
+RoleBinding：作用于命令空间内，将ClusterRole或者Role绑定到User、Group、ServiceAccount！
+</p>
+
+<p>
+ClusterRoleBinding：作用于整个集群。
+</p>
+
+<p>
+中文官方文档：<a href="https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/">https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ff321369-b7ea-474a-ac55-a669e4fbb032" class="outline-3">
+<h3 id="h:ff321369-b7ea-474a-ac55-a669e4fbb032">范例</h3>
+<div class="outline-text-3" id="text-h:ff321369-b7ea-474a-ac55-a669e4fbb032">
+<ul class="org-ul">
+<li>apiGroup  资源属于哪个组的 <a href="https://kubernetes.io/docs/reference/using-api/#api-groups">https://kubernetes.io/docs/reference/using-api/#api-groups</a></li>
+<li>resoures 资源类型，* 代表所有，查询 <code>kubectl api-resources</code>
+<ul class="org-ul">
+<li>Subresource</li>
+</ul></li>
+<li>verbs 可执行的操作，* 代表所有
+<ul class="org-ul">
+<li>["get", "list", "watch", "create", "update", "patch", "delete", "post"]</li>
+<li><a href="https://kubernetes.io/docs/reference/access-authn-authz/authorization/">https://kubernetes.io/docs/reference/access-authn-authz/authorization/</a></li>
+</ul></li>
+</ul>
+
+<p>
+子资源检查脚本
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #a0522d;">_list</span>=($(<span style="color: #ff00ff;">kubectl get --raw / |grep "^    \"/api"|sed 's/[",]//g'</span>)); 
+<span style="color: #a020f0;">for</span> _api<span style="color: #a020f0;"> in</span> ${<span style="color: #a0522d;">_list</span>[@]}; <span style="color: #a020f0;">do</span>
+  <span style="color: #a0522d;">_aruyo</span>=$(<span style="color: #ff00ff;">kubectl get --raw ${_api} | jq .resources</span>); 
+  <span style="color: #a020f0;">if</span> [ <span style="color: #8b2252;">"x${_aruyo}"</span> != <span style="color: #8b2252;">"xnull"</span> ]; <span style="color: #a020f0;">then</span> 
+    <span style="color: #483d8b;">echo</span>; 
+    <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"===${_api}==="</span>; 
+    kubectl get --raw ${<span style="color: #a0522d;">_api</span>} | jq -r <span style="color: #8b2252;">".resources[].name"</span>; 
+  <span style="color: #a020f0;">fi</span>; 
+<span style="color: #a020f0;">done</span>
+
+&#25110;&#32773;
+<span style="color: #a0522d;">_list</span>=($(<span style="color: #ff00ff;">kubectl get --raw / |grep "^    \"/api"|sed 's/[",]//g'</span>)); <span style="color: #a020f0;">for</span> _api<span style="color: #a020f0;"> in</span> ${<span style="color: #a0522d;">_list</span>[@]}; <span style="color: #a020f0;">do</span> <span style="color: #a0522d;">_aruyo</span>=$(<span style="color: #ff00ff;">kubectl get --raw ${_api} | jq .resources</span>); <span style="color: #a020f0;">if</span> [ <span style="color: #8b2252;">"x${_aruyo}"</span> != <span style="color: #8b2252;">"xnull"</span> ]; <span style="color: #a020f0;">then </span><span style="color: #483d8b;">echo</span>; <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"===${_api}==="</span>; kubectl get --raw ${<span style="color: #a0522d;">_api</span>} | jq -r <span style="color: #8b2252;">".resources[].name"</span>; <span style="color: #a020f0;">fi</span>; <span style="color: #a020f0;">done</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">root@VM-8-13-ubuntu:/opt/devops/jenkinsfile#<span style="color: #a0522d;">_list</span>=($(<span style="color: #ff00ff;">kubectl get --raw / |grep "^    \"/api"|sed 's/[",]//g'</span>)); <span style="color: #a020f0;">for</span> _api<span style="color: #a020f0;"> in</span> ${<span style="color: #a0522d;">_list</span>[@]}; <span style="color: #a020f0;">do</span> <span style="color: #a0522d;">_aruyo</span>=$(<span style="color: #ff00ff;">kubectl get --raw ${_api} | jq .resources</span>); <span style="color: #a020f0;">if</span> [ <span style="color: #8b2252;">"x${_aruyo}"</span> != <span style="color: #8b2252;">"xnull"</span> ]; <span style="color: #a020f0;">then </span><span style="color: #483d8b;">echo</span>; <span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"===${_api}==="</span>; kubectl get --raw ${<span style="color: #a0522d;">_api</span>} | jq -r <span style="color: #8b2252;">".resources[].name"</span>; <span style="color: #a020f0;">fi</span>; donee
+
+
+===/api/v1===
+bindings
+componentstatuses
+configmaps
+endpoints
+events
+limitranges
+namespaces
+namespaces/finalize
+namespaces/status
+nodes
+nodes/proxy
+nodes/status
+persistentvolumeclaims
+persistentvolumeclaims/status
+persistentvolumes
+persistentvolumes/status
+pods
+pods/attach
+pods/binding
+pods/ephemeralcontainers
+pods/eviction
+pods/exec
+pods/log
+pods/portforward
+pods/proxy
+pods/status
+podtemplates
+replicationcontrollers
+replicationcontrollers/scale
+replicationcontrollers/status
+resourcequotas
+resourcequotas/status
+secrets
+serviceaccounts
+serviceaccounts/token
+services
+services/proxy
+services/status
+
+===/apis/acme.cert-manager.io/v1===
+challenges
+challenges/status
+orders
+orders/status
+
+===/apis/admissionregistration.k8s.io/v1===
+mutatingwebhookconfigurations
+validatingadmissionpolicies
+validatingadmissionpolicies/status
+validatingadmissionpolicybindings
+validatingwebhookconfigurations
+
+===/apis/apiextensions.k8s.io/v1===
+customresourcedefinitions
+customresourcedefinitions/status
+
+===/apis/apiregistration.k8s.io/v1===
+apiservices
+apiservices/status
+
+===/apis/apps/v1===
+controllerrevisions
+daemonsets
+daemonsets/status
+deployments
+deployments/scale
+deployments/status
+replicasets
+replicasets/scale
+replicasets/status
+statefulsets
+statefulsets/scale
+statefulsets/status
+
+===/apis/authentication.k8s.io/v1===
+selfsubjectreviews
+tokenreviews
+
+===/apis/authorization.k8s.io/v1===
+localsubjectaccessreviews
+selfsubjectaccessreviews
+selfsubjectrulesreviews
+subjectaccessreviews
+
+===/apis/autoscaling/v1===
+horizontalpodautoscalers
+horizontalpodautoscalers/status
+
+===/apis/autoscaling/v2===
+horizontalpodautoscalers
+horizontalpodautoscalers/status
+
+===/apis/batch/v1===
+cronjobs
+cronjobs/status
+<span style="color: #483d8b;">jobs</span>
+jobs/status
+
+===/apis/cert-manager.io/v1===
+certificates
+certificates/status
+certificaterequests
+certificaterequests/status
+issuers
+issuers/status
+clusterissuers
+clusterissuers/status
+
+===/apis/certificates.k8s.io/v1===
+certificatesigningrequests
+certificatesigningrequests/approval
+certificatesigningrequests/status
+
+===/apis/configuration.konghq.com/v1===
+kongconsumers
+kongconsumers/status
+kongplugins
+kongplugins/status
+kongingresses
+kongingresses/status
+kongclusterplugins
+kongclusterplugins/status
+
+===/apis/configuration.konghq.com/v1alpha1===
+konglicenses
+konglicenses/status
+ingressclassparameterses
+kongvaults
+kongvaults/status
+
+===/apis/configuration.konghq.com/v1beta1===
+kongconsumergroups
+kongconsumergroups/status
+tcpingresses
+tcpingresses/status
+kongupstreampolicies
+kongupstreampolicies/status
+udpingresses
+udpingresses/status
+
+===/apis/coordination.k8s.io/v1===
+leases
+
+===/apis/crd.k8s.amazonaws.com/v1alpha1===
+eniconfigs
+
+===/apis/discovery.k8s.io/v1===
+endpointslices
+
+===/apis/elbv2.k8s.aws/v1alpha1===
+targetgroupbindings
+targetgroupbindings/status
+
+===/apis/elbv2.k8s.aws/v1beta1===
+targetgroupbindings
+targetgroupbindings/status
+ingressclassparams
+
+===/apis/events.k8s.io/v1===
+events
+
+===/apis/flowcontrol.apiserver.k8s.io/v1===
+flowschemas
+flowschemas/status
+prioritylevelconfigurations
+prioritylevelconfigurations/status
+
+===/apis/flowcontrol.apiserver.k8s.io/v1beta3===
+flowschemas
+flowschemas/status
+prioritylevelconfigurations
+prioritylevelconfigurations/status
+
+===/apis/metrics.eks.amazonaws.com/v1===
+kcm
+kcm/metrics
+ksh
+ksh/metrics
+
+===/apis/metrics.k8s.io/v1beta1===
+nodes
+pods
+
+===/apis/networking.k8s.aws/v1alpha1===
+policyendpoints
+policyendpoints/status
+
+===/apis/networking.k8s.io/v1===
+ingressclasses
+ingresses
+ingresses/status
+networkpolicies
+
+===/apis/node.k8s.io/v1===
+runtimeclasses
+
+===/apis/policy/v1===
+poddisruptionbudgets
+poddisruptionbudgets/status
+
+===/apis/rbac.authorization.k8s.io/v1===
+clusterrolebindings
+clusterroles
+rolebindings
+roles
+
+===/apis/scheduling.k8s.io/v1===
+priorityclasses
+
+===/apis/storage.k8s.io/v1===
+csidrivers
+csinodes
+csistoragecapacities
+storageclasses
+volumeattachments
+volumeattachments/status
+
+===/apis/storage.k8s.io/v1beta1===
+volumeattributesclasses
+
+===/apis/vpcresources.k8s.aws/v1alpha1===
+cninodes
+
+===/apis/vpcresources.k8s.aws/v1beta1===
+securitygrouppolicies
+</pre>
+</div>
+</div>
+<div id="outline-container-h:f9cf94fe-497b-4833-a161-2e8b082bbafa" class="outline-4">
+<h4 id="h:f9cf94fe-497b-4833-a161-2e8b082bbafa">Role 示例</h4>
+<div class="outline-text-4" id="text-h:f9cf94fe-497b-4833-a161-2e8b082bbafa">
+<p>
+Role 总是用来在某个名字空间内设置访问权限；在你创建 Role 时，你必须指定该 Role 所属的名字空间
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""] # "" 标明 core API 组
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:47af253b-b2ee-4c29-abf1-de1ef723c755" class="outline-4">
+<h4 id="h:47af253b-b2ee-4c29-abf1-de1ef723c755">ClusterRole 示例</h4>
+<div class="outline-text-4" id="text-h:47af253b-b2ee-4c29-abf1-de1ef723c755">
+<p>
+ClusterRole 有若干用法。你可以用它来：
+</p>
+
+<ol class="org-ol">
+<li>定义对某名字空间域对象的访问权限，并将在各个名字空间内完成授权；</li>
+<li>为名字空间作用域的对象设置访问权限，并跨所有名字空间执行授权；</li>
+<li>为集群作用域的资源定义访问权限。</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  # "namespace" 被忽略，因为 ClusterRoles 不受名字空间限制
+  name: secret-reader
+rules:
+- apiGroups: [""]
+  # 在 HTTP 层面，用来访问 Secret 对象的资源的名称为 "secrets"
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e282006e-025b-40c4-8fd7-e0db7d85045e" class="outline-4">
+<h4 id="h:e282006e-025b-40c4-8fd7-e0db7d85045e">RoleBinding 示例</h4>
+<div class="outline-text-4" id="text-h:e282006e-025b-40c4-8fd7-e0db7d85045e">
+<p>
+下面的例子中的 RoleBinding 将 "pod-reader" Role 授予在 "default" 名字空间中的用户 "jane"。 这样，用户 "jane" 就具有了读取 "default" 名字空间中 pods 的权限。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+# 此角色绑定允许 "jane" 读取 "default" 名字空间中的 Pods
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+# 你可以指定不止一个“subject（主体）”
+- kind: User # 这里可以是User,Group,ServiceAccount
+  name: jane # "name" 是不区分大小写的
+  apiGroup: rbac.authorization.k8s.io # 可不写
+roleRef:
+  # "roleRef" 指定与某 Role 或 ClusterRole 的绑定关系
+  kind: Role # 此字段必须是 Role 或 ClusterRole
+  name: pod-reader     # 此字段必须与你要绑定的 Role 或 ClusterRole 的名称匹配
+  apiGroup: rbac.authorization.k8s.io # 可不写
+</pre>
+</div>
+
+<p>
+subject 主体推荐使用 serviceAccount，user 还要重启 apiserver
+</p>
+</div>
+<div id="outline-container-h:177abf71-d26b-4acd-9854-4ac5cce0e628" class="outline-5">
+<h5 id="h:177abf71-d26b-4acd-9854-4ac5cce0e628">RoleBinding 引用 ClusterRole</h5>
+<div class="outline-text-5" id="text-h:177abf71-d26b-4acd-9854-4ac5cce0e628">
+<p>
+RoleBinding 也可以引用 ClusterRole，以将对应 ClusterRole 中定义的访问权限授予 RoleBinding 所在名字空间的资源。这种引用使得你可以跨整个集群定义一组通用的角色， 之后在多个名字空间中复用！
+</p>
+
+<p>
+下面的例子中的 RoleBinding，将"secret-reader" ClusterRole授予在"development" namespace中的用户"dave"。这样，用户 "dave" 就具有了读取 "development" 名字空间中 pods 的权限。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+# 此角色绑定使得用户 "dave" 能够读取 "default" 名字空间中的 Secrets
+# 你需要一个名为 "secret-reader" 的 ClusterRole
+kind: RoleBinding
+metadata:
+  name: read-secrets
+  # RoleBinding 的名字空间决定了访问权限的授予范围。
+  # 这里仅授权在 "development" 名字空间内的访问权限。
+  namespace: development
+subjects:
+- kind: User
+  name: dave # 'name' 是不区分大小写的
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:deac2ba9-c736-4700-a464-5d14dd0b956e" class="outline-4">
+<h4 id="h:deac2ba9-c736-4700-a464-5d14dd0b956e">ClusterRoleBinding 示例</h4>
+<div class="outline-text-4" id="text-h:deac2ba9-c736-4700-a464-5d14dd0b956e">
+<p>
+要跨整个集群完成访问权限的授予，你可以使用一个 ClusterRoleBinding。 下面的 ClusterRoleBinding 允许 "manager" 组内的所有用户访问任何名字空间中的 Secrets。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+# 此集群角色绑定允许 “manager” 组中的任何人访问任何名字空间中的 secrets
+kind: ClusterRoleBinding
+metadata:
+  name: read-secrets-global
+subjects:
+- kind: Group
+  name: manager # 'name' 是不区分大小写的
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+</pre>
+</div>
+
+<p>
+注意：
+</p>
+
+<p>
+创建了绑定之后，你不能再修改绑定对象所引用的 Role 或 ClusterRole。 试图改变绑定对象的 roleRef 将导致合法性检查错误。 如果你想要改变现有绑定对象中 roleRef 字段的内容，必须删除重新创建绑定对象。
+</p>
+
+<p>
+这种限制有两个主要原因：
+</p>
+
+<ol class="org-ol">
+<li>针对不同角色的绑定是完全不一样的绑定。要求通过删除/重建绑定来更改 roleRef, 这样可以确保要赋予绑定的所有主体会被授予新的角色（而不是在允许修改 roleRef 的情况下导致所有现有主体胃镜验证即被授予新角色对应的权限）。</li>
+<li>将 roleRef 设置为不可以改变，这使得可以为用户授予对现有绑定对象的 update 权限， 这样可以让他们管理主体列表，同时不能更改被授予这些主体的角色。</li>
+</ol>
+
+<p>
+命令 <code>kubectl auth reconcile</code> 可以创建或者更新包含 RBAC 对象的清单文件， 并且在必要的情况下删除和重新创建绑定对象，以改变所引用的角色
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:dac54b4c-d187-4a7e-b8cc-297bb954f051" class="outline-3">
+<h3 id="h:dac54b4c-d187-4a7e-b8cc-297bb954f051">聚合的 ClusterRole</h3>
+<div class="outline-text-3" id="text-h:dac54b4c-d187-4a7e-b8cc-297bb954f051">
+<p>
+将若干 ClusterRole 聚合（Aggregate） 起来，形成一个复合的 ClusterRole。
+</p>
+
+
+<p>
+下面是一个聚合 ClusterRole 的示例：
+聚合符合标签的 clusterrole
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      rbac.example.com/aggregate-to-monitoring: "true"
+rules: [] # 控制面自动填充这里的规则
+
+-------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring-endpoints
+  labels:
+    rbac.example.com/aggregate-to-monitoring: "true"
+# 当你创建 "monitoring-endpoints" ClusterRole 时，
+# 下面的规则会被添加到 "monitoring" ClusterRole 中
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods"]
+  verbs: ["get", "list", "watch"]
+</pre>
+</div>
+
+<p>
+下面的 ClusterRoles 让默认角色 "admin" 和 "edit" 拥有管理自定义资源 "CronTabs" 的权限， "view" 角色对 CronTab 资源拥有读操作权限。 你可以假定 CronTab 对象在 API 服务器所看到的 URL 中被命名为 "crontabs"。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aggregate-cron-tabs-edit
+  labels:
+    # 添加以下权限到默认角色 "admin" 和 "edit" 中
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: ["stable.example.com"]
+  resources: ["crontabs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aggregate-cron-tabs-view
+  labels:
+    # 添加以下权限到 "view" 默认角色中
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups: ["stable.example.com"]
+  resources: ["crontabs"]
+  verbs: ["get", "list", "watch"]
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3d151571-bd68-4e69-b729-53fc043c6717" class="outline-3">
+<h3 id="h:3d151571-bd68-4e69-b729-53fc043c6717">RBAC 企业实战</h3>
+<div class="outline-text-3" id="text-h:3d151571-bd68-4e69-b729-53fc043c6717">
+</div>
+<div id="outline-container-h:ab50ae1b-ac9b-43cf-a79a-d40ea481fd21" class="outline-4">
+<h4 id="h:ab50ae1b-ac9b-43cf-a79a-d40ea481fd21">如何管理权限和用户</h4>
+<div class="outline-text-4" id="text-h:ab50ae1b-ac9b-43cf-a79a-d40ea481fd21">
+
+<figure id="org69cf58c">
+<img src="./images/Snipaste_2022-09-29_17-00-33.png" alt="Snipaste_2022-09-29_17-00-33.png" width="50%">
+
+</figure>
+
+<p>
+创建通用权限用 clusterrole 管理。
+</p>
+
+
+<figure id="org51f17d1">
+<img src="./images/Snipaste_2022-09-29_17-25-16.png" alt="Snipaste_2022-09-29_17-25-16.png" width="50%">
+
+</figure>
+
+<p>
+如何进行用户管理？
+</p>
+<ul class="org-ul">
+<li>专门有个名称空间存放 sa。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c95b21c3-404e-4d7e-b6c7-30bd3edcb8ce" class="outline-4">
+<h4 id="h:c95b21c3-404e-4d7e-b6c7-30bd3edcb8ce">不同用户不同权限</h4>
+<div class="outline-text-4" id="text-h:c95b21c3-404e-4d7e-b6c7-30bd3edcb8ce">
+<p>
+需求：
+</p>
+<ol class="org-ol">
+<li>用户one可以查看default、kube-system下Pod的日志</li>
+<li>用户two可以在default下的Pod中执行命令，并且可以删除Pod</li>
+</ol>
+
+
+<p>
+分析：
+</p>
+<ul class="org-ul">
+<li>查看 pod 日志、pod 执行命令、删除 pod 都是通用权限，分别创建 clusterrole 即可。</li>
+<li>切换名称空间的通用权限，创建一个 clusterrole。</li>
+</ul>
+</div>
+<div id="outline-container-h:b1bf1e1a-6de7-4415-82d2-5b6ab3c78bf5" class="outline-5">
+<h5 id="h:b1bf1e1a-6de7-4415-82d2-5b6ab3c78bf5">创建通用权限</h5>
+<div class="outline-text-5" id="text-h:b1bf1e1a-6de7-4415-82d2-5b6ab3c78bf5">
+<div class="org-src-container">
+<pre class="src src-yaml">---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: namespace-readonly
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+  - apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-delete
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-exec
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2d9c3cc6-1861-4153-a9bc-bc929aafc37b" class="outline-5">
+<h5 id="h:2d9c3cc6-1861-4153-a9bc-bc929aafc37b">创建用户</h5>
+<div class="outline-text-5" id="text-h:2d9c3cc6-1861-4153-a9bc-bc929aafc37b">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create ns kube-users
+kubectl create sa one two -n kube-users
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f857ceb0-55aa-458c-8cba-c0f191d60b69" class="outline-5">
+<h5 id="h:f857ceb0-55aa-458c-8cba-c0f191d60b69">绑定权限</h5>
+<div class="outline-text-5" id="text-h:f857ceb0-55aa-458c-8cba-c0f191d60b69">
+<p>
+绑定全局命名空间查看权限：
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">kubectl create clusterrolebinding namespace-readonly \
+--clusterrole=namespace-readonly --serviceaccount=system:serviceaccounts:kube-users
+</pre>
+</div>
+
+
+<p>
+绑定权限：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create rolebinding one-pod-log <span style="color: #8b2252;">\</span>
+--clusterrole=pod-log --serviceaccount=kube-users:one --namespace=kube-system
+kubectl create rolebinding one-pod-log <span style="color: #8b2252;">\</span>
+--clusterrole=pod-log --serviceaccount=kube-users:one --namespace=default
+
+kubectl create rolebinding two-pod-exec <span style="color: #8b2252;">\</span>
+--clusterrole=pod-exec --serviceaccount=kube-users:two --namespace=default
+kubectl create rolebinding two-pod-delete <span style="color: #8b2252;">\</span>
+--clusterrole=pod-delete --serviceaccount=kube-users:two --namespace=default
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f6505929-98c6-463b-bbb7-d544ba418ba7" class="outline-2">
+<h2 id="h:f6505929-98c6-463b-bbb7-d544ba418ba7">Dashboard使用用户名密码形式登录</h2>
+<div class="outline-text-2" id="text-h:f6505929-98c6-463b-bbb7-d544ba418ba7">
+</div>
+<div id="outline-container-h:0d578873-1947-44c9-aa2b-0f42206beb8c" class="outline-3">
+<h3 id="h:0d578873-1947-44c9-aa2b-0f42206beb8c">1、基本说明</h3>
+<div class="outline-text-3" id="text-h:0d578873-1947-44c9-aa2b-0f42206beb8c">
+<p>
+在生产环境使用k8s以后，大部分应用都实现了高可用，不仅降低了维护成本，
+也简化了很多应用的部署成本，但是同时也带来了诸多问题。比如开发可能需要
+查看自己的应用状态、连接信息、日志、执行命令等。
+</p>
+
+<p>
+使用k8s后，业务应用以Pod为单位，不像之前的以服务器为单位，可以直接通过
+登录服务器进行相关操作。当业务应用使用k8s部署后，k8s官方的dashboard虽
+然可以进行查看日志、执行命令等基本操作，但是作为运维人员，不想让开发操
+作或查看自己范围之外的Pod，此时就要使用RBAC进行相关的权限配置。
+</p>
+
+<p>
+本文章主要讲解两方面的问题：
+</p>
+<ul class="org-ul">
+<li>使用用户名密码登录Dashboard
+<ul class="org-ul">
+<li>对已登录用户进行权限配置，实现只能操作自己Namespace的Pod，不能进入到未授权的其他Namespace</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c30a5c09-6bd0-49ff-9f86-ea7444ab6cfc" class="outline-3">
+<h3 id="h:c30a5c09-6bd0-49ff-9f86-ea7444ab6cfc">2、更改Dashboard认证方式</h3>
+<div class="outline-text-3" id="text-h:c30a5c09-6bd0-49ff-9f86-ea7444ab6cfc">
+<p>
+为了方便开发和运维人员登录Dashboard，需要将Dashboard登录方式用户名密码认证（用户名密码和Token可以同时开启）。
+</p>
+
+<p>
+使用Ratel将kubernetes-dashboard的deployment的&#x2013;authentication-mode改成basic即可，未安装Ratel的可以使用kubectl edit进行更改，更改完成会自动重启。
+</p>
+
+
+<figure id="org4a200ad">
+<img src="./images/1095387-20191203150941688-563425830.png" alt="1095387-20191203150941688-563425830.png" width="50%">
+
+</figure>
+
+
+
+<p>
+之后更改kube-apiserver配置添加
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim /usr/lib/systemd/system/kube-apiserver.service
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22686;&#21152;&#22914;&#19979;&#34892;</span>
+
+--basic-auth-file=/etc/kubernetes/basic_auth_file
+</pre>
+</div>
+
+<p>
+basic_auth_file为存储账号密码的文件，格式如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">xxx1_2019,xxx1,3,<span style="color: #8b2252;">"system:authentication"</span>
+xxx2_2019,xxx2,4,<span style="color: #8b2252;">"system:authentication"</span>
+xxx3_2019,xxx3,5,<span style="color: #8b2252;">"system:authentication"</span>
+xxx4_2019,xxx4,6,<span style="color: #8b2252;">"system:authentication"</span>
+
+</pre>
+</div>
+
+<p>
+依次是密码、用户名、ID号、用户组，因为下面会为已登录的用户进行授权，所以把组设置成了system:authentication，按需更改。
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">systemctl daemon-reload
+systemctl restart kube-apiserver
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a9d702c2-6019-40df-9046-74c1f0a066ca" class="outline-3">
+<h3 id="h:a9d702c2-6019-40df-9046-74c1f0a066ca">3、添加默认权限</h3>
+<div class="outline-text-3" id="text-h:a9d702c2-6019-40df-9046-74c1f0a066ca">
+<p>
+首先配置一个system:authentication组允许查询namespace列表（因为进入到指定namespace，必须能list该集群的namespace）:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /root/rbac &amp;&amp; <span style="color: #483d8b;">cd</span> /root/rbac
+vim namespaceReadonly.yaml
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: <span style="color: #8b2252;">"true"</span>
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+    rbac.authorization.k8s.io/aggregate-to-edit: <span style="color: #8b2252;">"true"</span>
+  name: ratel-namespace-readonly
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ratel-namespace-readonly
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ratel-namespace-readonly
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authentication
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f namespaceReadonly.yaml
+</pre>
+</div>
+
+<p>
+创建查看namespace资源的权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim view-resource.yaml
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ratel-resource-readonly
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - configmaps
+  - endpoints
+  - persistentvolumeclaims
+  - pods
+  - replicationcontrollers
+  - replicationcontrollers/scale
+  - serviceaccounts
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - bindings
+  - events
+  - limitranges
+  - namespaces/status
+  - pods/log
+  - pods/status
+  - replicationcontrollers/status
+  - resourcequotas
+  - resourcequotas/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - controllerrevisions
+  - daemonsets
+  - deployments
+  - deployments/scale
+  - replicasets
+  - replicasets/scale
+  - statefulsets
+  - statefulsets/scale
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - deployments/scale
+  - ingresses
+  - networkpolicies
+  - replicasets
+  - replicasets/scale
+  - replicationcontrollers/scale
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f view-resource.yaml
+</pre>
+</div>
+
+<p>
+创建Pod执行权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim podExec.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ratel-pod-exec
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - pods/exec
+  verbs:
+  - create
+</pre>
+</div>
+
+<p>
+创建Pod删除权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim podDelete.yaml
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ratel-pod-delete
+rules:
+- apiGroups:
+  - <span style="color: #8b2252;">""</span>
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - delete
+</pre>
+</div>
+
+<p>
+上述权限创建完成后，只需要将对应的用户绑定对应的权限即可实现不同的用户在不同的namespace实现不同的权限。
+</p>
+
+<p>
+对RBAC不熟悉的可以参考<a href="https://www.cnblogs.com/dukuan/p/9948063.html">https://www.cnblogs.com/dukuan/p/9948063.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:0c837ba2-3b7d-426a-a871-8c1e45e67f68" class="outline-3">
+<h3 id="h:0c837ba2-3b7d-426a-a871-8c1e45e67f68">4、配置权限</h3>
+<div class="outline-text-3" id="text-h:0c837ba2-3b7d-426a-a871-8c1e45e67f68">
+<p>
+案例：假设有一个用户叫java7，需要访问default命名空间下的资源，可以在容器执行命令和查看日志
+</p>
+
+<p>
+添加权限之前是不能查看任何信息的:
+</p>
+</div>
+<div id="outline-container-h:2b203536-faf7-4192-989d-ec98c870f661" class="outline-4">
+<h4 id="h:2b203536-faf7-4192-989d-ec98c870f661">方式1</h4>
+<div class="outline-text-4" id="text-h:2b203536-faf7-4192-989d-ec98c870f661">
+<p>
+方式一：使用Ratel一键配置，选择对应的集群、Namespace、用户名、勾选权限点击创建即可
+</p>
+
+
+<figure id="org9f3d1d9">
+<img src="./images/1095387-20191203153400136-128916704.png" alt="1095387-20191203153400136-128916704.png" width="50%">
+
+</figure>
+
+
+<figure id="org0188715">
+<img src="./images/1095387-20191203153738140-507518129.png" alt="1095387-20191203153738140-507518129.png" width="50%">
+
+</figure>
+
+
+<p>
+创建成功后再次登录，即可查看该Namespace的信息
+</p>
+
+
+<figure id="org5383088">
+<img src="./images/1095387-20191203153925786-1719087315.png" alt="1095387-20191203153925786-1719087315.png" width="50%">
+
+</figure>
+
+
+<p>
+查看日志：
+</p>
+
+
+<figure id="org752932d">
+<img src="./images/1095387-20191203154012007-702443056.png" alt="1095387-20191203154012007-702443056.png" width="50%">
+
+</figure>
+
+<p>
+执行命令：
+</p>
+
+
+<figure id="org34c222f">
+<img src="./images/1095387-20191203154233612-9033296.png" alt="1095387-20191203154233612-9033296.png" width="50%">
+
+</figure>
+
+<p>
+同时也不能查看其他namespace的资源
+</p>
+
+
+<figure id="orgaee62b5">
+<img src="./images/1095387-20191203154332405-813229353.png" alt="1095387-20191203154332405-813229353.png" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:5147c8c0-ad3b-4a70-9ff2-519b7d9470e4" class="outline-4">
+<h4 id="h:5147c8c0-ad3b-4a70-9ff2-519b7d9470e4">方式2</h4>
+<div class="outline-text-4" id="text-h:5147c8c0-ad3b-4a70-9ff2-519b7d9470e4">
+<p>
+使用yaml文件配置
+</p>
+
+<p>
+使用Ratel进行权限配置，在配置权限后在对应的namespace下创建对应的RoleBinding，如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl get rolebinding 
+NAME                            AGE
+gitlab                          112d
+ratel-pod-delete-java7          11m
+ratel-pod-exec-java7            11m
+ratel-resource-readonly-java7   11m
+</pre>
+</div>
+
+<p>
+内容如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">ource-readonly-java7 -o yaml
+
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: ratel-pod-delete-java7
+    namespace: default
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ratel-pod-delete
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: java7
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: ratel-pod-exec-java7
+    namespace: default
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ratel-pod-exec
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: java7
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: ratel-resource-readonly-java7
+    namespace: default
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: ratel-resource-readonly
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: java7
+kind: List
+metadata:
+  resourceVersion: <span style="color: #8b2252;">""</span>
+  selfLink: <span style="color: #8b2252;">""</span>
+</pre>
+</div>
+
+<p>
+在没有安装Ratel的情况下，可以使用上述yaml内容直接创建至对应的namespace下即可完成权限配置。
+</p>
+
+<p>
+上述只是实现了对常用资源的权限控制，其他权限控制类似。
+</p>
+
+<p>
+Kubernetes多集群资源管理平台Ratel安装可以参考：<a href="https://github.com/dotbalo/ratel-doc">https://github.com/dotbalo/ratel-doc</a>
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7b77bf90-4a6e-4cc6-a3ab-39ff8ee5ba77" class="outline-2">
+<h2 id="h:7b77bf90-4a6e-4cc6-a3ab-39ff8ee5ba77">Ratel 工具图形化管理多 k8s 集群</h2>
+<div class="outline-text-2" id="text-h:7b77bf90-4a6e-4cc6-a3ab-39ff8ee5ba77">
+</div>
+<div id="outline-container-h:3252e050-081a-4743-8419-dd053369ccbc" class="outline-3">
+<h3 id="h:3252e050-081a-4743-8419-dd053369ccbc">Ratel 介绍</h3>
+<div class="outline-text-3" id="text-h:3252e050-081a-4743-8419-dd053369ccbc">
+<p>
+个人开发项目，主要用来降低学习难度，适合集群管理员
+</p>
+
+<p>
+<a href="https://github.com/dotbalo/ratel-doc">https://github.com/dotbalo/ratel-doc</a>
+</p>
+
+<p>
+<a href="https://www.cnblogs.com/dukuan/p/11883541.html">https://www.cnblogs.com/dukuan/p/11883541.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:04904efd-762c-46fb-afa0-c09815d3008e" class="outline-3">
+<h3 id="h:04904efd-762c-46fb-afa0-c09815d3008e">安装Ratel</h3>
+<div class="outline-text-3" id="text-h:04904efd-762c-46fb-afa0-c09815d3008e">
+</div>
+<div id="outline-container-h:eae30af7-603e-4851-a4b4-a4afa9af4fd5" class="outline-4">
+<h4 id="h:eae30af7-603e-4851-a4b4-a4afa9af4fd5">安装说明</h4>
+<div class="outline-text-4" id="text-h:eae30af7-603e-4851-a4b4-a4afa9af4fd5">
+<p>
+集群安装配置需要两类文件: servers.yaml和集群管理的kubeconfig文件
+</p>
+
+<p>
+servers.yaml是ratel的配置文件, 格式如下:
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">- serverName: 'xxx'
+  serverAddress: 'https://1.1.1.1:8443'
+  #serverAdminUser: 'xxx'
+  #serverAdminPassword: 'xxx#'
+  serverAdminToken: 'null'
+  serverDashboardUrl: "https://k8s.xxx.com.cn/#"
+  production: 'false'
+  kubeConfigPath: "/mnt/xxx.config"
+  harborConfig: "HarborUrl, HarborUsername, HarborPassword, HarborEmail"
+</pre>
+</div>
+
+<p>
+其中管理的方式有两种(Token暂不支持): 账号密码和kubeconfig形式, 只需配置一种即可, kubeconfig优先级高
+</p>
+
+<p>
+参数解析:
+</p>
+<ul class="org-ul">
+<li>serverName: 集群别名</li>
+<li>serverAddress: Kubernetes APIServer地址</li>
+<li>serverAdminUser: Kubernetes管理员账号(需要配置basic auth)</li>
+<li>serverAdminPassword: Kubernetes管理员密码</li>
+<li>serverAdminToken: Kubernetes管理员Token // 暂不支持</li>
+<li>serverDashboardUrl: Kubernetes官方dashboard地址，1.x版本需要添加/#!，2.x需要添加/#</li>
+<li>kubeConfigPath: Kubernetes kube.config路径(绝对路径，这个路径不是宿主机的本地路径，而是1.2小节secret的挂载路径，一般可以不改/mnt)</li>
+<li>harborConfig: 对于多集群管理的情况下，可能会存在不同的harbor仓库，配置此参数可以在拷贝资源的时候自动替换harbor配置</li>
+<li>kubeConfigPath 通过secret挂载到容器的/mnt目录或者其他目录</li>
+</ul>
+
+<p>
+本文档是将Ratel安装在Kubernetes集群，如果没有Kubernetes集群，可以参考本人写的另一篇文章，CentOS 8二进制高可用安装Kubernetes集群: <a href="https://www.cnblogs.com/dukuan/p/11780729.html">https://www.cnblogs.com/dukuan/p/11780729.html</a>
+</p>
+</div>
+<div id="outline-container-h:d8d67f7e-1f84-4e3b-a274-ae9b5699fa66" class="outline-5">
+<h5 id="h:d8d67f7e-1f84-4e3b-a274-ae9b5699fa66">创建Secret</h5>
+<div class="outline-text-5" id="text-h:d8d67f7e-1f84-4e3b-a274-ae9b5699fa66">
+<p>
+假设配置两个集群，对应的kubeconfig是test1.config和test2.config
+ratel配置文件servers.yaml内容如下:
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">- serverName: 'test1'
+  serverAddress: 'https://1.1.1.1:8443'
+  #serverAdminUser: 'xxx'
+  #serverAdminPassword: 'xxx#'
+  serverAdminToken: 'null'
+  serverDashboardUrl: "https://k8s.test1.com.cn/#"
+  production: 'false'
+  kubeConfigPath: "/mnt/test1.config"
+  harborConfig: "HarborUrl, HarborUsername, HarborPassword, HarborEmail"
+- serverName: 'test2'
+  serverAddress: 'https://1.1.1.2:8443'
+  #serverAdminUser: 'xxx'
+  #serverAdminPassword: 'xxx#'
+  serverAdminToken: 'null'
+  serverDashboardUrl: "https://k8s.test2.com.cn/#!"
+  production: 'false'
+  kubeConfigPath: "/mnt/test2.config"
+  harborConfig: "HarborUrl, HarborUsername, HarborPassword, HarborEmail"
+</pre>
+</div>
+
+<p>
+创建Secret: 
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create secret generic ratel-config  --from-file=test1.config --from-file=test2.config --from-file=servers.yaml -n kube-system
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7d8340d7-338f-4ffe-a1ce-3b4559fec32e" class="outline-4">
+<h4 id="h:7d8340d7-338f-4ffe-a1ce-3b4559fec32e">创建RBAC</h4>
+<div class="outline-text-4" id="text-h:7d8340d7-338f-4ffe-a1ce-3b4559fec32e">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#26435;&#38480;&#31649;&#29702;namespace</span>
+kubectl create ns kube-users
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#28982;&#21518;&#28155;&#21152;&#22914;&#19979;&#30340;ClusterroleBinding</span>
+vim ratel-rbac.yaml
+
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: <span style="color: #8b2252;">"true"</span>
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+      rbac.authorization.k8s.io/aggregate-to-edit: <span style="color: #8b2252;">"true"</span>
+    name: ratel-namespace-readonly
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - metrics.k8s.io
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ratel-pod-delete
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - delete
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ratel-pod-exec
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - pods
+    - pods/log
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - pods/exec
+    verbs:
+    - create
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: <span style="color: #8b2252;">"true"</span>
+    name: ratel-resource-edit
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - configmaps
+    - persistentvolumeclaims
+    - services
+    - services/proxy
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - apps
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/rollback
+    - deployments/scale
+    - statefulsets
+    - statefulsets/scale
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - autoscaling
+    resources:
+    - horizontalpodautoscalers
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    - jobs
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - extensions
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/rollback
+    - deployments/scale
+    - ingresses
+    - networkpolicies
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - ingresses
+    - networkpolicies
+    verbs:
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: ratel-resource-readonly
+  rules:
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - configmaps
+    - endpoints
+    - persistentvolumeclaims
+    - pods
+    - replicationcontrollers
+    - replicationcontrollers/scale
+    - serviceaccounts
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - bindings
+    - events
+    - limitranges
+    - namespaces/status
+    - pods/log
+    - pods/status
+    - replicationcontrollers/status
+    - resourcequotas
+    - resourcequotas/status
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - <span style="color: #8b2252;">""</span>
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    resources:
+    - controllerrevisions
+    - daemonsets
+    - deployments
+    - deployments/scale
+    - replicasets
+    - replicasets/scale
+    - statefulsets
+    - statefulsets/scale
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - autoscaling
+    resources:
+    - horizontalpodautoscalers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    - jobs
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - extensions
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/scale
+    - ingresses
+    - networkpolicies
+    - replicasets
+    - replicasets/scale
+    - replicationcontrollers/scale
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - networkpolicies
+    - ingresses
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - metrics.k8s.io
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+kind: List
+metadata:
+  resourceVersion: <span style="color: #8b2252;">""</span>
+  selfLink: <span style="color: #8b2252;">""</span>
+
+kubectl create -f ratel-rbac.yaml
+
+vim ratel-rbac-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ratel-namespace-readonly-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ratel-namespace-readonly
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:serviceaccounts:kube-users
+
+  kubectl create -f ratel-rbac-binding.yaml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5ed2f0eb-3a45-4ee9-a4c8-6a56f361722b" class="outline-4">
+<h4 id="h:5ed2f0eb-3a45-4ee9-a4c8-6a56f361722b">部署ratel</h4>
+<div class="outline-text-4" id="text-h:5ed2f0eb-3a45-4ee9-a4c8-6a56f361722b">
+<p>
+ratel的部署文件内容如下:
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ratel
+  name: ratel
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ratel
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    <span style="color: #483d8b;">type</span>: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ratel
+    spec:
+      containers:
+        - command:
+            - sh
+            - -c
+            - ./ratel -c /mnt/servers.yaml
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+            - name: LANG
+              value: C.UTF-8
+            - name: ProRunMode
+              value: prod
+            - name: ADMIN_USERNAME
+              value: admin
+            - name: ADMIN_PASSWORD
+              value: ratel_password
+          image: registry.cn-beijing.aliyuncs.com/dotbalo/ratel:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 2
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            tcpSocket:
+              port: 8888
+            timeoutSeconds: 2
+          name: ratel
+          ports:
+            - containerPort: 8888
+              name: web
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 2
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            tcpSocket:
+              port: 8888
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /mnt
+              name: ratel-config
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: myregistrykey
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: ratel-config
+          secret:
+            defaultMode: 420
+            secretName: ratel-config
+</pre>
+</div>
+
+<p>
+需要更改的内容如下:
+</p>
+<ul class="org-ul">
+<li>ProRunMode: 区别在于dev模式打印的是debug日志, 其他模式是info级别的日志, 实际使用时应该配置为非dev</li>
+<li>ADMIN_USERNAME: ratel自己的管理员账号</li>
+<li>ADMIN_PASSWORD: ratel自己的管理员密码</li>
+</ul>
+<p>
+实际使用时账号密码应满足复杂性要求,因为ratel可以直接操作所有配置的资源。
+其他无需配置, 端口配置暂不支持。
+</p>
+</div>
+</div>
+<div id="outline-container-h:94210348-549d-472e-911f-614343e09210" class="outline-4">
+<h4 id="h:94210348-549d-472e-911f-614343e09210">Service和Ingress配置</h4>
+<div class="outline-text-4" id="text-h:94210348-549d-472e-911f-614343e09210">
+<p>
+注意：如果没有安装ingress controller，需要把type: ClusterIP改成type: NodePort，然后通过主机IP+Port进行访问
+</p>
+
+<p>
+创建ratel Service的文件如下:
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ratel
+  name: ratel
+  namespace: kube-system
+spec:
+  ports:
+    - name: container-1-web-1
+      port: 8888
+      protocol: TCP
+      targetPort: 8888
+  selector:
+    app: ratel
+  type: ClusterIP
+</pre>
+</div>
+
+<p>
+创建ratel Ingress:
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ratel
+  namespace: kube-system
+spec:
+  rules:
+  - host: krm.test.com
+    http:
+      paths:
+      - backend:
+          serviceName: ratel
+          servicePort: 8888
+        path: /
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ce85f518-c358-4473-b2ad-e71f3078f82a" class="outline-4">
+<h4 id="h:ce85f518-c358-4473-b2ad-e71f3078f82a">访问ratel</h4>
+<div class="outline-text-4" id="text-h:ce85f518-c358-4473-b2ad-e71f3078f82a">
+<p>
+注意：如果没有安装ingress controller，需要把type: ClusterIP改成type: NodePort，然后通过主机IP+Port进行访问
+</p>
+
+<p>
+通过Ingress配置的krm.test.com/ratel访问，ratel登录页如下:
+</p>
+
+
+<figure id="org719efa8">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/login.png" alt="login.png" width="50%">
+
+</figure>
+
+
+<p>
+ratel首页如下:
+</p>
+
+<figure id="orge79ada6">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/index.png" alt="index.png" width="50%">
+
+</figure>
+
+
+<figure id="org44d9f42">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/index2.png" alt="index2.png" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:9b297427-09ff-4160-a7ad-9410cdeecf18" class="outline-4">
+<h4 id="h:9b297427-09ff-4160-a7ad-9410cdeecf18">资源列表</h4>
+<div class="outline-text-4" id="text-h:9b297427-09ff-4160-a7ad-9410cdeecf18">
+<p>
+Node列表及配置
+</p>
+
+<p>
+开启驱逐是配置了一个NoExecute的Taint，禁止调度室配置了一个NoSchedule的Taint，并非强制性的。
+</p>
+
+
+<figure id="org753a89f">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/nodelist.png" alt="nodelist.png" width="50%">
+
+</figure>
+
+<p>
+Deployment StatefulSet DaemonSet列表
+</p>
+
+<p>
+可以直接进行删除、更新(不更新任何内容触发更新)、编辑、添加Service，自动配置Service端口
+</p>
+
+<p>
+点击副本数可以直接进行扩容
+</p>
+
+
+<figure id="org3bf42b2">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/stslist.png" alt="stslist.png" width="50%">
+
+</figure>
+
+
+<figure id="org6eb33aa">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/dslist.png" alt="dslist.png" width="50%">
+
+</figure>
+
+
+<figure id="orgf7b272a">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/dplist.png" alt="dplist.png" width="50%">
+
+</figure>
+
+
+<p>
+Service列表，可以针对指定Service添加域名，自动配置端口
+</p>
+
+
+<figure id="org8191b72">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/svclist.png" alt="svclist.png" width="50%">
+
+</figure>
+
+
+<p>
+Pod列表，如果状态不是Running，可以将鼠标放在状态上即可查看出错原因
+</p>
+
+
+<figure id="org4dc4a35">
+<img src="https://cdn.jsdelivr.net/gh/dotbalo/ratel-doc/images/podslist.png" alt="podslist.png" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a31bb6b9-c64c-406c-b581-4a7c85b77649" class="outline-3">
+<h3 id="h:a31bb6b9-c64c-406c-b581-4a7c85b77649">图形化管理多租户权限</h3>
+<div class="outline-text-3" id="text-h:a31bb6b9-c64c-406c-b581-4a7c85b77649">
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 高级篇-云原生存储及存储进阶</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 高级篇-云原生存储及存储进阶</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:13963e79-9072-4026-b19a-a1b0f401cf1e">云原生存储及存储进阶</a>
+<ul>
+<li><a href="#h:f228b85c-ffd4-4c50-8fed-edadea91a2bf">云原生存储</a>
+<ul>
+<li><a href="#h:7da365c6-d34b-4de2-ac92-fa761b7ee3e3">什么是 StorageClass 和 CSI</a>
+<ul>
+<li><a href="#h:f5ad2d4a-b79d-42c0-9391-43e8d32ab834">Volume 回顾</a></li>
+<li><a href="#h:23ba88ed-e3fb-49f2-9e8d-14e3d4c19788">动态存储</a></li>
+</ul>
+</li>
+<li><a href="#h:d2e90024-c26a-4266-beac-be345ea6f755">什么是Rook？</a></li>
+<li><a href="#h:1636fc18-6d6c-46db-bdf7-b637c3b281dd">Rook 架构</a></li>
+<li><a href="#h:61e2f9e2-cb5a-41a0-83e3-309d82960ed8">部署 Rook</a>
+<ul>
+<li><a href="#h:f5854794-bbb7-483b-b842-ecd34029277b">Rook安装注意事项</a></li>
+<li><a href="#h:b95a0d9d-fe8a-4508-a6cd-8e437a5b8cce">实验环境最低配置</a></li>
+<li><a href="#h:49afcabd-90e8-43ee-bc11-b3c53aecdaf3">部署Rook</a></li>
+</ul>
+</li>
+<li><a href="#h:d15cd61a-9b98-4b21-8ccd-b3e3886fdc4b">使用 Rook 搭建 Ceph 集群</a>
+<ul>
+<li><a href="#h:4d77d23c-f99e-4263-a7be-b2068da53a9c">配置更改</a></li>
+<li><a href="#h:80752f5a-b844-4e3a-abae-44fb6cbf5977">创建Ceph集群</a></li>
+<li><a href="#h:77bcd5e8-7fc3-49a5-8645-8e8ed59bd142">安装ceph snapshot控制器</a></li>
+</ul>
+</li>
+<li><a href="#h:75d89c28-d852-4752-97cc-5b3e4444bd0f">Ceph Dashboard 和客户端工具安装</a>
+<ul>
+<li><a href="#h:daaa5619-e0fe-466a-9ae7-4de99decaa6b">安装ceph客户端工具</a></li>
+<li><a href="#h:744541dc-71a1-4bcb-b907-36d217ea75a1">Ceph dashboard</a></li>
+</ul>
+</li>
+<li><a href="#h:072cee82-fd99-492c-b405-fdd17c6021d6">StorageClass动态存储-块存储</a>
+<ul>
+<li><a href="#h:9f766ff0-4dee-4ba1-96e1-e8e71c17d4cf">创建StorageClass和ceph的存储池</a></li>
+<li><a href="#h:67e20468-3106-457b-a424-a40371b0d19c">挂载测试-PVC申请动态PV</a></li>
+<li><a href="#h:8b9192d2-cb21-4d96-9b63-e9fec0137ef6">StatefulSet volumeClaimTemplates动态存储</a></li>
+</ul>
+</li>
+<li><a href="#h:8b9bf55b-ce00-42a9-973e-9394112953eb">StorageClass动态存储-文件共享型存储</a>
+<ul>
+<li><a href="#h:5a2ab175-af27-4d7f-bf20-27d19181c398">创建共享类型的文件系统</a></li>
+<li><a href="#h:70ecd634-97a6-4da3-8695-e2a43260052c">创建共享类型文件系统的StorageClass</a></li>
+<li><a href="#h:1ea8e873-4839-4a58-af2e-f4a1a96eb125">文件共享型存储使用示例</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:6c4149a8-a3e4-4e2a-b203-bcc9146aa3d6">存储进阶</a>
+<ul>
+<li><a href="#h:ccc7207a-dc46-460e-99ff-b3e87178d78f">PVC在线扩容</a>
+<ul>
+<li><a href="#h:87fa537e-eb57-439c-adf0-a01dc9918da3">扩容文件共享型PVC</a></li>
+<li><a href="#h:d37d761a-7cb0-43f8-9f4a-7c5e3d23253e">扩容块存储</a></li>
+</ul>
+</li>
+<li><a href="#h:a95050b3-5e13-4d2c-9172-f7762cae8ee1">PVC 快照</a>
+<ul>
+<li><a href="#h:facab8ad-f945-4336-9701-d51d952b9cbc">块存储快照</a></li>
+</ul>
+</li>
+<li><a href="#h:5bc3674e-a75e-4ddf-a3fb-645dac547a0f">PVC 数据回滚</a>
+<ul>
+<li><a href="#h:248ebbcf-168c-4713-9081-f66b0583c641">文件共享类型快照</a></li>
+</ul>
+</li>
+<li><a href="#h:9e845e04-a7e1-46e0-bb1b-d6f27690e761">PVC克隆</a></li>
+<li><a href="#h:e8466de6-5ee5-479d-b6a9-5539dd386f04">Rook Ceph集群清理</a></li>
+</ul>
+</li>
+<li><a href="#h:b0275e21-43a6-476f-a81a-01a8aa081b09">ceph 创建和删除osd</a>
+<ul>
+<li><a href="#h:cb5f8958-280d-44ed-b5db-71e69f3c56df">概述</a></li>
+<li><a href="#h:d7a551ae-0513-4f52-8e13-447e2e249340">创建osd</a></li>
+<li><a href="#h:523257f5-6e9f-4c84-9124-cabc62fd6a9d">删除osd</a></li>
+</ul>
+</li>
+<li><a href="#h:0c542f36-85e5-415c-8970-d7e58bbe3fd7">ceph_dashboard</a>
+<ul>
+<li><a href="#h:9c7a3a3e-75fc-4bb3-873c-502a8a8474b8">dashboard</a>
+<ul>
+<li><a href="#h:f8f3be22-19d3-44c8-afe8-1a2c99ddc890">安装dashboard模块软件包</a></li>
+<li><a href="#h:2dba3ac3-1fa0-4a0c-b587-1faf25279b1e">启用dashboard</a></li>
+<li><a href="#h:84fd0a13-deae-42df-9468-556cf8eada60">配置dashboard</a></li>
+<li><a href="#h:3e1c6e46-4d53-46e2-b42a-109316db4989">修改证书或者修改配置以后需要重启dashboard模块来生效。</a></li>
+<li><a href="#h:a9ca5e74-a9b5-4f1f-8304-bb616edff85f">修改dashboard监听的端口</a></li>
+<li><a href="#h:8465c7ca-9ea3-4bb5-9403-3e52aa2cac33">为dashboard添加rgw的管理凭据</a></li>
+<li><a href="#h:414c9fd5-fff1-4ee5-864c-17a9d48c11ab">登录</a></li>
+</ul>
+</li>
+<li><a href="#h:655b0e03-3476-4846-8e5e-4d997a21de75">启用Prometheus监控接口</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:13963e79-9072-4026-b19a-a1b0f401cf1e" class="outline-2">
+<h2 id="h:13963e79-9072-4026-b19a-a1b0f401cf1e">云原生存储及存储进阶</h2>
+<div class="outline-text-2" id="text-h:13963e79-9072-4026-b19a-a1b0f401cf1e">
+</div>
+<div id="outline-container-h:f228b85c-ffd4-4c50-8fed-edadea91a2bf" class="outline-3">
+<h3 id="h:f228b85c-ffd4-4c50-8fed-edadea91a2bf">云原生存储</h3>
+<div class="outline-text-3" id="text-h:f228b85c-ffd4-4c50-8fed-edadea91a2bf">
+</div>
+<div id="outline-container-h:7da365c6-d34b-4de2-ac92-fa761b7ee3e3" class="outline-4">
+<h4 id="h:7da365c6-d34b-4de2-ac92-fa761b7ee3e3">什么是 StorageClass 和 CSI</h4>
+<div class="outline-text-4" id="text-h:7da365c6-d34b-4de2-ac92-fa761b7ee3e3">
+</div>
+<div id="outline-container-h:f5ad2d4a-b79d-42c0-9391-43e8d32ab834" class="outline-5">
+<h5 id="h:f5ad2d4a-b79d-42c0-9391-43e8d32ab834">Volume 回顾</h5>
+<div class="outline-text-5" id="text-h:f5ad2d4a-b79d-42c0-9391-43e8d32ab834">
+<div class="org-src-container">
+<pre class="src src-yaml">volumes:
+- name: share-volume
+  emptyDir: {}
+  #medium: Memory
+- name: timezone
+  hostPath:
+  path: /etc/timezone
+  type: File
+- name: nfs-volume
+  nfs:
+  server: 192.168.0.204
+  path: /data/nfs/test-dp
+</pre>
+</div>
+
+<p>
+还是比较复杂，为了降低复杂度引用了 PV/PVC。遗留了动态存储 StorageClass 部分。
+</p>
+
+
+<figure id="orge9f7381">
+<img src="./images/Snipaste_2022-09-15_23-05-56.png" alt="Snipaste_2022-09-15_23-05-56.png" width="50%">
+
+</figure>
+
+<p>
+集群的规模很大的时候，管理 pv 也是比较麻烦的，包括创建、扩容、删除、快照等。
+</p>
+</div>
+</div>
+<div id="outline-container-h:23ba88ed-e3fb-49f2-9e8d-14e3d4c19788" class="outline-5">
+<h5 id="h:23ba88ed-e3fb-49f2-9e8d-14e3d4c19788">动态存储</h5>
+<div class="outline-text-5" id="text-h:23ba88ed-e3fb-49f2-9e8d-14e3d4c19788">
+<p>
+StorageClass：存储类，由K8s管理员创建，用于动态PV的管理，可以链接至不同的后端存储，比如Ceph、GlusterFS等。之后对存储的请求可以指向StorageClass，然后StorageClass会自动的创建、删除PV。
+</p>
+
+<p>
+实现方式：
+</p>
+<ul class="org-ul">
+<li>in-tree: 内置于K8s核心代码，对于存储的管理，都需要编写相应的代码。</li>
+<li>out-of-tree：由存储厂商提供一个驱动（CSI或Flex Volume），安装到K8s集群，然后StorageClass只需要配置该驱动即可，驱动器会代替StorageClass管理存储。</li>
+</ul>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/storage/storage-classes/">https://kubernetes.io/docs/concepts/storage/storage-classes/</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d2e90024-c26a-4266-beac-be345ea6f755" class="outline-4">
+<h4 id="h:d2e90024-c26a-4266-beac-be345ea6f755">什么是Rook？</h4>
+<div class="outline-text-4" id="text-h:d2e90024-c26a-4266-beac-be345ea6f755">
+<p>
+Rook 是一个自我管理的分布式存储编排系统，它本身并不是存储系统，在存储和 k8s 之前搭建了一个桥梁，使存储系统的搭建或者维护变得特别简单，Rook 将分布式存储系统转变为自我管理、自我扩展、自我修复的存储服务。它让一些存储的操作，比如部署、配置、扩容、升级、迁移、灾难恢复、监视和资源管理变得自动化，无需人工处理。并且 Rook 支持 CSI，可以利用 CSI 做一些 PVC 的快照、扩容、克隆等操作。
+</p>
+
+<p>
+<a href="https://rook.io/">https://rook.io/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:1636fc18-6d6c-46db-bdf7-b637c3b281dd" class="outline-4">
+<h4 id="h:1636fc18-6d6c-46db-bdf7-b637c3b281dd">Rook 架构</h4>
+<div class="outline-text-4" id="text-h:1636fc18-6d6c-46db-bdf7-b637c3b281dd">
+
+<figure id="org6adf4ac">
+<img src="./images/Snipaste_2022-10-09_18-17-26.png" alt="Snipaste_2022-10-09_18-17-26.png" width="50%">
+
+</figure>
+
+<p>
+Rook由Operator和Cluster两部分组成：
+</p>
+
+<p>
+Operator：由一些CRD和一个All in one镜像构成，包含包含启动和监控存储系统的所有功能。主要用于有状态的服务，或者用于比较复杂应用的管理。
+</p>
+
+<p>
+Cluster：负责创建CRD对象，指定相关参数，包括ceph镜像、元数据持久化位置、磁盘位置、dashboard等等…
+</p>
+
+
+<p>
+Rook:
+</p>
+<ul class="org-ul">
+<li>Agent: 在每个存储节点上运行，用于配置一个FlexVolume插件，和k8s的存储卷进行集成。挂载网络存储、加载存储卷、格式化文件系统。</li>
+<li>Discover: 用于检测连接到存储节点上的设备。</li>
+</ul>
+
+<p>
+Ceph:
+</p>
+<ul class="org-ul">
+<li>OSD: 直接连接每个集群节点的物理磁盘或者是目录。集群的副本数，高可用性和容错性。</li>
+<li>Mon: 集群监控，所有集群的节点都会向Mon汇报，他记录了集群的拓扑以及数据存储位置的信息。</li>
+<li>MDS: 元数据服务器，负责跟踪文件层次结构并存储Ceph元数据。如果用的是对象存储、块存储就不用 mds 了。</li>
+<li>RGW: restful API 接口</li>
+<li>MGR: 提供额外的监控和界面。</li>
+</ul>
+
+
+<figure id="orgf34872a">
+<img src="./images/image-20210601145255027.png" alt="image-20210601145255027.png" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:61e2f9e2-cb5a-41a0-83e3-309d82960ed8" class="outline-4">
+<h4 id="h:61e2f9e2-cb5a-41a0-83e3-309d82960ed8">部署 Rook</h4>
+<div class="outline-text-4" id="text-h:61e2f9e2-cb5a-41a0-83e3-309d82960ed8">
+</div>
+<div id="outline-container-h:f5854794-bbb7-483b-b842-ecd34029277b" class="outline-5">
+<h5 id="h:f5854794-bbb7-483b-b842-ecd34029277b">Rook安装注意事项</h5>
+<div class="outline-text-5" id="text-h:f5854794-bbb7-483b-b842-ecd34029277b">
+<ul class="org-ul">
+<li>K8s集群至少五个节点，每个节点的内存不低于5G，CPU不低于2核</li>
+<li>至少有三个存储节点，并且每个节点至少有一个裸盘</li>
+<li>K8s集群所有的节点时间必须一致</li>
+</ul>
+
+<p>
+Rook官方文档：<a href="https://rook.io/docs/rook/v1.9/ceph-quickstart.html">https://rook.io/docs/rook/v1.9/ceph-quickstart.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:b95a0d9d-fe8a-4508-a6cd-8e437a5b8cce" class="outline-5">
+<h5 id="h:b95a0d9d-fe8a-4508-a6cd-8e437a5b8cce">实验环境最低配置</h5>
+<div class="outline-text-5" id="text-h:b95a0d9d-fe8a-4508-a6cd-8e437a5b8cce">
+<ul class="org-ul">
+<li>做这个实验需要高配置，每个节点配置不能低于**2核4G**</li>
+<li>k8s 1.19以上版本，快照功能需要单独安装snapshot控制器</li>
+<li>rook的版本大于1.3，不要使用目录创建集群，要使用单独的裸盘进行创建，也就是创建一个新的磁盘，挂载到宿主机，不进行格式化，直接使用即可。对于的磁盘节点配置如下</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# fdisk -l   
+
+Disk /dev/sda: 42.9 GB, 42949672960 bytes, 83886080 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x000d76eb
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sda1   *        2048     2099199     1048576   83  Linux
+/dev/sda2         2099200    83886079    40893440   8e  Linux LVM
+
+Disk /dev/sdb: 10.7 GB, 10737418240 bytes, 20971520 sectors  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26032;&#30340;&#30913;&#30424;</span>
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:49afcabd-90e8-43ee-bc11-b3c53aecdaf3" class="outline-5">
+<h5 id="h:49afcabd-90e8-43ee-bc11-b3c53aecdaf3">部署Rook</h5>
+<div class="outline-text-5" id="text-h:49afcabd-90e8-43ee-bc11-b3c53aecdaf3">
+<p>
+下载Rook安装文件：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 app]# git clone --single-branch --branch v1.5.3 https://github.com/rook/rook.git
+</pre>
+</div>
+
+<p>
+配置更改：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 app]# cd rook/cluster/examples/kubernetes/ceph
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20462;&#25913;Rook CSI&#38236;&#20687;&#22320;&#22336;&#65292;&#21407;&#26412;&#30340;&#22320;&#22336;&#21487;&#33021;&#26159;gcr&#30340;&#38236;&#20687;&#65292;&#20294;&#26159;gcr&#30340;&#38236;&#20687;&#26080;&#27861;&#34987;&#22269;&#20869;&#35775;&#38382;&#65292;&#25152;&#20197;&#38656;&#35201;&#21516;&#27493;gcr&#30340;&#38236;&#20687;&#21040;&#38463;&#37324;&#20113;&#38236;&#20687;&#20179;&#24211;&#65292;&#25991;&#26723;&#29256;&#26412;&#24050;&#32463;&#20026;&#22823;&#23478;&#23436;&#25104;&#21516;&#27493;&#65292;&#21487;&#20197;&#30452;&#25509;&#20462;&#25913;&#22914;&#19979;&#65306;</span>
+[root@k8s-master01 ceph]# vim operator.yaml
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">47-52&#34892;&#26356;&#25913;&#20026;&#65306;</span>
+ROOK_CSI_CEPH_IMAGE: <span style="color: #8b2252;">"quay.io/cephcsi/cephcsi:v3.1.2"</span>
+ROOK_CSI_REGISTRAR_IMAGE: <span style="color: #8b2252;">"registry.cn-beijing.aliyuncs.com/dotbalo/csi-node-driver-registrar:v2.0.1"</span>
+ROOK_CSI_RESIZER_IMAGE: <span style="color: #8b2252;">"registry.cn-beijing.aliyuncs.com/dotbalo/csi-resizer:v1.0.0"</span>
+ROOK_CSI_PROVISIONER_IMAGE: <span style="color: #8b2252;">"registry.cn-beijing.aliyuncs.com/dotbalo/csi-provisioner:v2.0.0"</span>
+ROOK_CSI_SNAPSHOTTER_IMAGE: <span style="color: #8b2252;">"registry.cn-beijing.aliyuncs.com/dotbalo/csi-snapshotter:v3.0.0"</span>
+ROOK_CSI_ATTACHER_IMAGE: <span style="color: #8b2252;">"registry.cn-beijing.aliyuncs.com/dotbalo/csi-attacher:v3.0.0"</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22914;&#26524;&#26159;&#20854;&#20182;&#29256;&#26412;&#65292;&#38656;&#35201;&#33258;&#34892;&#21516;&#27493;&#65292;&#21516;&#27493;&#26041;&#27861;&#21487;&#20197;&#22312;&#32593;&#19978;&#25214;&#21040;&#30456;&#20851;&#25991;&#31456;&#12290;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#36824;&#26159;operator&#25991;&#20214;&#65292;&#26032;&#29256;&#26412;rook&#40664;&#35748;&#20851;&#38381;&#20102;&#33258;&#21160;&#21457;&#29616;&#30913;&#30424;&#65292;&#21487;&#20197;&#25214;&#21040;ROOK_ENABLE_DISCOVERY_DAEMON&#25913;&#25104;true&#21363;&#21487;&#65306;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">ROOK_ENABLE_DISCOVERY_DAEMON&#25913;&#25104;true&#21363;&#21487;&#65306;</span>
+- name: ROOK_ENABLE_DISCOVERY_DAEMON
+          value: <span style="color: #8b2252;">"true"</span>
+</pre>
+</div>
+
+<p>
+部署rook：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#36827;&#21040;/rook/cluster/examples/kubernetes/ceph&#30446;&#24405;</span>
+[root@k8s-master01 ceph]# pwd
+/app/rook/cluster/examples/kubernetes/ceph
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#37096;&#32626;</span>
+[root@k8s-master01 ceph]# kubectl create -f crds.yaml -f common.yaml -f operator.yaml
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#31561;&#24453;operator&#23481;&#22120;&#21644;discover&#23481;&#22120;&#21551;&#21160;&#65288;&#20840;&#37096;&#21464;&#25104;1/1  Running &#25165;&#21487;&#20197;&#21019;&#24314;Ceph&#38598;&#32676;&#65289;</span>
+[root@k8s-master01 ceph]# kubectl get pod  -n rook-ceph -owide
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d15cd61a-9b98-4b21-8ccd-b3e3886fdc4b" class="outline-4">
+<h4 id="h:d15cd61a-9b98-4b21-8ccd-b3e3886fdc4b">使用 Rook 搭建 Ceph 集群</h4>
+<div class="outline-text-4" id="text-h:d15cd61a-9b98-4b21-8ccd-b3e3886fdc4b">
+<p>
+ceph 生产环境有条件的话建议用原生安装，不建议部署在 k8s 内部。
+</p>
+</div>
+<div id="outline-container-h:4d77d23c-f99e-4263-a7be-b2068da53a9c" class="outline-5">
+<h5 id="h:4d77d23c-f99e-4263-a7be-b2068da53a9c">配置更改</h5>
+<div class="outline-text-5" id="text-h:4d77d23c-f99e-4263-a7be-b2068da53a9c">
+<p>
+<b>主要更改的是osd节点所在的位置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ceph]# vim cluster.yaml 
+<span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#26356;&#25913;storage&#65288;&#33258;&#24049;&#25351;&#23450;&#20351;&#29992;&#30913;&#30424;&#30340;&#33410;&#28857;&#65289;</span>
+... ...
+&#21407;&#37197;&#32622;:
+  storage: <span style="color: #b22222;"># </span><span style="color: #b22222;">cluster level storage configuration and selection</span>
+    useAllNodes: true
+    useAllDevices: true
+&#26356;&#25913;&#20026;:
+  storage: <span style="color: #b22222;"># </span><span style="color: #b22222;">cluster level storage configuration and selection</span>
+    useAllNodes: false  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26159;&#21542;&#20351;&#29992;&#25152;&#26377;&#33410;&#28857;&#24403; osd</span>
+    useAllDevices: false <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26159;&#21542;&#20351;&#29992;&#32553;&#20027;&#26426;&#19978;&#25152;&#26377;&#30340;&#30913;&#30424;</span>
+... ...
+     - name: <span style="color: #8b2252;">"k8s-master03"</span>
+       devices:
+       - name: <span style="color: #8b2252;">"sdb"</span>
+     - name: <span style="color: #8b2252;">"k8s-node01"</span>
+       devices:
+       - name: <span style="color: #8b2252;">"sdb"</span>
+     - name: <span style="color: #8b2252;">"k8s-node02"</span>
+       devices:
+       - name: <span style="color: #8b2252;">"sdb"</span>
+... ...
+</pre>
+</div>
+
+
+<figure id="org05e77c2">
+<img src="./images/1876212-20210316000835378-373823316.png" alt="1876212-20210316000835378-373823316.png" width="50%">
+
+</figure>
+
+<p>
+<b>注意：新版必须采用裸盘，即未格式化的磁盘。其中k8s-master03 k8s-node01 node02有新加的一个磁盘，可以通过lsblk -f查看新添加的磁盘名称。建议最少三个节点，否则后面的试验可能会出现问题</b>
+</p>
+</div>
+</div>
+<div id="outline-container-h:80752f5a-b844-4e3a-abae-44fb6cbf5977" class="outline-5">
+<h5 id="h:80752f5a-b844-4e3a-abae-44fb6cbf5977">创建Ceph集群</h5>
+<div class="outline-text-5" id="text-h:80752f5a-b844-4e3a-abae-44fb6cbf5977">
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ceph]# kubectl create -f cluster.yaml
+cephcluster.ceph.rook.io/rook-ceph created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#23436;&#25104;&#21518;&#65292;&#21487;&#20197;&#26597;&#30475;pod&#30340;&#29366;&#24577;</span>
+[root@k8s-master01 ceph]# kubectl -n rook-ceph get pod
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:77bcd5e8-7fc3-49a5-8645-8e8ed59bd142" class="outline-5">
+<h5 id="h:77bcd5e8-7fc3-49a5-8645-8e8ed59bd142">安装ceph snapshot控制器</h5>
+<div class="outline-text-5" id="text-h:77bcd5e8-7fc3-49a5-8645-8e8ed59bd142">
+<p>
+k8s 1.19版本以上需要单独安装snapshot控制器，才能完成pvc的快照功能，所以在此提前安装下，如果是1.19以下版本，不需要单独安装。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;snapshot&#25511;&#21046;&#22120;&#30340;&#37096;&#32626;&#22312;&#38598;&#32676;&#23433;&#35013;&#26102;&#30340;k8s-ha-install&#39033;&#30446;&#20013;&#65292;&#38656;&#35201;&#20999;&#25442;&#21040;1.20.x&#20998;&#25903;</span>
+[root@k8s-master01 ~]# cd /root/k8s-ha-install/
+[root@k8s-master01 k8s-ha-install]# git checkout manual-installation-v1.20.x
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#21019;&#24314;snapshot controller</span>
+[root@k8s-master01 k8s-ha-install]# kubectl create -f snapshotter/ -n kube-system
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#26597;&#30475;snapshot controller&#29366;&#24577;</span>
+[root@k8s-master01 k8s-ha-install]# kubectl  get po -n kube-system -l <span style="color: #a0522d;">app</span>=snapshot-controller
+NAME                    READY   STATUS    RESTARTS   AGE
+snapshot-controller-0   1/1     Running   0          15s
+</pre>
+</div>
+
+<p>
+具体文档：<a href="https://rook.io/docs/rook/v1.5/ceph-csi-snapshot.html">https://rook.io/docs/rook/v1.5/ceph-csi-snapshot.html</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:75d89c28-d852-4752-97cc-5b3e4444bd0f" class="outline-4">
+<h4 id="h:75d89c28-d852-4752-97cc-5b3e4444bd0f">Ceph Dashboard 和客户端工具安装</h4>
+<div class="outline-text-4" id="text-h:75d89c28-d852-4752-97cc-5b3e4444bd0f">
+</div>
+<div id="outline-container-h:daaa5619-e0fe-466a-9ae7-4de99decaa6b" class="outline-5">
+<h5 id="h:daaa5619-e0fe-466a-9ae7-4de99decaa6b">安装ceph客户端工具</h5>
+<div class="outline-text-5" id="text-h:daaa5619-e0fe-466a-9ae7-4de99decaa6b">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#23433;&#35013;</span>
+[root@k8s-master01 ceph]# pwd
+/app/rook/cluster/examples/kubernetes/ceph
+[root@k8s-master01 ceph]# kubectl  create -f toolbox.yaml -n rook-ceph
+deployment.apps/rook-ceph-tools created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#24453;&#23481;&#22120;Running&#21518;&#65292;&#21363;&#21487;&#25191;&#34892;&#30456;&#20851;&#21629;&#20196;</span>
+[root@k8s-master01 ceph]# kubectl  get po -n rook-ceph -l <span style="color: #a0522d;">app</span>=rook-ceph-tools
+NAME                               READY   STATUS    RESTARTS   AGE
+rook-ceph-tools-6f7467bb4d-r9vqx   1/1     Running   0          31s
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#25191;&#34892;&#21629;&#20196;ceph status</span>
+[root@k8s-master01 ceph]# kubectl -n rook-ceph exec -it deploy/rook-ceph-tools -- bash
+[root@rook-ceph-tools-6f7467bb4d-r9vqx /]# ceph status
+  cluster:
+    id:     83c11641-ca98-4054-b2e7-422e942befe6
+    health: HEALTH_OK
+
+  services:
+    mon: 1 daemons, quorum a (age 43m)
+    mgr: a(active, since 13m)
+    osd: 3 osds: 3 up (since 18m), 3<span style="color: #a020f0;"> in</span> (since 44m)
+
+  data:
+    pools:   1 pools, 1 pgs
+    objects: 0 objects, 0 B
+    usage:   3.0 GiB used, 27 GiB / 30 GiB avail
+    pgs:     1 active+clean
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">4&#12289;&#25191;&#34892;&#21629;&#20196; </span>
+[root@rook-ceph-tools-6f7467bb4d-r9vqx /]# ceph osd status
+ID  HOST           USED  AVAIL  WR OPS  WR DATA  RD OPS  RD DATA  STATE      
+ 0  k8s-master03  1028M  9207M      0        0       0        0   exists,up  
+ 1  k8s-node01    1028M  9207M      0        0       0        0   exists,up  
+ 2  k8s-node02    1028M  9207M      0        0       0        0   exists,up 
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">5&#12289;&#25191;&#34892;&#21629;&#20196;-&#26597;&#30475;&#29366;&#24577;</span>
+[root@rook-ceph-tools-6f7467bb4d-r9vqx /]# ceph df
+--- RAW STORAGE ---
+CLASS  SIZE    AVAIL   USED    RAW USED  %RAW USED
+hdd    30 GiB  27 GiB  14 MiB   3.0 GiB      10.05
+TOTAL  30 GiB  27 GiB  14 MiB   3.0 GiB      10.05
+
+--- POOLS ---
+POOL                   ID  STORED  OBJECTS  USED  %USED  MAX AVAIL
+device_health_metrics   1     0 B        0   0 B      0    8.5 GiB
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:744541dc-71a1-4bcb-b907-36d217ea75a1" class="outline-5">
+<h5 id="h:744541dc-71a1-4bcb-b907-36d217ea75a1">Ceph dashboard</h5>
+<div class="outline-text-5" id="text-h:744541dc-71a1-4bcb-b907-36d217ea75a1">
+</div>
+<ul class="org-ul">
+<li><a id="h:590329c8-de43-41a5-bd8d-a62e121b1283"></a>暴露服务<br>
+<div class="outline-text-6" id="text-h:590329c8-de43-41a5-bd8d-a62e121b1283">
+<p>
+1、默认情况下，ceph dashboard是打开的，可以通过以下命令查看ceph dashboard的service
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">
+[root@k8s-master01 ceph]# kubectl -n rook-ceph get service rook-ceph-mgr-dashboard
+NAME                      TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
+rook-ceph-mgr-dashboard   ClusterIP   10.97.5.123   &lt;none&gt;        8443/TCP   47m
+</pre>
+</div>
+
+<p>
+2、可以两种方式访问：
+</p>
+<ul class="org-ul">
+<li>将该service改为NodePort</li>
+<li>通过ingress代理</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ceph]# kubectl -n rook-ceph edit service rook-ceph-mgr-dashboard
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26356;&#25913;type&#31867;&#22411;&#21363;&#21487;</span>
+<span style="color: #483d8b;">type</span>: NodePort
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#35775;&#38382;&#12289;&#20219;&#24847;&#33410;&#28857;ip:port&#35775;&#38382;&#21363;&#21487;</span>
+[root@k8s-master01 ceph]# kubectl -n rook-ceph get service rook-ceph-mgr-dashboard
+NAME                      TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)          AGE
+rook-ceph-mgr-dashboard   NodePort   10.97.5.123   &lt;none&gt;        8443:32202/TCP   49m
+</pre>
+</div>
+
+
+<figure id="org5d91492">
+<img src="./images/1876212-20210316000906458-1575569425.png" alt="1876212-20210316000906458-1575569425.png" width="50%">
+
+</figure>
+
+
+<p>
+3、登录、账号为admin，查看密码
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl -n rook-ceph get secret rook-ceph-dashboard-password -o <span style="color: #a0522d;">jsonpath</span>=<span style="color: #8b2252;">"{['data']['password']}"</span> | base64 --decode &amp;&amp; <span style="color: #483d8b;">echo</span>
+@}g<span style="color: #8b2252;">"P{-FVe9yb]-AV/&gt;3</span>
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:072cee82-fd99-492c-b405-fdd17c6021d6" class="outline-4">
+<h4 id="h:072cee82-fd99-492c-b405-fdd17c6021d6">StorageClass动态存储-块存储</h4>
+<div class="outline-text-4" id="text-h:072cee82-fd99-492c-b405-fdd17c6021d6">
+<p>
+块存储一般用于一个Pod挂载一块存储使用，相当于一个服务器新挂了一个盘，只给一个应用使用。
+</p>
+
+<p>
+参考文档：<a href="https://rook.io/docs/rook/v1.6/ceph-block.html">https://rook.io/docs/rook/v1.6/ceph-block.html</a>
+</p>
+</div>
+<div id="outline-container-h:9f766ff0-4dee-4ba1-96e1-e8e71c17d4cf" class="outline-5">
+<h5 id="h:9f766ff0-4dee-4ba1-96e1-e8e71c17d4cf">创建StorageClass和ceph的存储池</h5>
+<div class="outline-text-5" id="text-h:9f766ff0-4dee-4ba1-96e1-e8e71c17d4cf">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">1&#12289;&#21019;&#24314;&#25991;&#20214;</span>
+[root@k8s-master01 ~]# cd /app/rook/cluster/examples/kubernetes/ceph/
+[root@k8s-master01 ceph]# vim storageclass.yaml
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: replicapool
+  namespace: rook-ceph
+spec:
+  failureDomain: host
+  replicated:
+    size: 3
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: rook-ceph-block
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Change "rook-ceph" provisioner prefix to match the operator namespace if needed</span>
+provisioner: rook-ceph.rbd.csi.ceph.com
+parameters:
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">clusterID is the namespace where the rook cluster is running</span>
+    clusterID: rook-ceph
+    <span style="color: #b22222;"># </span><span style="color: #b22222;">Ceph pool into which the RBD image shall be created</span>
+    pool: replicapool
+
+    imageFormat: <span style="color: #8b2252;">"2"</span>
+    imageFeatures: layering
+    csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+    csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+    csi.storage.k8s.io/controller-expand-secret-name: rook-csi-rbd-provisioner
+    csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+    csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+    csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+    csi.storage.k8s.io/fstype: ext4
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Delete the rbd volume when a PVC is deleted</span>
+reclaimPolicy: Delete
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">2&#12289;&#21019;&#24314;&#22359;</span>
+[root@k8s-master01 ceph]# kubectl create -f storageclass.yaml
+cephblockpool.ceph.rook.io/replicapool created
+storageclass.storage.k8s.io/rook-ceph-block created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">3&#12289;&#26597;&#30475;&#29366;&#24577;</span>
+[root@k8s-master01 ceph]# kubectl get CephBlockPool -n rook-ceph
+NAME          AGE
+replicapool   2m14s
+[root@k8s-master01 ceph]# kubectl  get sc
+NAME              PROVISIONER                  RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+rook-ceph-block   rook-ceph.rbd.csi.ceph.com   Delete          Immediate           false                  2m47s
+</pre>
+</div>
+</div>
+<ul class="org-ul">
+<li><a id="h:5ef47395-b5a9-4997-9d24-2d6cc9c638ba"></a>此时可以在ceph dashboard查看到改Pool，如果没有显示说明没有创建成功<br>
+<div class="outline-text-6" id="text-h:5ef47395-b5a9-4997-9d24-2d6cc9c638ba">
+
+<figure id="orge4e39cf">
+<img src="./images/1876212-20210316000927745-2078751520.png" alt="1876212-20210316000927745-2078751520.png" width="50%">
+
+</figure>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:67e20468-3106-457b-a424-a40371b0d19c" class="outline-5">
+<h5 id="h:67e20468-3106-457b-a424-a40371b0d19c">挂载测试-PVC申请动态PV</h5>
+<div class="outline-text-5" id="text-h:67e20468-3106-457b-a424-a40371b0d19c">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#19968;&#20010;MySQL&#26381;&#21153;</span>
+[root@k8s-master01 kubernetes]# pwd
+/app/rook/cluster/examples/kubernetes
+[root@k8s-master01 kubernetes]# kubectl create -f mysql.yaml 
+[root@k8s-master01 kubernetes]# kubectl create -f wordpress.yaml
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;svc</span>
+[root@k8s-master01 kubernetes]# kubectl get svc wordpress
+NAME        TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+wordpress   LoadBalancer   10.109.161.119   &lt;pending&gt;     80:32301/TCP   3m57s
+</pre>
+</div>
+
+<p>
+该文件有一段pvc的配置
+</p>
+
+
+<figure id="org78edace">
+<img src="./images/1876212-20210316000944056-2027170856.png" alt="1876212-20210316000944056-2027170856.png" width="50%">
+
+</figure>
+
+<p>
+pvc会连接刚才创建的storageClass，然后动态创建pv，然后连接到ceph创建对应的存储
+</p>
+
+<p>
+之后创建pvc只需要指定storageClassName为刚才创建的StorageClass名称即可连接到rook的ceph。如果是statefulset，只需要将volumeTemplateClaim里面的Claim名称改为StorageClass名称即可动态创建Pod，具体请听视频。
+</p>
+
+<p>
+其中MySQL deployment的volumes配置挂载了该pvc：
+</p>
+
+
+<figure id="orgfd1971e">
+<img src="./images/1876212-20210316000956428-1487749740.png" alt="1876212-20210316000956428-1487749740.png" width="50%">
+
+</figure>
+
+<p>
+claimName为pvc的名称
+</p>
+
+<p>
+因为MySQL的数据不能多个MySQL实例连接同一个存储，所以一般只能用块存储。相当于新加了一块盘给MySQL使用。
+</p>
+
+<p>
+创建完成后可以查看创建的pvc和pv
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 kubernetes]# kubectl get pv 
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                    STORAGECLASS      REASON   AGE
+pvc-1843c13e-09cb-46c6-9dd8-5f54a834681b   20Gi       RWO            Delete           Bound    default/mysql-pv-claim   rook-ceph-block            65m
+[root@k8s-master01 kubernetes]# kubectl get pvc
+NAME               STATUS    VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+mysql-pv-claim     Bound     pvc-1843c13e-09cb-46c6-9dd8-5f54a834681b   20Gi       RWO            rook-ceph-block   66m
+</pre>
+</div>
+
+<p>
+此时在ceph dashboard上面也可以查看到对应的image
+</p>
+
+
+<figure id="org52b6dd3">
+<img src="./images/1876212-20210316001019585-1427726751.png" alt="1876212-20210316001019585-1427726751.png" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:8b9192d2-cb21-4d96-9b63-e9fec0137ef6" class="outline-5">
+<h5 id="h:8b9192d2-cb21-4d96-9b63-e9fec0137ef6">StatefulSet volumeClaimTemplates动态存储</h5>
+<div class="outline-text-5" id="text-h:8b9192d2-cb21-4d96-9b63-e9fec0137ef6">
+<p>
+<a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/</a>
+</p>
+
+<p>
+通过一个模板 volumeClaimTemplates 为每个 pod 创建一个 pvc。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8b9bf55b-ce00-42a9-973e-9394112953eb" class="outline-4">
+<h4 id="h:8b9bf55b-ce00-42a9-973e-9394112953eb">StorageClass动态存储-文件共享型存储</h4>
+<div class="outline-text-4" id="text-h:8b9bf55b-ce00-42a9-973e-9394112953eb">
+<p>
+共享文件系统一般用于多个Pod共享一个存储
+</p>
+
+<p>
+官方文档：<a href="https://rook.io/docs/rook/v1.6/ceph-filesystem.html">https://rook.io/docs/rook/v1.6/ceph-filesystem.html</a>
+</p>
+
+<p>
+默认情况下，只能使用Rook创建一个共享文件系统。Ceph中的多文件系统支持仍被认为是实验性的，可以使用中 <code>ROOK_ALLOW_MULTIPLE_FILESYSTEMS</code> 定义的环境变量启用operator.yaml。
+</p>
+</div>
+<div id="outline-container-h:5a2ab175-af27-4d7f-bf20-27d19181c398" class="outline-5">
+<h5 id="h:5a2ab175-af27-4d7f-bf20-27d19181c398">创建共享类型的文件系统</h5>
+<div class="outline-text-5" id="text-h:5a2ab175-af27-4d7f-bf20-27d19181c398">
+<p>
+通过为 <code>CephFilesystem</code> CRD中的元数据池，数据池和元数据服务器指定所需的设置来创建文件系统
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 kubernetes]# pwd
+/app/rook/cluster/examples/kubernetes
+[root@k8s-master01 kubernetes]# vim filesystem.yaml
+apiVersion: ceph.rook.io/v1
+kind: CephFilesystem
+metadata:
+  name: myfs
+  namespace: rook-ceph
+spec:
+  metadataPool:   <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21407;&#25968;&#25454;&#21103;&#26412;&#25968;</span>
+    replicated:
+      size: 3
+  dataPools:      <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25968;&#25454;&#21103;&#26412;&#25968;</span>
+    - replicated:
+        size: 3
+  preserveFilesystemOnDelete: true
+  metadataServer: <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21407;&#25968;&#25454;&#26381;&#21153;&#21103;&#26412;&#25968;</span>
+    activeCount: 1
+    activeStandby: true  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#20102;&#20010;&#20174;&#33410;&#28857;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;</span>
+[root@k8s-master01 kubernetes]# kubectl create -f filesystem.yaml
+cephfilesystem.ceph.rook.io/myfs created
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#65292;&#19968;&#20010;&#20027;&#65292;&#19968;&#20010;&#22791;</span>
+[root@k8s-master01 kubernetes]# kubectl -n rook-ceph get pod -l <span style="color: #a0522d;">app</span>=rook-ceph-mds
+NAME                                    READY   STATUS    RESTARTS   AGE
+rook-ceph-mds-myfs-a-5d8547c74d-vfvx2   1/1     Running   0          90s
+rook-ceph-mds-myfs-b-766d84d7cb-wj7nd   1/1     Running   0          87s
+</pre>
+</div>
+</div>
+<ul class="org-ul">
+<li><a id="h:1f782210-7b05-494f-953a-f8a653fe682b"></a>也可以在ceph dashboard上面查看状态<br>
+<div class="outline-text-6" id="text-h:1f782210-7b05-494f-953a-f8a653fe682b">
+
+<figure id="orgb42337f">
+<img src="./images/1876212-20210316001034634-1043707680.png" alt="1876212-20210316001034634-1043707680.png" width="50%">
+
+</figure>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:70ecd634-97a6-4da3-8695-e2a43260052c" class="outline-5">
+<h5 id="h:70ecd634-97a6-4da3-8695-e2a43260052c">创建共享类型文件系统的StorageClass</h5>
+<div class="outline-text-5" id="text-h:70ecd634-97a6-4da3-8695-e2a43260052c">
+<div class="org-src-container">
+<pre class="src src-shell">&#23448;&#32593;&#65306;https://rook.io/docs/rook/v1.5/ceph-filesystem.html
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: rook-cephfs
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Change "rook-ceph" provisioner prefix to match the operator namespace if needed</span>
+provisioner: rook-ceph.cephfs.csi.ceph.com
+parameters:
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">clusterID is the namespace where operator is deployed.</span>
+  clusterID: rook-ceph
+
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">CephFS filesystem name into which the volume shall be created</span>
+  fsName: myfs
+
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">Ceph pool into which the volume shall be created</span>
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">Required for provisionVolume: "true"</span>
+  pool: myfs-data0
+
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">Root path of an existing CephFS volume</span>
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">Required for provisionVolume: "false"</span>
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">rootPath: /absolute/path</span>
+
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">The secrets contain Ceph admin credentials. These are generated automatically by the operator</span>
+  <span style="color: #b22222;"># </span><span style="color: #b22222;">in the same namespace as the cluster.</span>
+  csi.storage.k8s.io/provisioner-secret-name: rook-csi-cephfs-provisioner
+  csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+  csi.storage.k8s.io/controller-expand-secret-name: rook-csi-cephfs-provisioner
+  csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+  csi.storage.k8s.io/node-stage-secret-name: rook-csi-cephfs-node
+  csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+
+reclaimPolicy: Delete
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1ea8e873-4839-4a58-af2e-f4a1a96eb125" class="outline-5">
+<h5 id="h:1ea8e873-4839-4a58-af2e-f4a1a96eb125">文件共享型存储使用示例</h5>
+<div class="outline-text-5" id="text-h:1ea8e873-4839-4a58-af2e-f4a1a96eb125">
+<p>
+nginx
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+  - port: 80
+    name: web
+  selector:
+    app: nginx
+  type: ClusterIP
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nginx-share-pvc
+spec:
+  storageClassName: rook-cephfs 
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: web
+spec:
+  selector:
+    matchLabels:
+      app: nginx # has to match .spec.template.metadata.labels
+  replicas: 3 # by default is 1
+  template:
+    metadata:
+      labels:
+        app: nginx # has to match .spec.selector.matchLabels
+    spec:
+      containers:
+      - name: nginx
+        image: nginx 
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: web
+        volumeMounts:
+        - name: www
+          mountPath: /usr/share/nginx/html
+      volumes:
+        - name: www
+          persistentVolumeClaim:
+            claimName: nginx-share-pvc
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6c4149a8-a3e4-4e2a-b203-bcc9146aa3d6" class="outline-3">
+<h3 id="h:6c4149a8-a3e4-4e2a-b203-bcc9146aa3d6">存储进阶</h3>
+<div class="outline-text-3" id="text-h:6c4149a8-a3e4-4e2a-b203-bcc9146aa3d6">
+</div>
+<div id="outline-container-h:ccc7207a-dc46-460e-99ff-b3e87178d78f" class="outline-4">
+<h4 id="h:ccc7207a-dc46-460e-99ff-b3e87178d78f">PVC在线扩容</h4>
+<div class="outline-text-4" id="text-h:ccc7207a-dc46-460e-99ff-b3e87178d78f">
+<p>
+文件共享类型的PVC扩容需要k8s 1.15+
+</p>
+
+<p>
+块存储类型的PVC扩容需要k8s 1.16+
+</p>
+
+<p>
+PVC扩容需要开启ExpandCSIVolumes，新版本的k8s已经默认打开了这个功能，可以查看自己的k8s版本是否已经默认打开了该功能：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 kubernetes]# kube-apiserver -h |grep ExpandCSIVolumes 
+<span style="color: #a0522d;">ExpandCSIVolumes</span>=true|false (BETA - <span style="color: #a0522d;">default</span>=true)
+</pre>
+</div>
+
+<p>
+如果default为true就不需要打开此功能，如果default为false，需要开启该功能。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl get sc gp3 -oyaml
+allowVolumeExpansion: true
+</pre>
+</div>
+</div>
+<div id="outline-container-h:87fa537e-eb57-439c-adf0-a01dc9918da3" class="outline-5">
+<h5 id="h:87fa537e-eb57-439c-adf0-a01dc9918da3">扩容文件共享型PVC</h5>
+<div class="outline-text-5" id="text-h:87fa537e-eb57-439c-adf0-a01dc9918da3">
+<p>
+将大小修改为2Gi，之前是1Gi.
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl  edit pvc cephfs-pvc -n kube-system
+
+requests:
+  storage: 2Gi
+</pre>
+</div>
+
+<p>
+查看容器内是否已经完成扩容：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl  exec -ti kube-registry-66d4c7bf47-46bpq -n kube-system -- df -Th | grep <span style="color: #8b2252;">"/var/lib/registry"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d37d761a-7cb0-43f8-9f4a-7c5e3d23253e" class="outline-5">
+<h5 id="h:d37d761a-7cb0-43f8-9f4a-7c5e3d23253e">扩容块存储</h5>
+<div class="outline-text-5" id="text-h:d37d761a-7cb0-43f8-9f4a-7c5e3d23253e">
+<p>
+扩容步骤类似，找到PVC，直接edit即可
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl  edit pvc mysql-pv-claim
+</pre>
+</div>
+
+<p>
+也可以看到ceph dashboard的image也完成了扩容，但是pvc和pod里面的状态会有延迟，大概等待5-10分钟后，即可完成扩容：
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a95050b3-5e13-4d2c-9172-f7762cae8ee1" class="outline-4">
+<h4 id="h:a95050b3-5e13-4d2c-9172-f7762cae8ee1">PVC 快照</h4>
+<div class="outline-text-4" id="text-h:a95050b3-5e13-4d2c-9172-f7762cae8ee1">
+<p>
+注意：PVC快照功能需要k8s 1.17+
+</p>
+</div>
+<div id="outline-container-h:facab8ad-f945-4336-9701-d51d952b9cbc" class="outline-5">
+<h5 id="h:facab8ad-f945-4336-9701-d51d952b9cbc">块存储快照</h5>
+<div class="outline-text-5" id="text-h:facab8ad-f945-4336-9701-d51d952b9cbc">
+</div>
+<ul class="org-ul">
+<li><a id="h:dccb2a5e-0292-4f33-a4d5-59841460c929"></a>创建 snapshotClass<br>
+<div class="outline-text-6" id="text-h:dccb2a5e-0292-4f33-a4d5-59841460c929">
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">pwd</span>
+/root/rook/cluster/examples/kubernetes/ceph/csi/rbd
+<span style="color: #b22222;"># </span><span style="color: #b22222;">kubectl create -f snapshotclass.yaml </span>
+</pre>
+</div>
+</div>
+</li>
+<li><a id="h:41053f62-396a-4b0a-8999-9cd362d49cf9"></a>创建快照<br>
+<div class="outline-text-6" id="text-h:41053f62-396a-4b0a-8999-9cd362d49cf9">
+<p>
+修改snapshot.yaml文件的source pvc为创建的MySQL pvc
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: new-snapshot-test
+spec:
+  volumeSnapshotClassName: csi-hostpath-snapclass
+  <span style="color: #483d8b;">source</span>:
+    persistentVolumeClaimName: pvc-test
+
+kubectl get volumesnapshot
+</pre>
+</div>
+<p>
+persistentVolumeClaimName 是 PersistentVolumeClaim 数据源对快照的名称。 这个字段是动态制备快照中的必填字段。
+</p>
+
+<p>
+卷快照可以通过指定 VolumeSnapshotClass 使用 volumeSnapshotClassName 属性来请求特定类。如果没有设置，那么使用默认类（如果有）
+</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:5bc3674e-a75e-4ddf-a3fb-645dac547a0f" class="outline-4">
+<h4 id="h:5bc3674e-a75e-4ddf-a3fb-645dac547a0f">PVC 数据回滚</h4>
+<div class="outline-text-4" id="text-h:5bc3674e-a75e-4ddf-a3fb-645dac547a0f">
+</div>
+<ul class="org-ul">
+<li><a id="h:bebba360-bf34-478e-b1ae-710afa7b602e"></a>指定快照创建PVC<br>
+<div class="outline-text-6" id="text-h:bebba360-bf34-478e-b1ae-710afa7b602e">
+<p>
+如果想要创建一个具有某个数据的PVC，可以从某个快照恢复：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 rbd]# cat pvc-restore.yaml 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rbd-pvc-restore
+spec:
+  storageClassName: rook-ceph-block
+  dataSource:
+    name: rbd-pvc-snapshot
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+[root@k8s-master01 rbd]# kubectl create -f pvc-restore.yaml 
+persistentvolumeclaim/rbd-pvc-restore created
+</pre>
+</div>
+
+<p>
+注意：dataSource为快照名称，storageClassName为新建pvc的storageClass，storage的大小不能低于原pvc的大小
+</p>
+</div>
+</li>
+<li><a id="h:505a8df2-9116-49d5-af03-16976ebe8ff3"></a>8.1.4 数据校验<br>
+<div class="outline-text-6" id="text-h:505a8df2-9116-49d5-af03-16976ebe8ff3">
+<p>
+创建一个容器，挂载该PVC，查看是否含有之前的文件：
+</p>
+</div>
+</li>
+</ul>
+<div id="outline-container-h:248ebbcf-168c-4713-9081-f66b0583c641" class="outline-5">
+<h5 id="h:248ebbcf-168c-4713-9081-f66b0583c641">文件共享类型快照</h5>
+<div class="outline-text-5" id="text-h:248ebbcf-168c-4713-9081-f66b0583c641">
+<p>
+操作步骤和块存储类型无区别，可以参考：
+<a href="https://rook.io/docs/rook/v1.6/ceph-csi-snapshot.html#cephfs-snapshots">https://rook.io/docs/rook/v1.6/ceph-csi-snapshot.html#cephfs-snapshots</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9e845e04-a7e1-46e0-bb1b-d6f27690e761" class="outline-4">
+<h4 id="h:9e845e04-a7e1-46e0-bb1b-d6f27690e761">PVC克隆</h4>
+<div class="outline-text-4" id="text-h:9e845e04-a7e1-46e0-bb1b-d6f27690e761">
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 rbd]# pwd
+/root/rook/cluster/examples/kubernetes/ceph/csi/rbd
+[root@k8s-master01 rbd]# cat pvc-clone.yaml 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rbd-pvc-clone
+spec:
+  storageClassName: rook-ceph-block
+  dataSource:
+    name: mysql-pv-claim
+    kind: PersistentVolumeClaim
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+[root@k8s-master01 rbd]# kubectl create -f pvc-clone.yaml 
+persistentvolumeclaim/rbd-pvc-clone created
+[root@k8s-master01 rbd]# kubectl  get pvc
+NAME             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+mysql-pv-claim   Bound    pvc-fd8b9860-c0d4-4797-8e1d-1fab880bc9fc   3Gi        RWO            rook-ceph-block   110m
+rbd-pvc-clone    Bound    pvc-6dda14c9-9d98-41e6-9d92-9d4ea382c614   3Gi        RWO            rook-ceph-block   4s
+</pre>
+</div>
+
+<p>
+需要注意的是pvc-clone.yaml的dataSource的name是被克隆的pvc名称，在此是mysql-pv-claim，storageClassName为新建pvc的storageClass名称，storage不能小于之前pvc的大小。
+</p>
+</div>
+</div>
+<div id="outline-container-h:e8466de6-5ee5-479d-b6a9-5539dd386f04" class="outline-4">
+<h4 id="h:e8466de6-5ee5-479d-b6a9-5539dd386f04">Rook Ceph集群清理</h4>
+<div class="outline-text-4" id="text-h:e8466de6-5ee5-479d-b6a9-5539dd386f04">
+<p>
+如果Rook要继续使用，可以只清理创建的deploy、pod、pvc即可。之后可以直接投入使用
+</p>
+
+<p>
+数据清理步骤：
+</p>
+<ol class="org-ol">
+<li>首先清理挂载了PVC和Pod，可能需要清理单独创建的Pod和Deployment或者是其他的高级资源</li>
+<li>之后清理PVC，清理掉所有通过ceph StorageClass创建的PVC后，最好检查下PV是否被清理</li>
+<li>之后清理快照：kubectl delete volumesnapshot XXXXXXXX</li>
+<li>之后清理创建的Pool，包括块存储和文件存储
+<ol class="org-ol">
+<li>kubectl delete -n rook-ceph cephblockpool replicapool</li>
+<li>kubectl delete -n rook-ceph cephfilesystem myfs</li>
+</ol></li>
+<li>清理StorageClass：kubectl delete sc rook-ceph-block  rook-cephfs</li>
+<li>清理Ceph集群：kubectl -n rook-ceph delete cephcluster rook-ceph</li>
+<li>删除Rook资源：
+<ol class="org-ol">
+<li>kubectl delete -f operator.yaml</li>
+<li>kubectl delete -f common.yaml</li>
+<li>kubectl delete -f crds.yaml</li>
+</ol></li>
+<li><p>
+如果卡住需要参考Rook的troubleshooting
+</p>
+
+<p>
+a) <a href="https://rook.io/docs/rook/v1.6/ceph-teardown.html#troubleshooting">https://rook.io/docs/rook/v1.6/ceph-teardown.html#troubleshooting</a>  a
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #a020f0;">for</span> CRD<span style="color: #a020f0;"> in</span> $(<span style="color: #ff00ff;">kubectl get crd -n rook-ceph | awk '/ceph.rook.io/ {print $1}'</span>); <span style="color: #a020f0;">do</span>     kubectl get -n rook-ceph <span style="color: #8b2252;">"$CRD"</span> -o name |     xargs -I {} kubectl patch {} --type merge -p <span style="color: #8b2252;">'{"metadata":{"finalizers": [null]}}'</span> -n rook-ceph; <span style="color: #a020f0;">done</span>
+</pre>
+</div></li>
+
+<li>清理数据目录和磁盘</li>
+</ol>
+
+<p>
+参考链接：<a href="https://rook.io/docs/rook/v1.6/ceph-teardown.html#delete-the-data-on-hosts">https://rook.io/docs/rook/v1.6/ceph-teardown.html#delete-the-data-on-hosts</a>
+</p>
+
+<p>
+参考链接：<a href="https://rook.io/docs/rook/v1.6/ceph-teardown.html">https://rook.io/docs/rook/v1.6/ceph-teardown.html</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b0275e21-43a6-476f-a81a-01a8aa081b09" class="outline-3">
+<h3 id="h:b0275e21-43a6-476f-a81a-01a8aa081b09">ceph 创建和删除osd</h3>
+<div class="outline-text-3" id="text-h:b0275e21-43a6-476f-a81a-01a8aa081b09">
+</div>
+<div id="outline-container-h:cb5f8958-280d-44ed-b5db-71e69f3c56df" class="outline-4">
+<h4 id="h:cb5f8958-280d-44ed-b5db-71e69f3c56df">概述</h4>
+<div class="outline-text-4" id="text-h:cb5f8958-280d-44ed-b5db-71e69f3c56df">
+<p>
+本次主要是使用ceph-deploy工具和使用ceph的相关命令实现在主机上指定磁盘创建和删除osd，本次以主机172.16.1.96(主机名hadoop96)为例，此主机系统盘为/dev/sda, 其他盘有/dev/sdb、/dev/sdc和/dev/sdd，这几个盘都是裸磁盘，目的是使用这几个盘的组合创建osd。
+</p>
+
+<p>
+磁盘情况如下图：
+</p>
+
+
+<figure id="org1ba72dd">
+<img src="./images/783788-20160904175239521-1686946267.png" alt="783788-20160904175239521-1686946267.png" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:d7a551ae-0513-4f52-8e13-447e2e249340" class="outline-4">
+<h4 id="h:d7a551ae-0513-4f52-8e13-447e2e249340">创建osd</h4>
+<div class="outline-text-4" id="text-h:d7a551ae-0513-4f52-8e13-447e2e249340">
+<p>
+使用ceph-deploy(工具安装在hadoop95上)创建osd，这里创建两个osd，其中一个数据和日志在同一个磁盘上，另外的osd日志被独立到另一个盘。
+</p>
+
+<p>
+1）数据和日志在同一个磁盘上
+</p>
+
+<p>
+执行ceph-deploy osd create hadoop96:/dev/sdb,然后在hadoop96上查看如下图：
+</p>
+
+
+<figure id="org3e92e64">
+<img src="./images/783788-20160904175317242-282324371.png" alt="783788-20160904175317242-282324371.png" width="50%">
+
+</figure>
+
+<p>
+进入/var/lib/ceph/osd/ceph-4目录查看
+</p>
+
+
+<figure id="org711bf1e">
+<img src="./images/783788-20160904175437232-1469720757.png" alt="783788-20160904175437232-1469720757.png" width="50%">
+
+</figure>
+
+<p>
+如上图可知日志目录被链接到/dev/disk/by-partuuid/17f23e99-13dc-4a15-827b-745213c5c3dd，我们查看/dev/disk/by-partuuid/17f23e99-13dc-4a15-827b-745213c5c3dd，如下图：
+</p>
+
+
+<figure id="org9dee225">
+<img src="./images/783788-20160904175501843-1020885679.png" alt="783788-20160904175501843-1020885679.png" width="50%">
+
+</figure>
+
+<p>
+说明/dev/sdb2被作为日志的分区使用，所以新创建的osd.4默认数据和日志都在同一个磁盘/dev/sdb上不同分区。
+</p>
+
+<p>
+2）osd日志被独立到另一个盘
+</p>
+
+<p>
+执行ceph-deploy osd create hadoop96:/dev/sdc:/dev/sdd,然后在hadoop96上查看如下图：
+</p>
+
+
+<figure id="orgd26aa69">
+<img src="./images/783788-20160904175523110-976061614.png" alt="783788-20160904175523110-976061614.png" width="50%">
+
+</figure>
+
+<p>
+进入/var/lib/ceph/osd/ceph-5目录查看
+</p>
+
+
+<figure id="org756bf16">
+<img src="./images/783788-20160904175544503-1729354002.png" alt="783788-20160904175544503-1729354002.png" width="50%">
+
+</figure>
+
+<p>
+如上图可知日志目录被链接到/dev/disk/by-partuuid/96eb886f-4095-4cb4-90fc-2976a8869cc1，我们查看/dev/disk/by-partuuid/96eb886f-4095-4cb4-90fc-2976a8869cc1，如下图：
+</p>
+
+
+<figure id="orgc6d2993">
+<img src="./images/783788-20160904175608801-540347639.png" alt="783788-20160904175608801-540347639.png" width="50%">
+
+</figure>
+
+<p>
+说明/dev/sdd1被作为日志的分区使用，所以新创建的osd.5数据在/dev/sdc1，而日志则独立在另一个磁盘的分区/dev/sdd1。
+</p>
+</div>
+</div>
+<div id="outline-container-h:523257f5-6e9f-4c84-9124-cabc62fd6a9d" class="outline-4">
+<h4 id="h:523257f5-6e9f-4c84-9124-cabc62fd6a9d">删除osd</h4>
+<div class="outline-text-4" id="text-h:523257f5-6e9f-4c84-9124-cabc62fd6a9d">
+<p>
+删除上面创建的osd。
+</p>
+
+<p>
+1）数据和日志在同一个磁盘上的osd
+</p>
+
+<p>
+将osd.4踢出集群，执行ceph osd out 4
+</p>
+
+
+<figure id="orge5f4de5">
+<img src="./images/783788-20160904175639381-848421704.png" alt="783788-20160904175639381-848421704.png" width="50%">
+
+</figure>
+
+<p>
+停止此osd进程，执行systemctl stop [ceph-osd@4](<a href="mailto:ceph-osd@4">mailto:ceph-osd@4</a>)
+</p>
+
+
+<figure id="org7b9f41a">
+<img src="./images/783788-20160904175703008-870995157.png" alt="783788-20160904175703008-870995157.png" width="50%">
+
+</figure>
+
+<p>
+然后执行：ceph osd crush remove osd.4,此时osd.4已经不再osd tree中了
+</p>
+
+
+<figure id="orgca8b988">
+<img src="./images/783788-20160904175731541-537365184.png" alt="783788-20160904175731541-537365184.png" width="50%">
+
+</figure>
+
+<p>
+执行ceph auth del osd.4 和 ceph osd rm 4, 此时删除成功但是原来的数据和日志目录还在，也就是数据还在
+</p>
+
+
+<figure id="org8644ea2">
+<img src="./images/783788-20160904175756215-41672508.png" alt="783788-20160904175756215-41672508.png" width="50%">
+
+</figure>
+
+<p>
+此时我们将/dev/sdb1磁盘umount,然后将磁盘进行擦除那么数据就会被完全删除了，执行umount /dev/sdb,然后执行ceph-disk zap /dev/sdb
+</p>
+
+
+<figure id="orgd70bfaf">
+<img src="./images/783788-20160904175817248-1475982247.png" alt="783788-20160904175817248-1475982247.png" width="50%">
+
+</figure>
+
+<p>
+这时/dev/sdb又成为裸磁盘了，也就相当于彻底删除了osd.4。
+</p>
+
+<p>
+2)删除日志被独立到另一个盘的osd
+</p>
+
+<p>
+执行步骤和之前类似。
+</p>
+
+<p>
+将osd.5踢出集群，执行ceph osd out 5
+</p>
+
+
+<figure id="org8ef83e5">
+<img src="./images/783788-20160904175841937-1715352757.png" alt="783788-20160904175841937-1715352757.png" width="50%">
+
+</figure>
+
+<p>
+停止此osd进程，执行systemctl stop ceph-osd@4
+</p>
+
+
+<figure id="org8d48641">
+<img src="./images/783788-20160904175900704-1637160662.png" alt="783788-20160904175900704-1637160662.png" width="50%">
+
+</figure>
+
+<p>
+然后执行：ceph osd crush remove osd.5,此时osd.5已经不再osd tree中了
+</p>
+
+
+<figure id="org7150d6d">
+<img src="./images/783788-20160904175920893-487280110.png" alt="783788-20160904175920893-487280110.png" width="50%">
+
+</figure>
+
+<p>
+执行ceph auth del osd.5和 ceph osd rm 5, 此时删除成功但是原来的数据和日志目录还在，也就是数据还在
+</p>
+
+
+<figure id="orgb4ddc4d">
+<img src="./images/783788-20160904175942176-1122923600.png" alt="783788-20160904175942176-1122923600.png" width="50%">
+
+</figure>
+
+<p>
+此时我们将/dev/sdc1磁盘umount,然后将磁盘进行擦除那么数据就会被完全删除了，执行umount /dev/sdc1,然后执行ceph-disk zap /dev/sdc
+</p>
+
+
+<figure id="org843b477">
+<img src="./images/783788-20160904180002427-751498531.png" alt="783788-20160904180002427-751498531.png" width="50%">
+
+</figure>
+
+<p>
+这时/dev/sdc又成为裸磁盘了，也就相当于彻底删除了osd.5，但是原来作为日志的分区/dev/sdd1还在，此时如果sdd有多个分区作为其他osd的日志分区那么就不能擦除/dev/sdd盘，但是此时/dev/sdd1分区已经没有被osd使用了所以再创建osd时要记得再利用，目前我觉得只能这样。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0c542f36-85e5-415c-8970-d7e58bbe3fd7" class="outline-3">
+<h3 id="h:0c542f36-85e5-415c-8970-d7e58bbe3fd7">ceph_dashboard</h3>
+<div class="outline-text-3" id="text-h:0c542f36-85e5-415c-8970-d7e58bbe3fd7">
+<p>
+ph仪表板是基于Web的内置Ceph管理和监视应用程序，用于管理集群的各个方面和对象。它作为Ceph Manager守护程序的模块实现。
+</p>
+
+<p>
+从Luminous开始，Ceph 提供了原生的Dashboard功能，通过Dashboard可以获取Ceph集群的各种基本状态信息，而且经过不断更新，现在已经有了各种管理功能。
+</p>
+</div>
+<div id="outline-container-h:9c7a3a3e-75fc-4bb3-873c-502a8a8474b8" class="outline-4">
+<h4 id="h:9c7a3a3e-75fc-4bb3-873c-502a8a8474b8">dashboard</h4>
+<div class="outline-text-4" id="text-h:9c7a3a3e-75fc-4bb3-873c-502a8a8474b8">
+</div>
+<div id="outline-container-h:f8f3be22-19d3-44c8-afe8-1a2c99ddc890" class="outline-5">
+<h5 id="h:f8f3be22-19d3-44c8-afe8-1a2c99ddc890">安装dashboard模块软件包</h5>
+<div class="outline-text-5" id="text-h:f8f3be22-19d3-44c8-afe8-1a2c99ddc890">
+<p>
+dashboard作为mgr的模块存在，需要安装一下模块的软件包。
+</p>
+
+<p>
+包的名字叫做: ceph-mgr-dashboard, 使用ceph的yum源安装就可以。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">yum install ceph-mgr-dashboard -y
+</pre>
+</div>
+
+<p>
+所有mgr节点都需要安装，不然在启用dashboard模块的时候会报错:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph mgr module enable dashboardError ENOENT: all mgr daemons<span style="color: #a020f0;"> do</span> not support module <span style="color: #8b2252;">'dashboard'</span>, pass --force to force enablement
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2dba3ac3-1fa0-4a0c-b587-1faf25279b1e" class="outline-5">
+<h5 id="h:2dba3ac3-1fa0-4a0c-b587-1faf25279b1e">启用dashboard</h5>
+<div class="outline-text-5" id="text-h:2dba3ac3-1fa0-4a0c-b587-1faf25279b1e">
+<p>
+可以使用 <code>ceph mgr module ls</code> 查看一下模块列表。这个列表跟安没安装ceph-mgr-dashboard没关系。
+</p>
+
+<p>
+可以看到启用的模块里没有dashboard:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="color: #8b2252;">"enabled_modules"</span>: [        <span style="color: #8b2252;">"iostat"</span>,        <span style="color: #8b2252;">"pg_autoscaler"</span>,        <span style="color: #8b2252;">"restful"</span>    ],
+</pre>
+</div>
+
+<p>
+执行 <code>ceph mgr module enable dashboard</code> 来启用dashboard。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph mgr module enable dashboard
+</pre>
+</div>
+
+<p>
+启用以后就会有监听端口了，默认是8443。
+</p>
+</div>
+</div>
+<div id="outline-container-h:84fd0a13-deae-42df-9468-556cf8eada60" class="outline-5">
+<h5 id="h:84fd0a13-deae-42df-9468-556cf8eada60">配置dashboard</h5>
+<div class="outline-text-5" id="text-h:84fd0a13-deae-42df-9468-556cf8eada60">
+<p>
+提供证书
+</p>
+
+<p>
+默认情况下，dashboard提供https访问。所以需要证书。
+</p>
+
+<p>
+有三种方式：
+</p>
+<ol class="org-ol">
+<li>一是使用ceph dashboard生成自签名证书。</li>
+<li>二是指定提供的证书。</li>
+<li>三是不使用https。</li>
+</ol>
+
+
+<ul class="org-ul">
+<li>生成自签名证书：</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph dashboard create-self-signed-certSelf-signed certificate created
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>指定证书</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ ceph dashboard set-ssl-certificate -i dashboard.crt$ ceph dashboard set-ssl-certificate-key -i dashboard.key
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>取消https</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">ceph config set mgr mgr/dashboard/ssl false
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3e1c6e46-4d53-46e2-b42a-109316db4989" class="outline-5">
+<h5 id="h:3e1c6e46-4d53-46e2-b42a-109316db4989">修改证书或者修改配置以后需要重启dashboard模块来生效。</h5>
+<div class="outline-text-5" id="text-h:3e1c6e46-4d53-46e2-b42a-109316db4989">
+<div class="org-src-container">
+<pre class="src src-shell">$ ceph mgr module disable dashboard$ ceph mgr module enable dashboard
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a9ca5e74-a9b5-4f1f-8304-bb616edff85f" class="outline-5">
+<h5 id="h:a9ca5e74-a9b5-4f1f-8304-bb616edff85f">修改dashboard监听的端口</h5>
+<div class="outline-text-5" id="text-h:a9ca5e74-a9b5-4f1f-8304-bb616edff85f">
+<p>
+默认情况下，监听所有地址的8443或8080
+</p>
+
+<p>
+修改监听的地址与端口：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ ceph config set mgr mgr/dashboard/server_addr $<span style="color: #a0522d;">IP</span>$ ceph config set mgr mgr/dashboard/server_port $<span style="color: #a0522d;">PORT</span>$ ceph config set mgr mgr/dashboard/ssl_server_port $<span style="color: #a0522d;">PORT</span>
+</pre>
+</div>
+
+<p>
+如，修改https端口为8843。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph config set mgr mgr/dashboard/ssl_server_port 8843# &#37325;&#21551;&#27169;&#22359;&#29983;&#25928;&#65292;&#21487;&#20197;&#30475;&#19968;&#19979;&#30417;&#21548;&#30340;&#31471;&#21475;&#26377;&#27809;&#26377;&#21464;&#21270;&#12290;[root@cephnode1 ~]# ceph mgr module disable dashboard[root@cephnode1 ~]# ceph mgr module enable dashboard
+</pre>
+</div>
+
+<p>
+登录用户
+</p>
+
+<p>
+为了能够登录，需要创建一个用户帐户并将其与至少一个角色相关联， dashboard提供了一组可以使用的预定义系统角色。如administrator表示管理员。
+</p>
+
+<p>
+要创建具有管理员角色的用户，可以使用以下命令：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ ceph dashboard ac-user-create &lt;username&gt; &lt;password&gt; administrator
+</pre>
+</div>
+
+<p>
+如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph dashboard ac-user-create mydashboard abcdefg administrator{<span style="color: #8b2252;">"username"</span>: <span style="color: #8b2252;">"mydashboard"</span>, <span style="color: #8b2252;">"lastUpdate"</span>: 1584676335, <span style="color: #8b2252;">"name"</span>: null, <span style="color: #8b2252;">"roles"</span>: [<span style="color: #8b2252;">"administrator"</span>], <span style="color: #8b2252;">"password"</span>: <span style="color: #8b2252;">"$2b$12$uNxxDZgdrlCZwfQZlLwgL.L0F9aKSYznqnyfX2Lc3BBDqhZDEv9wC"</span>, <span style="color: #8b2252;">"email"</span>: null}
+</pre>
+</div>
+
+<p>
+现在dashboard就已经可以访问了。只是其中的rgw管理的功能还不可以用。
+</p>
+
+<p>
+我这里按下面的步骤都做完，还有官网提到的一些其他点，最后还是不能管理rgw，暂时还不知道怎么回事。
+</p>
+</div>
+</div>
+<div id="outline-container-h:8465c7ca-9ea3-4bb5-9403-3e52aa2cac33" class="outline-5">
+<h5 id="h:8465c7ca-9ea3-4bb5-9403-3e52aa2cac33">为dashboard添加rgw的管理凭据</h5>
+<div class="outline-text-5" id="text-h:8465c7ca-9ea3-4bb5-9403-3e52aa2cac33">
+<p>
+因为rgw是一个单独的组件，dashboard不能直接管理，需要创建凭据让dashboard有权限管理rgw。
+</p>
+
+<p>
+如果不需要dashboard管理rgw，这一步可以跳过。
+</p>
+
+<p>
+&gt; 要使用dashboard管理rgw的功能，需要提供启用了system标志的用户凭据。
+</p>
+
+<p>
+如果有用户，使用下面这个命令获取凭据信息。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">radosgw-admin user info --uid=&lt;user_id&gt;
+</pre>
+</div>
+
+<p>
+没有则需要创建。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ radosgw-admin user create --uid=&lt;user_id&gt; --display-name=&lt;display_name&gt; <span style="color: #8b2252;">\ </span>   --system
+</pre>
+</div>
+
+<p>
+如：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# radosgw-admin user create --uid=dashboard --display-name=dashboard{    <span style="color: #8b2252;">"user_id"</span>: <span style="color: #8b2252;">"dashboard"</span>,    <span style="color: #8b2252;">"display_name"</span>: <span style="color: #8b2252;">"dashboard"</span>,    <span style="color: #8b2252;">"email"</span>: <span style="color: #8b2252;">""</span>,    <span style="color: #8b2252;">"suspended"</span>: 0,    <span style="color: #8b2252;">"max_buckets"</span>: 1000,    <span style="color: #8b2252;">"subusers"</span>: [],    <span style="color: #8b2252;">"keys"</span>: [        {            <span style="color: #8b2252;">"user"</span>: <span style="color: #8b2252;">"dashboard"</span>,            <span style="color: #8b2252;">"access_key"</span>: <span style="color: #8b2252;">"MOEG3CY0LEB8JETFFA5Z"</span>,            <span style="color: #8b2252;">"secret_key"</span>: <span style="color: #8b2252;">"DaJBFSnyV9CgEBkRTEpYn9Tk391IppOkgybRx0wu"</span>        }    ],    <span style="color: #8b2252;">"swift_keys"</span>: [],    <span style="color: #8b2252;">"caps"</span>: [],
+</pre>
+</div>
+
+<p>
+记下显示的 <code>access_key</code> 与 <code>secret_key</code>
+</p>
+
+<p>
+最后，向dashboard提供凭据，以便让它可以连接rgw：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ ceph dashboard set-rgw-api-access-key &lt;access_key&gt;$ ceph dashboard set-rgw-api-secret-key &lt;secret_key&gt;
+</pre>
+</div>
+
+<p>
+如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph dashboard set-rgw-api-access-key MOEG3CY0LEB8JETFFA5ZOption RGW_API_ACCESS_KEY updated[root@cephnode1 ~]# ceph dashboard set-rgw-api-secret-key DaJBFSnyV9CgEBkRTEpYn9Tk391IppOkgybRx0wuOption RGW_API_SECRET_KEY updated
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:414c9fd5-fff1-4ee5-864c-17a9d48c11ab" class="outline-5">
+<h5 id="h:414c9fd5-fff1-4ee5-864c-17a9d48c11ab">登录</h5>
+<div class="outline-text-5" id="text-h:414c9fd5-fff1-4ee5-864c-17a9d48c11ab">
+<p>
+查看mgr中的服务
+</p>
+
+<p>
+可以使用 <code>ceph mgr services</code> 查看mgr中提供的服务。可以确定dashboard的登录地址与端口。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph mgr services{    <span style="color: #8b2252;">"dashboard"</span>: <span style="color: #8b2252;">"https://cephnode1:8843/"</span>}[root@cephnode1 ~]#
+</pre>
+</div>
+
+<p>
+最后
+</p>
+
+<p>
+打开网址登录
+</p>
+
+<p>
+我这里能够登录，但是Object Gateway(rgw)访问还是有问题。
+</p>
+
+<p>
+其他的dashhboard命令可以通过 <code>ceph dashboard --help</code> 查看。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:655b0e03-3476-4846-8e5e-4d997a21de75" class="outline-4">
+<h4 id="h:655b0e03-3476-4846-8e5e-4d997a21de75">启用Prometheus监控接口</h4>
+<div class="outline-text-4" id="text-h:655b0e03-3476-4846-8e5e-4d997a21de75">
+<p>
+就是暴露出去一个metrics接口，让prometheus使用。
+</p>
+
+<p>
+启用prometheus模块就行。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@cephnode1 ~]# ceph mgr module enable prometheus
+</pre>
+</div>
+
+<p>
+端口9283就可以直接访问了。
+</p>
+
+<p>
+这里就是简单提一下， 至于prometheus与grafana的配置就略过了。
+</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

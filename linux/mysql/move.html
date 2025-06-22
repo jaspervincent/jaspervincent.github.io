@@ -26,134 +26,74 @@
 <div id="content" class="content">
 <header>
 <h1 class="title">Linux: RDS迁移自建操作步骤</h1>
-</header><p>
-0、修改服务器时区<br>
-</p>
-
-<p>
-timedatectl statusmysql_replication_hostgroups<br>
-</p>
-
-
-
-<p>
-timedatectl set-timezone "Asia/Shanghai"<br>
-</p>
-
-
-<p>
-1、部署MySQL<br>
-</p>
-
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:e161f18c-21dd-42dd-b364-ad1b12a291fb">0、修改服务器时区</a></li>
+<li><a href="#h:37a10a03-6a5c-43f1-9574-d38631c7fca1">1、部署MySQL</a></li>
+<li><a href="#h:22cb5b58-60fc-41d5-b4b7-6626c9632115">2、部署proxysql-cluster</a></li>
+<li><a href="#h:ae6d15f7-30f1-4ca6-a92e-13993323d0db">3、添加到orchestrator</a></li>
+<li><a href="#h:f73a9576-c90a-40d4-81e5-2fe827564bb2">4、 部署supervisor</a></li>
+<li><a href="#h:00a8ef79-dc88-4d85-ae4f-ddb0fedb6551">5、部署mysqld_exporter</a></li>
+<li><a href="#h:71bfb7b6-ddf1-4d7f-8974-5de9bce3804e">6、部署node_exporter</a></li>
+</ul>
+</div>
+</nav>
+<section id="outline-container-h:e161f18c-21dd-42dd-b364-ad1b12a291fb" class="outline-2">
+<h2 id="h:e161f18c-21dd-42dd-b364-ad1b12a291fb">0、修改服务器时区</h2>
+<div class="outline-text-2" id="text-h:e161f18c-21dd-42dd-b364-ad1b12a291fb">
+<div class="org-src-container">
+<pre class="src src-sh">timedatectl statusmysql_replication_hostgroups
+timedatectl set-timezone <span style="color: #8b2252;">"Asia/Shanghai"</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:37a10a03-6a5c-43f1-9574-d38631c7fca1" class="outline-2">
+<h2 id="h:37a10a03-6a5c-43f1-9574-d38631c7fca1">1、部署MySQL</h2>
+<div class="outline-text-2" id="text-h:37a10a03-6a5c-43f1-9574-d38631c7fca1">
 <p>
 配置文件修改<br>
 </p>
 
-<p>
-cd /usr/local/src<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">cd</span> /usr/local/src
 
-<p>
-sudo wget <a href="https://downloads.mysql.com/archives/get/p/23/file/mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz">https://downloads.mysql.com/archives/get/p/23/file/mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz</a><br>
-</p>
+sudo wget https://downloads.mysql.com/archives/get/p/23/file/mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz
+sudo tar -zxvf mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz
+sudo groupadd mysql
+sudo useradd -r -g mysql -s /bin/false mysql 
+sudo mkdir -p /mysqldata/mysql /mysqldata/tmpdir /mysqldata/output  /mysqllog/binlog /mysqllog/relaylog
+sudo chown -R mysql:mysql /mysqldata/mysql /mysqldata/tmpdir /mysqldata/output /mysqllog/binlog /mysqllog/relaylog
+sudo mv mysql-5.7.34-linux-glibc2.12-x86_64 ../mysql
+sudo chown -R mysql:mysql /usr/local/mysql
 
-<p>
-sudo tar -zxvf mysql-5.7.34-linux-glibc2.12-x86_64.tar.gz<br>
-</p>
+sudo /usr/local/mysql/bin/mysqld --initialize --user=mysql
 
-<p>
-sudo groupadd mysql<br>
-</p>
+sudo cp /usr/local/mysql/support-files/mysql.server /etc/init.d/mysqld
+sudo systemctl enable mysqld
+sudo chkconfig mysqld on
+sudo systemctl start mysqld
+sudo systemctl status mysqld
 
-<p>
-sudo useradd -r -g mysql -s /bin/false mysql<br>
-</p>
-
-<p>
-sudo mkdir -p /mysqldata/mysql /mysqldata/tmpdir /mysqldata/output  /mysqllog/binlog /mysqllog/relaylog<br>
-</p>
-
-<p>
-sudo chown -R mysql:mysql /mysqldata/mysql /mysqldata/tmpdir /mysqldata/output /mysqllog/binlog /mysqllog/relaylog<br>
-</p>
-
-<p>
-sudo mv mysql-5.7.34-linux-glibc2.12-x86_64 ../mysql<br>
-</p>
-
-<p>
-sudo chown -R mysql:mysql /usr/local/mysql<br>
-</p>
-
-<p>
-sudo /usr/local/mysql/bin/mysqld &#x2013;initialize &#x2013;user=mysql<br>
-</p>
-
-<p>
-sudo cp /usr/local/mysql/support-files/mysql.server /etc/init.d/mysqld<br>
-</p>
-
-<p>
-sudo systemctl enable mysqld<br>
-</p>
-
-<p>
-sudo chkconfig mysqld on<br>
-</p>
-
-<p>
-sudo systemctl start mysqld<br>
-</p>
-
-<p>
-sudo systemctl status mysqld<br>
-</p>
-
-<p>
-sudo vim /etc/profile<br>
-</p>
-
-<p>
-export PATH=$PATH:/usr/local/mysql/bin<br>
-</p>
-
-<p>
-source /etc/profile<br>
-</p>
+sudo vim /etc/profile
+<span style="color: #483d8b;">export</span> <span style="color: #a0522d;">PATH</span>=$<span style="color: #a0522d;">PATH</span>:/usr/local/mysql/bin
+<span style="color: #483d8b;">source</span> /etc/profile
 
 
 
-<p>
-create database meta;<br>
-</p>
+create database meta;
+CREATE TABLE <span style="color: #ff00ff;">`cluster`</span> (
+  <span style="color: #ff00ff;">`anchor`</span> tinyint(4) NOT NULL,
+  <span style="color: #ff00ff;">`cluster_name`</span> varchar(128) CHARACTER SET ascii NOT NULL DEFAULT <span style="color: #8b2252;">''</span>,
+  <span style="color: #ff00ff;">`cluster_domain`</span> varchar(128) CHARACTER SET ascii NOT NULL DEFAULT <span style="color: #8b2252;">''</span>,
+  PRIMARY KEY (<span style="color: #ff00ff;">`anchor`</span>)
+) <span style="color: #a0522d;">ENGINE</span>=InnoDB DEFAULT <span style="color: #a0522d;">CHARSET</span>=utf8;
 
-<p>
-CREATE TABLE `cluster` (<br>
-</p>
-
-<p>
-`anchor` tinyint(4) NOT NULL,<br>
-</p>
-
-<p>
-`cluster_name` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',<br>
-</p>
-
-<p>
-`cluster_domain` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',<br>
-</p>
-
-<p>
-PRIMARY KEY (`anchor`)<br>
-</p>
-
-<p>
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;<br>
-</p>
-
-<p>
-insert into meta.cluster (anchor,cluster_name)values (1,'xxxxxxx') ;<br>
-</p>
+insert into meta.cluster (anchor,cluster_name)values (1,<span style="color: #8b2252;">'xxxxxxx'</span>) ;
+</pre>
+</div>
 
 
 
@@ -161,75 +101,35 @@ insert into meta.cluster (anchor,cluster_name)values (1,'xxxxxxx') ;<br>
 创建MySQL用户<br>
 </p>
 
-<p>
-orchestrator拓扑用户<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #b22222;">-- </span><span style="color: #b22222;">orchestrator&#25299;&#25169;&#29992;&#25143;</span>
+<span style="color: #a020f0;">GRANT</span> <span style="color: #a020f0;">SELECT</span> <span style="color: #a020f0;">ON</span> `meta`.`cluster` <span style="color: #a020f0;">TO</span> `orchestrator`@`172.21.39.6`;
+<span style="color: #a020f0;">GRANT</span> <span style="color: #a020f0;">SELECT</span> <span style="color: #a020f0;">ON</span> `mysql`.`slave_master_info` <span style="color: #a020f0;">TO</span> `orchestrator`@`172.21.39.6`;
+<span style="color: #a020f0;">GRANT</span> RELOAD, PROCESS, SUPER, REPLICATION SLAVE, REPLICATION CLIENT <span style="color: #a020f0;">ON</span> *.* <span style="color: #a020f0;">TO</span> `orchestrator`@`172.21.39.6`;
 
-<p>
-GRANT SELECT ON `meta`.`cluster` TO `orchestrator`@`172.21.39.6`;<br>
-</p>
+<span style="color: #b22222;">-- </span><span style="color: #b22222;">proxysql&#30340;&#30417;&#25511;&#29992;&#25143;</span>
+<span style="color: #a020f0;">GRANT</span> PROCESS, REPLICATION SLAVE, REPLICATION CLIENT <span style="color: #a020f0;">ON</span> *.* <span style="color: #a020f0;">TO</span> `monitor`@`172.41.%`;
 
-<p>
-GRANT SELECT ON `mysql`.`slave_master_info` TO `orchestrator`@`172.21.39.6`;<br>
-</p>
+<span style="color: #b22222;">-- </span><span style="color: #b22222;">prometheus&#30417;&#25511;&#29992;&#25143;</span>
+<span style="color: #a020f0;">GRANT</span> <span style="color: #a020f0;">SELECT</span>, PROCESS, REPLICATION CLIENT <span style="color: #a020f0;">ON</span> *.* <span style="color: #a020f0;">TO</span> <span style="color: #8b2252;">'prometheus_exporter'</span>@<span style="color: #8b2252;">'127.0.0.1'</span> ;
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:22cb5b58-60fc-41d5-b4b7-6626c9632115" class="outline-2">
+<h2 id="h:22cb5b58-60fc-41d5-b4b7-6626c9632115">2、部署proxysql-cluster</h2>
+<div class="outline-text-2" id="text-h:22cb5b58-60fc-41d5-b4b7-6626c9632115">
+<div class="org-src-container">
+<pre class="src src-sh">sudo vim /etc/yum.repos.d/proxysql.repo
+[proxysql_repo]
+<span style="color: #a0522d;">name</span>= ProxySQL YUM repository
+<span style="color: #a0522d;">baseurl</span>=https://repo.proxysql.com/ProxySQL/proxysql-2.1.x/centos/latest
+<span style="color: #a0522d;">gpgcheck</span>=1
+<span style="color: #a0522d;">gpgkey</span>=https://repo.proxysql.com/ProxySQL/repo_pub_key
 
-<p>
-GRANT RELOAD, PROCESS, SUPER, REPLICATION SLAVE, REPLICATION CLIENT ON <b>.</b> TO `orchestrator`@`172.21.39.6`;<br>
-</p>
-
-<p>
-proxysql的监控用户<br>
-</p>
-
-<p>
-GRANT PROCESS, REPLICATION SLAVE, REPLICATION CLIENT ON <b>.</b> TO `monitor`@`172.41.%`;<br>
-</p>
-
-<p>
-prometheus监控用户<br>
-</p>
-
-<p>
-GRANT SELECT, PROCESS, REPLICATION CLIENT ON <b>.</b> TO 'prometheus_exporter'@'127.0.0.1' ;<br>
-</p>
-
-
-
-
-
-
-
-<p>
-2、部署proxysql-cluster<br>
-</p>
-
-<p>
-sudo vim /etc/yum.repos.d/proxysql.repo<br>
-</p>
-
-<p>
-[proxysql_repo]<br>
-</p>
-
-<p>
-name= ProxySQL YUM repository<br>
-</p>
-
-<p>
-baseurl=<a href="https://repo.proxysql.com/ProxySQL/proxysql-2.1.x/centos/latest">https://repo.proxysql.com/ProxySQL/proxysql-2.1.x/centos/latest</a><br>
-</p>
-
-<p>
-gpgcheck=1<br>
-</p>
-
-<p>
-gpgkey=<a href="https://repo.proxysql.com/ProxySQL/repo_pub_key">https://repo.proxysql.com/ProxySQL/repo_pub_key</a><br>
-</p>
-
-<p>
-sudo yum -y install proxysql<br>
-</p>
+sudo yum -y install proxysql
+</pre>
+</div>
 
 
 
@@ -237,56 +137,32 @@ sudo yum -y install proxysql<br>
 在两台proxysql服务器的proxysql配置文件添加proxysql集群服务器信息<br>
 </p>
 
-<p>
-vim /etc/proxysql.cnf<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/proxysql.cnf
+<span style="color: #a0522d;">admin_variables</span>=
+{
+<span style="color: #a0522d;">admin_credentials</span>=<span style="color: #8b2252;">"admin:admin;cluster_user:o"</span>
+<span style="color: #a0522d;">cluster_username</span>=<span style="color: #8b2252;">"cluster_user"</span>
+<span style="color: #a0522d;">cluster_password</span>=<span style="color: #8b2252;">"go"</span>
+}
 
-<p>
-admin_variables=<br>
-</p>
-
-<p>
-{<br>
-</p>
-
-<p>
-admin_credentials="admin:admin;cluster_user:o"<br>
-</p>
-
-<p>
-cluster_username="cluster_user"<br>
-</p>
-
-<p>
-cluster_password="go"<br>
-</p>
-
-<p>
-}<br>
-</p>
-
-
-
-<p>
-proxysql_servers=<br>
-</p>
-
-<p>
-(<br>
-{<br>
-hostname="172.21.xx.xx"<br>
-port=6032<br>
-weight=1<br>
-comment="xxx-proxysql-node1"<br>
-},<br>
-{<br>
-hostname="172.21.xx.xx"<br>
-port=6032<br>
-weight=1<br>
-comment="xxx-proxysql-node2"<br>
-}<br>
-)<br>
-</p>
+<span style="color: #a0522d;">proxysql_servers</span>=
+(
+{
+<span style="color: #a0522d;">hostname</span>=<span style="color: #8b2252;">"172.21.xx.xx"</span>
+<span style="color: #a0522d;">port</span>=6032
+<span style="color: #a0522d;">weight</span>=1
+<span style="color: #a0522d;">comment</span>=<span style="color: #8b2252;">"xxx-proxysql-node1"</span>
+},
+{
+<span style="color: #a0522d;">hostname</span>=<span style="color: #8b2252;">"172.21.xx.xx"</span>
+<span style="color: #a0522d;">port</span>=6032
+<span style="color: #a0522d;">weight</span>=1
+<span style="color: #a0522d;">comment</span>=<span style="color: #8b2252;">"xxx-proxysql-node2"</span>
+}
+)
+</pre>
+</div>
 
 
 
@@ -294,71 +170,57 @@ comment="xxx-proxysql-node2"<br>
 修改参数<br>
 </p>
 
-<p>
-update global_variables set variable_value=262144 where variable_name='mysql-stacksize';<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=262144 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'mysql-stacksize'</span>;
 
-<p>
-update global_variables set variable_value=1073741824 where variable_name='mysql-max_allowed_packet';<br>
-update global_variables set variable_value='false' where variable_name='mysql-log_unhealthy_connections';<br>
-</p>
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=1073741824 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'mysql-max_allowed_packet'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=<span style="color: #8b2252;">'false'</span> <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'mysql-log_unhealthy_connections'</span>;
 
-<p>
-update global_variables set variable_value=200 where variable_name='admin-cluster_check_interval_ms';<br>
-update global_variables set variable_value=100 where variable_name='admin-cluster_check_status_frequency';<br>
-</p>
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=200 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_check_interval_ms'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=100 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_check_status_frequency'</span>;
 
-<p>
-update global_variables set variable_value='true' where variable_name='admin-cluster_mysql_query_rules_save_to_disk';<br>
-update global_variables set variable_value='true' where variable_name='admin-cluster_mysql_servers_save_to_disk';<br>
-update global_variables set variable_value='true' where variable_name='admin-cluster_mysql_users_save_to_disk';<br>
-update global_variables set variable_value='true' where variable_name='admin-cluster_proxysql_servers_save_to_disk';<br>
-</p>
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=<span style="color: #8b2252;">'true'</span> <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_mysql_query_rules_save_to_disk'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=<span style="color: #8b2252;">'true'</span> <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_mysql_servers_save_to_disk'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=<span style="color: #8b2252;">'true'</span> <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_mysql_users_save_to_disk'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=<span style="color: #8b2252;">'true'</span> <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_proxysql_servers_save_to_disk'</span>;
 
-<p>
-update global_variables set variable_value=3 where variable_name='admin-cluster_mysql_query_rules_diffs_before_sync';<br>
-update global_variables set variable_value=3 where variable_name='admin-cluster_mysql_servers_diffs_before_sync';<br>
-update global_variables set variable_value=3 where variable_name='admin-cluster_mysql_users_diffs_before_sync';<br>
-update global_variables set variable_value=3 where variable_name='admin-cluster_proxysql_servers_diffs_before_sync';<br>
-</p>
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=3 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_mysql_query_rules_diffs_before_sync'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=3 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_mysql_servers_diffs_before_sync'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=3 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_mysql_users_diffs_before_sync'</span>;
+<span style="color: #a020f0;">update</span> global_variables <span style="color: #a020f0;">set</span> variable_value=3 <span style="color: #a020f0;">where</span> variable_name=<span style="color: #8b2252;">'admin-cluster_proxysql_servers_diffs_before_sync'</span>;
 
-<p>
-load admin variables to RUNTIME;<br>
-save admin variables to disk;<br>
-</p>
+load <span style="color: #a020f0;">admin</span> variables <span style="color: #a020f0;">to</span> RUNTIME;
+save <span style="color: #a020f0;">admin</span> variables <span style="color: #a020f0;">to</span> disk;
 
-<p>
-load mysql variables to RUNTIME;<br>
-save mysql variables to disk;<br>
-</p>
+load mysql variables <span style="color: #a020f0;">to</span> RUNTIME;
+save mysql variables <span style="color: #a020f0;">to</span> disk;
+</pre>
+</div>
 
 <p>
 添加MySQL读写组<br>
 </p>
 
-<p>
-INSERT INTO mysql_replication_hostgroups VALUES (1,2,'read_only','w r group');<br>
-</p>
-
+<div class="org-src-container">
+<pre class="src src-sh">INSERT INTO mysql_replication_hostgroups VALUES (1,2,<span style="color: #8b2252;">'read_only'</span>,<span style="color: #8b2252;">'w r group'</span>);
+</pre>
+</div>
 
 
 <p>
 添加MySQL servers<br>
 </p>
 
-<p>
-INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('172.41.52.74',1,3306,1);<br>
-INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('172.41.49.188',2,3306,1);<br>
-INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('172.41.56.75',2,3306,1);<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #a020f0;">INSERT</span> <span style="color: #a020f0;">INTO</span> mysql_servers (hostname,hostgroup_id,port,weight) <span style="color: #a020f0;">VALUES</span> (<span style="color: #8b2252;">'172.41.52.74'</span>,1,3306,1);
+<span style="color: #a020f0;">INSERT</span> <span style="color: #a020f0;">INTO</span> mysql_servers (hostname,hostgroup_id,port,weight) <span style="color: #a020f0;">VALUES</span> (<span style="color: #8b2252;">'172.41.49.188'</span>,2,3306,1);
+<span style="color: #a020f0;">INSERT</span> <span style="color: #a020f0;">INTO</span> mysql_servers (hostname,hostgroup_id,port,weight) <span style="color: #a020f0;">VALUES</span> (<span style="color: #8b2252;">'172.41.56.75'</span>,2,3306,1);
 
-<p>
-load mysql servers to runtime;<br>
-</p>
+load mysql servers <span style="color: #a020f0;">to</span> runtime;
 
-<p>
-save mysql servers to disk;<br>
-</p>
+save mysql servers <span style="color: #a020f0;">to</span> disk;
+</pre>
+</div>
 
 
 
@@ -366,29 +228,20 @@ save mysql servers to disk;<br>
 添加MySQL users<br>
 </p>
 
-<p>
-INSERT INTO mysql_users (username,password,active,default_hostgroup,default_schema) VALUES ('alibet','MLYNQG6j4^ODHJnv',1,1,'information_schema');<br>
-INSERT INTO mysql_users (username,password,active,default_hostgroup,default_schema) VALUES ('read_only','Agt@Fantasy#2021$readonly',1,2,'information_schema');<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #a020f0;">INSERT</span> <span style="color: #a020f0;">INTO</span> mysql_users (username,password,active,default_hostgroup,default_schema) <span style="color: #a020f0;">VALUES</span> (<span style="color: #8b2252;">'alibet'</span>,<span style="color: #8b2252;">'MLYNQG6j4^ODHJnv'</span>,1,1,<span style="color: #8b2252;">'information_schema'</span>);
+<span style="color: #a020f0;">INSERT</span> <span style="color: #a020f0;">INTO</span> mysql_users (username,password,active,default_hostgroup,default_schema) <span style="color: #a020f0;">VALUES</span> (<span style="color: #8b2252;">'read_only'</span>,<span style="color: #8b2252;">'Agt@Fantasy#2021$readonly'</span>,1,2,<span style="color: #8b2252;">'information_schema'</span>);
 
-<p>
-load mysql users to runtime;<br>
-</p>
-
-<p>
-save mysql users to memory;<br>
-</p>
-
-<p>
-save mysql users to disk;<br>
-</p>
-
-
-
-<p>
-3、添加到orchestrator<br>
-</p>
-
+load mysql users <span style="color: #a020f0;">to</span> runtime;
+save mysql users <span style="color: #a020f0;">to</span> memory;
+save mysql users <span style="color: #a020f0;">to</span> disk;
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:ae6d15f7-30f1-4ca6-a92e-13993323d0db" class="outline-2">
+<h2 id="h:ae6d15f7-30f1-4ca6-a92e-13993323d0db">3、添加到orchestrator</h2>
+<div class="outline-text-2" id="text-h:ae6d15f7-30f1-4ca6-a92e-13993323d0db">
 <p>
 通过映射端口登陆orchestrator页面，填入ip获取集群<br>
 </p>
@@ -397,373 +250,153 @@ save mysql users to disk;<br>
 让只读库永远不升级为Master<br>
 </p>
 
-<p>
-继续往下添加/devops/dba_script/orchestrator_must_not.sh<br>
-</p>
-
-<p>
-例如：<br>
-</p>
-
-<p>
-##fantasy日常<br>
-orchestrator-client -c register-candidate -i ip-172-41-49-188.ap-south-1.compute.internal &#x2013;promotion-rule prefer_not<br>
-</p>
-
-<p>
-4、 部署supervisor<br>
-</p>
-
-
-
-<p>
-sudo wget <a href="https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz">https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz</a><br>
-</p>
-
-<p>
-tar -zxvf supervisor-4.2.2.tar.gz<br>
-</p>
-
-<p>
-sudo mv supervisor-4.2.2  /usr/local/supervisor<br>
-</p>
-
-<p>
-cd <i>usr/local/supervisor</i><br>
-</p>
-
-<p>
-sudo python setup.py install<br>
-</p>
-
-<p>
-sudo -s<br>
-</p>
-
-<p>
-mkdir -p /etc/supervisor/conf.d<br>
-</p>
-
-<p>
-echo_supervisord_conf &gt; /etc/supervisor/supervisord.conf<br>
-</p>
-
-<p>
-sudo mkdir -p /devops/nodexporter<br>
-</p>
-
-<p>
-sudo mkdir /devops/mysqld_exporter<br>
-</p>
-
-
-
-
-
-<p>
-sudo vim /etc/supervisor/supervisord.conf<br>
-</p>
-
-<p>
-[unix_http_server]<br>
-</p>
-
-<p>
-file=/var/run/supervisor.sock<br>
-</p>
-
-<p>
-;chmod=0700<br>
-</p>
-
-<p>
-;chown=nobody:nobody<br>
-</p>
-
-
-
-<p>
-[supervisord]<br>
-</p>
-
-<p>
-logfile=/var/log/supervisord.log<br>
-</p>
-
-<p>
-logfile_maxbytes=50MB<br>
-</p>
-
-<p>
-logfile_backups=2<br>
-</p>
-
-<p>
-loglevel=info<br>
-</p>
-
-<p>
-pidfile=/var/run/supervisord.pid<br>
-</p>
-
-<p>
-nodaemon=false<br>
-</p>
-
-<p>
-minfds=65535<br>
-</p>
-
-<p>
-minprocs=200<br>
-</p>
-
-
-
-<p>
-; the below section must remain in the config file for RPC<br>
-</p>
-
-<p>
-; (supervisorctl/web interface) to work, additional interfaces may be<br>
-</p>
-
-<p>
-; added by defining them in separate rpcinterface: sections<br>
-</p>
-
-<p>
-[rpcinterface:supervisor]<br>
-</p>
-
-<p>
-supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface<br>
-</p>
-
-
-
-<p>
-[supervisorctl]<br>
-</p>
-
-<p>
-serverurl=unix:///var/run/supervisor.sock<br>
-</p>
-
-<p>
-#[inet_http_server]<br>
-</p>
-
-<p>
-#port=10.211.55.11:9001<br>
-</p>
-
-<p>
-#username=user<br>
-</p>
-
-<p>
-#password=123<br>
-</p>
-
-
-
-<p>
-[include]<br>
-</p>
-
-<p>
-files = /etc/supervisor/conf.d/*.conf<br>
-</p>
-
-
-
-
-
-<p>
-sudo vim /etc/supervisor/conf.d/mysqld_exporter.conf<br>
-</p>
-
-<p>
-[program:fantasy_daily_mysqld_master]<br>
-</p>
-
-<p>
-command =  /devops/mysqld_exporter/mysqld_exporter &#x2013;collect.info_schema.query_response_time    &#x2013;collect.info_schema.tablestats &#x2013;collect.engine_innodb_status  &#x2013;collect.info_schema.schemastats &#x2013;collect.info_schema.processlist.processes_by_host<br>
-</p>
-
-<p>
-environment=DATA_SOURCE_NAME='prometheus_exporter:ascvf$$Wa#2Q4f@(127.0.0.1:3306)/'<br>
-</p>
-
-<p>
-user = root<br>
-</p>
-
-<p>
-autostart = true<br>
-</p>
-
-<p>
-autorestart = true<br>
-</p>
-
-<p>
-redirect_stderr=true<br>
-</p>
-
-<p>
-stdout_logfile_backups = 2<br>
-</p>
-
-<p>
-stdout_logfile = /devops/mysqld_exporter/exporter.log<br>
-</p>
-
-
-
-
-
-<p>
-sudo vim /etc/supervisor/conf.d/node_exporter.conf<br>
-</p>
-
-
-
-<p>
-[program:node_exporter]<br>
-</p>
-
-<p>
-command = /devops/nodexporter/node_exporter &#x2013;collector.tcpstat &#x2013;collector.filesystem.ignored-fs-types="^(autofs|cgroup2?|configfs|debugfs|devpts|tmpfs|fusectl|hugetlbfs|mqueue)$"<br>
-</p>
-
-<p>
-user = root<br>
-</p>
-
-<p>
-autostart = true<br>
-</p>
-
-<p>
-autorestart = true<br>
-</p>
-
-<p>
-redirect_stderr=true<br>
-</p>
-
-<p>
-stdout_logfile_backups = 2<br>
-</p>
-
-<p>
-stdout_logfile = /devops/nodexporter/node_exporter.log<br>
-</p>
-
-
-
-
-
-
-
-<p>
-sudo supervisord -c /etc/supervisor/supervisord.conf<br>
-</p>
-
-<p>
-sudo supervisorctl  status all<br>
-</p>
-
-
-<p>
-[root@ip-172-21-39-187 nodexporter]# cat /usr/lib/systemd/system/supervisor.service<br>
-[Unit]<br>
-Description=Supervisor process control system for UNIX<br>
-Documentation=<a href="http://supervisord.org">http://supervisord.org</a><br>
-After=network.target<br>
-</p>
-
-<p>
-[Service]<br>
-ExecStart=/usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf<br>
-ExecStop=/usr/bin/supervisorctl $OPTIONS shutdown<br>
-ExecReload=/usr/bin/supervisorctl -c /etc/supervisor/supervisord.conf $OPTIONS reload<br>
-KillMode=process<br>
-Restart=on-failure<br>
-RestartSec=50s<br>
-</p>
-
-<p>
-[Install]<br>
-WantedBy=multi-user.target<br>
-</p>
-
-
-
-
-
-
-
-<p>
-5、部署mysqld_exporter<br>
-</p>
-
-<p>
-sudo mv mysqld_exporter <i>devops/mysqld_exporter</i><br>
-</p>
-
-
-
-
-
-<p>
-6、部署node_exporter<br>
-</p>
-
-<p>
-sudo mv node_exporter <i>devops/nodexporter</i><br>
-</p>
-
-
-
-
+<div class="org-src-container">
+<pre class="src src-sh">&#32487;&#32493;&#24448;&#19979;&#28155;&#21152;/devops/dba_script/orchestrator_must_not.sh
+
+&#20363;&#22914;&#65306;
+
+<span style="color: #b22222;">##</span><span style="color: #b22222;">fantasy&#26085;&#24120;</span>
+orchestrator-client -c register-candidate -i ip-172-41-49-188.ap-south-1.compute.internal --promotion-rule prefer_not
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f73a9576-c90a-40d4-81e5-2fe827564bb2" class="outline-2">
+<h2 id="h:f73a9576-c90a-40d4-81e5-2fe827564bb2">4、 部署supervisor</h2>
+<div class="outline-text-2" id="text-h:f73a9576-c90a-40d4-81e5-2fe827564bb2">
+<div class="org-src-container">
+<pre class="src src-sh">sudo wget https://files.pythonhosted.org/packages/d3/7f/c780b7471ba0ff4548967a9f7a8b0bfce222c3a496c3dfad0164172222b0/supervisor-4.2.2.tar.gz
+tar -zxvf supervisor-4.2.2.tar.gz 
+sudo mv supervisor-4.2.2  /usr/local/supervisor
+
+<span style="color: #483d8b;">cd</span> /usr/local/supervisor/
+sudo python setup.py install
+sudo -s
+mkdir -p /etc/supervisor/conf.d
+echo_supervisord_conf &gt; /etc/supervisor/supervisord.conf
+sudo mkdir -p /devops/nodexporter
+sudo mkdir /devops/mysqld_exporter
+
+sudo vim /etc/supervisor/supervisord.conf
+[unix_http_server]
+<span style="color: #a0522d;">file</span>=/var/run/supervisor.sock
+;<span style="color: #a0522d;">chmod</span>=0700
+;<span style="color: #a0522d;">chown</span>=nobody:nobody
+
+[supervisord]
+<span style="color: #a0522d;">logfile</span>=/var/log/supervisord.log
+<span style="color: #a0522d;">logfile_maxbytes</span>=50MB
+<span style="color: #a0522d;">logfile_backups</span>=2
+<span style="color: #a0522d;">loglevel</span>=info
+<span style="color: #a0522d;">pidfile</span>=/var/run/supervisord.pid
+<span style="color: #a0522d;">nodaemon</span>=false
+<span style="color: #a0522d;">minfds</span>=65535
+<span style="color: #a0522d;">minprocs</span>=200
+
+; the below section must remain<span style="color: #a020f0;"> in</span> the config file for RPC
+; (supervisorctl/web interface) to work, additional interfaces may be
+; added by defining them<span style="color: #a020f0;"> in</span> separate rpcinterface: sections
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+<span style="color: #a0522d;">serverurl</span>=unix:///var/run/supervisor.sock
+<span style="color: #b22222;">#</span><span style="color: #b22222;">[inet_http_server]</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">port=10.211.55.11:9001</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">username=user</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">password=123</span>
+
+[include]
+files = /etc/supervisor/conf.d/*.conf
+
+
+sudo vim /etc/supervisor/conf.d/mysqld_exporter.conf
+[program:fantasy_daily_mysqld_master]
+<span style="color: #483d8b;">command</span> =  /devops/mysqld_exporter/mysqld_exporter --collect.info_schema.query_response_time    --collect.info_schema.tablestats --collect.engine_innodb_status  --collect.info_schema.schemastats --collect.info_schema.processlist.processes_by_host
+<span style="color: #a0522d;">environment</span>=<span style="color: #a0522d;">DATA_SOURCE_NAME</span>=<span style="color: #8b2252;">'prometheus_exporter:ascvf$$Wa#2Q4f@(127.0.0.1:3306)/'</span>
+user = root
+autostart = true
+autorestart = true
+<span style="color: #a0522d;">redirect_stderr</span>=true
+stdout_logfile_backups = 2
+stdout_logfile = /devops/mysqld_exporter/exporter.log
+
+
+sudo vim /etc/supervisor/conf.d/node_exporter.conf
+[program:node_exporter]
+<span style="color: #483d8b;">command</span> = /devops/nodexporter/node_exporter --collector.tcpstat --collector.filesystem.ignored-fs-types=<span style="color: #8b2252;">"^(autofs|cgroup2?|configfs|debugfs|devpts|tmpfs|fusectl|hugetlbfs|mqueue)$"</span>
+user = root
+autostart = true
+autorestart = true
+<span style="color: #a0522d;">redirect_stderr</span>=true
+stdout_logfile_backups = 2
+stdout_logfile = /devops/nodexporter/node_exporter.log
+
+
+sudo supervisord -c /etc/supervisor/supervisord.conf
+sudo supervisorctl  status all
+
+[root@ip-172-21-39-187 nodexporter]# cat /usr/lib/systemd/system/supervisor.service
+[Unit]
+<span style="color: #a0522d;">Description</span>=Supervisor process control system for UNIX
+<span style="color: #a0522d;">Documentation</span>=http://supervisord.org
+<span style="color: #a0522d;">After</span>=network.target
+
+[Service]
+<span style="color: #a0522d;">ExecStart</span>=/usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
+<span style="color: #a0522d;">ExecStop</span>=/usr/bin/supervisorctl $<span style="color: #a0522d;">OPTIONS</span> shutdown
+<span style="color: #a0522d;">ExecReload</span>=/usr/bin/supervisorctl -c /etc/supervisor/supervisord.conf $<span style="color: #a0522d;">OPTIONS</span> reload
+<span style="color: #a0522d;">KillMode</span>=process
+<span style="color: #a0522d;">Restart</span>=on-failure
+<span style="color: #a0522d;">RestartSec</span>=50s
+
+[Install]
+<span style="color: #a0522d;">WantedBy</span>=multi-user.target
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:00a8ef79-dc88-4d85-ae4f-ddb0fedb6551" class="outline-2">
+<h2 id="h:00a8ef79-dc88-4d85-ae4f-ddb0fedb6551">5、部署mysqld_exporter</h2>
+<div class="outline-text-2" id="text-h:00a8ef79-dc88-4d85-ae4f-ddb0fedb6551">
+<div class="org-src-container">
+<pre class="src src-sh">sudo mv mysqld_exporter /devops/mysqld_exporter/
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:71bfb7b6-ddf1-4d7f-8974-5de9bce3804e" class="outline-2">
+<h2 id="h:71bfb7b6-ddf1-4d7f-8974-5de9bce3804e">6、部署node_exporter</h2>
+<div class="outline-text-2" id="text-h:71bfb7b6-ddf1-4d7f-8974-5de9bce3804e">
+<div class="org-src-container">
+<pre class="src src-sh">sudo mv node_exporter /devops/nodexporter/
+</pre>
+</div>
 
 <p>
 7、部署proxysql_exporter<br>
 </p>
 
-<p>
-sudo mkdir  /devops/proxysqlexporter<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sh">sudo mkdir  /devops/proxysqlexporter
+sudo cp proxysql_exporter /devops/proxysqlexporter/
 
-<p>
-sudo cp proxysql_exporter <i>devops/proxysqlexporter</i><br>
-</p>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">sudo vim /etc/supervisor/conf.d/proxysql_exporter.conf</span>
+sudo vim /etc/supervisor/conf.d/proxysql_exporter.conf
 
-
-
-<p>
-sudo vim /etc/supervisor/conf.d/proxysql_exporter.conf<br>
-</p>
-
-<p>
-[program:proxysql_exporter]<br>
-command = /devops/proxysqlexporter/proxysql_exporter<br>
-user = root<br>
-autostart = true<br>
-autorestart = true<br>
-redirect_stderr=true<br>
-stdout_logfile_backups = 2<br>
-stdout_logfile = /devops/proxysqlexporter/proxysql_exporter.log<br>
-</p>
+[program:proxysql_exporter]
+<span style="color: #483d8b;">command</span> = /devops/proxysqlexporter/proxysql_exporter
+user = root
+autostart = true
+autorestart = true
+<span style="color: #a0522d;">redirect_stderr</span>=true
+stdout_logfile_backups = 2
+stdout_logfile = /devops/proxysqlexporter/proxysql_exporter.log
 
 
-
-<p>
-sudo supervisorctl update<br>
-</p>
+sudo supervisorctl update
+</pre>
+</div>
 
 
 
@@ -775,13 +408,12 @@ sudo supervisorctl update<br>
 停服后 show full processlist;<br>
 </p>
 
-<p>
-show master status;观察binlog postition<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sql">show master status;&#35266;&#23519;binlog postition
 
-<p>
-select substring_index(host,':',1) IP,user,count(<b>) count from information_schema.PROCESSLIST GROUP BY substring_index(host,':',1),user ORDER BY count(</b>) DESC;<br>
-</p>
+<span style="color: #a020f0;">select</span> substring_index(<span style="color: #a020f0;">host</span>,<span style="color: #8b2252;">':'</span>,1) IP,<span style="color: #483d8b;">user</span>,<span style="color: #483d8b;">count</span>(*) <span style="color: #483d8b;">count</span> <span style="color: #a020f0;">from</span> information_schema.PROCESSLIST <span style="color: #a020f0;">GROUP</span> <span style="color: #a020f0;">BY</span> substring_index(<span style="color: #a020f0;">host</span>,<span style="color: #8b2252;">':'</span>,1),<span style="color: #483d8b;">user</span> <span style="color: #a020f0;">ORDER</span> <span style="color: #a020f0;">BY</span> <span style="color: #483d8b;">count</span>(*) <span style="color: #a020f0;">DESC</span>;
+</pre>
+</div>
 
 
 
@@ -789,48 +421,35 @@ select substring_index(host,':',1) IP,user,count(<b>) count from information_sch
 RDS<br>
 </p>
 
-<p>
-mysql -h agt-fantasy-prod-fantayslr-rds.co7izkdw11dl.ap-south-1.rds.amazonaws.com -u -p -Ne "select concat(table_schema,'.',table_name) from information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema','meta')" &gt; database.txt<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sh">mysql -h agt-fantasy-prod-fantayslr-rds.co7izkdw11dl.ap-south-1.rds.amazonaws.com -u -p -Ne <span style="color: #8b2252;">"select concat(table_schema,'.',table_name) from information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema','meta')"</span> &gt; database.txt
 
-<p>
-bash  tablecount.sh &gt; tablecountrds.txt<br>
-</p>
-
-
+bash  tablecount.sh &gt; tablecountrds.txt
+</pre>
+</div>
 
 <p>
 自建<br>
-mysql -h172.41.9.163 -u -p -Ne "select concat(table_schema,'.',table_name) from information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema','meta')" &gt; database.txt<br>
 </p>
+<div class="org-src-container">
+<pre class="src src-sh">mysql -h172.41.9.163 -u -p -Ne <span style="color: #8b2252;">"select concat(table_schema,'.',table_name) from information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema','meta')"</span> &gt; database.txt
 
-<p>
-bash  tablecount.sh &gt; tablecount.txt<br>
-</p>
-
-
-
-<p>
-diff tablecountrds.txt tablecount.txt<br>
-</p>
-
-
+bash  tablecount.sh &gt; tablecount.txt
+diff tablecountrds.txt tablecount.txt
+</pre>
+</div>
 
 <p>
 回写验证<br>
 </p>
+<div class="org-src-container">
+<pre class="src src-sql">use testfordts
 
-<p>
-use testfordts<br>
-</p>
-
-<p>
-insert into student values (7,'zyx');<br>
-update student set name='super' where id=7;<br>
-delete from student where id=7;<br>
-</p>
-
-
+<span style="color: #a020f0;">insert</span> <span style="color: #a020f0;">into</span> student <span style="color: #a020f0;">values</span> (7,<span style="color: #8b2252;">'zyx'</span>);
+<span style="color: #a020f0;">update</span> student <span style="color: #a020f0;">set</span> <span style="color: #a020f0;">name</span>=<span style="color: #8b2252;">'super'</span> <span style="color: #a020f0;">where</span> id=7;
+<span style="color: #a020f0;">delete</span> <span style="color: #a020f0;">from</span> student <span style="color: #a020f0;">where</span> id=7;
+</pre>
+</div>
 
 
 
@@ -838,132 +457,65 @@ delete from student where id=7;<br>
 tablecount.sh脚本<br>
 </p>
 
-<p>
-#!/bin/bash<br>
-</p>
-
-<p>
-for i in `cat ./database.txt`<br>
-</p>
-
-<p>
-do<br>
-</p>
-
-<p>
-##fantasylr<br>
-</p>
-
-<p>
-echo $i<br>
-</p>
-
-<p>
-mysql -hagt-fantasy-prod-fantayslr-rds.co7izkdw11dl.ap-south-1.rds.amazonaws.com -uxxxxxx -p'xxxxxx' -Ne"select count(*) from $i"<br>
-</p>
-
-
-
-<p>
-done<br>
-</p>
-
+<div class="org-src-container">
+<pre class="src src-sql">#!/bin/bash
+<span style="color: #a020f0;">for</span> i <span style="color: #a020f0;">in</span> `cat ./database.txt`
+do
+        ##fantasylr
+        echo $i
+        mysql -hagt-fantasy-prod-fantayslr-rds.co7izkdw11dl.ap-south-1.rds.amazonaws.com -uxxxxxx -p<span style="color: #8b2252;">'xxxxxx'</span> -Ne"<span style="color: #a020f0;">select</span> <span style="color: #483d8b;">count</span>(*) <span style="color: #a020f0;">from</span> $i"
+done
+</pre>
+</div>
 
 
 <p>
 检查参数<br>
 </p>
-
-<p>
-select @@binlog_format,@@binlog_row_image,@@explicit_defaults_for_timestamp,@@innodb_file_format,@@innodb_large_prefix,@@lower_case_table_names,@@tx_isolation,@@time_zone,@@innodb_sync_array_size,@@max_connections,@@max_user_connections;<br>
-</p>
-
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #a020f0;">select</span> @@binlog_format,@@binlog_row_image,@@explicit_defaults_for_timestamp,@@innodb_file_format,@@innodb_large_prefix,@@lower_case_table_names,@@tx_isolation,@@time_zone,@@innodb_sync_array_size,@@max_connections,@@max_user_connections;
+</pre>
+</div>
 
 
 <p>
 readonly服务器安装xtrabackup<br>
 </p>
 
-<p>
-yum -y install perl perl-devel libaio libaio-devel perl-Time-HiRes perl-DBD-MySQL perl-DBI perl-IO-Socket-SSL.noarch perl-TermReadKey perl-Digest-MD5 perl-ExtUtils-MakeMaker<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sh">yum -y install perl perl-devel libaio libaio-devel perl-Time-HiRes perl-DBD-MySQL perl-DBI perl-IO-Socket-SSL.noarch perl-TermReadKey perl-Digest-MD5 perl-ExtUtils-MakeMaker
 
-<p>
-percona-xtrabackup-2.4.16-Linux-x86_64.libgcrypt153.tar.gz<br>
-</p>
-
-
-
-<p>
-sudo wget <a href="https://repo.percona.com/yum/release/7/RPMS/x86_64/qpress-11-1.el7.x86_64.rpm">https://repo.percona.com/yum/release/7/RPMS/x86_64/qpress-11-1.el7.x86_64.rpm</a><br>
-</p>
-
-<p>
-sudo yum -y install qpress-11-1.el7.x86_64.rpm<br>
-</p>
-
-
-
-
-
-
+percona-xtrabackup-2.4.16-Linux-x86_64.libgcrypt153.tar.gz
+sudo wget https://repo.percona.com/yum/release/7/RPMS/x86_64/qpress-11-1.el7.x86_64.rpm
+sudo yum -y install qpress-11-1.el7.x86_64.rpm
+</pre>
+</div>
 
 <p>
 备份<br>
 </p>
 
-<p>
-sudo mkdir /mysqlback/bakscript /mysqlback/checkpoint /mysqlback/mysql_backup<br>
-</p>
+<div class="org-src-container">
+<pre class="src src-sh">sudo mkdir /mysqlback/bakscript /mysqlback/checkpoint /mysqlback/mysql_backup
+sudo chown -R centos:centos /mysqlback/
 
-<p>
-sudo chown -R centos:centos <i>mysqlback</i><br>
-</p>
+30 03 * * * /bin/bash /mysqlback/bakscript/db_bak.sh 2&gt;&amp;1 &gt;/dev/null
 
+<span style="color: #b22222;">#</span><span style="color: #b22222;">!/bin/bash</span>
+<span style="color: #a0522d;">USER</span>=<span style="color: #8b2252;">'xxxxxxxx'</span>
+<span style="color: #a0522d;">HOST</span>=<span style="color: #8b2252;">'xxxxxxxxx'</span>
+<span style="color: #a0522d;">PORT</span>=3306
+<span style="color: #a0522d;">TODAY</span>=<span style="color: #ff00ff;">`date +%F`</span>
+<span style="color: #a0522d;">WEEK</span>=<span style="color: #ff00ff;">`date +%w`</span>
+<span style="color: #a0522d;">YESTERDAY</span>=<span style="color: #ff00ff;">`date -d '-1 day' +%F`</span>
 
+sudo /usr/local/src/percona-xtrabackup-2.4.16-Linux-x86_64/bin/innobackupex  --defaults-file=/etc/my.cnf --no-timestamp --user=$<span style="color: #a0522d;">USER</span> --password=<span style="color: #8b2252;">'xxxxxxx'</span> --host=$<span style="color: #a0522d;">HOST</span> --port=$<span style="color: #a0522d;">PORT</span>  --no-version-check --ftwrl-wait-timeout=30 --slave-info --parallel=2 --compress --compress-threads=2  --tmpdir=/mysqlback --extra-lsndir=/mysqlback/checkpoint/$<span style="color: #a0522d;">TODAY</span> /mysqlback/mysql_backup/ --stream=xbstream 2&gt;/mysqlback/db_bak.log |cat - &gt; /mysqlback/mysql_backup/payment2full$<span style="color: #a0522d;">TODAY</span>.xbstream.gz
 
-<p>
-30 03 * * * /bin/bash /mysqlback/bakscript/db_bak.sh 2&gt;&amp;1 &gt;/dev/null<br>
-</p>
-
-<p>
-#!/bin/bash<br>
-</p>
-
-<p>
-USER='xxxxxxxx'<br>
-</p>
-
-<p>
-HOST='xxxxxxxxx'<br>
-</p>
-
-<p>
-PORT=3306<br>
-</p>
-
-<p>
-TODAY=`date +%F`<br>
-</p>
-
-<p>
-WEEK=`date +%w`<br>
-</p>
-
-<p>
-YESTERDAY=`date -d '-1 day' +%F`<br>
-</p>
-
-<p>
-sudo <i>usr/local/src/percona-xtrabackup-2.4.16-Linux-x86_64/bin/innobackupex  &#x2013;defaults-file=/etc/my.cnf &#x2013;no-timestamp &#x2013;user=$USER &#x2013;password='xxxxxxx' &#x2013;host=$HOST &#x2013;port=$PORT  &#x2013;no-version-check &#x2013;ftwrl-wait-timeout=30 &#x2013;slave-info &#x2013;parallel=2 &#x2013;compress &#x2013;compress-threads=2  &#x2013;tmpdir=/mysqlback &#x2013;extra-lsndir=/mysqlback/checkpoint/$TODAY /mysqlback/mysql_backup</i> &#x2013;stream=xbstream 2&gt;/mysqlback/db_bak.log |cat - &gt; /mysqlback/mysql_backup/payment2full$TODAY.xbstream.gz<br>
-</p>
-
-
-
-
-
-<p>
-/usr/local/bin/aws s3 cp /mysqlback/mysql_backup/xxxxxxxfull$TODAY.xbstream.gz s3://agt-fantasy-prod-s3-mysql-self-log/mysqlbakup/fantasylr/xxxxxxxfull$TODAY.xbstream.gz</p>
+/usr/local/bin/aws s3 cp /mysqlback/mysql_backup/xxxxxxxfull$<span style="color: #a0522d;">TODAY</span>.xbstream.gz s3://agt-fantasy-prod-s3-mysql-self-log/mysqlbakup/fantasylr/xxxxxxxfull$<span style="color: #a0522d;">TODAY</span>.xbstream.gz
+</pre>
+</div>
+</div>
+</section>
 </div>
 <div id="postamble" class="status">
     <div class=bar data-astro-cid-p3givckg>

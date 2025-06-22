@@ -436,8 +436,83 @@ spec:
 </ul>
 
 <p>
+范例：ci-mysql指向集群外IP
+</p>
+
+<ul class="org-ul">
+<li>1.33+版本，使用<a href="https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/">EndpointSlice</a>，利用标签匹配service</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; ci-mysql.yaml
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Service</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: ci-mysql</span>
+<span style="color: #ffa54f;">  namespace: ci</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  clusterIP: None</span>
+<span style="color: #ffa54f;">  ports:</span>
+<span style="color: #ffa54f;">  - name: mysql</span>
+<span style="color: #ffa54f;">    port: 3306</span>
+<span style="color: #ffa54f;">    targetPort: 3306</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">apiVersion: discovery.k8s.io/v1</span>
+<span style="color: #ffa54f;">kind: EndpointSlice</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: ci-mysql</span>
+<span style="color: #ffa54f;">  namespace: ci</span>
+<span style="color: #ffa54f;">  labels:</span>
+<span style="color: #ffa54f;">    kubernetes.io/service-name: ci-mysql</span>
+<span style="color: #ffa54f;">addressType: IPv4</span>
+<span style="color: #ffa54f;">ports:</span>
+<span style="color: #ffa54f;">- name: mysql</span>
+<span style="color: #ffa54f;">  port: 3306</span>
+<span style="color: #ffa54f;">  protocol: TCP</span>
+<span style="color: #ffa54f;">endpoints:</span>
+<span style="color: #ffa54f;">- addresses:</span>
+<span style="color: #ffa54f;">  - "10.0.224.4"</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>1.33版本前做法，利用endpoints中name名称保持一致</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; ci-mysql.yaml
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Service</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: ci-mysql</span>
+<span style="color: #ffa54f;">  namespace: ci</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  clusterIP: None</span>
+<span style="color: #ffa54f;">  ports:</span>
+<span style="color: #ffa54f;">  - name: mysql</span>
+<span style="color: #ffa54f;">    port: 3306</span>
+<span style="color: #ffa54f;">    targetPort: 3306</span>
+<span style="color: #ffa54f;">---</span>
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Endpoints</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: ci-mysql  #&#21517;&#23383;&#35201;&#36319;svc&#30340;&#19968;&#33268;</span>
+<span style="color: #ffa54f;">  namespace: ci</span>
+<span style="color: #ffa54f;">subsets:</span>
+<span style="color: #ffa54f;">- addresses:</span>
+<span style="color: #ffa54f;">  - ip: 10.0.224.4</span>
+<span style="color: #ffa54f;">  ports:</span>
+<span style="color: #ffa54f;">  - port: 3306</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+
+
+<p>
 不配置标签选择器就没有对就的 endpoint
 </p>
+
 <div class="org-src-container">
 <pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;&#19968;&#20010;&#31867;&#22411;&#20026;external&#30340;service&#65288;svc&#65289;&#65292;&#36825;&#20010;svc&#19981;&#20250;&#33258;&#21160;&#21019;&#24314;&#19968;&#20010;ep</span>
 [root@k8s-master01 ~]# vim nginx-svc-external.yaml 
@@ -456,24 +531,7 @@ spec:
   sessionAffinity: None
   <span style="color: #483d8b;">type</span>: ClusterIP
 
-<span style="color: #b22222;"># </span><span style="color: #b22222;">create svc</span>
-[root@k8s-master01 ~]# kubectl create -f nginx-svc-external.yaml 
-service/nginx-svc-external created
-
-<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;svc</span>
-[root@k8s-master01 ~]# kubectl get svc
-NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
-kubernetes           ClusterIP   10.96.0.1       &lt;none&gt;        443/TCP          6d4h
-nginx-svc            ClusterIP   10.96.141.65    &lt;none&gt;        80/TCP,443/TCP   4d3h
-nginx-svc-external   ClusterIP   10.109.18.238   &lt;none&gt;        80/TCP           16s
-</pre>
-</div>
-
-<p>
-endpoint 名字要跟 svc 的一致
-</p>
-<div class="org-src-container">
-<pre class="src src-shell"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25163;&#21160;&#21019;&#24314;&#19968;&#20010;ep&#65292;&#36319;&#19978;&#38754;&#21019;&#24314;&#30340;svc&#20851;&#32852;&#36215;&#26469;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25163;&#21160;&#21019;&#24314;&#19968;&#20010;ep&#65292;&#36319;&#19978;&#38754;&#21019;&#24314;&#30340;svc&#20851;&#32852;&#36215;&#26469;</span>
 [root@k8s-master01 ~]# vim nginx-ep-external.yaml 
 apiVersion: v1
 kind: Endpoints
@@ -490,9 +548,9 @@ subsets:
     port: 80
     protocol: TCP
 
-<span style="color: #b22222;"># </span><span style="color: #b22222;">create ep</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">create svc , create ep</span>
+[root@k8s-master01 ~]# kubectl create -f nginx-svc-external.yaml 
 [root@k8s-master01 ~]# kubectl create -f nginx-ep-external.yaml
-endpoints/nginx-svc-external created
 
 <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;ep (EP&#21518;&#38754;&#23545;&#24212;&#30340;&#21015;&#34920;&#23601;&#26159;&#21487;&#29992;Pod&#30340;&#21015;&#34920;)</span>
 [root@k8s-master01 ~]# kubectl get ep
@@ -687,7 +745,7 @@ Ingress &#x2013;&gt; Service &#x2013;&gt; Pod
 <h5 id="h:cb777157-be0a-45a3-a386-b15d3bbae347">使用 Ingress 发布服务的流程</h5>
 <div class="outline-text-5" id="text-h:cb777157-be0a-45a3-a386-b15d3bbae347">
 
-<figure id="org9247178">
+<figure id="org50371f5">
 <img src="./images/Snipaste_2022-09-06_06-12-34.png" alt="Snipaste_2022-09-06_06-12-34.png" width="50%">
 
 </figure>

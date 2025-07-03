@@ -70,6 +70,7 @@
 <ul>
 <li><a href="#h:e3365f2c-d8f0-4588-9eb2-600accfcd95a">云原生要素-配置分离</a></li>
 <li><a href="#h:1c48e628-c8ea-4ace-aad5-1a8f3ac15272">什么是configmap</a></li>
+<li><a href="#h:13dc6c80-8fa5-4db9-ae59-49e948227fa9">yaml 文件中多行字符串</a></li>
 <li><a href="#h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e">创建 ConfigMap 的几种形式</a>
 <ul>
 <li><a href="#h:a56ec79b-7468-45d0-8cd2-1464c7ac4f0e">基于目录或文件创建 ConfigMap</a></li>
@@ -160,6 +161,111 @@ Secret: Secret更倾向于存储和共享敏感、加密的配置信息。
 <p>
 配置文档：<a href="https://kubernetes.io/docs/concepts/configuration/configmap/">https://kubernetes.io/docs/concepts/configuration/configmap/</a>
 </p>
+</div>
+</div>
+<div id="outline-container-h:13dc6c80-8fa5-4db9-ae59-49e948227fa9" class="outline-4">
+<h4 id="h:13dc6c80-8fa5-4db9-ae59-49e948227fa9">yaml 文件中多行字符串</h4>
+<div class="outline-text-4" id="text-h:13dc6c80-8fa5-4db9-ae59-49e948227fa9">
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://yaml.org/spec/1.2.2/#8112-block-chomping-indicator">8.1.1.2. Block Chomping Indicator</a></li>
+</ul>
+
+<p>
+yaml 文件中多行字符串可以使用|保留换行符，或者使用&gt;将换行符替换为空格。其中，这两个换行符有以下几种用法：
+</p>
+<ul class="org-ul">
+<li>|：文中自动换行，默认仅保留一行空行</li>
+<li>|+：文中自动换行，保留字符串后面所有的空行</li>
+<li>|-：文中自动换行，删除字符串后面所有的空行</li>
+<li>&gt;：文中不自动换行，默认仅保留一行空行</li>
+<li>&gt;+：文中不自动换行，保留字符串后面所有的空行</li>
+<li>&gt;-：文中不自动换行，删除字符串后面所有的空行</li>
+</ul>
+
+<p>
+多行字符串可以使用引号括起来：" "会进行特殊字符转义，' '保留原始字符串。
+</p>
+
+<p>
+测试
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span style="color: #a020f0;">import</span> yaml
+
+<span style="color: #a020f0;">with</span> <span style="color: #483d8b;">open</span>(<span style="color: #8b2252;">'string.yaml'</span>,<span style="color: #8b2252;">'r'</span>, encoding=<span style="color: #8b2252;">'utf-8'</span>) <span style="color: #a020f0;">as</span> f:
+    <span style="color: #a0522d;">data</span> = yaml.load(f, Loader=yaml.FullLoader)
+
+<span style="color: #a020f0;">for</span> key <span style="color: #a020f0;">in</span> data:
+    <span style="color: #483d8b;">print</span>(f<span style="color: #8b2252;">'</span>{key}<span style="color: #8b2252;">:</span>{data[key]}<span style="color: #8b2252;">'</span>)
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-yaml">string_1: |
+  I am a string_1.
+  11111.
+string_2: |+
+  I am a string_2.
+  22222.
+string_3: |-
+  I am a string_3.
+  33333.
+string_4: &gt;
+  I am a string_4.
+  44444.
+string_5: &gt;+
+  I am a string_5.
+  55555.
+string_6: &gt;-
+  I am a string_6.
+  66666.
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@localhost ~]# python3 read_yaml.py
+string_1:I am a string_1.
+11111.
+
+string_2:I am a string_2.
+22222.
+
+string_3:I am a string_3.
+33333.
+string_4:I am a string_4. 44444.
+
+string_5:I am a string_5. 55555.
+
+string_6:I am a string_6. 66666.
+[root@localhost ~]#
+</pre>
+</div>
+
+<p>
+范例
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  containers:                                                                                                                                                                                                                 
+  - name: mq-nameserver-1
+    image: gehuiwin/rocketmq:4.9.2
+    imagePullPolicy: IfNotPresent
+    env:
+    - name: JAVA_OPT_EXT
+      value: |-
+        -XX:+PerfDisableSharedMem
+        -Xloggc:/home/rocketmq/logs/rocketmq_gc.log
+        -XX:+PrintGCDetails 
+        -XX:+PrintGCDateStamps 
+        -XX:+PrintGCTimeStamps
+        -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=4 -XX:GCLogFileSize=128M
+        -Duser.timezone=Asia/Calcutta -Duser.home=/home/rocketmq -Xms512M -Xmx512M -Xmn512m
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e" class="outline-4">

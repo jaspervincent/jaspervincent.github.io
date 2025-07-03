@@ -90,6 +90,7 @@
 <li><a href="#h:6fcb0e0d-db18-4aba-9271-4db16883d560">范例-LimitRange 的配置文件：</a></li>
 </ul>
 </li>
+<li><a href="#h:218fe9d5-e6d7-4b5a-baf5-b27123e38519">为 Pod 或容器配置安全上下文</a></li>
 <li><a href="#h:e46b3c85-494c-4f3c-8cbd-eb1cdbeda344">NetworkPolicies 网络策略</a></li>
 <li><a href="#h:8f277d0b-f422-4cf5-9186-e5beb6ce344b">PodDisruptionBudgets 中断预算</a></li>
 <li><a href="#h:431ae0a6-5224-4f19-9d1d-f4e1c6e77594">PodSecurityPolicies 安全策略</a></li>
@@ -527,7 +528,7 @@ LimitRange 是一种用于限制命名空间中(到容器组或容器的)资源�
 <h4 id="h:e5fd0686-08a8-4073-ab85-8b4b09012f0a">只有 ResourceQuota 是不够的</h4>
 <div class="outline-text-4" id="text-h:e5fd0686-08a8-4073-ab85-8b4b09012f0a">
 
-<figure id="orgada4d29">
+<figure id="org8355238">
 <img src="./images/Snipaste_2022-09-28_16-28-45.png" alt="Snipaste_2022-09-28_16-28-45.png" width="50%">
 
 </figure>
@@ -541,7 +542,7 @@ LimitRange 是一种用于限制命名空间中(到容器组或容器的)资源�
 <h4 id="h:4ae168c5-99a3-46be-9d8e-d56989a860c1">LimitRange做了什么</h4>
 <div class="outline-text-4" id="text-h:4ae168c5-99a3-46be-9d8e-d56989a860c1">
 
-<figure id="org0ffd40d">
+<figure id="org6e8fbc2">
 <img src="./images/Snipaste_2022-09-28_16-30-22.png" alt="Snipaste_2022-09-28_16-30-22.png" width="50%">
 
 </figure>
@@ -698,6 +699,131 @@ limits:
 <p>
 说明：当创建 LimitRange 对象时，你也可以声明大页面和 GPU 的限制。 当这些资源同时声明了 'default' 和 'defaultRequest' 参数时，两个参数值必须相同。
 </p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:218fe9d5-e6d7-4b5a-baf5-b27123e38519" class="outline-2">
+<h2 id="h:218fe9d5-e6d7-4b5a-baf5-b27123e38519">为 Pod 或容器配置安全上下文</h2>
+<div class="outline-text-2" id="text-h:218fe9d5-e6d7-4b5a-baf5-b27123e38519">
+<p>
+<a href="https://kubernetes.io/zh-cn/docs/concepts/security/cloud-native-security/">https://kubernetes.io/zh-cn/docs/concepts/security/cloud-native-security/</a>
+</p>
+
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/tasks/configure-pod-container/security-context/">为 Pod 或容器配置安全上下文</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; security-context.yaml
+<span style="color: #ffa54f;">apiVersion: v1</span>
+<span style="color: #ffa54f;">kind: Pod</span>
+<span style="color: #ffa54f;">metadata:</span>
+<span style="color: #ffa54f;">  name: security-context-demo</span>
+<span style="color: #ffa54f;">spec:</span>
+<span style="color: #ffa54f;">  securityContext:</span>
+<span style="color: #ffa54f;">    runAsUser: 1000</span>
+<span style="color: #ffa54f;">    runAsGroup: 3000</span>
+<span style="color: #ffa54f;">    fsGroup: 2000</span>
+<span style="color: #ffa54f;">    supplementalGroups: [4000]</span>
+<span style="color: #ffa54f;">  volumes:</span>
+<span style="color: #ffa54f;">  - name: sec-ctx-vol</span>
+<span style="color: #ffa54f;">    emptyDir: {}</span>
+<span style="color: #ffa54f;">  containers:</span>
+<span style="color: #ffa54f;">  - name: sec-ctx-demo</span>
+<span style="color: #ffa54f;">    image: busybox:1.28</span>
+<span style="color: #ffa54f;">    command: [ "sh", "-c", "sleep 1h" ]</span>
+<span style="color: #ffa54f;">    volumeMounts:</span>
+<span style="color: #ffa54f;">    - name: sec-ctx-vol</span>
+<span style="color: #ffa54f;">      mountPath: /data/demo</span>
+<span style="color: #ffa54f;">    securityContext:</span>
+<span style="color: #ffa54f;">      allowPrivilegeEscalation: false</span>
+<span style="color: #ffa54f;">EOF</span>
+
+kubectl apply -f https://k8s.io/examples/pods/security/security-context.yaml
+
+kubectl get pod security-context-demo
+kubectl exec -it security-context-demo -- sh
+
+[root@jump tmp]# kubectl  exec -it security-context-demo -- sh
+/ $ ps  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034;&#36827;&#31243;&#20197;&#29992;&#25143; 1000 &#36816;&#34892;&#65292;&#21363; runAsUser &#25152;&#35774;&#32622;&#30340;&#20540;</span>
+PID   USER     TIME  COMMAND
+    1 1000      0:00 sleep 1h
+   13 1000      0:00 sh
+   19 1000      0:00 ps
+/ $ cd /data/
+/data $ ls -l <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034; /data/demo &#30446;&#24405;&#30340;&#32452; ID &#20026; 2000&#65292;&#21363; fsGroup &#30340;&#35774;&#32622;&#20540;</span>
+total 0
+drwxrwsrwx    2 root     2000             6 Jun 23 13:48 demo
+/data $ cd demo/
+/data/demo $ echo hello &gt; testfile
+/data/demo $ ls -l <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034; testfile &#30340;&#32452; ID &#20026; 2000&#65292;&#20063;&#23601;&#26159; fsGroup &#25152;&#35774;&#32622;&#30340;&#20540;</span>
+total 4
+-rw-r--r--    1 1000     2000             6 Jun 23 13:50 testfile
+/data/demo $ id
+<span style="color: #a0522d;">uid</span>=1000 <span style="color: #a0522d;">gid</span>=3000 <span style="color: #a0522d;">groups</span>=2000,3000,4000
+/data/demo $ exit
+</pre>
+</div>
+
+
+<ul class="org-ul">
+<li><a href="https://github.com/kubernetes/kube-state-metrics">https://github.com/kubernetes/kube-state-metrics</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/version: 2.15.0
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-state-metrics
+        app.kubernetes.io/version: 2.15.0
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.15.0
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: http-metrics
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        name: kube-state-metrics
+        ports:
+        - containerPort: 8080
+          name: http-metrics
+        - containerPort: 8081
+          name: telemetry
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: telemetry
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          seccompProfile:
+            <span style="color: #483d8b;">type</span>: RuntimeDefault
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: kube-state-metrics
+</pre>
 </div>
 </div>
 </section>

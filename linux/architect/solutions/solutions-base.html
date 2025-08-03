@@ -33,6 +33,7 @@
 <li><a href="#h:371fc5f5-fd41-4d27-bb5a-13affe449179">httpDNS</a></li>
 <li><a href="#h:8a0b0132-2978-4c32-96fd-f986287cd90b">Aliyun DTS基于VPN网关实现阿里云RDS和AWS EC2间的数据同步</a></li>
 <li><a href="#h:2d41b930-9c33-4944-a80e-57f619f301cb">AWS CluoudFront-使用鉴权-URL</a></li>
+<li><a href="#h:b22e33c3-7ca7-416f-a942-58347adc82b4">Cloudflare 使用url鉴权</a></li>
 </ul>
 </div>
 </nav>
@@ -537,6 +538,144 @@ cloudfront_signer = CloudFrontSigner(key_id, rsa_signer)
 signed_url = cloudfront_signer.generate_presigned_url(
     url, <span style="color: #a0522d;">date_less_than</span>=expire_date)
 <span style="color: #0000ff;">print</span>(signed_url)
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:b22e33c3-7ca7-416f-a942-58347adc82b4" class="outline-2">
+<h2 id="h:b22e33c3-7ca7-416f-a942-58347adc82b4">Cloudflare 使用url鉴权</h2>
+<div class="outline-text-2" id="text-h:b22e33c3-7ca7-416f-a942-58347adc82b4">
+<p>
+规则&#x2013;&gt;Snippets中创建片段，添加js脚本
+</p>
+<ul class="org-ul">
+<li><a href="https://help.aliyun.com/zh/cdn/user-guide/type-a-signing">阿里A方式鉴权</a></li>
+</ul>
+
+<p>
+修改m3u8策略
+</p>
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #a020f0;">export</span> <span style="color: #a020f0;">default</span> {
+  <span style="color: #a020f0;">async</span> fetch(request) {
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">key</span> = <span style="color: #8b2252;">'xxxx'</span>;
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">url</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">URL</span>(request.url);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">pathname</span> = url.pathname;
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">authKey</span> = url.searchParams.get(<span style="color: #8b2252;">'auth_key'</span>);
+    <span style="color: #a020f0;">if</span> (!authKey) <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Missing auth_key parameter'</span>, { status: 403 });
+
+    <span style="color: #a020f0;">const</span> [<span style="color: #a0522d;">ts</span>, <span style="color: #a0522d;">rand</span>, <span style="color: #a0522d;">uid</span>, <span style="color: #a0522d;">sig</span>] = authKey.split(<span style="color: #8b2252;">'-'</span>);
+    <span style="color: #a020f0;">if</span> (!ts || !rand || !uid || !sig) <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Invalid auth_key format'</span>, { status: 403 });
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">now</span> = Math.floor(Date.now() / 1000);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">timestamp</span> = parseInt(ts, 10);
+    <span style="color: #a020f0;">if</span> (isNaN(timestamp) || timestamp &lt; now) <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Link has expired'</span>, { status: 403 });
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">raw</span> = <span style="color: #8b2252;">`${pathname}-${ts}-${rand}-${uid}-${key}`</span>;
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">encoder</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">TextEncoder</span>();
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">data</span> = encoder.encode(raw);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">hashBuffer</span> = <span style="color: #a020f0;">await</span> crypto.subtle.digest(<span style="color: #8b2252;">'MD5'</span>, data);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">expectedSig</span> = Array.from(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">Uint8Array</span>(hashBuffer))
+      .map(b =&gt; b.toString(16).padStart(2, <span style="color: #8b2252;">'0'</span>)).join(<span style="color: #8b2252;">''</span>);
+
+    <span style="color: #a020f0;">if</span> (expectedSig !== sig) <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Unauthorized: signature mismatch'</span>, { status: 403 });
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">response</span> = <span style="color: #a020f0;">await</span> fetch(request);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">contentType</span> = response.headers.get(<span style="color: #8b2252;">'Content-Type'</span>) || <span style="color: #8b2252;">''</span>;
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">isM3U8</span> = pathname.endsWith(<span style="color: #8b2252;">'.m3u8'</span>) || contentType.includes(<span style="color: #8b2252;">'mpegurl'</span>);
+
+    <span style="color: #a020f0;">if</span> (!isM3U8) <span style="color: #a020f0;">return</span> response;
+
+    <span style="color: #b22222;">// </span><span style="color: #b22222;">&#20462;&#25913; m3u8 &#20869;&#23481;</span>
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">basePath</span> = pathname.substring(0, pathname.lastIndexOf(<span style="color: #8b2252;">'/'</span>) + 1);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">body</span> = <span style="color: #a020f0;">await</span> response.text();
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">tsNow</span> = Math.floor(Date.now() / 1000);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">newTs</span> = tsNow + 7200;
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">newRand</span> = <span style="color: #8b2252;">'0'</span>;
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">newUid</span> = <span style="color: #8b2252;">'0'</span>;
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">lines</span> = body.split(<span style="color: #8b2252;">'\n'</span>);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">processed</span> = <span style="color: #a020f0;">await</span> Promise.all(lines.map(<span style="color: #a020f0;">async</span> line =&gt; {
+      <span style="color: #a020f0;">if</span> (line.trim().length &gt; 0 &amp;&amp; line.trim().endsWith(<span style="color: #8b2252;">'.ts'</span>)) {
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">tsPath</span> = basePath + line.trim();
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">raw</span> = <span style="color: #8b2252;">`${tsPath}-${newTs}-${newRand}-${newUid}-${key}`</span>;
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">encoder</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">TextEncoder</span>();
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">data</span> = encoder.encode(raw);
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">hashBuffer</span> = <span style="color: #a020f0;">await</span> crypto.subtle.digest(<span style="color: #8b2252;">'MD5'</span>, data);
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">sig</span> = Array.from(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">Uint8Array</span>(hashBuffer))
+          .map(b =&gt; b.toString(16).padStart(2, <span style="color: #8b2252;">'0'</span>)).join(<span style="color: #8b2252;">''</span>);
+        <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">authKey</span> = <span style="color: #8b2252;">`${newTs}-${newRand}-${newUid}-${sig}`</span>;
+        <span style="color: #a020f0;">return</span> <span style="color: #8b2252;">`${line.trim()}?auth_key=${authKey}`</span>;
+      } <span style="color: #a020f0;">else</span> {
+        <span style="color: #a020f0;">return</span> line;
+      }
+    }));
+
+    <span style="color: #b22222;">// </span><span style="color: #b22222;">&#20811;&#38534;&#21407;&#22987; header</span>
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">newHeaders</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Headers</span>(response.headers);
+    newHeaders.<span style="color: #a020f0;">delete</span>(<span style="color: #8b2252;">'Content-Length'</span>); <span style="color: #b22222;">// </span><span style="color: #b22222;">&#36991;&#20813;&#38271;&#24230;&#19981;&#19968;&#33268;</span>
+
+    <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(processed.join(<span style="color: #8b2252;">'\n'</span>), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders
+    });
+  }
+}
+</pre>
+</div>
+
+
+<figure id="orgbe2f778">
+<img src="./images/img_20250716_153016.png" alt="img_20250716_153016.png" width="50%">
+
+</figure>
+
+<p>
+原始策略
+</p>
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #a020f0;">export</span> <span style="color: #a020f0;">default</span> {
+  <span style="color: #a020f0;">async</span> fetch(request) {
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">key</span> = <span style="color: #8b2252;">'xxxx'</span>; <span style="color: #b22222;">// </span><span style="color: #b22222;">&#20320;&#30340;&#20027;&#23494;&#38053;</span>
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">url</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">URL</span>(request.url);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">pathname</span> = url.pathname;
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">authKey</span> = url.searchParams.get(<span style="color: #8b2252;">'auth_key'</span>);
+    <span style="color: #a020f0;">if</span> (!authKey) {
+      <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Missing auth_key parameter'</span>, { status: 403 });
+    }
+
+    <span style="color: #a020f0;">const</span> [<span style="color: #a0522d;">ts</span>, <span style="color: #a0522d;">rand</span>, <span style="color: #a0522d;">uid</span>, <span style="color: #a0522d;">sig</span>] = authKey.split(<span style="color: #8b2252;">'-'</span>);
+    <span style="color: #a020f0;">if</span> (!ts || !rand || !uid || !sig) {
+      <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Invalid auth_key format'</span>, { status: 403 });
+    }
+
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">now</span> = Math.floor(Date.now() / 1000);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">timestamp</span> = parseInt(ts, 10);
+    <span style="color: #a020f0;">if</span> (isNaN(timestamp) || timestamp &lt; now) {
+      <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Link has expired'</span>, { status: 403 });
+    }
+
+    <span style="color: #b22222;">// </span><span style="color: #b22222;">&#29983;&#25104; md5(pathname-timestamp-rand-uid-key)</span>
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">raw</span> = <span style="color: #8b2252;">`${pathname}-${ts}-${rand}-${uid}-${key}`</span>;
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">encoder</span> = <span style="color: #a020f0;">new</span> <span style="color: #228b22;">TextEncoder</span>();
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">data</span> = encoder.encode(raw);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">hashBuffer</span> = <span style="color: #a020f0;">await</span> crypto.subtle.digest(<span style="color: #8b2252;">'MD5'</span>, data);
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">hashArray</span> = Array.from(<span style="color: #a020f0;">new</span> <span style="color: #228b22;">Uint8Array</span>(hashBuffer));
+    <span style="color: #a020f0;">const</span> <span style="color: #a0522d;">expectedSig</span> = hashArray.map(b =&gt; b.toString(16).padStart(2, <span style="color: #8b2252;">'0'</span>)).join(<span style="color: #8b2252;">''</span>);
+
+    <span style="color: #a020f0;">if</span> (expectedSig !== sig) {
+      <span style="color: #a020f0;">return</span> <span style="color: #a020f0;">new</span> <span style="color: #228b22;">Response</span>(<span style="color: #8b2252;">'Unauthorized: signature mismatch'</span>, { status: 403 });
+    }
+
+    <span style="color: #b22222;">// </span><span style="color: #b22222;">&#9989; &#37492;&#26435;&#36890;&#36807;&#65292;&#32487;&#32493; fetch &#21407;&#22987;&#35831;&#27714;</span>
+    <span style="color: #a020f0;">return</span> fetch(request);
+  }
+}
 </pre>
 </div>
 </div>

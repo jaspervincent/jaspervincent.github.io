@@ -30,17 +30,93 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org365caa7">nginx20秒健康检查</a></li>
-<li><a href="#orga630ae2">nginx_auto_add_deny.pl</a></li>
+<li><a href="#h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae">备份</a></li>
+<li><a href="#h:20bb8cd9-5793-4491-9f28-3736be7974e4">同步</a></li>
+<li><a href="#h:83147386-8461-4a60-92f0-b4179f185928">nginx20秒健康检查</a></li>
+<li><a href="#h:75713da9-c104-4aec-903b-b580c9269f5e">nginx_auto_add_deny.pl</a></li>
 </ul>
 </div>
 </nav>
 <ul class="org-ul">
 <li>TAGS: <a href="../index.html">Script</a></li>
 </ul>
-<section id="outline-container-org365caa7" class="outline-2">
-<h2 id="org365caa7">nginx20秒健康检查</h2>
-<div class="outline-text-2" id="text-org365caa7">
+<section id="outline-container-h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae" class="outline-2">
+<h2 id="h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae">备份</h2>
+<div class="outline-text-2" id="text-h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae">
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /opt/shell/nginx_conf_bak.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">[ -d /data/nginx_conf_bak ] || mkdir -p /data/nginx_conf_bak</span>
+<span style="color: #ffa54f;">cd /data/nginx_conf_bak                                                                                                                                                                                   </span>
+<span style="color: #ffa54f;">zip -r -9 nginx_conf_$(</span><span style="color: #ff00ff;">date +%Y%m%d</span><span style="color: #ffa54f;">).zip /usr/local/nginx/conf/  &gt;/dev/null 2&gt;&amp;1</span>
+
+<span style="color: #ffa54f;">find /data/nginx_conf_bak/*  -mtime +10 -name '*.zip' |xargs rm -f</span>
+<span style="color: #ffa54f;">EOF</span>
+
+crontab -l
+0 1 * * * . /etc/profile;/opt/shell/nginx_conf_bak.sh
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:20bb8cd9-5793-4491-9f28-3736be7974e4" class="outline-2">
+<h2 id="h:20bb8cd9-5793-4491-9f28-3736be7974e4">同步</h2>
+<div class="outline-text-2" id="text-h:20bb8cd9-5793-4491-9f28-3736be7974e4">
+<p>
+文件目录同步
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /opt/shell/rsync-nginx-web.sh
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">#rsync nginx configuration</span>
+<span style="color: #ffa54f;">n_ip="10.2.22.96 10.2.27.167"</span>
+
+<span style="color: #ffa54f;">for n in $n_ip;do</span>
+
+<span style="color: #ffa54f;">echo -e "\e[31m[Nginx]: $n conf sync.....\e[0m"</span>
+
+<span style="color: #ffa54f;">/usr/bin/rsync -avz --delete -e 'ssh -p 65522 -i /root/.ssh/OPS.pem'  /usr/local/nginx/html/ $n:/usr/local/nginx/html/</span>
+
+<span style="color: #ffa54f;">echo -e "\e[31m$n sync done\e[0m\n\n"</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
+
+crontab -l
+* * * * * /bin/bash /opt/shell/rsync-nginx-web.sh &amp;&gt;/tmp/rsync-nginx-web.log
+</pre>
+</div>
+
+<p>
+配置文件同步
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /opt/shell/rsync-nginx.sh 
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">#rsync nginx configuration</span>
+<span style="color: #ffa54f;">n_ip="10.2.22.96 10.2.27.167"</span>
+
+<span style="color: #ffa54f;">for n in $n_ip;do</span>
+
+<span style="color: #ffa54f;">echo -e "\e[31m[Nginx]: $n conf sync.....\e[0m"</span>
+
+<span style="color: #ffa54f;">rsync -avz --delete -e 'ssh -p 65522 -i ~/.ssh/OPS.pem'  /usr/local/nginx/conf/ $n:/usr/local/nginx/conf/</span>
+<span style="color: #ffa54f;">sleep 1</span>
+<span style="color: #ffa54f;">#rsync -avz --delete -e 'ssh -p 65522 -i ~/.ssh/OPS.pem'  /usr/local/nginx/html/ $n:/usr/local/nginx/html/</span>
+
+<span style="color: #ffa54f;">echo -e "\nnginx -t; nginx -s reload"</span>
+<span style="color: #ffa54f;">ssh -p 65522 -i ~/.ssh/OPS.pem $n "nginx -t"</span>
+<span style="color: #ffa54f;">ssh -p 65522 -i ~/.ssh/OPS.pem $n "nginx -s reload"</span>
+
+<span style="color: #ffa54f;">echo -e "\e[31m$n sync done\e[0m\n\n"</span>
+<span style="color: #ffa54f;">done</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:83147386-8461-4a60-92f0-b4179f185928" class="outline-2">
+<h2 id="h:83147386-8461-4a60-92f0-b4179f185928">nginx20秒健康检查</h2>
+<div class="outline-text-2" id="text-h:83147386-8461-4a60-92f0-b4179f185928">
 <div class="org-src-container">
 <pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#65281;/bin/bash</span>
 
@@ -59,9 +135,9 @@
 </div>
 </div>
 </section>
-<section id="outline-container-orga630ae2" class="outline-2">
-<h2 id="orga630ae2">nginx_auto_add_deny.pl</h2>
-<div class="outline-text-2" id="text-orga630ae2">
+<section id="outline-container-h:75713da9-c104-4aec-903b-b580c9269f5e" class="outline-2">
+<h2 id="h:75713da9-c104-4aec-903b-b580c9269f5e">nginx_auto_add_deny.pl</h2>
+<div class="outline-text-2" id="text-h:75713da9-c104-4aec-903b-b580c9269f5e">
 <div class="org-src-container">
 <pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">!/usr/bin/</span><span style="color: #a020f0;">perl</span>
 <span style="color: #b22222;">#</span><span style="color: #b22222;">author : feng.sun</span>

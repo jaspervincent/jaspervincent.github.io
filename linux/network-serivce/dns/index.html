@@ -1,0 +1,3777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 域名系统 DNS 服务</title>
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 域名系统 DNS 服务</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:ce9a32a8-f9ad-45f6-8892-bc052fd8ca43">域名系统DNS服务</a>
+<ul>
+<li><a href="#h:d0b734d2-b8cf-4654-ade3-14c312b5f9c5">名字解析介绍和DNS</a>
+<ul>
+<li><a href="#h:4682b6d4-60fd-41be-90b5-6d4bb7cff3b4">DNS服务工作原理</a></li>
+<li><a href="#h:da01ae48-3113-4179-a056-953fb87a4c15">DNS查询类型</a></li>
+<li><a href="#h:ac8deae3-6752-441a-a791-5c6ce4a0310f">名称服务器</a></li>
+<li><a href="#h:61597d1b-f990-44df-972f-dbec7b10c7ce">解析类型</a></li>
+<li><a href="#h:4cefa36e-2e81-451d-acd4-7b2c34e1a736">完整的查询请求经过的流程</a></li>
+<li><a href="#h:8ba204be-cb3d-4098-ad57-e6b0cd2bc943">nsswitch网路名称服务解析</a></li>
+<li><a href="#h:187f4491-39c8-432f-945b-58275966d7aa">resolv.conf</a></li>
+</ul>
+</li>
+<li><a href="#h:6fda7978-ff74-41ad-aa99-27bb7a142ee8">DNS 服务相关概念和技术</a>
+<ul>
+<li><a href="#h:7daa7fbb-2b51-4235-8dad-0df58f97dbbd">DNS服务器的类型</a></li>
+<li><a href="#h:aa33f1a8-6647-4aef-af3c-490aff5fd663">区域传输</a></li>
+<li><a href="#h:11bc22a5-7615-44e8-bf5e-ae9bda395e50">解析形式</a></li>
+<li><a href="#h:2039ff81-0953-4483-96d8-f92dba2a82ec">负责本地域名的正向和反向解析库</a></li>
+<li><a href="#h:08306ef6-cf62-4e0b-95d9-c2eb4d68a19e">解析答案</a></li>
+<li><a href="#h:c8419a84-4d83-4300-a879-932c13460d19">各种资源记录</a>
+<ul>
+<li><a href="#h:97f3e0f7-b9da-43c4-9602-a278414677a4">资源记录定义的格式</a></li>
+<li><a href="#h:63ffa04b-d21d-4c00-8149-9747318a9c36">SOA记录</a></li>
+<li><a href="#h:c467e01c-2a83-4e69-9c43-dbd65647e320">NS记录</a></li>
+<li><a href="#h:a327eec4-ac93-4f00-b44f-2fc111140966">MX记录</a></li>
+<li><a href="#h:a43da457-94ce-45fc-870f-38dd9ecf1903">A记录</a></li>
+<li><a href="#h:a9a8ca46-f2a2-48c1-9ab1-9ae49d751285">AAAA记录</a></li>
+<li><a href="#h:c863ed60-070e-479b-b23e-24f44d6de439">PTR记录</a></li>
+<li><a href="#h:7179febd-c0f8-4995-8bf9-99de71da6933">CNAME别名记录</a></li>
+<li><a href="#h:45ce32d4-e0d3-4b81-a30e-3878d52a5ef4">bind配置样例</a></li>
+</ul>
+</li>
+<li><a href="#h:4a2f57df-8fe8-4c90-8b89-edb41629f845">子域授权</a></li>
+<li><a href="#h:7ccbb594-a46a-4c55-b5fd-0c80808deffd">互联网域名</a></li>
+</ul>
+</li>
+<li><a href="#h:b0095ea5-b5a0-44b0-a63e-fec025fb4c30">DNS软件bind</a>
+<ul>
+<li><a href="#h:755073c3-506e-4a9c-a424-40eca76fb2b7">BIND相关程序包</a></li>
+<li><a href="#h:675c094e-1657-41fe-add8-fae7d81061c6">BIND包相关文件</a></li>
+<li><a href="#h:2823210f-6905-4f5b-a993-c619584c90c8">主配置文件</a></li>
+</ul>
+</li>
+<li><a href="#h:c521c356-b98e-4a2f-aacf-b8203e8c1a03">实现主DNS服务器</a>
+<ul>
+<li><a href="#h:b9a231c9-b3c6-4cb2-8f7b-416ca90b6352">主DNS服务器配置</a></li>
+<li><a href="#h:1ddff8fb-bd41-4de2-8b17-e7f2605e7a2e">主配置文件语法检查</a></li>
+<li><a href="#h:fed36949-91ca-4483-afc1-49b740995418">解析库文件语法检查</a></li>
+<li><a href="#h:592b4797-da4d-4586-a74a-93494e7e8bcd">配置生效</a></li>
+<li><a href="#h:69b36bac-131e-43bf-b358-02881cb956e1">测试和管理工具</a>
+<ul>
+<li><a href="#h:aa970a54-0d6f-4c60-98f4-44bda0fff5c7"><b>dig 命令</b></a></li>
+<li><a href="#h:85204c9e-23c6-4a39-9a97-79c8a521e68c"><b>host命令</b></a></li>
+<li><a href="#h:eeb95f37-bec5-4b9a-b90d-31a2c3e1ce76"><b>nslookup命令</b></a></li>
+<li><a href="#h:da9e2cc7-33c2-404f-9b0d-c086a7fd38be"><b>rndc 命令</b></a></li>
+</ul>
+</li>
+<li><a href="#h:b58515e1-70d9-4896-ac43-9662d749505b">允许动态更新</a></li>
+<li><a href="#h:9e67c761-5ef2-4c71-92f3-947209c5be96">实战案例：实现DNS正向主服务器</a>
+<ul>
+<li><a href="#h:64e4913e-3819-47d5-9389-4991860b5d0e">实现步骤</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:b9417bbf-4374-4abb-b6f8-35bd40c9c2e5">实现反向解析区域</a>
+<ul>
+<li><a href="#h:efa07714-261b-472d-a9cc-4a0cf5c91b83">反向解析配置</a></li>
+<li><a href="#h:330eebe6-48b6-4369-b819-e3ef64f55c6b">实战案例: 反向解析</a></li>
+</ul>
+</li>
+<li><a href="#h:5fc6d8fe-fc4b-48b3-8d72-cde33378683a">实现从服务器</a>
+<ul>
+<li><a href="#h:27aec1e9-2abf-47fa-85e1-b21600109f93">DNS从服务器</a></li>
+<li><a href="#h:1ee68a87-92dc-47b9-a2ac-56612d4ba913">定义从区域</a></li>
+<li><a href="#h:8ec61da2-a37c-4284-9ffb-b726fa9ae0aa">实战案例：实现DNS从服务器</a>
+<ul>
+<li><a href="#h:29a0ccf6-d6d6-43f1-a91d-bf22124ba188">实现步骤</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:6f8e1dd5-31a3-4cb1-956b-7972d81c1cbc">实现子域</a>
+<ul>
+<li><a href="#h:fe5ea787-275b-4fca-8e41-413045d812b0">子域委派授权</a></li>
+<li><a href="#h:5bbbbdbc-ebf7-4344-8c4e-1ee23abde64b">范例：实现DNS父域和子域服务</a>
+<ul>
+<li><a href="#h:a6b01a36-ea51-4e57-820b-0c5b31ea65e1">实现步骤</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:e660314a-174a-490a-870d-4dfc6895ad6c">实现DNS转发（缓存）服务器</a>
+<ul>
+<li><a href="#h:ea48e77d-5e9a-4653-8b4d-6f2c011e552e">DNS转发</a></li>
+<li><a href="#h:ecbab737-7a2a-4b95-bb6f-91ad47cbca14">转发方式</a>
+<ul>
+<li><a href="#h:cc28bb36-d4ff-4038-9951-e9c3eae49dbc"><b>全局转发:</b></a></li>
+<li><a href="#h:32aaf96d-6195-4e26-9834-d57c1c0f8bdc"><b>特定区域转发</b></a></li>
+</ul>
+</li>
+<li><a href="#h:03e2dda1-0c73-4315-af61-a88668724904">实战案例：实现DNS forward（缓存）服务器</a>
+<ul>
+<li><a href="#h:8da728ea-e299-416e-bc9b-22a45955436a">实现步骤</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:f2703489-18aa-436b-aaf0-2333a8e3aa29">实现智能DNS</a>
+<ul>
+<li><a href="#h:9aa6d4d2-9cb1-4549-aaed-965823ed6298">GSLB</a></li>
+<li><a href="#h:3baa9e51-6091-4677-8ce3-439a690b4df8">CDN （Content Delivery Network）内容分发网络</a>
+<ul>
+<li><a href="#h:4ef6e1e2-6307-426b-9230-866657596bd4">CDN工作原理</a></li>
+<li><a href="#h:f0f37b86-ed85-4879-bf84-32660e566af1">CDN服务商</a></li>
+</ul>
+</li>
+<li><a href="#h:56b6def4-874e-407c-8cc8-206aa197271d">智能DNS相关技术</a>
+<ul>
+<li><a href="#h:fc098f35-c5ae-412f-b667-9ad7692af124"><b>bind中ACL</b></a></li>
+<li><a href="#h:922823db-c22b-4caf-bae5-64d256668e28"><b>bind有四个内置的acl</b></a></li>
+<li><a href="#h:afe15a00-b868-4fcf-ac60-f47bb62f4c4d">*访问控制的指令*：</a></li>
+<li><a href="#h:a64946e1-f0b8-4269-8717-05def2e9b583"><b>view 视图</b></a></li>
+</ul>
+</li>
+<li><a href="#h:7131424a-90f3-4757-ad96-b6b92c2ff4b7">实战案例：利用view实现智能DNS</a>
+<ul>
+<li><a href="#h:128f41ec-c4f7-410b-ae87-106ee950c214">实现步骤</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:c41efbe1-78d7-4712-bd53-b6078272e69e">DNS排错</a></li>
+<li><a href="#h:48dc0000-434e-442c-a26e-814e26f8c3a7">实战案例</a>
+<ul>
+<li><a href="#h:cb88380c-a346-422c-897e-54fd05ed9306">实战案例：综合案例，实现Internet 的DNS 服务架构</a>
+<ul>
+<li><a href="#h:3c5c11fc-ade2-4d78-a3e5-83f660b467fa">实现步骤</a></li>
+</ul>
+</li>
+<li><a href="#h:cba99d4c-3419-461b-8063-05858056885d">范例：自建dns服务器，数据库绑定MySQL</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-h:ce9a32a8-f9ad-45f6-8892-bc052fd8ca43" class="outline-2">
+<h2 id="h:ce9a32a8-f9ad-45f6-8892-bc052fd8ca43">域名系统DNS服务</h2>
+<div class="outline-text-2" id="text-h:ce9a32a8-f9ad-45f6-8892-bc052fd8ca43">
+<p>
+内容概述
+</p>
+
+<ul class="org-ul">
+<li>名字解析介绍</li>
+<li>DNS服务工作原理</li>
+<li>实现主服务器</li>
+<li>实现反向解析区域</li>
+<li>实现从服务器</li>
+<li>实现子域</li>
+<li>实现转发</li>
+<li>实现智能DNS</li>
+<li>DNS排错</li>
+<li>实现Internet 的DNS构架</li>
+</ul>
+</div>
+<div id="outline-container-h:d0b734d2-b8cf-4654-ade3-14c312b5f9c5" class="outline-3">
+<h3 id="h:d0b734d2-b8cf-4654-ade3-14c312b5f9c5">名字解析介绍和DNS</h3>
+<div class="outline-text-3" id="text-h:d0b734d2-b8cf-4654-ade3-14c312b5f9c5">
+<p>
+当前TCP/IP网络中的设备之间进行通信，是利用和依赖于IP地址实现的。但数字
+形式的IP地址是很难记忆的。当网络设备众多，想要记住每个设备的IP地址，可
+以说是“不可能完成的任务”。那么如何解决这一难题呢？我们可以给每个网络
+设备起一个友好的名称，如：www.aulii.com，这种由文字组成的名称，显而易
+见要更容易记忆。但是计算机不会理解这种名称的，我们可以利用一种名字解析
+服务将名称转化成（解析）成IP地址。从而我们就可以利用名称来直接访问网络
+中设备了。除此之外还有一个重要功能，利用名称解析服务可以实现主机和IP的
+解耦，即：当主机IP变化时，只需要修改名称服务即可，用户仍可以通过原有的
+名称进行访问而不受影响。
+</p>
+
+<p>
+实现此服务的方法是多样的。如下面所述：
+</p>
+
+<p>
+本地名称解析配置文件：hosts
+</p>
+
+<pre class="example" id="org8ca83fc">
+Linux: /etc/hosts
+windows: %WINDIR%/system32/drivers/etc/hosts
+
+122.10.117.2 www.me.org
+93.46.8.89 www.google.com
+</pre>
+
+<p>
+DNS：Domain Name System域名系统,应用层协议,是互联网的一项服务。它作为
+将域名和IP地址相互映射的一个分布式数据库，能够使人更方便地访问互联网基
+于C/S架构，服务器端：53/udp, 53/tcp BIND：Bekerley Internet Name
+Domain,由 ISC （www.isc.org）提供的DNS软件实现DNS域名结构
+</p>
+
+
+<figure id="org88c692d">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210122170934638.png" alt="image-20210122170934638.png">
+
+</figure>
+
+
+<figure id="orgb590c10">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210422120743632.png" alt="image-20210422120743632.png">
+
+</figure>
+
+<p>
+FQDN是指主机名加上全路径，全路径中列出了序列中所有域成员。全域名可以从
+逻辑上准确地表示出主机在什么地方，也可以说全域名是主机名的一种完全表示
+形式。从全域名中包含的信息可以看出主机在域名树中的位置
+</p>
+
+<pre class="example" id="org3a7be0c">
+www.abc.com.
+
+FQDN 全称域名 = 主机名(www)+域名(abc.com) 
+域名 = 子域名(abc) + 父域名(com =子域名(com)+父域名(.))
+</pre>
+
+<ul class="org-ul">
+<li>根域</li>
+<li><p>
+一级域名：Top Level Domain: tld  
+com, edu, mil, gov, net, org, int,arpa  
+</p>
+
+<p>
+三类：组织域、国家域\(.cn, .ca, .hk, .tw\)、反向域
+</p>
+
+<p>
+国家都按照ISO3166国家代码分配
+</p></li>
+
+<li>二级域名：me.com</li>
+<li>三级域名：study.me.com</li>
+<li>最多可达到127级域名</li>
+</ul>
+
+<p>
+ICANN（The Internet Corporation for Assigned Names and Numbers）互联网
+名称与数字地址分配机构，负责在全球范围内对互联网通用顶级域名（gTLD）以
+及国家和地区顶级域名（ccTLD）系统的管理、以及根服务器系统的管理
+</p>
+</div>
+<div id="outline-container-h:4682b6d4-60fd-41be-90b5-6d4bb7cff3b4" class="outline-4">
+<h4 id="h:4682b6d4-60fd-41be-90b5-6d4bb7cff3b4">DNS服务工作原理</h4>
+<div class="outline-text-4" id="text-h:4682b6d4-60fd-41be-90b5-6d4bb7cff3b4">
+
+<figure id="org05f9063">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210122171002396.png" alt="image-20210122171002396.png">
+
+</figure>
+
+
+<figure id="org681aad6">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210423172139508.png" alt="image-20210423172139508.png">
+
+</figure>
+
+<p>
+DNS代理解析服务器：值缓存服务器，没有缓存记录会去问根服务器它的下级域
+名服务器在哪，收到地址后再去询问直到找到域名对应的地址，本地缓存返回给
+用户。
+</p>
+</div>
+</div>
+<div id="outline-container-h:da01ae48-3113-4179-a056-953fb87a4c15" class="outline-4">
+<h4 id="h:da01ae48-3113-4179-a056-953fb87a4c15">DNS查询类型</h4>
+<div class="outline-text-4" id="text-h:da01ae48-3113-4179-a056-953fb87a4c15">
+<ul class="org-ul">
+<li><p>
+递归查询：最终结果，负责到底
+</p>
+
+<p>
+一般客户机和本地DNS服务器之间属于递归查询，即当客户机向DNS服务器发出
+请求后，若DNS服务器本身不能解析，则会向另外的DNS服务器发出查询请求，
+得到最终的肯定或否定的结果后转交给客户机。此查询的源和目标保持不变,
+为了查询结果只需要发起一次查询
+</p></li>
+
+<li><p>
+迭代查询：最好结果，不负责到底
+</p>
+
+<p>
+一般情况下(有例外)本地的DNS服务器向其它DNS服务器的查询属于迭代查询,
+如：若对方不能返回权威的结果，则它会向下一个DNS服务器(参考前一个DNS
+服务器返回的结果)再次发起进行查询，直到返回查询的结果为止。此查询的
+源不变,但查询的目标不断变化,为查询结果一般需要发起多次查询
+</p></li>
+</ul>
+
+<p>
+范例： whois 查询域名信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install -y whois
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">whois xuchangwei.com</span>
+   Domain Name: XUCHANGWEI.COM
+   Registry Domain ID: 2586961341_DOMAIN_COM-VRSN
+   Registrar WHOIS Server: grs-whois.hichina.com
+   Registrar URL: http://www.net.cn
+   Updated Date: 2021-01-26T08:40:52Z
+   Creation Date: 2021-01-25T13:38:08Z
+... ...
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ac8deae3-6752-441a-a791-5c6ce4a0310f" class="outline-4">
+<h4 id="h:ac8deae3-6752-441a-a791-5c6ce4a0310f">名称服务器</h4>
+<div class="outline-text-4" id="text-h:ac8deae3-6752-441a-a791-5c6ce4a0310f">
+<p>
+Name Server,域内负责解析本域内的名称的DNS服务器
+</p>
+
+<p>
+IPv4的根名称服务器：全球共13个负责解析根域的DNS服务器，美国10个，荷兰1，瑞典1，日本1
+</p>
+
+<p>
+IPv6的根名称服务器：全球共25个，中国1主3从，美国1主2从
+</p>
+</div>
+</div>
+<div id="outline-container-h:61597d1b-f990-44df-972f-dbec7b10c7ce" class="outline-4">
+<h4 id="h:61597d1b-f990-44df-972f-dbec7b10c7ce">解析类型</h4>
+<div class="outline-text-4" id="text-h:61597d1b-f990-44df-972f-dbec7b10c7ce">
+<ul class="org-ul">
+<li>FQDN &#x2013;&gt; IP 正向解析</li>
+<li><p>
+IP &#x2013;&gt; FQDN 反向解析
+</p>
+
+<p>
+注意：正反向解析是两个不同的名称空间，是两棵不同的解析树
+</p></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:4cefa36e-2e81-451d-acd4-7b2c34e1a736" class="outline-4">
+<h4 id="h:4cefa36e-2e81-451d-acd4-7b2c34e1a736">完整的查询请求经过的流程</h4>
+<div class="outline-text-4" id="text-h:4cefa36e-2e81-451d-acd4-7b2c34e1a736">
+<pre class="example" id="orgf8b3300">
+Client --&gt;hosts文件 --&gt; Client DNS Service Local Cache --&gt; DNS Server (recursion递归) --&gt; DNS Server Cache --&gt;DNS iteration(迭代) --&gt; 根--&gt; 顶级域名DNS--&gt;二级域名DNS…
+</pre>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">D:\download<span style="color: #8b2252;">\&gt;</span>ipconfig/displaydns | findstr  redhat
+
+D:\download<span style="color: #8b2252;">\&gt;</span>ping www.redhat.com
+
+&#27491;&#22312; Ping e3396.ca2.s.tl88.net [223.111.109.110] &#20855;&#26377; 32 &#23383;&#33410;&#30340;&#25968;&#25454;:
+&#26469;&#33258; 223.111.109.110 &#30340;&#22238;&#22797;: <span style="color: #a0522d;">&#23383;&#33410;</span>=32 <span style="color: #a0522d;">&#26102;&#38388;</span>=38ms <span style="color: #a0522d;">TTL</span>=54
+&#26469;&#33258; 223.111.109.110 &#30340;&#22238;&#22797;: <span style="color: #a0522d;">&#23383;&#33410;</span>=32 <span style="color: #a0522d;">&#26102;&#38388;</span>=38ms <span style="color: #a0522d;">TTL</span>=54
+&#26469;&#33258; 223.111.109.110 &#30340;&#22238;&#22797;: <span style="color: #a0522d;">&#23383;&#33410;</span>=32 <span style="color: #a0522d;">&#26102;&#38388;</span>=38ms <span style="color: #a0522d;">TTL</span>=54
+&#26469;&#33258; 223.111.109.110 &#30340;&#22238;&#22797;: <span style="color: #a0522d;">&#23383;&#33410;</span>=32 <span style="color: #a0522d;">&#26102;&#38388;</span>=38ms <span style="color: #a0522d;">TTL</span>=54
+
+223.111.109.110 &#30340; Ping &#32479;&#35745;&#20449;&#24687;:
+    &#25968;&#25454;&#21253;: &#24050;&#21457;&#36865; = 4&#65292;&#24050;&#25509;&#25910; = 4&#65292;&#20002;&#22833; = 0 (0% &#20002;&#22833;)&#65292;
+<span style="color: #0000ff;">&#24448;&#36820;&#34892;&#31243;&#30340;&#20272;&#35745;&#26102;&#38388;</span>(&#20197;&#27627;&#31186;&#20026;&#21333;&#20301;):
+    &#26368;&#30701; = 38ms&#65292;&#26368;&#38271; = 38ms&#65292;&#24179;&#22343; = 38ms
+
+D:\download<span style="color: #8b2252;">\&gt;</span>ipconfig/displaydns | findstr  redhat
+    www.redhat.com
+    &#35760;&#24405;&#21517;&#31216;. . . . . . . : www.redhat.com
+    CNAME &#35760;&#24405;  . . . . . : ds-www.redhat.com.edgekey.net
+    &#35760;&#24405;&#21517;&#31216;. . . . . . . : ds-www.redhat.com.edgekey.net
+    CNAME &#35760;&#24405;  . . . . . : ds-www.redhat.com.edgekey.net.globalredir.akadns.net
+    &#35760;&#24405;&#21517;&#31216;. . . . . . . : ds-www.redhat.com.edgekey.net.globalredir.akadns.net
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21047;&#26032; dns &#32531;&#23384;</span>
+D:\download<span style="color: #8b2252;">\&gt;</span>ipconfig/flushdns
+
+Windows IP &#37197;&#32622;
+
+&#24050;&#25104;&#21151;&#21047;&#26032; DNS &#35299;&#26512;&#32531;&#23384;&#12290;
+
+D:\download<span style="color: #8b2252;">\&gt;</span>ipconfig/displaydns | findstr  redhat
+
+D:\download<span style="color: #8b2252;">\&gt;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8ba204be-cb3d-4098-ad57-e6b0cd2bc943" class="outline-4">
+<h4 id="h:8ba204be-cb3d-4098-ad57-e6b0cd2bc943">nsswitch网路名称服务解析</h4>
+<div class="outline-text-4" id="text-h:8ba204be-cb3d-4098-ad57-e6b0cd2bc943">
+<p>
+1.nsswitch：network/name service switch网路名称服务解析
+</p>
+
+<p>
+nsswitch是通用框架，与各种类型存储进行交互的公共模块化实现；
+</p>
+
+<pre class="example" id="org51c01d0">
+实现： /usr/lib64/libnss*, /lib64/libnss*
+
+框架：libnss
+
+驱动： libnss_files-
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node1 lib]# ls /usr/lib64/ | grep nss
+libnss_dns-2.17.so
+libnss_dns.so.2
+libnss_files-2.17.so
+libnss_files.so.2
+libnss_hesiod-2.17.so
+libnss_hesiod.so.2
+libnss_myhostname.so.2
+libnss_nis-2.17.so
+</pre>
+</div>
+
+<p>
+2.配置文件：/etc/nsswitch.conf
+</p>
+
+<p>
+(1)格式 解析库: store1 store2
+</p>
+
+<p>
+为每一种用到解析库的应用通过配置文件定义其位置：
+</p>
+
+<p>
+例如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">passwd: files ldap      <span style="color: #b22222;"># </span><span style="color: #b22222;">&#23494;&#30721;&#36890;&#36807;&#25991;&#20214;&#35299;&#26512;</span>
+hosts: files  dns       <span style="color: #b22222;"># </span><span style="color: #b22222;">DNS&#30340;&#20248;&#20808;&#32423;&#12290;&#36890;&#36807;&#25991;&#20214;&#35299;&#26512;&#65292;&#33509;&#27809;&#26377;&#20877;&#36890;&#36807;dns&#35299;&#26512;&#12290; files=/etc/hosts dns=/etc/resolv.conf</span>
+</pre>
+</div>
+
+<p>
+(2)解析库： 文件、关系型数据管理系统(MySQL)、LDAP、NIS、DNS
+</p>
+
+<p>
+(3)每种存储中的查找结果状态：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">STATSU =&gt; success | notfound | unavail | tryagain
+
+success: &#26381;&#21153;&#27491;&#24120;
+NOTFOUND: &#26381;&#21153;&#27491;&#24120;&#65292;&#20294;&#27809;&#26377;&#23545;&#24212;&#26465;&#30446;
+UNAVAIL&#65306;&#26381;&#21153;&#19981;&#21487;&#29992;
+TRYAGAIN&#65306;&#26381;&#21153;&#26377;&#20020;&#26102;&#24615;&#25925;&#38556;
+    &#40664;&#35748;&#22312;SUCCESS&#21518;&#23601; return&#20102;&#65292;
+</pre>
+</div>
+
+<p>
+(4)对应于每种状态结果的行为：
+</p>
+
+<p>
+<code>return（返回） | continue （继续）</code>
+</p>
+
+<p>
+例子：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">hosts: files  nis [<span style="color: #a0522d;">NOTFOUND</span>=return]  dns 
+    &#25214;hosts&#26102;&#31532;&#19968;&#27425;file&#20013;&#25214;&#65292;&#25214;&#19981;&#21040;&#21435;Nis&#20013;&#25214;&#65292;nis&#26381;&#21153;&#27491;&#24120;&#65292;&#20294;&#27809;&#26377;&#23545;&#24212;&#26465;&#30446;&#23601;&#36820;&#22238;&#65292;nis&#26381;&#21153;&#19981;&#21487;&#29992;&#26102;&#21435;dns&#20013;&#25214;
+</pre>
+</div>
+
+<p>
+3.getent命令：get entries，从管理库中获取指定条目
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">getent  DATABASE  [key]
+</pre>
+</div>
+
+<p>
+范例
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node1 lib]# getent hosts  &#33719;&#21462;&#23545;&#24212;&#24211;&#20869;&#23481;
+127.0.0.1       localhost localhost.localdomain localhost4 localhost4.localdomain4
+127.0.0.1       localhost localhost.localdomain localhost6 localhost6.localdomain6
+[root@node1 lib]# getent passwd root   &#33719;&#21462;&#24211;&#20013;&#25351;&#23450;&#26465;&#30446;
+root:x:0:0:root:/root:/bin/bash
+[root@middle-ware ~]# getent shadow root
+root:$<span style="color: #a0522d;">6</span>$<span style="color: #a0522d;">G7pLVnKe4xdwkUQ6</span>$<span style="color: #a0522d;">oL0Z2gOtb7ssPatwwUKBhhAuft</span>.cJHkt7MO.FXw0ZxzIS0BX0R4A1o85bVrPEeiDZOdAhP9ffI725jtrfx/kP.::0:99999:7:::
+
+[root@node1 lib]# getent hosts xuchangwei.com   file&#20013;&#27809;&#24471;&#65292;&#36890;&#36807;dns 172.16.0.1 &#35299;&#26512;
+182.92.4.110    xuchangwei.com
+
+[root@node1 lib]# cat /etc/resolv.conf 
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Generated by NetworkManager</span>
+search xuchangwei.com
+nameserver 223.5.5.5
+nameserver 223.6.6.6
+
+IPv4&#22320;&#22336;&#65306;
+223.5.5.5
+223.6.6.6
+
+IPv6&#22320;&#22336;&#65306;
+2400:3200::1
+2400:3200:baba::1
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:187f4491-39c8-432f-945b-58275966d7aa" class="outline-4">
+<h4 id="h:187f4491-39c8-432f-945b-58275966d7aa">resolv.conf</h4>
+<div class="outline-text-4" id="text-h:187f4491-39c8-432f-945b-58275966d7aa">
+<p>
+参考：<a href="http://man7.org/linux/man-pages/man5/resolv.conf.5.html">http://man7.org/linux/man-pages/man5/resolv.conf.5.html</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">options rotate timeout:1 attempts:3 single-request-reopen
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37322;&#20041;&#65306; &#24490;&#29615;&#26597;&#35810; &#36229;&#26102;&#26102;&#38388; &#37325;&#35797;&#27425;&#25968; &#21482;&#25910;&#21040;&#19968;&#20010;IPV4&#24212;&#31572;&#25110;&#32773;&#21482;&#25910;&#21040;&#19968;&#20010;IPV6&#24212;&#31572;&#65292;&#37325;&#26032;&#24320;&#19968;&#20010;socket&#26597;&#35810;</span>
+
+&#37197;&#32622;&#35828;&#26126;&#65306;
+nameserver &#65306;&#34920;&#26126;DNS&#26381;&#21153;&#22120;&#30340;IP&#22320;&#22336;&#12290;&#21487;&#20197;&#26377;&#24456;&#22810;&#34892;&#30340;nameserver&#65292;&#27599;&#19968;&#20010;&#24102;&#19968;&#20010;IP&#22320;&#22336;&#12290;&#22312;&#26597;&#35810;&#26102;&#23601;&#25353;nameserver&#22312;&#26412;&#25991;&#20214;&#20013;&#30340;&#39034;&#24207;&#36827;&#34892;&#65292;&#19988;&#21482;&#26377;&#24403;&#31532;&#19968;&#20010;nameserver&#27809;&#26377;&#21453;&#24212;&#26102;&#25165;&#26597;&#35810;&#19979;&#38754;&#30340;nameserver&#12290;
+domain     &#65306;&#22768;&#26126;&#20027;&#26426;&#30340;&#22495;&#21517;&#12290;&#24456;&#22810;&#31243;&#24207;&#29992;&#21040;&#23427;&#65292;&#22914;&#37038;&#20214;&#31995;&#32479;&#65307;&#24403;&#20026;&#27809;&#26377;&#22495;&#21517;&#30340;&#20027;&#26426;&#36827;&#34892;DNS&#26597;&#35810;&#26102;&#65292;&#20063;&#35201;&#29992;&#21040;&#12290;&#22914;&#26524;&#27809;&#26377;&#22495;&#21517;&#65292;&#20027;&#26426;&#21517;&#23558;&#34987;&#20351;&#29992;&#65292;&#21024;&#38500;&#25152;&#26377;&#22312;&#31532;&#19968;&#20010;&#28857;( <span style="color: #483d8b;">.</span>)&#21069;&#38754;&#30340;&#20869;&#23481;&#12290;
+search     &#65306;&#23427;&#30340;&#22810;&#20010;&#21442;&#25968;&#25351;&#26126;&#22495;&#21517;&#26597;&#35810;&#39034;&#24207;&#12290;&#24403;&#35201;&#26597;&#35810;&#27809;&#26377;&#22495;&#21517;&#30340;&#20027;&#26426;&#65292;&#20027;&#26426;&#23558;&#22312;&#30001;search&#22768;&#26126;&#30340;&#22495;&#20013;&#20998;&#21035;&#26597;&#25214;&#12290;domain&#21644;search&#19981;&#33021;&#20849;&#23384;&#65307;&#22914;&#26524;&#21516;&#26102;&#23384;&#22312;&#65292;&#21518;&#38754;&#20986;&#29616;&#30340;&#23558;&#20250;&#34987;&#20351;&#29992;&#12290;
+sortlist   &#65306;&#20801;&#35768;&#23558;&#24471;&#21040;&#22495;&#21517;&#32467;&#26524;&#36827;&#34892;&#29305;&#23450;&#30340;&#25490;&#24207;&#12290;&#23427;&#30340;&#21442;&#25968;&#20026;&#32593;&#32476;/&#25513;&#30721;&#23545;&#65292;&#20801;&#35768;&#20219;&#24847;&#30340;&#25490;&#21015;&#39034;&#24207;&#12290;
+options    &#65306;&#29992;&#20110;&#37197;&#32622;resolver&#30340;&#20869;&#32622;&#21464;&#37327;&#65292;&#19981;&#26159;resolv.conf&#30340;&#24120;&#35265;&#37197;&#32622;&#12290;
+
+* &#27880;&#24847;&#20107;&#39033;
+&#65288;1&#65289;search &#21644; domain &#19981;&#33021;&#20849;&#23384;&#65292;&#22914;&#26524;&#21516;&#26102;&#23384;&#22312;&#65292;&#20197;&#26368;&#21518;&#20986;&#29616;&#30340;&#20026;&#20934;&#12290;
+&#65288;2&#65289;&#20998;&#21495;&#65288;;&#65289;&#25110;&#20117;&#21495;&#65288;#&#65289;&#24320;&#22836;&#30340;&#34892;&#20026;&#27880;&#37322;&#34892;&#65307;
+&#65288;3&#65289;&#27599;&#19968;&#20010;&#37197;&#32622;&#39033;&#24517;&#39035;&#21333;&#29420;&#25104;&#34892;&#65292;&#19988;&#20197;&#20851;&#38190;&#35789;&#24320;&#22836;&#65292;&#31354;&#26684;&#20998;&#38548;&#37197;&#32622;&#20540;&#12290;
+
+options&#21462;&#20540;&#65306;
+ndots:[n]            &#65306;&#35774;&#32622;&#35843;&#29992;res_query()&#35299;&#26512;&#22495;&#21517;&#26102;&#22495;&#21517;&#33267;&#23569;&#21253;&#21547;&#30340;&#28857;&#30340;&#25968;&#37327;
+timeout:[n]          &#65306;&#35774;&#32622;&#31561;&#24453;dns&#26381;&#21153;&#22120;&#36820;&#22238;&#30340;&#36229;&#26102;&#26102;&#38388;&#65292;&#21333;&#20301;&#31186;&#12290;<span style="color: #a0522d;">&#40664;&#35748;&#20540;RES_TIMEOUT</span>=5&#65292;&#21442;&#35265;&lt;resolv.h&gt;
+attempts:[n]         &#65306;&#35774;&#32622;resolver&#21521;DNS&#26381;&#21153;&#22120;&#21457;&#36215;&#22495;&#21517;&#35299;&#26512;&#30340;&#35831;&#27714;&#27425;&#25968;&#12290;<span style="color: #a0522d;">&#40664;&#35748;&#20540;RES_DFLRETRY</span>=2&#65292;&#21442;&#35265;&lt;resolv.h&gt;
+rotate               &#65306;&#22312;_res.options&#20013;&#35774;&#32622;RES_ROTATE&#65292;&#37319;&#29992;&#36718;&#35810;&#26041;&#24335;&#35775;&#38382;nameserver&#65292;&#23454;&#29616;&#36127;&#36733;&#22343;&#34913;
+no-check-names       &#65306;&#22312;_res.options&#20013;&#35774;&#32622;RES_NOCHECKNAME&#65292;&#31105;&#27490;&#23545;&#20256;&#20837;&#30340;&#20027;&#26426;&#21517;&#21644;&#37038;&#20214;&#22320;&#22336;&#36827;&#34892;&#26080;&#25928;&#23383;&#31526;&#26816;&#26597;&#65292;&#27604;&#22914;&#19979;&#21010;&#32447;&#65288;_&#65289;,&#38750;ASCII&#23383;&#31526;&#25110;&#25511;&#21046;&#23383;&#31526;
+use-vc               &#65306;&#24378;&#21046; glibc &#20351;&#29992; TCP &#21327;&#35758;&#21457;&#36865; DNS query
+single-request       &#65306; &#29992;&#26469;&#25351;&#23450;&#20998;&#21035;&#25191;&#34892;A&#21644;AAAA&#35299;&#26512;&#65307;&#21363;&#65292;&#25910;&#21040;A&#35760;&#24405;&#35299;&#26512;&#30340;&#32467;&#26524;&#21518;&#22312;&#21457;&#36865;AAAA&#35760;&#24405;&#35299;&#26512;&#35831;&#27714;&#65307; &#40664;&#35748;&#24773;&#20917;&#19979;&#65292;&#21516;&#26102;&#22312;&#19968;&#20010;&#36830;&#25509;&#19978;&#21457;&#36865;A&#21644;AAAA&#30340;&#35299;&#26512;&#65292;&#36825;&#26679;&#25928;&#29575;&#20250;&#39640;&#19968;&#20493;&#65307;&#28982;&#32780;&#65292;&#26377;&#20123;dns server&#19981;&#33021;&#24456;&#22909;&#22320;&#22788;&#29702;&#36825;&#31181;&#35831;&#27714;&#26041;&#24335;&#65292;&#24456;&#21487;&#33021;&#19981;&#33021;&#27491;&#30830;&#22320;&#36820;&#22238;AAAA&#30340;&#21709;&#24212;&#65292;&#20197;&#33267;&#20110;&#35831;&#27714;&#20250;&#36229;&#26102;
+single-request-reopen&#65306;&#24378;&#21046;A&#21644;AAAA&#30340;&#35299;&#26512;&#22312;&#20004;&#20010;&#36830;&#25509;&#20013;&#22788;&#29702;&#65288;&#20027;&#35201;&#20307;&#29616;&#22312;&#36830;&#25509;&#30340;&#28304;&#31471;&#21475;&#19981;&#21516;&#65289;
+</pre>
+</div>
+
+<p>
+范例：DNS解析缓慢
+</p>
+
+<p>
+原因是CentOS 6/REHL 6总是需要等待AAAA（IPv6）的结果，即使IPv6已在网络
+设置中禁用
+</p>
+
+<p>
+你没法通过options来禁用ipv6解析
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#22312;/etc/resolv.conf&#25991;&#20214;&#28155;&#21152;&#19979;&#38754;&#19968;&#34892;&#65306;</span>
+vim /etc/resolv.conf
+options single-request-reopen
+nameserver 192.168.18.77
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20462;&#25913;/etc/sysctl.conf&#25991;&#20214;&#65306;</span>
+vim /etc/sysctl.conf
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20351;&#20043;&#29983;&#25928;</span>
+sysctl -p 
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6fda7978-ff74-41ad-aa99-27bb7a142ee8" class="outline-3">
+<h3 id="h:6fda7978-ff74-41ad-aa99-27bb7a142ee8">DNS 服务相关概念和技术</h3>
+<div class="outline-text-3" id="text-h:6fda7978-ff74-41ad-aa99-27bb7a142ee8">
+</div>
+<div id="outline-container-h:7daa7fbb-2b51-4235-8dad-0df58f97dbbd" class="outline-4">
+<h4 id="h:7daa7fbb-2b51-4235-8dad-0df58f97dbbd">DNS服务器的类型</h4>
+<div class="outline-text-4" id="text-h:7daa7fbb-2b51-4235-8dad-0df58f97dbbd">
+<ul class="org-ul">
+<li>主DNS服务器</li>
+<li>从DNS服务器</li>
+<li>缓存DNS服务器（转发器）</li>
+</ul>
+
+<p>
+<b>主DNS服务器</b>
+</p>
+
+<p>
+管理和维护所负责解析的域内解析库的服务器
+</p>
+
+<p>
+<b>从DNS服务器</b>
+</p>
+
+<p>
+从主服务器或从服务器“复制”（区域传输）解析库副本
+</p>
+
+<ul class="org-ul">
+<li>序列号：解析库版本号，主服务器解析库变化时，其序列递增</li>
+<li>刷新时间间隔：从服务器从主服务器请求同步解析的时间间隔</li>
+<li>重试时间间隔：从服务器请求同步失败时，再次尝试时间间隔</li>
+<li>过期时长：从服务器联系不到主服务器时，多久后停止服务</li>
+<li>通知机制：主服务器解析库发生变化时，会主动通知从服务器</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:aa33f1a8-6647-4aef-af3c-490aff5fd663" class="outline-4">
+<h4 id="h:aa33f1a8-6647-4aef-af3c-490aff5fd663">区域传输</h4>
+<div class="outline-text-4" id="text-h:aa33f1a8-6647-4aef-af3c-490aff5fd663">
+<ul class="org-ul">
+<li>完全传输：传送整个解析库</li>
+<li>增量传输：传递解析库变化的那部分内容</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:11bc22a5-7615-44e8-bf5e-ae9bda395e50" class="outline-4">
+<h4 id="h:11bc22a5-7615-44e8-bf5e-ae9bda395e50">解析形式</h4>
+<div class="outline-text-4" id="text-h:11bc22a5-7615-44e8-bf5e-ae9bda395e50">
+<ul class="org-ul">
+<li>正向：FQDN（ Fully Qualified Domain Name） &#x2013;&gt; IP</li>
+<li>反向: IP &#x2013;&gt; FQDN</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2039ff81-0953-4483-96d8-f92dba2a82ec" class="outline-4">
+<h4 id="h:2039ff81-0953-4483-96d8-f92dba2a82ec">负责本地域名的正向和反向解析库</h4>
+<div class="outline-text-4" id="text-h:2039ff81-0953-4483-96d8-f92dba2a82ec">
+<ul class="org-ul">
+<li>正向区域</li>
+<li>反向区域</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:08306ef6-cf62-4e0b-95d9-c2eb4d68a19e" class="outline-4">
+<h4 id="h:08306ef6-cf62-4e0b-95d9-c2eb4d68a19e">解析答案</h4>
+<div class="outline-text-4" id="text-h:08306ef6-cf62-4e0b-95d9-c2eb4d68a19e">
+<ul class="org-ul">
+<li>肯定答案：存在对应的查询结果</li>
+<li>否定答案：请求的条目不存在等原因导致无法返回结果</li>
+<li>权威答案：直接由存有此查询结果的DNS服务器（权威服务器）返回的答案</li>
+<li>非权威答案：由其它非权威服务器返回的查询答案</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c8419a84-4d83-4300-a879-932c13460d19" class="outline-4">
+<h4 id="h:c8419a84-4d83-4300-a879-932c13460d19">各种资源记录</h4>
+<div class="outline-text-4" id="text-h:c8419a84-4d83-4300-a879-932c13460d19">
+<p>
+权威参考：<a href="http://www.ietf.org/rfc/rfc1035.txt">RFC 1035</a>
+</p>
+
+<p>
+区域解析库：由众多资源记录RR(Resource Record)组成。
+</p>
+
+<p>
+记录类型：A, AAAA, PTR, SOA, NS, CNAME, MX
+</p>
+
+<p>
+可查询的类型有如下
+</p>
+<ul class="org-ul">
+<li><b>SOA</b> ：Start Of Authority，起始授权记录；一个区域解析库有且仅能有一个
+SOA记录，必须位于解析库的第一条记录</li>
+<li><b>A</b> ：internet Address，地址记录，作用FQDN &#x2013;&gt; IP ，即名称解析成IP</li>
+<li><b>AAAA</b> ：地址记录，FQDN &#x2013;&gt; IPv6</li>
+<li>AFSDB ：Andrew文件系统数据库服务器记录</li>
+<li>ATMA ：ATM地址记录</li>
+<li><b>CNAME</b> ：Canonical Name别名记录</li>
+<li>HINFO ：硬件配置记录，包括CPU、操作系统信息</li>
+<li>ISDN  ：域名对应的ISDN号码</li>
+<li>MB ：存放指定邮箱的服务器</li>
+<li>MG ：邮件组记录</li>
+<li>MINFO ：邮件组和邮箱的信息记录</li>
+<li>MR ：改名的邮箱记录</li>
+<li><b>MX</b> ：Mail eXchanger邮件服务器记录</li>
+<li><b>NS</b> ：Name Server名字服务器记录，专用于标明当前区域的DNS服务器</li>
+<li><b>PTR</b> ：PoinTeR反向记录，IP &#x2013;&gt; FQDN</li>
+<li>RP ：负责人记录</li>
+<li>RT ：路由穿透记录</li>
+<li>SRV ：TCP服务器信息记录。主机记录： 格式为 服务的名字.协议的类型；例如： <code>_sip._tcp</code></li>
+<li>X25 ：域名对应的X.25地址记录</li>
+<li><p>
+<b>TXT</b> ：域名对应的文本信息；对域名进行标识和说明的一种方式，一般做验证
+记录时会使用此项，如：SPF（反垃圾邮件）记录，https验证等，如下示
+例：
+</p>
+
+<pre class="example" id="org9193cef">
+_dnsauth TXT 2012011200000051qgs69bwoh4h6nht4n1h0lr038x
+</pre></li>
+</ul>
+
+<p>
+范例：nslookup使用详解
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#30452;&#25509;&#26597;&#35810;&#26576;&#22495;&#21517;&#30340;IP,&#40664;&#35748;&#20351;&#29992;&#31995;&#32479;&#30340;dns&#26381;&#21153;&#22120;&#26469;&#26597;&#35810;</span>
+nslookup www.baidu.com
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25351;&#23450;dns&#26381;&#21153;&#22120;&#26597;&#35810;&#26576;&#22495;&#21517;,&#25351;&#23450;&#20351;&#29992;114.114.114.114dns&#26381;&#21153;&#22120;&#26469;&#26597;&#35810;&#22495;&#21517;</span>
+nslookup www.baidu.com 114.114.114.114
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25351;&#23450;&#26597;&#35810;&#26576;&#22495;&#21517;&#30340;&#35760;&#24405;&#31867;&#22411;,&#40664;&#35748;&#26597;&#35810;&#30340;&#26159;A&#35760;&#24405;</span>
+nslookup -qt=MX mail.163.com
+</pre>
+</div>
+</div>
+<div id="outline-container-h:97f3e0f7-b9da-43c4-9602-a278414677a4" class="outline-5">
+<h5 id="h:97f3e0f7-b9da-43c4-9602-a278414677a4">资源记录定义的格式</h5>
+<div class="outline-text-5" id="text-h:97f3e0f7-b9da-43c4-9602-a278414677a4">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #0000ff;">name</span>(&#21517;&#31216;)    [TTL](&#32531;&#23384;&#26102;&#38271;)   IN      rr_type(&#35760;&#24405;&#31867;&#22411;)     value(&#20540;&#65292;&#21487;&#20197;&#21253;&#21547;&#22810;&#27573;&#32452;&#25104;)
+</pre>
+</div>
+
+<p>
+注意：
+</p>
+
+<ol class="org-ol">
+<li>TTL可从全局继承</li>
+<li>使用 "<code>@</code>" 符号可用于引用当前区域的名字</li>
+<li>同一个名字可以通过多条记录定义多个不同的值；此时DNS服务器会以轮询方式响应</li>
+<li>同一个值也可能有多个不同的定义名字；通过多个不同的名字指向同一个值
+进行定义；此仅表示通过多个不同的名字可以找到同一个主机</li>
+</ol>
+
+<p>
+面试题：
+</p>
+
+<blockquote>
+<ol class="org-ol">
+<li>我的网站域名需要更改，如何使其更快的生效？</li>
+
+<li>更改TTL值为多少比较合适呢？是如何生效的？</li>
+</ol>
+</blockquote>
+</div>
+</div>
+<div id="outline-container-h:63ffa04b-d21d-4c00-8149-9747318a9c36" class="outline-5">
+<h5 id="h:63ffa04b-d21d-4c00-8149-9747318a9c36">SOA记录</h5>
+<div class="outline-text-5" id="text-h:63ffa04b-d21d-4c00-8149-9747318a9c36">
+<p>
+起始授权记录，描述了当前数据库的信息
+</p>
+
+<p>
+name: 当前区域的名字，例如“me.org.” 或者 "@"
+</p>
+
+<p>
+value: 有多部分组成
+</p>
+
+<p>
+注意：
+</p>
+
+<ol class="org-ol">
+<li>当前区域的主DNS服务器的FQDN，也可以使用当前区域的名字</li>
+<li>当前区域管理员的邮箱地址；但地址中不能使用@符号，一般用.替换
+例如：admin.me.org</li>
+<li>主从服务区域传输相关定义以及否定的答案的统一的TTL。时间单位：M(分)，
+H(时)，D(天)，W(天)，M(月)</li>
+</ol>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">//@   86400   IN  SOA       ns1.me.org.(&#24403;&#21069;&#30340;dns&#26381;&#21153;&#22120;&#20027;&#26381;&#21153;&#22120;)   nsadmin.me.org.(&#24403;&#21069;dns&#26381;&#21153;&#22120;&#30340;&#31649;&#29702;&#21592;)   (&#23646;&#24615;&#65292;&#21487;&#23450;&#20041;&#22312;&#19968;&#34892;&#25110;&#22810;&#34892;&#20013;)
+//&#24403;&#21069;&#30340;dns&#26381;&#21153;&#22120;&#21487;&#33021;A&#35760;&#24405;&#35299;&#26512; ns.me.org. IN A 10.0.0.8
+
+me.org.   86400   IN  SOA       ns1.me.org.   nsadmin.me.org.   (
+        2015042201  ;&#24207;&#21015;&#21495;&#65292;&#25163;&#21160;&#35774;&#32622;&#12290;&#22914;&#26524;&#20027;&#26381;&#21153;&#22120;&#29256;&#26412;&#21495;&#27604;&#20174;&#26381;&#21153;&#22120;&#29256;&#26412;&#21495;&#22823;&#23601;&#35748;&#20026;&#26159;&#26356;&#26032;&#20102;&#65292;&#20027;&#26381;&#21153;&#22120;&#35760;&#24405;&#23601;&#21516;&#27493;&#21040;&#20174;&#26381;&#21153;&#22120;&#12290;&#38271;&#26368;&#22810;&#21313;&#20301;&#25968;&#23383;&#32452;&#25104;
+        2H          ;&#21047;&#26032;&#26102;&#38388;&#65292;&#20174;&#26381;&#21153;&#22120;2&#20010;&#23567;&#26102;&#20570;&#19968;&#20010;&#25289;&#25805;&#20316;
+        10M         ;&#37325;&#35797;&#26102;&#38388;&#65292;&#20174;&#26381;&#21153;&#22120;&#25289;&#25805;&#20316;&#22833;&#36133;&#22810;&#38271;&#26102;&#38388;&#37325;&#35797;
+        1W          ;&#36807;&#26399;&#26102;&#38388;&#65292;&#20174;&#26381;&#21153;&#22120;&#24635;&#21516;&#27493;&#22833;&#36133;&#65292;&#23450;&#20041;&#20174;&#26381;&#21153;&#22120;&#35760;&#24405;&#30340;&#22833;&#25928;&#26102;&#38388;
+        1D          ;&#21542;&#23450;&#31572;&#26696;&#30340;TTL&#20540;&#65292;&#19981;&#23384;&#22312;&#35760;&#24405;&#32531;&#23384;&#26102;&#38388;&#65292;&#19981;&#29992;&#29992;&#25143;&#26597;&#25968;&#25454;&#24211;
+        )
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c467e01c-2a83-4e69-9c43-dbd65647e320" class="outline-5">
+<h5 id="h:c467e01c-2a83-4e69-9c43-dbd65647e320">NS记录</h5>
+<div class="outline-text-5" id="text-h:c467e01c-2a83-4e69-9c43-dbd65647e320">
+<p>
+name: 当前区域的名字
+</p>
+
+<p>
+value：当前区域的某DNS服务器的名字，从dns服务器地址，例如ns.me.org.
+</p>
+
+<p>
+注意：
+</p>
+
+<ol class="org-ol">
+<li>相邻的两个资源记录的name相同时，后续的可省略</li>
+<li>对NS记录而言，任何一个ns记录后面的服务器名字，都应该在后续有一个A记录</li>
+<li>一个区域可以有多个NS记录</li>
+</ol>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">@ IN NS ns1
+@ IN NS ns2
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25110;</span>
+me.org. IN NS ns1.me.org.
+me.org. IN NS ns2.me.org.
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a327eec4-ac93-4f00-b44f-2fc111140966" class="outline-5">
+<h5 id="h:a327eec4-ac93-4f00-b44f-2fc111140966">MX记录</h5>
+<div class="outline-text-5" id="text-h:a327eec4-ac93-4f00-b44f-2fc111140966">
+<p>
+name: 当前区域的名字
+</p>
+
+<p>
+value: 当前区域的某邮件服务器(smtp服务器)的主机名
+</p>
+
+<p>
+注意：
+</p>
+
+<ol class="org-ol">
+<li>一个区域内，MX记录可有多个；但每个记录的value之前应该有一个数字
+(0-99)，表示此服务器的优先级；数字越小优先级越高</li>
+<li>对MX记录而言，任何一个MX记录后面的服务器名字，都应该在后续有一个A记录</li>
+</ol>
+
+<p>
+范例：
+</p>
+
+<pre class="example" id="orgc9d5014">
+me.org. IN      MX  10  mx1.me.org.
+        IN      MX  20  mx2.me.org.
+</pre>
+</div>
+</div>
+<div id="outline-container-h:a43da457-94ce-45fc-870f-38dd9ecf1903" class="outline-5">
+<h5 id="h:a43da457-94ce-45fc-870f-38dd9ecf1903">A记录</h5>
+<div class="outline-text-5" id="text-h:a43da457-94ce-45fc-870f-38dd9ecf1903">
+<p>
+name: 某主机的FQDN，例如：www.me.org. 或者只写www会自动补全www.me.org.
+</p>
+
+<p>
+value: 主机名对应主机的IP地址
+</p>
+
+<p>
+避免用户写错名称时给错误答案，可通过泛域名解析进行解析至某特定地址
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">www.me.org.         IN      A   1.1.1.1
+www.me.org.         IN      A   2.2.2.2
+mx1.me.org.         IN      A   3.3.3.3
+mx2.me.org.         IN      A   4.4.4.4
+$<span style="color: #a0522d;">GENERATE</span> 1-254 HOST$   IN      A   1.2.3.$  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#29983;&#25104;254&#26465;&#20214;&#35760;&#24405; &#30456;&#24403;&#20110;HOST1 IN A 1.2.3.1 &#21040; HOST254 IN A 1.2.3.254</span>
+*.me.org.           IN      A   5.5.5.5      <span style="color: #b22222;"># </span><span style="color: #b22222;">* &#27867;&#22495;&#21517;&#35299;&#26512;</span>
+me.org.             IN      A   6.6.6.6      <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25110;&#32773;&#20889;&#25104;@ &#22495;&#21517;&#35299;&#26512;</span>
+</pre>
+</div>
+
+<p>
+范例：阿里云
+</p>
+<pre class="example" id="org2e7b26a">
+主机记录就是域名前缀，常见用法有：
+www：解析后的域名为www.aliyun.com。
+@：直接解析主域名 aliyun.com。
+*：泛解析，匹配其他所有域名 *.aliyun.com。
+mail：将域名解析为mail.aliyun.com，通常用于解析邮箱服务器。
+二级域名：如：abc.aliyun.com，填写abc。
+手机网站：如：m.aliyun.com，填写m。
+显性URL：不支持泛解析（泛解析：将所有子域名解析到同一地址）
+</pre>
+</div>
+</div>
+<div id="outline-container-h:a9a8ca46-f2a2-48c1-9ab1-9ae49d751285" class="outline-5">
+<h5 id="h:a9a8ca46-f2a2-48c1-9ab1-9ae49d751285">AAAA记录</h5>
+<div class="outline-text-5" id="text-h:a9a8ca46-f2a2-48c1-9ab1-9ae49d751285">
+<p>
+name: FQDN
+</p>
+
+<p>
+value: IPv6
+</p>
+</div>
+</div>
+<div id="outline-container-h:c863ed60-070e-479b-b23e-24f44d6de439" class="outline-5">
+<h5 id="h:c863ed60-070e-479b-b23e-24f44d6de439">PTR记录</h5>
+<div class="outline-text-5" id="text-h:c863ed60-070e-479b-b23e-24f44d6de439">
+<p>
+name: IP，有特定格式，把IP地址反过来写，1.2.3.4，要写作4.3.2.1；而有特
+定后缀：inaddr.arpa.，所以完整写法为：4.3.2.1.in-addr.arpa.
+</p>
+
+<p>
+value: FQDN
+</p>
+
+<p>
+注意：网络地址及后缀可省略；主机地址依然需要反着写
+</p>
+
+<p>
+例如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">4.3.2.1.in-addr.arpa. IN PTR www.me.org.
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;1.2.3&#20026;&#32593;&#32476;&#22320;&#22336;&#65292;&#21487;&#31616;&#20889;&#25104;&#65306;</span>
+4   IN   PTR   www.me.org.
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7179febd-c0f8-4995-8bf9-99de71da6933" class="outline-5">
+<h5 id="h:7179febd-c0f8-4995-8bf9-99de71da6933">CNAME别名记录</h5>
+<div class="outline-text-5" id="text-h:7179febd-c0f8-4995-8bf9-99de71da6933">
+<p>
+name: 别名的FQDN
+</p>
+
+<p>
+value: 真正名字的FQDN
+</p>
+
+<p>
+例如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">www.me.org. IN CNAME websrv.me.org.
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:45ce32d4-e0d3-4b81-a30e-3878d52a5ef4" class="outline-5">
+<h5 id="h:45ce32d4-e0d3-4b81-a30e-3878d52a5ef4">bind配置样例</h5>
+<div class="outline-text-5" id="text-h:45ce32d4-e0d3-4b81-a30e-3878d52a5ef4">
+<div class="org-src-container">
+<pre class="src src-sh">; domain: cici.com
+; Exported (y-m-d hh:mm:ss): 
+;
+; This file is intended for use for informational and archival
+; purposes ONLY and MUST be edited before use on a production
+; DNS server.
+;
+; In particular, you must update the SOA record with the correct
+; authoritative name server and contact e-mail address information,
+; and add the correct NS records for the name servers which will
+; be authoritative for this domain.
+;
+; For further information, please consult the BIND documentation
+; located on the following website:
+;
+; http://www.isc.org/
+;
+; And RFC 1035:
+;
+; http://www.ietf.org/rfc/rfc1035.txt
+;
+; Please note that we<span style="color: #a020f0;"> do</span> NOT offer technical support for any use
+; of this zone data, the BIND name server, or any other third-
+; party DNS software.
+;
+; Use at your own risk.
+
+
+$<span style="color: #a0522d;">ORIGIN</span> cici.com.
+
+; SOA Record
+@  3600   IN   SOA  ns61.domaincontrol.com.  dns.jomax.net. (
+          2025052702
+          28800
+          7200
+          604800
+          3600
+          ) 
+
+; A Record
+@  600   IN   A  47.236.119.20
+amc  600   IN   A  47.236.119.20
+
+; TXT Record
+_dmarc  3600   IN   TXT  <span style="color: #8b2252;">"v=DMARC1; p=reject; adkim=r; aspf=r; rua=mailto:dmarc_rua@onsecureserver.net;"</span>
+
+; CNAME Record
+* 600 IN CNAME alb.xxx.com.
+*.qa 600 IN CNAME alb.xxx.com.
+wta 600 IN CNAME alb.xxx.com
+_domainconnect  3600   IN   CNAME  _domainconnect.gd.domaincontrol.com.
+
+; NS Record
+@  3600   IN   NS  ns61.domaincontrol.com.
+@  3600   IN   NS  ns62.domaincontrol.com.
+
+; MX Record
+@ 600  IN   MX  10  hzmx02.mxmail.netease.com.
+@ 600  IN   MX  5 hzmx01.mxmail.netease.com.
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4a2f57df-8fe8-4c90-8b89-edb41629f845" class="outline-4">
+<h4 id="h:4a2f57df-8fe8-4c90-8b89-edb41629f845">子域授权</h4>
+<div class="outline-text-4" id="text-h:4a2f57df-8fe8-4c90-8b89-edb41629f845">
+<p>
+每个域的名称服务器，都是通过其上级名称服务器在解析库进行授权,类似根域授权tld
+</p>
+
+<p>
+glue record：粘合记录，父域授权子域的记录
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">.com.       IN      NS      ns1.com.
+.com.       IN      NS      ns2.com.
+ns1.com.    IN      A       2.2.2.1
+ns2.com.    IN      A       2.2.2.2
+<span style="color: #b22222;">#</span><span style="color: #b22222;">me.org. &#22312;.com&#30340;&#21517;&#31216;&#26381;&#21153;&#22120;&#19978;&#65292;&#35299;&#26512;&#24211;&#20013;&#28155;&#21152;&#36164;&#28304;&#35760;&#24405;</span>
+me.org.         IN  NS  ns1.me.org.
+me.org.         IN  NS  ns2.me.org.
+me.org.         IN  NS  ns3.me.org.
+ns1.me.org.     IN  A   3.3.3.1
+ns2.me.org.     IN  A   3.3.3.2
+ns3.me.org.     IN  A   3.3.3.3
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7ccbb594-a46a-4c55-b5fd-0c80808deffd" class="outline-4">
+<h4 id="h:7ccbb594-a46a-4c55-b5fd-0c80808deffd">互联网域名</h4>
+<div class="outline-text-4" id="text-h:7ccbb594-a46a-4c55-b5fd-0c80808deffd">
+<ol class="org-ol">
+<li><p>
+<b>域名注册</b>
+</p>
+
+<p>
+代理商：万网, 新网, godaddy
+</p></li>
+
+<li><b>注册完成以后，想自己用专用服务来解析</b></li>
+</ol>
+
+<p>
+管理后台：把NS记录指向的服务器名称，和A记录指向的服务器地址
+</p>
+
+<p>
+范例：阿里云DNS管理后台界面
+</p>
+
+
+<figure id="org3a524e4">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210423173105410.png" alt="image-20210423173105410.png">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b0095ea5-b5a0-44b0-a63e-fec025fb4c30" class="outline-3">
+<h3 id="h:b0095ea5-b5a0-44b0-a63e-fec025fb4c30">DNS软件bind</h3>
+<div class="outline-text-3" id="text-h:b0095ea5-b5a0-44b0-a63e-fec025fb4c30">
+<p>
+DNS服务器软件：bind，powerdns(基于php管理界面)，unbound，coredns
+</p>
+</div>
+<div id="outline-container-h:755073c3-506e-4a9c-a424-40eca76fb2b7" class="outline-4">
+<h4 id="h:755073c3-506e-4a9c-a424-40eca76fb2b7">BIND相关程序包</h4>
+<div class="outline-text-4" id="text-h:755073c3-506e-4a9c-a424-40eca76fb2b7">
+<p>
+官方地址：<a href="https://www.isc.org/bind/">https://www.isc.org/bind/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum list all bind*
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>bind：服务器</li>
+<li>bind-libs：相关库</li>
+<li>bind-utils: 客户端</li>
+<li>bind-chroot: 安全包，将dns相关文件放至 <i>var/named/chroot</i></li>
+</ul>
+
+<p>
+范例：安装bind软件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#dnf -y install bind bind-utils
+[root@centos8 ~]#systemctl enable --now named
+<span style="color: #b22222;"># </span><span style="color: #b22222;">tcp udp 53&#31471;&#21475;&#65292; 953&#31649;&#29702;&#31471;&#21475;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:675c094e-1657-41fe-add8-fae7d81061c6" class="outline-4">
+<h4 id="h:675c094e-1657-41fe-add8-fae7d81061c6">BIND包相关文件</h4>
+<div class="outline-text-4" id="text-h:675c094e-1657-41fe-add8-fae7d81061c6">
+<ul class="org-ul">
+<li>BIND主程序：/usr/sbin/named</li>
+<li>服务脚本和Unit名称：/etc/rc.d/init.d/named，/usr/lib/systemd/system/named.service</li>
+<li>主配置文件：/etc/named.conf, /etc/named.rfc1912.zones, /etc/rndc.key</li>
+<li>管理工具：/usr/sbin/rndc：remote name domain controller，默认与bind
+安装在同一主机，且只能通过127.0.0.1连接named进程，提供辅助性的管理功
+能；953/tcp</li>
+<li><p>
+解析库文件：/var/named/ZONE_NAME.ZONE
+</p>
+
+<ul class="org-ul">
+<li>正向模板：/var/named/named.localhost</li>
+<li>反向模板：/var/named/named.loopback</li>
+</ul>
+
+<p>
+注意：
+</p>
+
+<p>
+(1) 一台物理服务器可同时为多个区域提供解析 
+</p>
+
+<p>
+(2) 必须要有根区域文件；/var/named/named.ca 保存了所有根服务器地址
+</p>
+
+<p>
+(3) 应该有两个（如果包括ipv6的，应该更多）实现localhost和本地回环地址的解析库
+</p></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2823210f-6905-4f5b-a993-c619584c90c8" class="outline-4">
+<h4 id="h:2823210f-6905-4f5b-a993-c619584c90c8">主配置文件</h4>
+<div class="outline-text-4" id="text-h:2823210f-6905-4f5b-a993-c619584c90c8">
+<ul class="org-ul">
+<li>全局配置：options {};</li>
+<li>日志子系统配置：logging {};</li>
+<li><p>
+区域定义：本机能够为哪些zone进行解析，就要定义哪些zone
+</p>
+
+<p>
+zone "ZONE_NAME" IN {};
+</p></li>
+</ul>
+
+<p>
+注意：
+</p>
+
+<ul class="org-ul">
+<li>任何服务程序如果期望其能够通过网络被其它主机访问，至少应该监听在一个能与外部主机通信的IP地址上</li>
+<li>缓存名称服务器的配置：监听外部地址即可</li>
+<li>dnssec: 建议关闭dnssec，设为no</li>
+</ul>
+
+<p>
+官方文档：<a href="https://kb.isc.org/docs/aa-00648">Installing and upgrading BIND</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c521c356-b98e-4a2f-aacf-b8203e8c1a03" class="outline-3">
+<h3 id="h:c521c356-b98e-4a2f-aacf-b8203e8c1a03">实现主DNS服务器</h3>
+<div class="outline-text-3" id="text-h:c521c356-b98e-4a2f-aacf-b8203e8c1a03">
+</div>
+<div id="outline-container-h:b9a231c9-b3c6-4cb2-8f7b-416ca90b6352" class="outline-4">
+<h4 id="h:b9a231c9-b3c6-4cb2-8f7b-416ca90b6352">主DNS服务器配置</h4>
+<div class="outline-text-4" id="text-h:b9a231c9-b3c6-4cb2-8f7b-416ca90b6352">
+<ol class="org-ol">
+<li><p>
+在主配置文件中定义区域
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+//  listen-on port 53 { 127.0.0.1; };   &#27880;&#37322;&#25110;&#32773;&#25442;&#25104;localhost&#21487;&#20197;&#26159;&#30417;&#21548;&#25152;&#26377;&#22320;&#22336;&#65307;&#22810;&#20010;&#22320;&#22336;&#29992;;&#20998;&#21495;&#20998;&#38548;
+//  allow-query         { localhost; }; &#27880;&#37322;&#21518;&#20801;&#35768;&#25152;&#26377;&#20027;&#26426;&#26597;&#35810;&#65292;&#25442;&#25104;any;&#20063;&#26159;&#20801;&#35768;&#25152;&#26377;
+directory       <span style="color: #8b2252;">"/var/named"</span>; // &#25968;&#25454;&#24211;&#25991;&#20214;&#23384;&#25918;&#20301;&#32622;
+
+zone <span style="color: #8b2252;">"ZONE_NAME"</span> IN {                 // &#21306;&#22495;&#21517;&#31216;&#65292;&#36825;&#37324;&#35201;&#20889;&#22495;&#21517;
+    <span style="color: #483d8b;">type</span> {master|slave|hint|forward}; // &#21306;&#22495;&#31867;&#22411;master|slave|hint|forward
+    file <span style="color: #8b2252;">"ZONE_NAME.zone"</span>;            // &#21306;&#22495;&#25968;&#25454;&#24211;&#25991;&#20214;
+};
+</pre>
+</div></li>
+
+<li><p>
+定义区域解析库文件
+</p>
+
+<p>
+出现的内容
+</p>
+
+<ul class="org-ul">
+<li>宏定义</li>
+<li>资源记录</li>
+</ul>
+
+<p>
+范例：区域数据库
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#19979;&#38754;&#20869;&#23481;</span>
+zone <span style="color: #8b2252;">"me.org"</span> IN {
+    <span style="color: #483d8b;">type</span> master;
+    file <span style="color: #8b2252;">"me.org.zone"</span>;
+};
+
+cp -p /var/named/named.localhost /var/named/me.org.zon <span style="color: #b22222;"># </span><span style="color: #b22222;">&#22797;&#21046;&#27169;&#26495;&#65292;-p&#20445;&#26412;&#25991;&#20214;&#23646;&#24615;</span>
+
+vim /var/named/me.org.zone
+$<span style="color: #a0522d;">TTL</span> 86400
+$<span style="color: #a0522d;">ORIGIN</span> me.org.
+@   IN  SOA ns1.me.org. admin.me.org (
+        2015042201
+        1H
+        5M
+        7D
+        1D )
+    IN  NS ns1
+    IN  NS ns2
+    IN  MX 10 mx1
+    IN  MX 20 mx2
+ns1 IN  A 172.16.100.11
+ns2 IN  A 172.16.100.12
+mx1 IN  A 172.16.100.13
+mx2 IN  A 172.16.100.14
+*       A 172.16.100.11
+
+websrv  IN A 172.16.100.11
+websrv  IN A 172.16.100.12
+www IN  CNAME websrv
+</pre>
+</div></li>
+</ol>
+
+
+<p>
+范例：抓包观察查询过程
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#tcpdump -i eth0 udp port 53 -nn  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#26377;&#35831;&#27714;&#36807;&#26469;&#27809;&#26377;&#22238;&#24212;</span>
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+11:37:38.458363 IP 10.0.0.7.42201 &gt; 10.0.0.8.53: 44928+ A? www.baidu.com. (31)
+11:37:38.458896 IP 10.0.0.7.54285 &gt; 10.0.0.8.53: 44928+ A? www.baidu.com. (31)
+11:37:38.460038 IP 10.0.0.7.42053 &gt; 10.0.0.8.53: 30536+ A?
+<span style="color: #0000ff;">www.baidu.com.zcici.com.</span> (48)
+11:37:38.460884 IP 10.0.0.7.37739 &gt; 10.0.0.8.53: 30536+ A?
+<span style="color: #0000ff;">www.baidu.com.zcici.com.</span> (48)
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">53&#31471;&#21475;&#26159;&#21542;&#36890;&#36807;&#12290;tcp 53&#31471;&#21475;&#25253;&#38169;</span>
+[root@centos7 ~]#telnet 10.0.0.8 53
+Trying 10.0.0.8...
+telnet: connect to address 10.0.0.8: Connection refused
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1ddff8fb-bd41-4de2-8b17-e7f2605e7a2e" class="outline-4">
+<h4 id="h:1ddff8fb-bd41-4de2-8b17-e7f2605e7a2e">主配置文件语法检查</h4>
+<div class="outline-text-4" id="text-h:1ddff8fb-bd41-4de2-8b17-e7f2605e7a2e">
+<div class="org-src-container">
+<pre class="src src-sh">named-checkconf
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:fed36949-91ca-4483-afc1-49b740995418" class="outline-4">
+<h4 id="h:fed36949-91ca-4483-afc1-49b740995418">解析库文件语法检查</h4>
+<div class="outline-text-4" id="text-h:fed36949-91ca-4483-afc1-49b740995418">
+<div class="org-src-container">
+<pre class="src src-sh">named-checkzone <span style="color: #8b2252;">"me.org"</span> /var/named/me.org.zone
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:592b4797-da4d-4586-a74a-93494e7e8bcd" class="outline-4">
+<h4 id="h:592b4797-da4d-4586-a74a-93494e7e8bcd">配置生效</h4>
+<div class="outline-text-4" id="text-h:592b4797-da4d-4586-a74a-93494e7e8bcd">
+<p>
+三种方式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">rndc reload
+systemctl reload named
+service named reload
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:69b36bac-131e-43bf-b358-02881cb956e1" class="outline-4">
+<h4 id="h:69b36bac-131e-43bf-b358-02881cb956e1">测试和管理工具</h4>
+<div class="outline-text-4" id="text-h:69b36bac-131e-43bf-b358-02881cb956e1">
+</div>
+<div id="outline-container-h:aa970a54-0d6f-4c60-98f4-44bda0fff5c7" class="outline-5">
+<h5 id="h:aa970a54-0d6f-4c60-98f4-44bda0fff5c7"><b>dig 命令</b></h5>
+<div class="outline-text-5" id="text-h:aa970a54-0d6f-4c60-98f4-44bda0fff5c7">
+<p>
+dig命令参考文档：<a href="https://bind9.readthedocs.io/en/latest/manpages.html#man-dig">dig - DNS lookup utility</a>
+</p>
+
+<p>
+dig只用于测试dns系统，不会查询hosts文件进行解析
+</p>
+
+<p>
+命令格式：
+</p>
+
+<pre class="example" id="org3cbf65b">
+dig [-t type] name [@SERVER] [query options]
+
+-t：指明资源类型
+name：资源记录对应的值
+@SERVER ：以指定服务器做测试
+query options：
+    +[no]trace：跟踪解析过程 : dig +trace me.org  
+    +[no]recurse：进行递归解析
+
+
++[no]all：不显示所有结果或显示所有结果
++[no]answer：显示答案。 如显示答案段 dig +noall +answer mail.163.com any
+</pre>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;&#37038;&#20214;&#26381;&#21153;&#22120;</span>
+dig -t mx me.org
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27979;&#35797;&#21453;&#21521;&#35299;&#26512;</span>
+dig -x IP = dig &#8211;t ptr reverseip.in-addr.arpa
+dig -x 10.0.0.100 @10.0.0.8
+dig -t ptr 100.0.0.10.in-addr.arpa. @10.0.0.8
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475; dns &#26381;&#21153;&#22120;&#22495;&#21517;&#24182;&#26597;&#21040;&#23545;&#24212; bind &#29256;&#26412;</span>
+dig -t ns me.org
+dig +noall +answer txt chaos VERSION.BIND @ns3.dnsv4.com
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27169;&#25311;&#21306;&#22495;&#20256;&#36865;</span>
+dig -t axfr ZONE_NAME @SERVER
+dig -t axfr me.org @10.10.10.11  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25235;&#21462;dns&#26381;&#21153;&#22120;&#25152;&#26377;&#35299;&#26512;&#35760;&#24405;</span>
+dig &#8211;t axfr 100.1.10.in-addr.arpa @172.16.1.1
+dig -t NS . @114.114.114.114
+dig -t NS . @a.root-servers.net
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">dig www.me.org @10.0.0.116</span>
+; &lt;&lt;&gt;&gt; DiG 9.11.4-P2-RedHat-9.11.4-26.P2.el7_9.3 &lt;&lt;&gt;&gt; www.me.org @10.0.0.116
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 42051
+<span style="color: #ffa54f;">;; flags: qr aa rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 1, ADDITIONAL: 2 </span>
+<span style="color: #ffa54f;"># aa &#20195;&#34920;&#20174;&#26435;&#23041;&#26381;&#21153;&#22120;&#24471;&#21040;&#30340;&#32467;&#26524;&#65292;10.0.0.116&#26159;&#30495;&#27491;&#37197;&#32622;dns&#35760;&#24405;&#30340;&#26381;&#21153;&#22120;</span>
+
+<span style="color: #ffa54f;">[root@centos7 ~]# dig -t A www.bamaface.com @172.16.0.1</span>
+<span style="color: #ffa54f;">; &lt;&lt;&gt;&gt; DiG 9.9.4-RedHat-9.9.4-18.el7 &lt;&lt;&gt;&gt; -t A www.bamaface.com @172.16.0.1</span>
+<span style="color: #ffa54f;">;; global options: +cmd  &#20840;&#23616;&#23646;&#24615;</span>
+<span style="color: #ffa54f;">;; Got answer:  &#33719;&#24471;&#31572;&#26696;</span>
+<span style="color: #ffa54f;">;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 30624</span>
+<span style="color: #ffa54f;">;; flags(&#26631;&#24535;&#20301;): qr(&#26597;&#35810;&#35831;&#27714;) rd ra(&#31572;&#26696;); QUERY: 1, ANSWER: 2, AUTHORITY: 2, ADDITIONAL: 3</span>
+
+<span style="color: #ffa54f;">;; OPT PSEUDOSECTION:&#20551;&#36873;&#39033;&#27573;&#65307;&#27809;&#26377;&#24847;&#20041;&#65292;&#24573;&#30053;&#65307; </span>
+<span style="color: #ffa54f;">; EDNS: version: 0, flags:; udp: 4096</span>
+<span style="color: #ffa54f;">;; QUESTION SECTION: &#38382;&#39064;&#27573;</span>
+<span style="color: #ffa54f;">;www.bamaface.com.          IN     A</span>
+
+<span style="color: #ffa54f;">;; ANSWER SECTION: &#31572;&#26696;&#27573;</span>
+<span style="color: #ffa54f;">www.bamaface.com.     3600     IN     CNAME     host.bamaface.com.</span>
+<span style="color: #ffa54f;">host.bamaface.com.     3600     IN     A     198.145.20.140</span>
+
+<span style="color: #ffa54f;">;; AUTHORITY SECTION:&#26435;&#23041;&#27573;&#65292;&#35841;&#26469;&#36127;&#36131;&#35299;&#26512;&#30340;&#65292;&#21487;&#20197;&#30475;&#21040;&#26377;2&#20010;dns&#26381;&#21153;&#22120;&#65307;</span>
+<span style="color: #ffa54f;">bamaface.com.          172799     IN     NS     ns10.domaincontrol.com.</span>
+<span style="color: #ffa54f;">bamaface.com.          172799     IN     NS     ns09.domaincontrol.com.</span>
+
+<span style="color: #ffa54f;">;; ADDITIONAL SECTION:&#26435;&#23041;&#27573;&#35299;&#26512;</span>
+<span style="color: #ffa54f;">ns09.domaincontrol.com.     170957     IN     A     216.69.185.5</span>
+<span style="color: #ffa54f;">ns10.domaincontrol.com.     170957     IN     A     208.109.255.5</span>
+
+<span style="color: #ffa54f;">;; Query time: 758 msec  &#26597;&#35810;&#26102;&#38271;</span>
+<span style="color: #ffa54f;">;; SERVER: 172.16.0.1#53(172.16.0.1)  &#30001;&#21738;&#20010;IP&#20027;&#26426;&#36827;&#34892;&#25805;&#20316;</span>
+<span style="color: #ffa54f;">;; WHEN: &#20108; 1&#26376; 12 10:35:35 CST 2016  &#26102;&#38388;</span>
+<span style="color: #ffa54f;">;; MSG SIZE  rcvd: 164</span>
+
+
+<span style="color: #ffa54f;">#&#36319;&#36394;+trace&#65292;&#26174;&#31034;&#20854;&#35299;&#26512;&#36807;&#31243;&#65292;&#22522;&#20110;&#36845;&#20195;&#26041;&#24335;&#35299;&#26512;&#65307;&#27880;&#24847;&#32593;&#32476;&#19981;&#22909;&#20250;&#35299;&#26512;&#24456;&#24930;&#65292;&#38459;&#22622;</span>
+<span style="color: #ffa54f;">[root@centos7 ~]# dig +trace -t A www.bamaface.com @172.16.0.1</span>
+
+<span style="color: #ffa54f;">; &lt;&lt;&gt;&gt; DiG 9.9.4-RedHat-9.9.4-18.el7 &lt;&lt;&gt;&gt; +trace -t A www.bamaface.com @172.16.0.1</span>
+<span style="color: #ffa54f;">;; global options: +cmd</span>
+<span style="color: #ffa54f;">.               517866     IN     NS     d.root-servers.net.</span>
+<span style="color: #ffa54f;">.               517866     IN     NS     b.root-servers.net.</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:85204c9e-23c6-4a39-9a97-79c8a521e68c" class="outline-5">
+<h5 id="h:85204c9e-23c6-4a39-9a97-79c8a521e68c"><b>host命令</b></h5>
+<div class="outline-text-5" id="text-h:85204c9e-23c6-4a39-9a97-79c8a521e68c">
+<p>
+命令格式：
+</p>
+
+<pre class="example" id="org95303b5">
+host [-t type] name [SERVER]
+</pre>
+
+<p>
+范例
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">host -t NS me.org 172.16.0.1
+host -t soa me.org
+host -t mx me.org
+host -t axfr me.org
+host 1.2.3.4
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21306;&#22495;&#20256;&#36755;</span>
+host -T -l sina.com 8.8.8.8
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:eeb95f37-bec5-4b9a-b90d-31a2c3e1ce76" class="outline-5">
+<h5 id="h:eeb95f37-bec5-4b9a-b90d-31a2c3e1ce76"><b>nslookup命令</b></h5>
+<div class="outline-text-5" id="text-h:eeb95f37-bec5-4b9a-b90d-31a2c3e1ce76">
+<p>
+nslookup 可以支持交互和非交互式两种方式执行
+</p>
+
+<p>
+window, linux都支持的命令
+</p>
+
+<p>
+全令格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">nslookup [-option] [name | -] [server]
+</pre>
+</div>
+
+<p>
+交互式模式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">nslookup&gt;
+server IP: &#25351;&#26126;&#20351;&#29992;&#21738;&#20010;DNS server&#36827;&#34892;&#26597;&#35810;
+<span style="color: #483d8b;">set</span> <span style="color: #a0522d;">q</span>=RR_TYPE: &#25351;&#26126;&#26597;&#35810;&#30340;&#36164;&#28304;&#35760;&#24405;&#31867;&#22411;
+NAME: &#35201;&#26597;&#35810;&#30340;&#21517;&#31216;
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#30452;&#25509;&#26597;&#35810;&#26576;&#22495;&#21517;&#30340;IP,&#40664;&#35748;&#20351;&#29992;&#31995;&#32479;&#30340;dns&#26381;&#21153;&#22120;&#26469;&#26597;&#35810;</span>
+nslookup www.baidu.com
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25351;&#23450;dns&#26381;&#21153;&#22120;&#26597;&#35810;&#26576;&#22495;&#21517;,&#25351;&#23450;&#20351;&#29992;114.114.114.114dns&#26381;&#21153;&#22120;&#26469;&#26597;&#35810;&#22495;&#21517;</span>
+nslookup www.baidu.com 114.114.114.114
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25351;&#23450;&#26597;&#35810;&#26576;&#22495;&#21517;&#30340;&#35760;&#24405;&#31867;&#22411;,&#40664;&#35748;&#26597;&#35810;&#30340;&#26159;A&#35760;&#24405;</span>
+nslookup -qt=MX mail.163.com
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:da9e2cc7-33c2-404f-9b0d-c086a7fd38be" class="outline-5">
+<h5 id="h:da9e2cc7-33c2-404f-9b0d-c086a7fd38be"><b>rndc 命令</b></h5>
+<div class="outline-text-5" id="text-h:da9e2cc7-33c2-404f-9b0d-c086a7fd38be">
+<p>
+利用rndc工具可以实现管理DNS功能
+</p>
+
+<p>
+rndc 监听端口: 953/tcp
+</p>
+
+<p>
+命令格式:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">rndc COMMAND
+COMMAND:
+    status: &#26597;&#30475;&#29366;&#24577;
+    stop  &#65306;&#20572;&#27490;&#26381;&#21153;
+    reload: &#37325;&#36733;&#20027;&#37197;&#32622;&#25991;&#20214;&#21644;&#21306;&#22495;&#35299;&#26512;&#24211;&#25991;&#20214;
+    reload zonename: &#37325;&#36733;&#21306;&#22495;&#35299;&#26512;&#24211;&#25991;&#20214;
+    retransfer zonename: &#25163;&#21160;&#21551;&#21160;&#21306;&#22495;&#20256;&#36865;&#65292;&#32780;&#19981;&#31649;&#24207;&#21015;&#21495;&#26159;&#21542;&#22686;&#21152;
+    notify zonename: &#37325;&#26032;&#23545;&#21306;&#22495;&#20256;&#36865;&#21457;&#36890;&#30693;
+    reconfig: &#37325;&#36733;&#20027;&#37197;&#32622;&#25991;&#20214;
+    querylog: &#24320;&#21551;&#25110;&#20851;&#38381;&#26597;&#35810;&#26085;&#24535;&#25991;&#20214;/var/log/message
+    trace: &#36882;&#22686;debug&#19968;&#20010;&#32423;&#21035;
+    trace LEVEL: &#25351;&#23450;&#20351;&#29992;&#30340;&#32423;&#21035;
+    notrace&#65306;&#23558;&#35843;&#35797;&#32423;&#21035;&#35774;&#32622;&#20026; 0
+    flush&#65306;&#28165;&#31354;DNS&#26381;&#21153;&#22120;&#30340;&#25152;&#26377;&#32531;&#23384;&#35760;&#24405;
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos7 ~]# rndc status
+version: 9.9.4-RedHat-9.9.4-18.el7 &lt;id:8f9657aa&gt;
+CPUs found: 2                                <span style="color: #b22222;">#</span><span style="color: #b22222;">CPU&#25968;&#37327;</span>
+worker threads: 2                            <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24037;&#20316;&#32447;&#31243;</span>
+UDP listeners per interface: 2               <span style="color: #b22222;">#</span><span style="color: #b22222;">UDP&#22312;&#25509;&#21475;&#30340;&#30417;&#21548;&#30334;&#20998;&#27604;</span>
+number of zones: 101                         <span style="color: #b22222;">#</span><span style="color: #b22222;">&#21306;&#22495;&#30340;&#25968;&#37327;</span>
+debug level: 0                               <span style="color: #b22222;">#</span><span style="color: #b22222;">&#35843;&#38169;&#31561;&#32423;</span>
+xfers running: 0                             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36816;&#34892;&#20013;&#30340;xfers</span>
+xfers deferred: 0                            <span style="color: #b22222;">#</span><span style="color: #b22222;">&#24310;&#36831;&#30340;xfers</span>
+soa queries<span style="color: #a020f0;"> in</span> progress: 0                   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#27491;&#22312;&#36827;&#34892;&#30340;SOA&#26597;&#35810;&#26377;&#22810;&#23569;&#20010;</span>
+query logging is OFF                         <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#35810;&#26085;&#24535;&#21151;&#33021;&#26159;&#20851;&#38381;&#30340;</span>
+recursive clients: 0/0/1000                  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36882;&#24402;&#26597;&#35810;&#30340;&#23458;&#25143;&#31471;&#26377;&#22810;&#23569;&#20010;&#65292;&#26368;&#22810;&#20801;&#35768;1000&#20010;</span>
+tcp clients: 0/100                           <span style="color: #b22222;">#</span><span style="color: #b22222;">tcp&#23458;&#25143;&#31471;&#26377;&#22810;&#23569;&#20010;&#65292;&#26368;&#22810;&#20801;&#35768;100&#20010;</span>
+server is up and running                     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26381;&#21153;&#22120;&#22788;&#20110;&#27491;&#24120;&#30340;&#21551;&#21160;&#29366;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b58515e1-70d9-4896-ac43-9662d749505b" class="outline-4">
+<h4 id="h:b58515e1-70d9-4896-ac43-9662d749505b">允许动态更新</h4>
+<div class="outline-text-4" id="text-h:b58515e1-70d9-4896-ac43-9662d749505b">
+<p>
+动态更新：可以通过远程更新区域数据库的资源记录
+</p>
+
+<p>
+实现动态更新，需要在指定的zone语句块中：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Allow-update {any;};
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod 770 /var/named
+setsebool -P named_write_master_zones on
+nsupdate
+&gt;server 127.0.0.1
+&gt;zone me.org
+&gt;update add ftp.me.org 88888 IN A 8.8.8.8
+&gt;send
+&gt;update delete www.me.org A
+&gt;send
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27979;&#35797;</span>
+dig ftp.me.org @127.0.0.1
+ls -l /var/named/me.org.zone.jnl
+cat /var/named/me.org.zone
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9e67c761-5ef2-4c71-92f3-947209c5be96" class="outline-4">
+<h4 id="h:9e67c761-5ef2-4c71-92f3-947209c5be96">实战案例：实现DNS正向主服务器</h4>
+<div class="outline-text-4" id="text-h:9e67c761-5ef2-4c71-92f3-947209c5be96">
+<p>
+<b>实验目的</b>
+</p>
+
+<p>
+搭建DNS正向主服务器，实现web服务器基于FQDN的访问
+</p>
+
+<p>
+<b>环境要求</b>
+</p>
+
+<pre class="example" id="org895b976">
+需要三台主机
+DNS服务端：10.0.0.8
+web服务器：10.0.0.7
+DNS客户端：10.0.0.6
+</pre>
+
+<p>
+<b>前提准备</b>
+</p>
+
+<ul class="org-ul">
+<li>关闭SElinux</li>
+<li>关闭防火墙</li>
+<li>时间同步</li>
+</ul>
+</div>
+<div id="outline-container-h:64e4913e-3819-47d5-9389-4991860b5d0e" class="outline-5">
+<h5 id="h:64e4913e-3819-47d5-9389-4991860b5d0e">实现步骤</h5>
+<div class="outline-text-5" id="text-h:64e4913e-3819-47d5-9389-4991860b5d0e">
+<p>
+<b>在DNS服务端安装bind</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+</pre>
+</div>
+
+<p>
+<b>修改bind 配置文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#19979;&#38754;&#20869;&#23481;</span>
+zone <span style="color: #8b2252;">"me.org"</span> IN {
+    <span style="color: #483d8b;">type</span> master;
+    file <span style="color: #8b2252;">"me.org.zone"</span>;
+};
+</pre>
+</div>
+
+<p>
+<b>DNS区域数据库文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cp -p /var/named/named.localhost /var/named/me.org.zone
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#27809;&#26377;&#21152;-p&#36873;&#39033;&#65292;&#38656;&#35201;&#20462;&#25913;&#25152;&#26377;&#32773;&#25110;&#26435;&#38480;&#12290;chgrp named me.org.zone</span>
+
+vim /var/named/me.org.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+                2019042210 ; serial
+                1D ; refresh
+                1H ; retry
+                1W ; expire
+                3H ) ; minimum
+@        NS master
+master  A 192.168.8.8
+*       A 192.168.8.7
+
+www     CNAME websrv
+websrv  A 192.168.8.7               
+</pre>
+</div>
+
+<p>
+<b>检查配置文件和数据库文件格式，并启动服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">named-checkconf
+named-checkzone me.org /var/named/me.org.zone
+
+systemctl start named     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>实现WEB服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;http&#26381;&#21153;</span>
+yum install httpd
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#32622;&#20027;&#39029;&#38754;</span>
+<span style="color: #483d8b;">echo</span> www.me.org &gt; /var/www/html/index.html
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21551;&#21160;&#26381;&#21153;</span>
+systemctl start httpd
+</pre>
+</div>
+
+<p>
+<b>在客户端实现测试</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DNS1</span>=192.168.8.8
+<span style="color: #b22222;">#</span><span style="color: #b22222;">centos7 &#20197;&#19978;&#29256;&#25191;&#34892;&#29616;&#19979;&#38754;&#21629;&#20196;&#29983;&#25928;</span>
+nmcli con reload
+nmcli con up eth0
+<span style="color: #b22222;">#</span><span style="color: #b22222;">centos 6 &#25191;&#34892;&#19979;&#38754;&#21629;&#20196;&#29983;&#25928;</span>
+service network restart
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#26377;&#20197;&#19979;&#35760;&#24405;&#65292;&#31639;&#26159;&#25104;&#21151;</span>
+cat /etc/resolv.conf
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Generated by NetworkManager</span>
+nameserver 192.168.8.8
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27979;&#35797;&#32593;&#39029;,&#33021;&#26174;&#31034;&#23601;&#26159;&#25104;&#21151;</span>
+curl www.me.org
+www.me.org
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b9417bbf-4374-4abb-b6f8-35bd40c9c2e5" class="outline-3">
+<h3 id="h:b9417bbf-4374-4abb-b6f8-35bd40c9c2e5">实现反向解析区域</h3>
+<div class="outline-text-3" id="text-h:b9417bbf-4374-4abb-b6f8-35bd40c9c2e5">
+</div>
+<div id="outline-container-h:efa07714-261b-472d-a9cc-4a0cf5c91b83" class="outline-4">
+<h4 id="h:efa07714-261b-472d-a9cc-4a0cf5c91b83">反向解析配置</h4>
+<div class="outline-text-4" id="text-h:efa07714-261b-472d-a9cc-4a0cf5c91b83">
+<p>
+反向区域：即将IP反向解析为FQDN
+</p>
+
+<p>
+区域名称：网络地址反写.in-addr.arpa.
+</p>
+
+<p>
+示例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">172.16.100. --&gt; 100.16.172.in-addr.arpa. <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20174;&#23567;&#24448;&#22823;&#20889;</span>
+</pre>
+</div>
+
+<p>
+(1) 定义区域
+</p>
+
+<pre class="example" id="orgf87a21a">
+zone "ZONE_NAME" IN {  // 反着写，如0.0.10.in-addr.arpa
+    type {master|slave|forward}；
+    file "网络地址.zone"  // 数据库文件
+};
+</pre>
+
+<p>
+(2) 定义区域解析库文件
+</p>
+
+<p>
+注意：不需要MX,以PTR记录为主
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span style="color: #a0522d;">TTL</span> 86400
+$<span style="color: #a0522d;">ORIGIN</span> 8.168.192.in-addr.arpa.
+@ IN SOA ns1.me.org. admin.me.org. (
+                2015042201
+                1H
+                5M
+                7D
+                1D )
+   IN NS ns1.me.org.
+11 IN PTR ns1.me.org.
+11 IN PTR www.me.org.
+12 IN PTR mx1.me.org.
+12 IN PTR www.me.org.
+13 IN PTR mx2.me.org.
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:330eebe6-48b6-4369-b819-e3ef64f55c6b" class="outline-4">
+<h4 id="h:330eebe6-48b6-4369-b819-e3ef64f55c6b">实战案例: 反向解析</h4>
+<div class="outline-text-4" id="text-h:330eebe6-48b6-4369-b819-e3ef64f55c6b">
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#cat /etc/named.conf
+options {
+    ......
+    listen-on port 53 { localhost; };
+    ......
+    allow-query   { any; };
+    ......
+}
+
+[root@centos8 ~]#vim /etc/named.rfc1912.zones
+zone <span style="color: #8b2252;">"0.0.10.in-addr.arpa"</span> {   // &#21453;&#30528;&#20889;
+ <span style="color: #483d8b;">type</span> master;
+ file <span style="color: #8b2252;">"10.0.0.zone"</span>;
+};
+[root@centos8 ~]#cd /var/named
+[root@centos8 named]#cp -p named.loopback 10.0.0.zone
+[root@centos8 named]#cat 10.0.0.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA ns1 admin.me.org. (
+    0 ; serial
+    1D ; refresh
+    1H ; retry
+    1W ; expire
+    3H ) ; minimum
+    NS  ns1.me.org.
+100 PTR www.me.org.
+200 PTR app.wange.org.
+
+[root@centos8 named]#named-checkzone 0.0.10.in-addr.arpa 10.0.0.zone
+zone 0.0.10.in-addr.arpa/IN: loaded serial 0
+OK
+
+[root@centos8 named]#systemctl restart named
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">dig &#26816;&#26597;&#21453;&#21521;&#35299;&#26512;&#22495;&#21517;</span>
+[root@centos6 ~]#dig -t ptr 100.0.0.10.in-addr.arpa. @10.0.0.8
+
+100.0.0.10.in-addr.arpa. 86400 IN PTR www.me.org.
+;; AUTHORITY SECTION:
+0.0.10.in-addr.arpa. 86400 IN NS ns1.me.org.
+;; ADDITIONAL SECTION:
+ns1.me.org. 86400 IN A 10.0.0.7
+;; Query time: 0 msec
+;; SERVER: 10.0.0.8#53(10.0.0.8)
+;; WHEN: Sat Jul 25 09:29:23 CST 2020
+;; MSG SIZE rcvd: 142
+
+[root@centos6 ~]#dig -x 10.0.0.100 @10.0.0.8
+;; ANSWER SECTION:
+100.0.0.10.in-addr.arpa. 86400 IN PTR www.me.org.
+;; AUTHORITY SECTION:
+0.0.10.in-addr.arpa. 86400 IN NS ns1.me.org.
+;; ADDITIONAL SECTION:
+ns1.me.org. 86400 IN A 10.0.0.7
+;; Query time: 1 msec
+;; SERVER: 10.0.0.8#53(10.0.0.8)
+;; WHEN: Sat Jul 25 09:30:46 2020
+;; MSG SIZE rcvd: 103
+
+[root@centos6 ~]#host 10.0.0.100
+100.0.0.10.in-addr.arpa domain name pointer www.me.org.
+[root@centos6 ~]#nslookup 10.0.0.200
+Server: 10.0.0.8
+Address: 10.0.0.8#53
+
+200.0.0.10.in-addr.arpa name = app.wange.org.
+[root@centos6 ~]#nslookup
+&gt; 10.0.0.100
+Server: 10.0.0.8
+Address: 10.0.0.8#53
+100.0.0.10.in-addr.arpa name = www.me.org.
+&gt; exit
+C:\Users\wang&gt;ping -a 10.0.0.100
+&#27491;&#22312; Ping www.me.org [10.0.0.100] &#20855;&#26377; 32 &#23383;&#33410;&#30340;&#25968;&#25454;:
+&#35831;&#27714;&#36229;&#26102;&#12290;
+10.0.0.100 &#30340; Ping &#32479;&#35745;&#20449;&#24687;:
+ &#25968;&#25454;&#21253;: &#24050;&#21457;&#36865; = 1&#65292;&#24050;&#25509;&#25910; = 0&#65292;&#20002;&#22833; = 1 (100% &#20002;&#22833;)&#65292;
+Control-C
+^C
+C:\Users\wang&gt;ping -a 10.0.0.200
+&#27491;&#22312; Ping app.wange.org [10.0.0.200] &#20855;&#26377; 32 &#23383;&#33410;&#30340;&#25968;&#25454;:
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5fc6d8fe-fc4b-48b3-8d72-cde33378683a" class="outline-3">
+<h3 id="h:5fc6d8fe-fc4b-48b3-8d72-cde33378683a">实现从服务器</h3>
+<div class="outline-text-3" id="text-h:5fc6d8fe-fc4b-48b3-8d72-cde33378683a">
+<p>
+只有一台主DNS服务器，存在单点失败的问题，可以建立主DNS服务器的备份服务器，即从服务器来实现DNS服务的容错机制。从服务器可以自动和主服务器进行单向的数据同步，从而和主DNS服务器一样，也可以对外提供查询服务，但从服务器不提供数据更新服务。
+</p>
+</div>
+<div id="outline-container-h:27aec1e9-2abf-47fa-85e1-b21600109f93" class="outline-4">
+<h4 id="h:27aec1e9-2abf-47fa-85e1-b21600109f93">DNS从服务器</h4>
+<div class="outline-text-4" id="text-h:27aec1e9-2abf-47fa-85e1-b21600109f93">
+<ol class="org-ol">
+<li>应该为一台独立的名称服务器</li>
+<li>主服务器的区域解析库文件中必须有一条NS记录指向从服务器</li>
+<li>从服务器只需要定义区域，而无须提供解析库文件；解析库文件应该放置于/var/named/slaves/目录中</li>
+<li>主服务器得允许从服务器作区域传送</li>
+<li>主从服务器时间应该同步，可通过ntp进行</li>
+<li>bind程序的版本应该保持一致；否则，应该从高，主低</li>
+<li>通过SOA的序列号实现从服务的同步，同步方式：推（主服务数据库添加从服
+务器的NS记录），拉（从服务器定时更新1D ; refresh）</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:1ee68a87-92dc-47b9-a2ac-56612d4ba913" class="outline-4">
+<h4 id="h:1ee68a87-92dc-47b9-a2ac-56612d4ba913">定义从区域</h4>
+<div class="outline-text-4" id="text-h:1ee68a87-92dc-47b9-a2ac-56612d4ba913">
+<p>
+格式:
+</p>
+
+<pre class="example" id="org6fa8069">
+zone "ZONE_NAME" IN {
+    type slave; 
+    masters { MASTER_IP; };        // 指定主服务器地址
+    file "slaves/ZONE_NAME.zone";  // 只须定义就行，同步时会自动创建
+};
+</pre>
+
+<p>
+区域传输控制
+</p>
+
+<pre class="example" id="orge88d6d3">
+vim /etc/named.conf
+
+allow-transfer { none;};       // 从节点配置
+allow-transfer { 从服务器IP;};  // 主节点配置，没有这个配置，dns记录可被其他人获取
+</pre>
+
+<p>
+范例：没有区域传输控制配置，抓取dns所有解析记录
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">dig -t axfr me.org @10.10.10.11  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25235;&#21462;dns&#26381;&#21153;&#22120;&#25152;&#26377;&#35299;&#26512;&#35760;&#24405;</span>
+dig &#8211;t axfr 100.1.10.in-addr.arpa @172.16.1.1
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">dig -t axfr me.org @10.0.0.116</span>
+; &lt;&lt;&gt;&gt; DiG 9.11.4-P2-RedHat-9.11.4-26.P2.el7_9.4 &lt;&lt;&gt;&gt; -t axfr me.org @10.0.0.116
+;; global options: +cmd
+me.org.            86400    IN    SOA    ns1.me.org. admin.me.org. 20210422 86400 3600 604800 10800
+me.org.            86400    IN    NS    ns1.me.org.
+ns1.me.org.        86400    IN    A    10.0.0.116
+websrv.me.org.        86400    IN    A    10.0.0.117
+www.me.org.        86400    IN    CNAME    websrv.me.org.
+me.org.            86400    IN    SOA    ns1.me.org. admin.me.org. 20210422 86400 3600 604800 10800
+;; Query time: 0 msec
+;; SERVER: 10.0.0.116#53(10.0.0.116)
+;; WHEN: Fri Apr 23 01:41:09 CST 2021
+;; XFR size: 6 records (messages 1, bytes 188)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8ec61da2-a37c-4284-9ffb-b726fa9ae0aa" class="outline-4">
+<h4 id="h:8ec61da2-a37c-4284-9ffb-b726fa9ae0aa">实战案例：实现DNS从服务器</h4>
+<div class="outline-text-4" id="text-h:8ec61da2-a37c-4284-9ffb-b726fa9ae0aa">
+<p>
+<b>实验目的</b>
+</p>
+
+<p>
+搭建DNS主从服务器架构，实现DNS服务冗余
+</p>
+
+<p>
+<b>环境要求</b>
+</p>
+
+<pre class="example" id="orgfad2290">
+需要四台主机
+DNS主服务器：192.168.8.8
+DNS从服务器:192.168.8.18
+web服务器：192.168.8.7
+DNS客户端：192.168.8.6
+</pre>
+
+<p>
+<b>前提准备</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20851;&#38381;SElinux
+&#20851;&#38381;&#38450;&#28779;&#22681;
+&#26102;&#38388;&#21516;&#27493;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:29a0ccf6-d6d6-43f1-a91d-bf22124ba188" class="outline-5">
+<h5 id="h:29a0ccf6-d6d6-43f1-a91d-bf22124ba188">实现步骤</h5>
+<div class="outline-text-5" id="text-h:29a0ccf6-d6d6-43f1-a91d-bf22124ba188">
+<p>
+<b>主DNS服务端配置(参看前面案例)</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21482;&#20801;&#35768;&#20174;&#26381;&#21153;&#22120;&#36827;&#34892;&#21306;&#22495;&#20256;&#36755;</span>
+allow-transfer { &#20174;&#26381;&#21153;&#22120;IP;};
+
+vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#36825;&#27573;</span>
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"me.org.zone"</span>;
+};
+
+cp -p /var/named/named.localhost /var/named/me.org.zone
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#27809;&#26377;-p&#65292;&#38656;&#35201;&#25913;&#26435;&#38480;&#12290;chgrp named me.org.zone</span>
+
+vim /var/named/me.org.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+        1 ; serial
+        1D ; refresh
+        1H ; retry
+        1W ; expire
+        3H ) ; minimum
+      NS master
+      NS slave
+master    A 192.168.8.8
+slave     A 192.168.8.18  // &#20174;&#26381;&#21153;&#22120;&#35760;&#24405;&#65292;&#20027;&#26381;&#21153;&#37197;&#32622;&#21457;&#29983;&#21464;&#21270;&#25165;&#20250;&#20027;&#21160;&#25512;&#36865;&#37197;&#32622;
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload       <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>从DNS服务器配置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+vim /etc/named.conf
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#20801;&#35768;&#20854;&#23427;&#20027;&#26426;&#36827;&#34892;&#21306;&#22495;&#20256;&#36755;</span>
+allow-transfer { none;};
+
+vim /etc/named.rfc1912.zones
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> slave;
+  masters { &#20027;&#26381;&#21153;&#22120;IP;};
+  file <span style="color: #8b2252;">"slaves/me.org.slave"</span>;
+};
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+ls /var/named/slaves/me.org.slave <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;&#21306;&#22495;&#25968;&#25454;&#24211;&#25991;&#20214;&#26159;&#21542;&#29983;&#25104;</span>
+</pre>
+</div>
+
+<p>
+<b>客户端测试主从DNS服务架构</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">DNS1</span>=&#20027;&#26381;&#21153;&#22120;
+<span style="color: #a0522d;">DNS2</span>=&#20174;&#26381;&#21153;&#22120;
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;&#20174;DNS&#26381;&#21153;&#22120;&#26159;&#21542;&#21487;&#20197;&#26597;&#35810;</span>
+dig www.me.org
+curl www.me.org
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#20027;&#26381;&#21153;&#22120;&#19978;&#20572;&#27490;DNS&#26381;&#21153;</span>
+systemctl stop named
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#39564;&#35777;&#20174;DNS&#26381;&#21153;&#22120;&#20173;&#28982;&#21487;&#20197;&#26597;&#35810;</span>
+dig www.me.org
+curl www.me.org
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6f8e1dd5-31a3-4cb1-956b-7972d81c1cbc" class="outline-3">
+<h3 id="h:6f8e1dd5-31a3-4cb1-956b-7972d81c1cbc">实现子域</h3>
+<div class="outline-text-3" id="text-h:6f8e1dd5-31a3-4cb1-956b-7972d81c1cbc">
+</div>
+<div id="outline-container-h:fe5ea787-275b-4fca-8e41-413045d812b0" class="outline-4">
+<h4 id="h:fe5ea787-275b-4fca-8e41-413045d812b0">子域委派授权</h4>
+<div class="outline-text-4" id="text-h:fe5ea787-275b-4fca-8e41-413045d812b0">
+<p>
+将子域委派给其它主机管理，实现分布式DNS数据库
+</p>
+
+<p>
+正向解析区域子域方法
+</p>
+
+<p>
+范例：定义两个子域区域
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">shanghai.me.org.        IN NS ns1.ops.me.org.
+shanghai.me.org.        IN NS ns2.ops.me.org.
+shenzhen.me.org.        IN NS ns1.shenzhen.me.org.
+shenzhen.me.org.        IN NS ns2.shenzhen.me.org.
+ns1.shanghai.me.org.    IN A 1.1.1.1
+ns2.shanghai.me.org.    IN A 1.1.1.2
+ns1.shenzhen.me.org.    IN A 1.1.1.3
+ns2.shenzhen.me.org.    IN A 1.1.1.4
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5bbbbdbc-ebf7-4344-8c4e-1ee23abde64b" class="outline-4">
+<h4 id="h:5bbbbdbc-ebf7-4344-8c4e-1ee23abde64b">范例：实现DNS父域和子域服务</h4>
+<div class="outline-text-4" id="text-h:5bbbbdbc-ebf7-4344-8c4e-1ee23abde64b">
+<p>
+<b>实验目的</b>
+</p>
+
+
+<figure id="org2860792">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210423105256222.png" alt="image-20210423105256222.png">
+
+</figure>
+
+<p>
+搭建DNS父域和子域服务器
+</p>
+
+<p>
+<b>环境要求</b>
+</p>
+
+<pre class="example" id="orgdc6c1c9">
+需要五台主机
+DNS父域服务器：192.168.8.8
+DNS子域服务器：192.168.8.18
+父域的web服务器：192.168.8.7，www.me.org
+子域的web服务器：192.168.8.17,www.shanghai.me.org
+DNS客户端：192.168.8.6
+</pre>
+
+<p>
+<b>前提准备</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20851;&#38381;SElinux
+&#20851;&#38381;&#38450;&#28779;&#22681;
+&#26102;&#38388;&#21516;&#27493;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:a6b01a36-ea51-4e57-820b-0c5b31ea65e1" class="outline-5">
+<h5 id="h:a6b01a36-ea51-4e57-820b-0c5b31ea65e1">实现步骤</h5>
+<div class="outline-text-5" id="text-h:a6b01a36-ea51-4e57-820b-0c5b31ea65e1">
+<p>
+<b>在父域DNS服务器上实现主me.org域的主DNS服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21482;&#20801;&#35768;&#20174;&#26381;&#21153;&#22120;&#36827;&#34892;&#21306;&#22495;&#20256;&#36755;</span>
+allow-transfer { &#20174;&#26381;&#21153;&#22120;IP;};
+dnssec-enable no;
+dnssec-validation no;
+
+vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#36825;&#27573;</span>
+zone <span style="color: #8b2252;">"me.org"</span> {
+    <span style="color: #483d8b;">type</span> master;
+    file <span style="color: #8b2252;">"me.org.zone"</span>;
+};
+
+cp -p /var/named/named.localhost /var/named/me.org.zone
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#27809;&#26377;-p&#65292;&#38656;&#35201;&#25913;&#26435;&#38480;&#12290;chgrp named me.org.zone</span>
+
+vim /var/named/me.org.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+                1 ; serial
+                1D ; refresh
+                1H ; retry
+                1W ; expire
+                3H ) ; minimum
+            NS master
+shanghai    NS shanghains  //&#23376;&#22495;
+
+master      A 192.168.8.8
+shanghains  A 192.168.8.18
+
+websrv      A 192.168.8.7
+www         CNAME websrv
+
+systemctl start named <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload           <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>实现子域的DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23376;&#22495;&#21517;&#37197;&#32622;</span>
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+allow-transfer { none;};
+
+
+vim /etc/named.rfc1912.zones
+zone <span style="color: #8b2252;">"shanghai.me.org"</span> {
+    <span style="color: #483d8b;">type</span> master;
+    file <span style="color: #8b2252;">"shanghai.me.org.zone"</span>;
+};
+
+cp -p /var/named/named.localhost /var/named/shanghai.me.org.zone
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#27809;&#26377;-p&#65292;&#38656;&#35201;&#25913;&#26435;&#38480;&#12290;chgrp named me.org.zone</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#23376;&#22495;&#25968;&#25454;&#24211;</span>
+vim /var/named/shanghai.me.org.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+                2019042214 ; serial
+                1D ; refresh
+                1H ; retry
+                1W ; expire
+                3H ) ; minimum
+            NS master
+master      A  192.168.8.18
+websrv      A  192.168.8.7
+www         CNAME websrv
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>在父域和子域的web服务器上安装httpd服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#29238;&#22495;&#30340;web&#26381;&#21153;&#22120;&#21033;&#29992;&#19978;&#38754;&#26696;&#20363;&#65288;&#30053;&#65289;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#23376;&#22495;&#30340;web&#26381;&#21153;&#22120;&#19978;&#23433;&#35013;http&#26381;&#21153;</span>
+yum install httpd
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#32622;&#20027;&#39029;&#38754;</span>
+<span style="color: #483d8b;">echo</span> www.shanghai.me.org &gt; /var/www/html/index.html
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21551;&#21160;&#26381;&#21153;</span>
+systemctl start httpd
+</pre>
+</div>
+
+<p>
+<b>7.2.3.4 客户端测试</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">dig www.shanghai.me.org
+www.shanghai.me.org
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e660314a-174a-490a-870d-4dfc6895ad6c" class="outline-3">
+<h3 id="h:e660314a-174a-490a-870d-4dfc6895ad6c">实现DNS转发（缓存）服务器</h3>
+<div class="outline-text-3" id="text-h:e660314a-174a-490a-870d-4dfc6895ad6c">
+</div>
+<div id="outline-container-h:ea48e77d-5e9a-4653-8b4d-6f2c011e552e" class="outline-4">
+<h4 id="h:ea48e77d-5e9a-4653-8b4d-6f2c011e552e">DNS转发</h4>
+<div class="outline-text-4" id="text-h:ea48e77d-5e9a-4653-8b4d-6f2c011e552e">
+<p>
+利用DNS转发，可以将用户的DNS请求，转发至指定的DNS服务，而非默认的根DNS服务器，并将指定服务器查询的返回结果进行缓存，提高效率。
+</p>
+
+<p>
+注意：
+</p>
+
+<ol class="org-ol">
+<li>被转发的服务器需要能够为请求者做递归，否则转发请求不予进行</li>
+<li>在全局配置块中，关闭dnssec功能</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#20840;&#23616;&#37197;&#32622; &#20851;&#38381;dnssec&#21151;&#33021;</span>
+dnssec-enable no;
+dnssec-validation no;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ecbab737-7a2a-4b95-bb6f-91ad47cbca14" class="outline-4">
+<h4 id="h:ecbab737-7a2a-4b95-bb6f-91ad47cbca14">转发方式</h4>
+<div class="outline-text-4" id="text-h:ecbab737-7a2a-4b95-bb6f-91ad47cbca14">
+</div>
+<div id="outline-container-h:cc28bb36-d4ff-4038-9951-e9c3eae49dbc" class="outline-5">
+<h5 id="h:cc28bb36-d4ff-4038-9951-e9c3eae49dbc"><b>全局转发:</b></h5>
+<div class="outline-text-5" id="text-h:cc28bb36-d4ff-4038-9951-e9c3eae49dbc">
+<p>
+对非本机所负责解析区域的请求，全转发给指定的服务器
+</p>
+
+
+<p>
+在全局配置块中实现：
+</p>
+
+<pre class="example" id="org76b2b57">
+Options {
+        forward first|only;  // first先转发到目标主机，目标主机没有则转发互联网IP查询；only找不到了就算了
+        forwarders { ip;};
+};
+</pre>
+</div>
+</div>
+<div id="outline-container-h:32aaf96d-6195-4e26-9834-d57c1c0f8bdc" class="outline-5">
+<h5 id="h:32aaf96d-6195-4e26-9834-d57c1c0f8bdc"><b>特定区域转发</b></h5>
+<div class="outline-text-5" id="text-h:32aaf96d-6195-4e26-9834-d57c1c0f8bdc">
+<p>
+仅转发对特定的区域的请求，比全局转发优先级高。用的不多
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">zone <span style="color: #8b2252;">"ZONE_NAME"</span> IN {
+    <span style="color: #483d8b;">type</span> forward;
+    forward first|only;
+    forwarders { ip;};
+};
+</pre>
+</div>
+
+<p>
+*first*：先转发至指定DNS服务器，如果无法解析查询请求，则本服务器再去根服务器查询
+</p>
+
+<p>
+<b>only</b>:先转发至指定DNS服务器，如果无法解析查询请求，则本服务器将不再去
+根服务器查询
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:03e2dda1-0c73-4315-af61-a88668724904" class="outline-4">
+<h4 id="h:03e2dda1-0c73-4315-af61-a88668724904">实战案例：实现DNS forward（缓存）服务器</h4>
+<div class="outline-text-4" id="text-h:03e2dda1-0c73-4315-af61-a88668724904">
+<p>
+<b>实验目的</b>
+</p>
+
+<p>
+搭建DNS转发（缓存）服务器
+</p>
+
+<p>
+<b>环境要求</b>
+</p>
+
+<pre class="example" id="org9ebc05b">
+需要四台主机
+DNS只缓存服务器：192.168.8.8
+DNS主服务器:192.168.8.18
+web服务器：192.168.8.7
+DNS客户端：192.168.8.6
+</pre>
+
+<p>
+<b>前提准备</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20851;&#38381;SElinux
+&#20851;&#38381;&#38450;&#28779;&#22681;
+&#26102;&#38388;&#21516;&#27493;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:8da728ea-e299-416e-bc9b-22a45955436a" class="outline-5">
+<h5 id="h:8da728ea-e299-416e-bc9b-22a45955436a">实现步骤</h5>
+<div class="outline-text-5" id="text-h:8da728ea-e299-416e-bc9b-22a45955436a">
+<p>
+<b>实现转发（只缓存）DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+forward first; // first&#20808;&#36716;&#21457;&#21040;&#30446;&#26631;&#20027;&#26426;&#65292;&#30446;&#26631;&#20027;&#26426;&#27809;&#26377;&#21017;&#36716;&#21457;&#20114;&#32852;&#32593;IP&#26597;&#35810;
+forwarders { 10.0.0.18;};
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20851;&#38381;dnsec&#21151;&#33021;</span>
+dnssec-enable no;
+dnssec-validation no;
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>实现主DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#19979;&#38754;&#36825;&#27573;</span>
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"me.org.zone"</span>;
+};
+
+cp -p /var/named/named.localhost /var/named/me.org.zone
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#27809;&#26377;-p&#65292;&#38656;&#35201;&#25913;&#26435;&#38480;&#12290;chgrp named me.org.zone</span>
+
+vim /var/named/me.org.zone
+
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+        2019042214 ; serial
+        1D ; refresh
+        1H ; retry
+        1W ; expire
+        3H ) ; minimum
+      NS master
+master    A  10.0.0.18
+websrv    A  10.0.0.7
+www     CNAME websrv
+
+systemctl start named <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload           <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>web服务器配置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;http&#26381;&#21153;</span>
+yum install httpd
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#32622;&#20027;&#39029;&#38754;</span>
+<span style="color: #483d8b;">echo</span> www.me.org &gt; /var/www/html/index.html
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21551;&#21160;&#26381;&#21153;</span>
+systemctl start httpd
+</pre>
+</div>
+
+<p>
+<b>在客户端测试</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#23458;&#25143;&#31471;&#37197;&#32622;&#65288;&#21442;&#30475;&#21069;&#38754;&#26696;&#20363;&#65292;&#30053;&#65289;</span>
+dig www.me.org
+curl www.me.org
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f2703489-18aa-436b-aaf0-2333a8e3aa29" class="outline-3">
+<h3 id="h:f2703489-18aa-436b-aaf0-2333a8e3aa29">实现智能DNS</h3>
+<div class="outline-text-3" id="text-h:f2703489-18aa-436b-aaf0-2333a8e3aa29">
+
+<figure id="org4f3ca28">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210122175455082.png" alt="image-20210122175455082.png">
+
+</figure>
+</div>
+<div id="outline-container-h:9aa6d4d2-9cb1-4549-aaed-965823ed6298" class="outline-4">
+<h4 id="h:9aa6d4d2-9cb1-4549-aaed-965823ed6298">GSLB</h4>
+<div class="outline-text-4" id="text-h:9aa6d4d2-9cb1-4549-aaed-965823ed6298">
+<p>
+GSLB：Global Server Load Balance全局负载均衡
+</p>
+
+<p>
+GSLB是对服务器和链路进行综合判断来决定由哪个地点的服务器来提供服务，实现异地服务器群服务质量的保证
+</p>
+
+<p>
+GSLB主要的目的是在整个网络范围内将用户的请求定向到最近的节点（或者区域），就近CDN节点再访求缓存源站数据。
+</p>
+
+<p>
+GSLB分为基于DNS实现、基于重定向实现、基于路由协议实现，其中最通用的是基于DNS解析方式
+</p>
+
+<p>
+范例：查询VIP使用网宿的CDN服务
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos6 ~]#dig www.vip.com
+
+; &lt;&lt;&gt;&gt; DiG 9.8.2rc1-RedHat-9.8.2-0.68.rc1.el6 &lt;&lt;&gt;&gt; www.vip.com
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 44153
+<span style="color: #ffa54f;">;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 5, ADDITIONAL: 0</span>
+
+<span style="color: #ffa54f;">;; QUESTION SECTION:</span>
+<span style="color: #ffa54f;">;www.vip.com. IN A</span>
+
+<span style="color: #ffa54f;">;; ANSWER SECTION:</span>
+<span style="color: #ffa54f;">www.vip.com. 180 IN CNAME www.vip.com.wscdns.com.#wscdn &#32593;&#23487;&#26381;&#21153;&#21830;</span>
+<span style="color: #ffa54f;">www.vip.com.wscdns.com. 60 IN A 111.206.176.92</span>
+
+<span style="color: #ffa54f;">;; AUTHORITY SECTION:</span>
+<span style="color: #ffa54f;">wscdns.com. 172800 IN NS dns2.wscdns.info.</span>
+<span style="color: #ffa54f;">wscdns.com. 172800 IN NS dns3.wscdns.org.</span>
+<span style="color: #ffa54f;">wscdns.com. 172800 IN NS dns4.wscdns.info.</span>
+<span style="color: #ffa54f;">wscdns.com. 172800 IN NS dns5.cdn30.org.</span>
+<span style="color: #ffa54f;">wscdns.com. 172800 IN NS dns1.wscdns.org.</span>
+
+<span style="color: #ffa54f;">;; Query time: 1290 msec</span>
+<span style="color: #ffa54f;">;; SERVER: 10.0.0.18#53(10.0.0.18)</span>
+<span style="color: #ffa54f;">;; WHEN: Wed Feb 12 18:05:17 2020</span>
+<span style="color: #ffa54f;">;; MSG SIZE rcvd: 200</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3baa9e51-6091-4677-8ce3-439a690b4df8" class="outline-4">
+<h4 id="h:3baa9e51-6091-4677-8ce3-439a690b4df8">CDN （Content Delivery Network）内容分发网络</h4>
+<div class="outline-text-4" id="text-h:3baa9e51-6091-4677-8ce3-439a690b4df8">
+
+<figure id="orgd7889bd">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210122175519053.png" alt="image-20210122175519053.png">
+
+</figure>
+</div>
+<div id="outline-container-h:4ef6e1e2-6307-426b-9230-866657596bd4" class="outline-5">
+<h5 id="h:4ef6e1e2-6307-426b-9230-866657596bd4">CDN工作原理</h5>
+<div class="outline-text-5" id="text-h:4ef6e1e2-6307-426b-9230-866657596bd4">
+<ol class="org-ol">
+<li>用户向浏览器输入www.a.com这个域名，浏览器第一次发现本地没有dns缓存，则向网站的DNS服务器请求</li>
+<li>网站的DNS域名解析器设置了CNAME，指向了www.a.tbcdn.com,请求指向了CDN
+网络中的 <b>智能DNS负载均衡系统</b></li>
+<li>智能DNS负载均衡系统解析域名，把对用户响应速度最快的IP节点返回给用户；</li>
+<li>用户向该IP节点（CDN服务器）发出请求</li>
+<li>由于是第一次访问，CDN服务器会通过Cache内部专用DNS解析得到此域名的原
+web站点IP，向原站点服务器发起请求，并在CDN服务器上缓存内容</li>
+<li>请求结果发给用户</li>
+</ol>
+
+<p>
+范例: CDN工作原理就近返回服务器地址
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos6 ~]#cat /etc/resolv.conf
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Generated by NetworkManager</span>
+search localdomain
+nameserver 54.252.183.4
+[root@centos6 ~]#ping www.jd.com -c1
+PING jd-abroad.cdn20.com (163.171.197.13) 56(84) bytes of data.
+64 bytes from 163.171.197.13: <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=128 <span style="color: #a0522d;">time</span>=266 ms
+--- jd-abroad.cdn20.com ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 739ms
+rtt min/avg/max/mdev = 266.711/266.711/266.711/0.000 ms
+[root@centos6 ~]#cat /etc/resolv.conf
+<span style="color: #b22222;"># </span><span style="color: #b22222;">Generated by NetworkManager</span>
+search localdomain
+nameserver 223.6.6.6
+nameserver 180.76.76.76
+[root@centos6 ~]#ping www.jd.com -c1
+PING img2x-v6-sched.jcloudedge.com (123.6.29.3) 56(84) bytes of data.
+64 bytes from hn.kd.ny.adsl (123.6.29.3): <span style="color: #a0522d;">icmp_seq</span>=1 <span style="color: #a0522d;">ttl</span>=128 <span style="color: #a0522d;">time</span>=3.04 ms
+--- img2x-v6-sched.jcloudedge.com ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 22ms
+rtt min/avg/max/mdev = 3.044/3.044/3.044/0.000 ms
+[root@centos6 ~]#
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f0f37b86-ed85-4879-bf84-32660e566af1" class="outline-5">
+<h5 id="h:f0f37b86-ed85-4879-bf84-32660e566af1">CDN服务商</h5>
+<div class="outline-text-5" id="text-h:f0f37b86-ed85-4879-bf84-32660e566af1">
+<ul class="org-ul">
+<li>服务商：阿里，腾讯，蓝汛，网宿，帝联等</li>
+<li>智能DNS: dnspod dns.la</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:56b6def4-874e-407c-8cc8-206aa197271d" class="outline-4">
+<h4 id="h:56b6def4-874e-407c-8cc8-206aa197271d">智能DNS相关技术</h4>
+<div class="outline-text-4" id="text-h:56b6def4-874e-407c-8cc8-206aa197271d">
+</div>
+<div id="outline-container-h:fc098f35-c5ae-412f-b667-9ad7692af124" class="outline-5">
+<h5 id="h:fc098f35-c5ae-412f-b667-9ad7692af124"><b>bind中ACL</b></h5>
+<div class="outline-text-5" id="text-h:fc098f35-c5ae-412f-b667-9ad7692af124">
+<p>
+ACL：把一个或多个地址归并为一个集合，并通过一个统一的名称调用
+</p>
+
+<p>
+注意：只能先定义后使用；因此一般定义在配置文件中，处于options的前面；从上往下匹配。
+</p>
+
+<p>
+格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">acl acl_name {
+    ip;
+    net/prelen;
+    &#8230;&#8230;
+};
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#25226;&#21271;&#20140;&#24066;&#25152;&#26377;IP&#24402;&#19968;&#20010;&#38598;&#21512;</span>
+acl beijingnet {
+    172.16.0.0/16;
+    10.10.10.10;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:922823db-c22b-4caf-bae5-64d256668e28" class="outline-5">
+<h5 id="h:922823db-c22b-4caf-bae5-64d256668e28"><b>bind有四个内置的acl</b></h5>
+<div class="outline-text-5" id="text-h:922823db-c22b-4caf-bae5-64d256668e28">
+<ul class="org-ul">
+<li>none 没有一个主机</li>
+<li>any 任意主机</li>
+<li>localhost 本机</li>
+<li>localnet 本机的IP同掩码运算后得到的网络地址</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:afe15a00-b868-4fcf-ac60-f47bb62f4c4d" class="outline-5">
+<h5 id="h:afe15a00-b868-4fcf-ac60-f47bb62f4c4d">*访问控制的指令*：</h5>
+<div class="outline-text-5" id="text-h:afe15a00-b868-4fcf-ac60-f47bb62f4c4d">
+<ul class="org-ul">
+<li>allow-query {}： 允许查询的主机；白名单</li>
+<li>allow-transfer {}：允许区域传送的主机；白名单</li>
+<li>allow-recursion {}: 允许递归的主机,建议全局使用</li>
+<li>allow-update {}: 允许更新区域数据库中的内容</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:a64946e1-f0b8-4269-8717-05def2e9b583" class="outline-5">
+<h5 id="h:a64946e1-f0b8-4269-8717-05def2e9b583"><b>view 视图</b></h5>
+<div class="outline-text-5" id="text-h:a64946e1-f0b8-4269-8717-05def2e9b583">
+<p>
+<b>View：视图，将ACL和区域数据库实现对应关系，以实现智能DNS</b>
+</p>
+
+<ul class="org-ul">
+<li>一个bind服务器可定义多个view，每个view中可定义一个或多个zone</li>
+<li>每个view用来匹配一组客户端</li>
+<li>多个view内可能需要对同一个区域进行解析，但使用不同的区域解析库文件</li>
+</ul>
+
+<p>
+注意：
+</p>
+
+<ul class="org-ul">
+<li>一旦启用了view，所有的zone都只能定义在view中</li>
+<li>仅在允许递归请求的客户端所在view中定义根区域</li>
+<li>客户端请求到达时，是自上而下检查每个view所服务的客户端列表</li>
+</ul>
+
+<p>
+<b>view 格式</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">view VIEW_NAME {
+        match-clients { beijingnet; }; // &#21305;&#37197;ACL&#37197;&#32622;
+        zone &#8220;me.org&#8221; {                // &#21305;&#37197;&#21040;ACL&#37197;&#32622;&#36820;&#22238;&#23545;&#24212;&#21306;&#25968;&#25454;&#24211;&#25991;&#20214;
+            <span style="color: #483d8b;">type</span> master;
+            file &#8220;me.org.zone.bj&#8221;;
+        };
+        include &#8220;/etc/named.rfc1912.zones&#8221;;
+};
+
+view VIEW_NAME {
+        match-clients { shanghainet; };
+        zone &#8220;me.org&#8221; {
+            <span style="color: #483d8b;">type</span> master;
+            file &#8220;me.org.zone.sh&#8221;;
+        };
+        include &#8220;/etc/named.rfc1912.zones&#8221;;
+};
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7131424a-90f3-4757-ad96-b6b92c2ff4b7" class="outline-4">
+<h4 id="h:7131424a-90f3-4757-ad96-b6b92c2ff4b7">实战案例：利用view实现智能DNS</h4>
+<div class="outline-text-4" id="text-h:7131424a-90f3-4757-ad96-b6b92c2ff4b7">
+<p>
+<b>实验目的</b>
+</p>
+
+<p>
+搭建DNS主从服务器架构，实现DNS服务冗余
+</p>
+
+<p>
+<b>环境要求</b>
+</p>
+
+<pre class="example" id="orgdb1860d">
+需要3台主机
+DNS主服务器和web服务器1：192.168.8.8/24，10.0.0.8/16
+web服务器2：10.0.0.7/24     北京 172.16.0.7/16   上海
+DNS客户端1：10.0.0.6/24     北京 172.16.0.6/16   上海
+</pre>
+
+<p>
+<b>前提准备</b>
+</p>
+
+<pre class="example" id="org42378f2">
+关闭SElinux
+关闭防火墙
+时间同步
+</pre>
+</div>
+<div id="outline-container-h:128f41ec-c4f7-410b-ae87-106ee950c214" class="outline-5">
+<h5 id="h:128f41ec-c4f7-410b-ae87-106ee950c214">实现步骤</h5>
+<div class="outline-text-5" id="text-h:128f41ec-c4f7-410b-ae87-106ee950c214">
+<p>
+<b>DNS 服务器的网卡配置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#32622;&#20004;&#20010;IP&#22320;&#22336;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">eth0&#65306;10.0.0.8/24</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">eth1: 172.16.0.8/16</span>
+ip a
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group
+default qlen 1000
+  link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+  inet 127.0.0.1/8 scope host lo
+    valid_lft forever preferred_lft forever
+  inet6 ::1/128 scope host
+    valid_lft forever preferred_lft forever
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc mq state UP group
+default qlen 1000
+  link/ether 00:0c:29:f9:8d:90 brd ff:ff:ff:ff:ff:ff
+  inet 10.0.0.8/24 brd 192.168.8.255 scope global noprefixroute eth0
+    valid_lft forever preferred_lft forever
+  inet6 fe80::20c:29ff:fef9:8d90/64 scope link
+    valid_lft forever preferred_lft forever
+3: eth1: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc mq state UP group
+default qlen 1000
+  link/ether 00:0c:29:f9:8d:11 brd ff:ff:ff:ff:ff:ff
+  inet 172.16.0.8/16 brd 172.16.0.255 scope global noprefixroute eth1
+    valid_lft forever preferred_lft forever
+  inet6 fe80::20c:29ff:fe11:8d90/64 scope link
+    valid_lft forever preferred_lft forever
+</pre>
+</div>
+
+<p>
+<b>主DNS服务端配置文件实现view</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#25991;&#20214;&#26368;&#21069;&#38754;&#21152;&#19979;&#38754;&#34892;</span>
+acl beijingnet {
+  10.0.0.0/24;
+};
+acl shanghainet {
+  172.16.0.0/16;
+};
+acl othernet {
+  any;  // &#20854;&#23427;IP
+};
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20027;&#37197;&#32622;&#19981;&#20445;&#30041;&#26681;&#37197;&#32622;&#65292;&#35201;&#25918;&#21040;named.rfc1912.zones&#25991;&#20214;&#20013;</span>
+// zone <span style="color: #8b2252;">"."</span> IN {
+//  type hint;  // &#26681;&#35299;&#26512;&#24471;&#26377;
+//  file <span style="color: #8b2252;">"named.ca"</span>;
+//};
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20854;&#23427;&#30053;</span>
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#21019;&#24314;view</span>
+view beijingview {
+  match-clients { beijingnet;};
+  include <span style="color: #8b2252;">"/etc/named.rfc1912.zones.bj"</span>;
+};
+view shanghaiview {
+  match-clients { shanghainet;};
+  include <span style="color: #8b2252;">"/etc/named.rfc1912.zones.sh"</span>;
+};
+view otherview {
+  match-clients { othernet;};
+  include <span style="color: #8b2252;">"/etc/named.rfc1912.zones.other"</span>;
+};
+// include <span style="color: #8b2252;">"/etc/named.rfc1912.zones"</span>; &#21024;&#38500;&#36825;&#20010;&#37197;&#32622;
+include <span style="color: #8b2252;">"/etc/named.root.key"</span>;
+</pre>
+</div>
+
+<p>
+<b>实现区域配置文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/named.rfc1912.zones.bj
+zone <span style="color: #8b2252;">"."</span> IN {
+  <span style="color: #483d8b;">type</span> hint;  // &#26681;&#35299;&#26512;&#24471;&#26377;
+  file <span style="color: #8b2252;">"named.ca"</span>;
+};
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"me.org.zone.bj"</span>;
+};
+
+vim /etc/named.rfc1912.zones.sh
+zone <span style="color: #8b2252;">"."</span> IN {
+  <span style="color: #483d8b;">type</span> hint;
+  file <span style="color: #8b2252;">"named.ca"</span>;
+};
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"me.org.zone.sh"</span>;
+};
+
+vim /etc/named.rfc1912.zones.other
+zone <span style="color: #8b2252;">"."</span> IN {
+  <span style="color: #483d8b;">type</span> hint;
+  file <span style="color: #8b2252;">"named.ca"</span>;
+};
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"me.org.zone.other"</span>;
+};
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20462;&#25913;&#38480;&#21046;</span>
+chgrp named /etc/named.rfc1912.zones.bj
+chgrp named /etc/named.rfc1912.zones.sh
+chgrp named /etc/named.rfc1912.zones.other
+</pre>
+</div>
+
+<p>
+<b>创建区域数据库文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">vim /var/named/me.org.zone.bj
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+        2019042214 ; serial
+        1D ; refresh
+        1H ; retry
+        1W ; expire
+        3H ) ; minimum
+      NS  master
+master    A   10.0.0.8
+websrv    A   10.0.0.7
+www     CNAME websrv
+
+vim /var/named/me.org.zone.sh
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+        2019042214 ; serial
+        1D ; refresh
+        1H ; retry
+        1W ; expire
+        3H ) ; minimum
+      NS master
+master    A 10.0.0.8
+websrv    A 172.16.0.7
+www     CNAME websrv
+
+vim /var/named/me.org.zone.other
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+        2019042214 ; serial
+        1D ; refresh
+        1H ; retry
+        1W ; expire
+        3H ) ; minimum
+      NS master
+master    A 10.0.0.8
+websrv    A 127.0.0.1
+www CNAME websrv
+
+chgrp named /var/named/me.org.zone.bj
+chgrp named /var/named/me.org.zone.sh
+chgrp named /var/named/me.org.zone.other
+
+systemctl start named <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>实现位于不同区域的三个WEB服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#20998;&#21035;&#22312;&#19977;&#21488;&#20027;&#26426;&#19978;&#23433;&#35013;http&#26381;&#21153;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;web&#26381;&#21153;&#22120;1&#65306;10.0.0.8/24&#23454;&#29616;</span>
+yum install httpd
+<span style="color: #483d8b;">echo</span> www.me.org<span style="color: #a020f0;"> in</span> Other &gt; /var/www/html/index.html
+systemctl start httpd
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;web&#26381;&#21153;&#22120;2&#65306;10.0.0.7/16</span>
+<span style="color: #483d8b;">echo</span> www.me.org<span style="color: #a020f0;"> in</span> Beijing &gt; /var/www/html/index.html
+systemctl start httpd
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;web&#26381;&#21153;&#22120;3&#65306;172.16.0.7/16</span>
+yum install httpd
+<span style="color: #483d8b;">echo</span> www.me.org<span style="color: #a020f0;"> in</span> Shanghai &gt; /var/www/html/index.html
+systemctl start httpd
+</pre>
+</div>
+
+<p>
+<b>客户端测试</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#20998;&#21035;&#22312;&#19977;&#21488;&#20027;&#26426;&#19978;&#35775;&#38382;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">DNS&#23458;&#25143;&#31471;1&#65306;10.0.0.6/24 &#23454;&#29616;&#65292;&#30830;&#20445;DNS&#25351;&#21521;10.0.0.8</span>
+curl www.me.org
+www.me.org<span style="color: #a020f0;"> in</span> Beijing
+<span style="color: #b22222;">#</span><span style="color: #b22222;">DNS&#23458;&#25143;&#31471;2&#65306;172.16.0.6/16 &#23454;&#29616;&#65292;&#30830;&#20445;DNS&#25351;&#21521;172.16.0.8</span>
+curl www.me.org
+www.me.org<span style="color: #a020f0;"> in</span> Shanghai
+<span style="color: #b22222;">#</span><span style="color: #b22222;">DNS&#23458;&#25143;&#31471;3&#65306;10.0.0.8 &#23454;&#29616;&#65292;&#65292;&#30830;&#20445;DNS&#25351;&#21521;127.0.0.1</span>
+curl www.me.org
+www.me.org<span style="color: #a020f0;"> in</span> Other
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c41efbe1-78d7-4712-bd53-b6078272e69e" class="outline-3">
+<h3 id="h:c41efbe1-78d7-4712-bd53-b6078272e69e">DNS排错</h3>
+<div class="outline-text-3" id="text-h:c41efbe1-78d7-4712-bd53-b6078272e69e">
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">dig A example.com
+
+; &lt;&lt;&gt;&gt; DiG 9.9.4-RedHat-9.9.4-14.el7 &lt;&lt;&gt;&gt; A example.com
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 30523
+<span style="color: #ffa54f;">...</span>
+</pre>
+</div>
+
+<p>
+SERVFAIL:The nameserver encountered a problem while processing the
+query.
+</p>
+
+<p>
+可使用dig +trace排错，可能是网络和防火墙导致
+</p>
+
+<p>
+NXDOMAIN：The queried name does not exist in the zone.
+</p>
+
+<p>
+可能是CNAME对应的A记录不存在导致
+</p>
+
+<p>
+REFUSED：The nameserver refused the client's DNS request due to policy
+restrictions.
+</p>
+
+<p>
+可能是DNS策略导致
+</p>
+</div>
+</div>
+<div id="outline-container-h:48dc0000-434e-442c-a26e-814e26f8c3a7" class="outline-3">
+<h3 id="h:48dc0000-434e-442c-a26e-814e26f8c3a7">实战案例</h3>
+<div class="outline-text-3" id="text-h:48dc0000-434e-442c-a26e-814e26f8c3a7">
+</div>
+<div id="outline-container-h:cb88380c-a346-422c-897e-54fd05ed9306" class="outline-4">
+<h4 id="h:cb88380c-a346-422c-897e-54fd05ed9306">实战案例：综合案例，实现Internet 的DNS 服务架构</h4>
+<div class="outline-text-4" id="text-h:cb88380c-a346-422c-897e-54fd05ed9306">
+<p>
+<b>1 实验目的</b>
+</p>
+
+
+<figure id="org6195274">
+<img src="https://raw.githubusercontent.com/jaspervincent/webimage/master/linux/network-serivce/dns/images/image-20210422044142685.png" alt="image-20210422044142685.png">
+
+</figure>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#25645;&#24314;DNS&#23454;&#29616;internet dns&#26550;&#26500;
+</pre>
+</div>
+
+<p>
+<b>2 环境要求</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#38656;&#35201;8&#21488;&#20027;&#26426;
+DNS&#23458;&#25143;&#31471;&#65306;10.0.0.7/24
+&#26412;&#22320;DNS&#26381;&#21153;&#22120;&#65288;&#21482;&#32531;&#23384;&#65289;&#65306;10.0.0.8/24
+&#36716;&#21457;&#30446;&#26631;DNS&#26381;&#21153;&#22120;&#65306;10.0.0.18/24
+&#26681;DNS&#26381;&#21153;&#22120;&#65306;10.0.0.28/24
+org&#22495;DNS&#26381;&#21153;&#22120;&#65306;10.0.0.38/24
+me.org&#22495;&#20027;DNS&#26381;&#21153;&#22120;&#65306;10.0.0.48/24
+me.org&#22495;&#20174;DNS&#26381;&#21153;&#22120;&#65306;10.0.0.58/24
+www.me.org&#30340;WEB&#26381;&#21153;&#22120;&#65306;10.0.0.68/24
+</pre>
+</div>
+
+<p>
+<b>3 前提准备</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20851;&#38381;SElinux
+&#20851;&#38381;&#38450;&#28779;&#22681;
+&#26102;&#38388;&#21516;&#27493;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:3c5c11fc-ade2-4d78-a3e5-83f660b467fa" class="outline-5">
+<h5 id="h:3c5c11fc-ade2-4d78-a3e5-83f660b467fa">实现步骤</h5>
+<div class="outline-text-5" id="text-h:3c5c11fc-ade2-4d78-a3e5-83f660b467fa">
+<p>
+<b>各种主机的网络配置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#23458;&#25143;&#31471;&#37197;&#32622;DNS&#26381;&#21153;&#22120;&#22320;&#22336;</span>
+vim /etc/sysconfig/network-scripts/ifcfg-eth0
+<span style="color: #a0522d;">NAME</span>=eth0
+<span style="color: #a0522d;">DEVICE</span>=eth0
+<span style="color: #a0522d;">BOOTPROTO</span>=static
+<span style="color: #a0522d;">IPADDR</span>=10.0.0.7
+<span style="color: #a0522d;">NETMASK</span>=255.255.255.0
+<span style="color: #a0522d;">DNS1</span>=10.0.0.8
+<span style="color: #a0522d;">ONBOOT</span>=yes
+
+service network restart
+</pre>
+</div>
+
+<p>
+<b>实现WEB服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;web&#26381;&#21153;&#22120;10.0.0.68/24&#19978;&#23454;&#29616;</span>
+yum install httpd
+<span style="color: #483d8b;">echo</span> www.me.org &gt; /var/www/html/index.html
+systemctl start httpd
+</pre>
+</div>
+
+<p>
+<b>实现me.org域的主DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;me.org&#22495;&#20027;DNS&#26381;&#21153;&#22120;10.0.0.48/24&#19978;&#23454;&#29616;</span>
+yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#19979;&#38754;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#35821;&#27861;&#26816;&#26597;</span>
+named-checkconf 
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21482;&#20801;&#35768;&#20174;&#26381;&#21153;&#22120;&#36827;&#34892;&#21306;&#22495;&#20256;&#36755;</span>
+allow-transfer { &#20174;&#26381;&#21153;&#22120;IP;};
+
+vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#36825;&#27573;</span>
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"me.org.zone"</span>;
+};
+
+vim /var/named/me.org.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. (
+        1 ; serial
+        1D ; refresh
+        1H ; retry
+        1W ; expire
+        3H ) ; minimum
+    NS  master
+    NS  slave
+master  A   10.0.0.48
+slave   A   10.0.0.58
+www   A   10.0.0.68
+
+chgrp named /var/named/me.org.zone
+
+systemctl start named <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload           <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>实现me.org域的从DNS服务器配置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;me.org&#22495;&#20174;DNS&#26381;&#21153;&#22120;10.0.0.58/24&#19978;&#23454;&#29616;</span>
+yum install bind -y
+
+vim /etc/named.conf
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#20801;&#35768;&#20854;&#23427;&#20027;&#26426;&#36827;&#34892;&#21306;&#22495;&#20256;&#36755;</span>
+allow-transfer { none;};
+
+vim /etc/named.rfc1912.zones
+zone <span style="color: #8b2252;">"me.org"</span> {
+  <span style="color: #483d8b;">type</span> slave;
+  masters { &#20027;&#26381;&#21153;&#22120;IP;};
+  file <span style="color: #8b2252;">"slaves/me.org.slave"</span>;
+};
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+ls /var/named/slaves/me.org.slave <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;&#21306;&#22495;&#25968;&#25454;&#24211;&#25991;&#20214;&#26159;&#21542;&#29983;&#25104;</span>
+</pre>
+</div>
+
+<p>
+<b>实现org域的主DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;org&#22495;&#30340;&#20027;DNS&#26381;&#21153;&#22120;10.0.0.38/24&#19978;&#23454;&#29616;</span>
+yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#20004;&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+vim /etc/named.rfc1912.zones
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21152;&#19978;&#36825;&#27573;</span>
+zone <span style="color: #8b2252;">"org"</span> {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"org.zone"</span>;
+};
+
+vim /var/named/org.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. ( 1 1D 1H 1W 3D )
+     NS master
+me   NS mens1
+me   NS mens2
+master   A  10.0.0.38
+mens1    A 10.0.0.48
+mens2    A 10.0.0.58
+
+chgrp named /var/named/org.zone
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+<p>
+<b>实现根域的主DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#26681;&#22495;&#30340;&#20027;DNS&#26381;&#21153;&#22120;10.0.0.28/24&#19978;&#23454;&#29616;</span>
+yum install bind -y
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#20004;&#34892;&#65292;&#31532;13&#34892;&#21644;&#31532;21&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23558;&#19979;&#38754;&#34892;&#25913;&#20026;&#65306;</span>
+zone <span style="color: #8b2252;">"."</span> IN {
+  <span style="color: #483d8b;">type</span> master;
+  file <span style="color: #8b2252;">"root.zone"</span>;
+};
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#20854;&#23427;dns&#26381;&#21153;&#22120;&#20570;&#22996;&#27966;</span>
+vim /var/named/root.zone
+$<span style="color: #a0522d;">TTL</span> 1D
+@ IN SOA master admin.me.org. ( 1 1D 1H 1W 3D )
+     NS   master
+org    NS   orgns
+master   A 10.0.0.28
+orgns    A 10.0.0.38
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#20840;&#21152;&#22266;</span>
+chgrp named /var/named/root.zone
+chmod 640 /var/named/root.zone
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;</span>
+</pre>
+</div>
+
+<p>
+<b>4.7 实现转发目标的DNS服务器</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#36716;&#21457;&#30446;&#26631;&#30340;DNS&#26381;&#21153;&#22120;10.0.0.18/24&#19978;&#23454;&#29616;</span>
+yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#20004;&#34892;&#65292;&#31532;13&#34892;&#21644;&#31532;21&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+// &#20851;&#38381;dnssec&#21151;&#33021;&#65292;&#36319;&#23433;&#20840;&#21152;&#23494;&#26377;&#20851;
+dnssec-enable no;
+dnssec-validation no
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25968;&#25454;&#24211;&#21482;&#20445;&#30041;&#33258;&#23450;&#20041;&#26681;&#22495;&#21517;&#26381;&#21153;&#22120;&#22320;&#22336;</span>
+vim /var/named/named.ca
+<span style="color: #483d8b;">.</span>             518400  IN   NS   a.root-servers.net.
+a.root-servers.net.   3600000 IN   A    10.0.0.28
+
+systemctl start named <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;</span>
+rndc reload           <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;</span>
+</pre>
+</div>
+
+<p>
+<b>实现本地只缓存DNS服务器</b>
+</p>
+
+<p>
+实现转发功能
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">&#22312;&#36716;&#21457;&#30446;&#26631;&#30340;DNS&#26381;&#21153;&#22120;10.0.0.8/24&#19978;&#23454;&#29616;</span>
+yum install bind -y
+
+vim /etc/named.conf
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#27880;&#37322;&#25481;&#20004;&#34892;&#65292;&#31532;13&#34892;&#21644;&#31532;21&#34892;</span>
+// listen-on port 53 { 127.0.0.1; };
+// allow-query { localhost; };
+
+forward only;
+forwarders { 10.0.0.18;};
+
+dnssec-enable no;
+dnssec-validation no
+
+systemctl start named   <span style="color: #b22222;">#</span><span style="color: #b22222;">&#31532;&#19968;&#27425;&#21551;&#21160;</span>
+rndc reload             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#19981;&#26159;&#31532;&#19968;&#27425;&#21551;&#21160;</span>
+</pre>
+</div>
+
+<p>
+<b>客户端测试</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat /etc/resolv.conf
+nameserver 10.0.0.8
+
+dig www.me.org
+
+; &lt;&lt;&gt;&gt; DiG 9.11.4-P2-RedHat-9.11.4-16.P2.el7_8.3 &lt;&lt;&gt;&gt; www.me.org
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 4873
+<span style="color: #ffa54f;">;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1</span>
+
+<span style="color: #ffa54f;">;; OPT PSEUDOSECTION:</span>
+<span style="color: #ffa54f;">; EDNS: version: 0, flags:; udp: 4096</span>
+<span style="color: #ffa54f;">;; QUESTION SECTION:</span>
+<span style="color: #ffa54f;">;www.me.org.      IN  A</span>
+
+<span style="color: #ffa54f;">;; ANSWER SECTION:</span>
+<span style="color: #ffa54f;">www.me.org.   86400 IN  A 10.0.0.68</span>
+
+<span style="color: #ffa54f;">;; AUTHORITY SECTION:</span>
+<span style="color: #ffa54f;">me.org. 86181 IN NS ns2.me.org.</span>
+<span style="color: #ffa54f;">me.org. 86181 IN NS ns1.me.org.</span>
+
+<span style="color: #ffa54f;">;; ADDITIONAL SECTION:</span>
+<span style="color: #ffa54f;">ns2.me.org. 86181 IN A 10.0.0.48</span>
+<span style="color: #ffa54f;">ns1.me.org. 86181 IN A 10.0.0.58</span>
+
+<span style="color: #ffa54f;">;; Query time: 8 msec</span>
+<span style="color: #ffa54f;">;; SERVER: 10.0.0.8#53(10.0.0.8)</span>
+<span style="color: #ffa54f;">;; WHEN: Sun May 31 08:47:45 CST 2020</span>
+<span style="color: #ffa54f;">;; MSG SIZE  rcvd: 59     &#25104;&#21151;</span>
+
+<span style="color: #ffa54f;">curl www.me.org</span>
+<span style="color: #ffa54f;">www.me.org</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cba99d4c-3419-461b-8063-05858056885d" class="outline-4">
+<h4 id="h:cba99d4c-3419-461b-8063-05858056885d">范例：自建dns服务器，数据库绑定MySQL</h4>
+<div class="outline-text-4" id="text-h:cba99d4c-3419-461b-8063-05858056885d">
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;">#</span><span style="color: #b22222;">1. &#21021;&#22987;&#21270;&#21644;&#23433;&#35013;bind9</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25346;&#36733;&#65306;</span>
+parted /dev/vdb print
+parted /dev/vdb mklabel gpt
+parted /dev/vdb help mkpart
+parted /dev/vdb mkpart primary xfs 0G 107G
+parted /dev/vdb print
+mkfs.xfs /dev/vdb1
+mkdir /data
+blkid
+vim /etc/fstab
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22522;&#30784;&#20381;&#36182;&#21253;</span>
+yum install -y gcc*  openssl-devel  ncurses-devel
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;mysql</span>
+./configure --prefix=/usr/local/mysql &amp;&amp; make &amp;&amp; make install
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36830;&#25509;lib&#24211;&#25991;&#20214;</span>
+ln -s /usr/local/mysql/lib/mysql/libmysqlclient.so.15 /lib64/libmysqlclient.so.15
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;DNS&#26381;&#21153;</span>
+./configure  --prefix=/data/named --with-dlz-mysql=/usr/local/mysql --enable-threads=no --disable-openssl-version-check &amp;&amp; make &amp;&amp; make install
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21551;&#21160;DNS&#26381;&#21153;</span>
+cp named.conf  &#21040; /data/named/etc &#19979;
+&#20462;&#25913;host,user,pass &#20026;&#24403;&#21069;&#25968;&#25454;&#24211;&#30340;&#23545;&#24212;&#20449;&#24687;key &#20449;&#24687;
+cp rndc.key /data/named/etc/
+
+nohup /data/named/sbin/named -gc /data/named/etc/named.conf &gt;&gt;/tmp/dns.log&amp;
+
+chmod +x  /etc/rc.d/rc.local
+<span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">'nohup /data/named/sbin/named -gc /data/named/etc/named.conf &gt;&gt;/tmp/dns.log&amp;'</span> &gt;&gt;/etc/rc.d/rc.local
+
+&#27979;&#35797;&#65306;
+/data/named/bin/dig -t A baidu.com @127.0.0.1
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">2.&#37197;&#32622;</span>
+cat &gt;&gt;/data/named/etc/named.conf&lt;&lt;\EOF
+<span style="color: #ffa54f;">options {</span>
+<span style="color: #ffa54f;">    recursion  yes;</span>
+<span style="color: #ffa54f;">    recursive-clients 100;</span>
+<span style="color: #ffa54f;">    directory "/data/named/etc"; #zone&#25991;&#20214;&#23384;&#25918;&#30446;&#24405;</span>
+<span style="color: #ffa54f;">    pid-file "named.pid";</span>
+<span style="color: #ffa54f;">    Forwarders {</span>
+<span style="color: #ffa54f;">        #219.141.136.10;             #&#23558;dns&#20013;&#37197;&#32622;&#30340;&#22495;&#21517;&#20197;&#22806;&#30340;&#22495;&#65292;&#36716;&#21457;&#21040;8.8.8.8, 202.106.196.115&#36827;&#34892;&#35299;&#26512;&#12290;</span>
+<span style="color: #ffa54f;">        #219.141.140.10;};</span>
+<span style="color: #ffa54f;">        8.8.8.8;</span>
+<span style="color: #ffa54f;">        100.100.2.138;</span>
+<span style="color: #ffa54f;">        100.100.2.136;};   # aliyun dns</span>
+
+<span style="color: #ffa54f;">        #114.114.114.114;};</span>
+<span style="color: #ffa54f;">        #219.141.136.10;             #&#23558;dns&#20013;&#37197;&#32622;&#30340;&#22495;&#21517;&#20197;&#22806;&#30340;&#22495;&#65292;&#36716;&#21457;&#21040;8.8.8.8, 202.106.196.115&#36827;&#34892;&#35299;&#26512;&#12290;</span>
+<span style="color: #ffa54f;">                #8.8.8.8;};</span>
+<span style="color: #ffa54f;">        Allow-query {any;};</span>
+<span style="color: #ffa54f;">        Dump-file "/data/named/cache_dump.db";</span>
+<span style="color: #ffa54f;">        Statistics-file "/data/named/named_stats.txt";</span>
+<span style="color: #ffa54f;">        version "TUANP BIND V9"; #&#20026;&#20102;&#23433;&#20840;&#36215;&#35265;&#65292;&#20462;&#25913;dns&#30340;&#29256;&#26412;&#21495;&#12290;</span>
+<span style="color: #ffa54f;">        listen-on port 53 {any;};</span>
+<span style="color: #ffa54f;">};</span>
+<span style="color: #ffa54f;">key "rndc-key" {</span>
+<span style="color: #ffa54f;">    algorithm hmac-md5;</span>
+<span style="color: #ffa54f;">    secret "xYbShtvVJ2W/1ZUB7H5AXw==";</span>
+<span style="color: #ffa54f;">};</span>
+
+<span style="color: #ffa54f;">controls {</span>
+<span style="color: #ffa54f;">        inet 127.0.0.1 port 953</span>
+<span style="color: #ffa54f;">                allow { 127.0.0.1; } keys { "rndc-key"; };</span>
+<span style="color: #ffa54f;">};</span>
+
+<span style="color: #ffa54f;">dlz "Mysql zone" {</span>
+<span style="color: #ffa54f;">database "mysql</span>
+<span style="color: #ffa54f;">{host=hb2-yu-dns-dbm-local.mysql.rds.aliyuncs.com dbname=dns_db ssl=false port=3306 user=mdns pass=DmUO4A33}</span>
+<span style="color: #ffa54f;">{select zone from dns_dns where zone = '$zone$' and status = 'online'}</span>
+<span style="color: #ffa54f;">{select ttl, type, mx_priority, case when lower(type)='txt' then concat('\"', data, '\"')</span>
+<span style="color: #ffa54f;">        when lower(type) = 'soa' then concat_ws(' ', data, resp_person, serial, refresh, retry, expire, minimum)</span>
+<span style="color: #ffa54f;">        else data end from dns_dns where zone = '$zone$' and host = '$record$' and status = 'online'}";</span>
+<span style="color: #ffa54f;">};</span>
+<span style="color: #ffa54f;">EOF</span>
+
+cat &gt;&gt;/data/named/etc/rndc.key&lt;&lt;EOF
+<span style="color: #ffa54f;">key "rndc-key" {</span>
+<span style="color: #ffa54f;">    algorithm hmac-md5;</span>
+<span style="color: #ffa54f;">    secret "xYbShtvVJ2W/1ZUB7H5AXw==";</span>
+<span style="color: #ffa54f;">};</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">3.&#23433;&#35013;&#26816;&#26597;&#33050;&#26412;</span>
+python &#23433;&#35013;
+./configure --prefix=/usr/local/python3 &amp;&amp; make &amp;&amp; make install
+/usr/local/python3/bin/pip3 install requests
+ln -sv /usr/local/python3/bin/python3 /usr/bin/python3
+ln -sv /usr/local/python3/bin/pip3 /usr/bin/pip3
+crontab -l
+*/1 * * * * /usr/bin/python3 /data/work/open-falcon/script/dns_qps_check.py
+
+mkdir -pv /data/work/open-falcon/script/
+cat &gt;/data/work/open-falcon/script/check_dns.sh&lt;&lt;\EOF
+<span style="color: #ffa54f;">#!/bin/bash</span>
+<span style="color: #ffa54f;">timestamp=`date +%s`</span>
+<span style="color: #ffa54f;">host_name=`hostname`</span>
+<span style="color: #ffa54f;">### check dns ###</span>
+<span style="color: #ffa54f;">num=`ps -ef | grep "named" | grep -v grep | wc -l`</span>
+<span style="color: #ffa54f;">curl -X POST -d '[{"metric": "dns.daemon_status", "endpoint": "'$host_name'", "timestamp": '$timestamp', "step": 60,"value": '$num',"counterType": "GAUGE","tags": ""}]' http://127.0.0.1:1988/v1/push</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">---</span>
+cat &gt;/data/work/open-falcon/script/dns_dig_check.py&lt;&lt; \EOF
+<span style="color: #ffa54f;"># !/usr/bin/env python</span>
+<span style="color: #ffa54f;"># -*- coding:utf-8 -*-</span>
+<span style="color: #ffa54f;">#&#33050;&#26412;&#25191;&#34892;&#21069; &#22312;&#21508;&#20010;&#26426;&#25151;&#20108;&#32423;&#22495;&#21517;&#20013;&#21152;&#20837;testmonitor ip&#25351;&#23450;1.1.1.1</span>
+<span style="color: #ffa54f;">import dns.resolver</span>
+<span style="color: #ffa54f;">import time</span>
+<span style="color: #ffa54f;">import json</span>
+<span style="color: #ffa54f;">import socket</span>
+<span style="color: #ffa54f;">import requests</span>
+
+<span style="color: #ffa54f;">ts = int(time.time())</span>
+<span style="color: #ffa54f;">hostname = socket.gethostname()</span>
+<span style="color: #ffa54f;">hlg_domain = ['testmonitor.xi','testmonitor.jmww.me']</span>
+<span style="color: #ffa54f;">hb2yxh_domain = ['testmonitor.zo.yu','testmonitor.yu','testmonitor.xi','testmonitor.me']</span>
+<span style="color: #ffa54f;">hd_domain = ['testmonitor.yun','testmonitor.xiyun','testmonitor.zys.me']</span>
+<span style="color: #ffa54f;">hb2sc_domain = ['testmonitor.yun','yunzongnet.antcloud']</span>
+<span style="color: #ffa54f;">#wl_domain = ['testmonitor.yun','testmonitor.yun.me']</span>
+<span style="color: #ffa54f;">wl_domain = ['testmonitor.yun']</span>
+<span style="color: #ffa54f;">domain = "testmonitor.yun"</span>
+<span style="color: #ffa54f;">for domain in hlg_domain:</span>
+<span style="color: #ffa54f;">    try:</span>
+<span style="color: #ffa54f;">        A = dns.resolver.query(domain,"A")</span>
+<span style="color: #ffa54f;">        for i in A.response.answer:</span>
+<span style="color: #ffa54f;">            for k in i.items:</span>
+<span style="color: #ffa54f;">                ip = k.address</span>
+<span style="color: #ffa54f;">                if ip == "1.1.1.1":</span>
+<span style="color: #ffa54f;">                    metricname = "%s_dnscheck" % domain</span>
+<span style="color: #ffa54f;">                    payload = [{"endpoint": hostname,"metric": metricname,"timestamp": ts,"step": 60,\</span>
+<span style="color: #ffa54f;">                                "value": 1,"counterType": "GAUGE","tages": ""}]</span>
+<span style="color: #ffa54f;">                    r = requests.post("http://127.0.0.1:1988/v1/push", data=json.dumps(payload))</span>
+<span style="color: #ffa54f;">                else:</span>
+<span style="color: #ffa54f;">                    payload = [{"endpoint": hostname,"metric": metricname,"timestamp": ts,"step": 60,\</span>
+<span style="color: #ffa54f;">                            "value": 0,"counterType": "GAUGE","tages": ""}]</span>
+<span style="color: #ffa54f;">                    r = requests.post("http://127.0.0.1:1988/v1/push", data=json.dumps(payload))</span>
+<span style="color: #ffa54f;">    except:</span>
+<span style="color: #ffa54f;">        payload = [{"endpoint": hostname,"metric": metricname,"timestamp": ts,"step": 60,\</span>
+<span style="color: #ffa54f;">                    "value": 0,"counterType": "GAUGE","tages": ""}]</span>
+<span style="color: #ffa54f;">        r = requests.post("http://127.0.0.1:1988/v1/push", data=json.dumps(payload))</span>
+<span style="color: #ffa54f;">EOF</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">----------------------------</span>
+cat &gt;/data/work/open-falcon/script/dns_qps_check.py&lt;&lt;\EOF
+<span style="color: #ffa54f;">import subprocess</span>
+<span style="color: #ffa54f;">import os</span>
+
+<span style="color: #ffa54f;">import time</span>
+<span style="color: #ffa54f;">import json</span>
+<span style="color: #ffa54f;">import socket</span>
+<span style="color: #ffa54f;">import requests</span>
+<span style="color: #ffa54f;">ts = int(time.time())</span>
+<span style="color: #ffa54f;">hostname = socket.gethostname()</span>
+<span style="color: #ffa54f;">os.system("&gt; /data/named/named_stats.txt")</span>
+<span style="color: #ffa54f;">os.system("/data/named/sbin/rndc stats")</span>
+<span style="color: #ffa54f;">dns_query = subprocess.getoutput("cat /data/named/named_stats.txt|grep QUERY")</span>
+<span style="color: #ffa54f;">first_query = dns_query.replace("QUERY","").replace(" ","").strip("\n")</span>
+<span style="color: #ffa54f;">time.sleep(1)</span>
+<span style="color: #ffa54f;">os.system("&gt; /data/named/named_stats.txt")</span>
+<span style="color: #ffa54f;">os.system("/data/named/sbin/rndc stats")</span>
+<span style="color: #ffa54f;">dns_query = subprocess.getoutput("cat /data/named/named_stats.txt|grep QUERY")</span>
+<span style="color: #ffa54f;">second_query = dns_query.replace("QUERY","").replace(" ","").strip("\n")</span>
+<span style="color: #ffa54f;">qps_monitor_res = int(second_query) - int(first_query)</span>
+<span style="color: #ffa54f;">print (qps_monitor_res)</span>
+<span style="color: #ffa54f;">EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

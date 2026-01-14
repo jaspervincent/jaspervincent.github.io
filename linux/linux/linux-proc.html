@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Linux-proc-sys</title>
+<meta name="generator" content="Org Mode" />
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<!--
+<script id="MathJax-script" async="" src="/static/aandds.com/js/mathjax.js"></script>
+
+<script type="text/javascript" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+-->
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Linux-proc-sys</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:a9ad6fa0-356f-4c89-9d4c-85b27fa7d308">/proc/sys</a>
+<ul>
+<li><a href="#h:c5b4b875-89fd-4802-bd2b-41513574c33b">systctl设置</a></li>
+</ul>
+</li>
+<li><a href="#h:70800c1a-2e75-44f9-845c-f4fa8bd1cf86">/proc/stat</a></li>
+<li><a href="#h:4c951358-2526-4e66-a287-2dcc0d7181fa">/proc/net/sockstat</a></li>
+<li><a href="#h:99edcc75-a6f5-464e-a8c4-ee70d80156f3">/sys 目录</a></li>
+<li><a href="#h:1dc55300-5491-499f-87d4-abaa4325afa9">Linux kernel map</a></li>
+<li><a href="#h:cf699c8b-b48e-4f44-a0f2-577ecad299b1">内核模块管理和编译</a>
+<ul>
+<li><a href="#h:4204a51c-b3f6-4d17-ab2e-fd819ae78ced">内核版本</a></li>
+<li><a href="#h:8c326ac8-2293-4cd6-a4ed-0b8a19bf4157">内核模块命令</a></li>
+<li><a href="#h:f30f3641-467f-49b3-a788-56a87a18d863">编译内核</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a></li>
+</ul>
+
+<p>
+linux一切皆文件。
+</p>
+
+
+<p>
+/proc目录：内核把自己内部状态信息及统计信息，以及可配置参数通过proc伪文件系统加以输出
+</p>
+
+<p>
+帮助：man proc
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install -y man-pages
+man proc
+</pre>
+</div>
+
+<p>
+内核参数：
+</p>
+<ul class="org-ul">
+<li>只读：只用于输出信息</li>
+<li>可写：可接受用户指定“新值”来实现对内核某功能或特性的配置</li>
+</ul>
+<section id="outline-container-h:a9ad6fa0-356f-4c89-9d4c-85b27fa7d308" class="outline-2">
+<h2 id="h:a9ad6fa0-356f-4c89-9d4c-85b27fa7d308">/proc/sys</h2>
+<div class="outline-text-2" id="text-h:a9ad6fa0-356f-4c89-9d4c-85b27fa7d308">
+</div>
+<div id="outline-container-h:c5b4b875-89fd-4802-bd2b-41513574c33b" class="outline-3">
+<h3 id="h:c5b4b875-89fd-4802-bd2b-41513574c33b">systctl设置</h3>
+<div class="outline-text-3" id="text-h:c5b4b875-89fd-4802-bd2b-41513574c33b">
+<p>
+systctl是一个允许改变正在运行中的linux系统的接口，修改的是整个系统的内核参数，对应/proc/sys/目录下文件。sysctl的修改是立即且临时的(重启后失效)。
+也可以通过修改sysctl.conf配置文件，达到永久生效。
+</p>
+
+<ul class="org-ul">
+<li>默认配置文件：/etc/sysctl.conf 及以下文件(参数设置放在任何一个都可以)</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">/run/sysctl.d/*.conf
+/etc/sysctl.d/*.conf
+/usr/local/lib/sysctl.d/*.conf
+/usr/lib/sysctl.d/*.conf
+/lib/sysctl.d/*.conf
+/etc/sysctl.conf
+</pre>
+</div>
+
+<p>
+sysctl命令用于查看或设定此目录中诸多参数
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sysctl -w path.to.parameter=VALUE
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>echo命令通过重定向方式也可以修改大多数参数的值</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"VALUE"</span> &gt; /proc/sys/path/to/parameter
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">echo</span> <span style="color: #8b2252;">"771888"</span> &gt; /proc/sys/fs/file-max <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;&#31995;&#32479;&#32423;&#26368;&#22823;&#20801;&#35768;&#25171;&#24320;&#30340;&#21477;&#26564;&#25968;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#23545;&#24212; sysctl -w fs.file-max=771888</span>
+
+<span style="color: #483d8b;">echo</span> &#8220;websrv&#8221; &gt; /proc/sys/kernel/hostname
+</pre>
+</div>
+
+<p>
+sysctl命令：
+</p>
+
+<p>
+(1) 临时设置某参数
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sysctl -w <span style="color: #a0522d;">parameter</span>=VALUE
+</pre>
+</div>
+
+<p>
+(2) 通过读取配置文件设置参数
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sysctl -p [/path/to/conf_file]
+</pre>
+</div>
+
+<p>
+(3) 查看所有生效参数
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sysctl -a
+</pre>
+</div>
+
+<p>
+常用的内核参数：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">net.ipv4.ip_forward                     <span style="color: #b22222;">#</span><span style="color: #b22222;">&#36335;&#30001;&#21151;&#33021;,&#34920;&#31034;&#24320;&#21551;ip&#36716;&#21457;</span>
+net.ipv4.icmp_echo_ignore_all  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20801;&#35768;ping&#35774;&#32622;</span>
+net.ipv4.ip_nonlocal_bind          <span style="color: #b22222;">#</span><span style="color: #b22222;">&#20801;&#35768;&#24212;&#29992;&#31243;&#24207;&#21487;&#20197;&#30417;&#21548;&#26412;&#22320;&#19981;&#23384;&#22312;&#30340;IP  &#65292;vip&#26102;&#20250;&#29992;&#21040;</span>
+vm.drop_caches                          <span style="color: #b22222;">#</span><span style="color: #b22222;">&#37322;&#25918;&#32531;&#20914;&#21306;</span>
+fs.file-max = 1020000               <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26368;&#22823;&#25991;&#20214;&#20010;&#25968;</span>
+
+vm.overcommit_memory = 0
+<span style="color: #b22222;">#</span><span style="color: #b22222;">0&#34920;&#31034;&#20869;&#26680;&#23558;&#26816;&#26597;&#26159;&#21542;&#26377;&#36275;&#22815;&#21487;&#29992;&#20869;&#23384;&#20379;&#36827;&#31243;&#20351;&#29992;&#65307;&#22914;&#26524;&#26377;&#36275;&#22815;&#21487;&#29992;&#20869;&#23384;&#65292;&#20869;&#23384;&#30003;&#35831;&#20801;&#35768;&#65307;&#21542;&#21017;&#20869;&#23384;&#30003;&#35831;&#22833;&#36133;&#65292;&#24182;&#25226;&#38169;&#35823;&#36820;&#22238;&#32473;&#24212;&#29992;&#36827;&#31243;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">1&#34920;&#31034;&#20869;&#26680;&#20801;&#35768;&#20998;&#37197;&#25152;&#26377;&#30340;&#29289;&#29702;&#20869;&#23384;&#65292;&#32780;&#19981;&#31649;&#24403;&#21069;&#20869;&#23384;&#29366;&#24577;&#22914;&#20309;&#12290;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">2&#34920;&#31034;&#20869;&#26680;&#20801;&#35768;&#20998;&#37197;&#36229;&#36807;&#25152;&#26377;&#29289;&#29702;&#20869;&#23384;&#21644;&#20132;&#25442;&#31354;&#38388;&#24635;&#21644;&#30340;&#20869;&#23384;</span>
+
+vm.swappiness = 10         <span style="color: #b22222;">#</span><span style="color: #b22222;">&#35774;&#32622;&#20869;&#23384;&#36824;&#21097;&#20313;10%&#31354;&#38386;&#31354;&#38388;&#26102;&#65292;&#23601;&#20250;&#20351;&#29992;swap&#31354;&#38388;&#65292;&#40664;&#35748;&#20540;&#20026;30&#65292;&#20540;&#36234;&#22823;&#34920;&#31034;&#36234;&#20542;&#21521;&#20110;&#20351;&#29992;swap</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#31105;&#29992;ipv6</span>
+net.ipv6.conf.all.disable_ipv6 =1
+net.ipv6.conf.default.disable_ipv6 =1
+</pre>
+</div>
+
+<p>
+范例
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#cat /proc/sys/net/ipv4/icmp_echo_ignore_all 
+0
+[root@centos8 ~]#vim /etc/sysctl.d/test.conf
+[root@centos8 ~]#cat /etc/sysctl.d/test.conf
+net.ipv4.icmp_echo_ignore_all=1
+[root@centos8 ~]#sysctl -p /etc/sysctl.d/test.conf
+net.ipv4.icmp_echo_ignore_all = 1
+[root@centos8 ~]#cat /proc/sys/net/ipv4/icmp_echo_ignore_all 
+1
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:70800c1a-2e75-44f9-845c-f4fa8bd1cf86" class="outline-2">
+<h2 id="h:70800c1a-2e75-44f9-845c-f4fa8bd1cf86">/proc/stat</h2>
+<div class="outline-text-2" id="text-h:70800c1a-2e75-44f9-845c-f4fa8bd1cf86">
+<div class="org-src-container">
+<pre class="src src-shell">man  proc_stat 
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">&#9492;&#9472;# cat /proc/stat                  
+cpu  1081 4 4221 4437576 3126 0 823 0 0 0
+cpu0 266 3 983 1108729 1895 0 414 0 0 0
+cpu1 287 0 1058 1110210 421 0 142 0 0 0
+cpu2 244 0 1018 1109307 581 0 185 0 0 0
+cpu3 283 0 1160 1109329 227 0 81 0 0 0
+intr 1574701 5 9 0 0 0 0 0 0 0 0 0 0 15 0 0 0 2 14634 52106 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5585 1413 0 2818 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 1856191
+btime 1760673532
+processes 6987
+procs_running 1
+procs_blocked 0
+softirq 905838 0 304161 11 46898 21885 0 11822 433187 0 87874
+</pre>
+</div>
+
+
+<p>
+第一行的数值表示的是CPU总的使用情况，所以我们只要用第一行的数字计算就可以了。 从系统启动开始累计到当前时刻：
+</p>
+<div class="org-src-container">
+<pre class="src src-text">cpu 10132153 290696 3084719 46828483 16683 0 25195 0 175628 0
+cpu0 1393280 32966 572056 13343292 6130 0 17875 0 23933 0
+    user   &#65288;1&#65289;&#22788;&#20110;&#29992;&#25143;&#27169;&#24335;&#30340;&#26102;&#38388;&#12290;&#19981;&#21253;&#21547; nice&#20540;&#20026;&#36127;&#36827;&#31243;
+    nice    (2) &#22312;&#20302;&#20248;&#20808;&#32423;&#30340;&#29992;&#25143;&#27169;&#24335;&#19979;&#33457;&#36153;&#30340;&#26102;&#38388;&#65288;nice&#65289;&#12290;
+    system&#65288;3&#65289; &#31995;&#32479;&#27169;&#24335;&#19979;&#25152;&#33457;&#36153;&#30340;&#26102;&#38388;&#12290;
+    idle   &#65288;4&#65289;&#31354;&#38386;&#20219;&#21153;&#25152;&#33457;&#36153;&#30340;&#26102;&#38388;&#12290;&#35813;&#20540;&#24212;&#20026; USER_HZ &#20056;&#20197;&#31186;/proc/uptime&#20266;&#25991;&#20214;&#20013;&#30340;&#26465;&#30446;&#12290;
+    iowait&#65288;&#33258; Linux 2.5.41 &#36215;&#65289;
+        &#65288;5&#65289;&#31561;&#24453; I/O &#23436;&#25104;&#30340;&#26102;&#38388;&#12290;&#27492;&#20540;&#19981;&#21487;&#38752;&#65292;&#22240;&#20026;
+        &#21407;&#22240;&#65306;
+        &#8226; CPU &#19981;&#20250;&#31561;&#24453; I/O &#23436;&#25104;&#65307;iowait &#26159;&#20219;&#21153;&#25191;&#34892;&#30340;&#26102;&#38388;
+           &#31561;&#24453; I/O &#23436;&#25104;&#12290;&#24403; CPU &#36827;&#20837;&#31354;&#38386;&#29366;&#24577;&#20197;&#22788;&#29702;&#26410;&#23436;&#25104;&#30340;
+           &#20219;&#21153; I/O&#65292;&#21478;&#19968;&#20010;&#20219;&#21153;&#23558;&#22312;&#36825;&#20010; CPU &#19978;&#23433;&#25490;&#12290;
+
+        &#8226; &#22312;&#22810;&#26680; CPU &#19978;&#65292;&#31561;&#24453; I/O &#23436;&#25104;&#30340;&#20219;&#21153;&#19981;&#22312;&#20219;&#20309;
+           CPU&#65292;&#22240;&#27492;&#27599;&#20010;CPU&#30340;iowait&#24456;&#38590;&#35745;&#31639;&#12290;
+
+        &#8226; &#22312;&#26576;&#20123;&#24773;&#20917;&#19979;&#65292;&#27492;&#23383;&#27573;&#20013;&#30340;&#20540;&#21487;&#33021;&#20250;&#20943;&#23569;&#12290;
+
+    irq&#65288;&#33258; Linux 2.6.0 &#36215;&#65289;
+        &#65288;6&#65289;&#26102;&#38388;&#26381;&#21153;&#20013;&#26029;&#12290;
+
+    softirq&#65288;&#33258; Linux 2.6.0 &#36215;&#65289;
+        &#65288;7&#65289;&#26102;&#38388;&#26381;&#21153;&#36719;&#20013;&#26029;&#12290;
+
+    steal&#65288;&#33258; Linux 2.6.11 &#36215;&#65289;
+        &#65288;8&#65289;&#20599;&#31363;&#26102;&#38388;&#65292;&#21363;&#22312;&#36816;&#34892;&#20854;&#20182;&#25805;&#20316;&#31995;&#32479;&#26102;&#25152;&#33457;&#36153;&#30340;&#26102;&#38388;&#34394;&#25311;&#21270;&#29615;&#22659;
+
+    guest&#65288;&#33258; Linux 2.6.24 &#36215;&#65289;
+        &#65288;9&#65289;&#22312;&#25511;&#21046;&#19979;&#36816;&#34892;&#23458;&#25143;&#25805;&#20316;&#31995;&#32479;&#34394;&#25311; CPU &#25152;&#33457;&#36153;&#30340;&#26102;&#38388;
+        Linux &#20869;&#26680;&#12290;
+
+    guest_nice&#65288;&#33258; Linux 2.6.33 &#36215;&#65289;
+        &#65288;10&#65289;&#36816;&#34892; niced &#23458;&#25143;&#31471;&#25152;&#33457;&#36153;&#30340;&#26102;&#38388;&#65288;&#23458;&#25143;&#31471;&#25805;&#20316;&#31995;&#32479;&#30340;&#34394;&#25311; CPU Linux &#20869;&#26680;&#30340;&#25511;&#21046;&#65289;&#12290;
+
+page 5741 1808
+    &#31995;&#32479;&#35843;&#20837;&#30340;&#39029;&#38754;&#25968;&#21644;&#35843;&#20986;&#30340;&#39029;&#38754;&#25968;&#65288;&#20174;&#30913;&#30424;&#65289;&#12290;
+
+swap 1 0
+     &#24050;&#24102;&#20837;&#21644;&#24102;&#20986;&#30340;&#20132;&#25442;&#39029;&#38754;&#30340;&#25968;&#37327;&#12290;
+
+intr 1462898
+    &#36825;&#19968;&#34892;&#26174;&#31034;&#20102;&#33258;&#21551;&#21160;&#20197;&#26469;&#65292;&#38024;&#23545;&#27599;&#20010;&#21487;&#33021;&#30340;&#20013;&#26029;&#26381;&#21153;&#30340;&#35745;&#25968;
+    &#31995;&#32479;&#20013;&#26029;&#12290;&#31532;&#19968;&#21015;&#26159;&#25152;&#26377;&#20013;&#26029;&#26381;&#21153;&#30340;&#24635;&#25968;&#65292;&#21253;&#25324;
+    &#26410;&#32534;&#21495;&#30340;&#20307;&#31995;&#32467;&#26500;&#29305;&#23450;&#30340;&#20013;&#26029;&#65307;&#27599;&#20010;&#21518;&#32493;&#21015;&#26159;&#35813;&#20307;&#31995;&#32467;&#26500;&#30340;&#24635;&#25968;
+    &#29305;&#23450;&#32534;&#21495;&#30340;&#20013;&#26029;&#12290;&#26410;&#32534;&#21495;&#30340;&#20013;&#26029;&#19981;&#26174;&#31034;&#65292;&#20165;&#27719;&#24635;&#21040;
+    &#20840;&#37096;&#30340;&#12290;
+
+disk_io: (2,0):(31,30,5764,1,2) (3,0):...
+    &#65288;&#20027;&#35201;&#65292;disk_idx&#65289;&#65306;&#65288;&#26080;&#20449;&#24687;&#65292;read_io_ops&#65292;blks_read&#65292;write_io_ops&#65292;blks_written&#65289;
+    &#65288;&#20165;&#38480; Linux 2.4&#65289;
+
+ctxt  115315
+    &#31995;&#32479;&#32463;&#21382;&#30340;&#19978;&#19979;&#25991;&#20999;&#25442;&#27425;&#25968;&#12290;
+
+btime  769041601
+    &#21551;&#21160;&#26102;&#38388;&#65292;&#20197;&#32426;&#20803; 1970-01-01 00:00:00 +0000 (UTC) &#20197;&#26469;&#30340;&#31186;&#25968;&#34920;&#31034;&#12290;
+
+processes 86031
+    &#33258;&#21551;&#21160;&#20197;&#26469;&#30340;&#20998;&#21449;&#25968;&#12290;
+
+procs_running  6
+    &#22788;&#20110;&#21487;&#36816;&#34892;&#29366;&#24577;&#30340;&#36827;&#31243;&#25968;&#12290;&#65288;Linux 2.5.45 &#21450;&#26356;&#39640;&#29256;&#26412;&#12290;&#65289;
+
+procs_blocked  2
+    &#31561;&#24453; I/O &#23436;&#25104;&#30340;&#38459;&#22622;&#36827;&#31243;&#25968;&#12290;&#65288;Linux 2.5.45 &#21450;&#26356;&#39640;&#29256;&#26412;&#12290;&#65289;
+
+softirq 229245889  94  60001584  13619  5175704  2471304  28  51212741  59130143  0  51240672
+    &#36825;&#19968;&#34892;&#26174;&#31034;&#20102;&#25152;&#26377; CPU &#30340;&#36719;&#20013;&#26029;&#25968;&#37327;&#12290;&#31532;&#19968;&#21015;&#26159;&#25152;&#26377; CPU &#30340;&#36719;&#20013;&#26029;&#24635;&#25968;&#12290;
+    softirqs&#65292;&#21518;&#38754;&#30340;&#27599;&#19968;&#21015;&#37117;&#26159;&#29305;&#23450; softirq &#30340;&#24635;&#25968;&#12290;&#65288;Linux 2.6.31
+    &#21521;&#21069;&#12290;&#65289;
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:4c951358-2526-4e66-a287-2dcc0d7181fa" class="outline-2">
+<h2 id="h:4c951358-2526-4e66-a287-2dcc0d7181fa">/proc/net/sockstat</h2>
+<div class="outline-text-2" id="text-h:4c951358-2526-4e66-a287-2dcc0d7181fa">
+<p>
+more /proc/net/sockstat
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">&#31995;&#32479;&#24635;&#20849;&#20351;&#29992;&#20102;216&#20010;socket&#65288;&#21253;&#25324;&#25152;&#26377;&#21327;&#35758;&#31867;&#22411;&#65289;
+TCP&#32479;&#35745;
+- inuse 7&#65306;&#27491;&#22312;&#20351;&#29992;&#30340;TCP socket&#25968;&#37327;&#65288;ESTABLISHED&#29366;&#24577;&#65289;
+- orphan 0&#65306;&#23396;&#20799;socket&#25968;&#37327;&#65288;&#24050;&#20851;&#38381;&#20294;&#23578;&#26410;&#23436;&#20840;&#37322;&#25918;&#65289;
+- tw 30&#65306;TIME_WAIT&#29366;&#24577;&#30340;socket&#25968;&#37327;&#65288;&#36830;&#25509;&#24050;&#20851;&#38381;&#65292;&#31561;&#24453;&#36229;&#26102;&#65289;
+- alloc 12&#65306;&#24050;&#20998;&#37197;&#30340;TCP socket&#24635;&#25968;
+- mem 1&#65306;TCP socket&#20351;&#29992;&#30340;&#20869;&#23384;&#39029;&#25968;&#65288;<span style="color: #a0522d;">1&#39029;</span>=&#36890;&#24120;4KB&#65289;
+UDP&#32479;&#35745;
+- inuse 4&#65306;&#27491;&#22312;&#20351;&#29992;&#30340;UDP socket&#25968;&#37327;
+- mem 0&#65306;UDP socket&#20351;&#29992;&#30340;&#20869;&#23384;&#39029;&#25968;
+&#20854;&#20182;&#21327;&#35758;
+- UDPLITE&#65306;UDPLite&#21327;&#35758;socket&#25968;&#37327;
+- RAW&#65306;&#21407;&#22987;socket&#25968;&#37327;&#65288;&#30452;&#25509;&#35775;&#38382;IP&#23618;&#65289;
+- FRAG&#65306;IP&#20998;&#29255;&#37325;&#32452;&#20351;&#29992;&#30340;socket
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">netstat -an
+more /proc/net/sockstat
+sockets: used 216
+TCP: inuse 7 orphan 0 tw 31 alloc 12 mem 6
+UDP: inuse 4 mem 0
+UDPLITE: inuse 0
+RAW: inuse 0
+FRAG: inuse 0 memory 0
+
+netstat -an |wc -l                                            <span style="color: #b22222;"># </span><span style="color: #b22222;">sockets: used 216</span>
+netstat -an |grep -w tcp |grep -E <span style="color: #8b2252;">'ESTABLISHED|LISTEN'</span> |wc -l <span style="color: #b22222;"># </span><span style="color: #b22222;">TCP: inuse 7</span>
+netstat -an |grep TIME_WAIT |wc -l                            <span style="color: #b22222;"># </span><span style="color: #b22222;">TCP: tw 31</span>
+netstat -an |grep -w udp |grep -i udp |wc -l                  <span style="color: #b22222;"># </span><span style="color: #b22222;">UDP: inuse 4</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:99edcc75-a6f5-464e-a8c4-ee70d80156f3" class="outline-2">
+<h2 id="h:99edcc75-a6f5-464e-a8c4-ee70d80156f3">/sys 目录</h2>
+<div class="outline-text-2" id="text-h:99edcc75-a6f5-464e-a8c4-ee70d80156f3">
+<p>
+/sys目录：
+</p>
+
+<p>
+使用sysfs文件系统，为用户使用的伪文件系统， <b>输出内核识别出的各硬件设
+备的相关属性信息</b> ，也有内核对硬件特性的设定信息；有些参数是可以修改的，
+用于调整硬件工作特性
+</p>
+
+<p>
+udev通过此路径下输出的信息动态为各设备创建所需要设备文件，udev是运行用
+户空间程序
+</p>
+
+<p>
+专用工具：udevadmin, hotplug
+</p>
+
+<p>
+udev为设备创建设备文件时，会读取其事先定义好的规则文件，一般在
+/etc/udev/rules.d 及/usr/lib/udev/rules.d目录下
+</p>
+</div>
+</section>
+<section id="outline-container-h:1dc55300-5491-499f-87d4-abaa4325afa9" class="outline-2">
+<h2 id="h:1dc55300-5491-499f-87d4-abaa4325afa9">Linux kernel map</h2>
+<div class="outline-text-2" id="text-h:1dc55300-5491-499f-87d4-abaa4325afa9">
+<p>
+这幅图是一张 Linux 内核地图（Linux Kernel Map），由 Costa Shulyupin 制作并维护，是一个系统性地展示 Linux 内核架构的可视化项目。它不仅是技术图谱，更是一个交互式学习工具，帮助你理解 Linux 内核的组成、模块间的关联与数据流动。
+</p>
+
+
+<figure id="orga6725ec">
+<img src="./images/LKM.svg" alt="LKM.svg" class="org-svg" width="100%">
+
+</figure>
+
+<ul class="org-ul">
+<li>纵向：内核功能层</li>
+<li>横向：内核子系统</li>
+</ul>
+
+<p>
+为什么你应该关注? 
+</p>
+<ol class="org-ol">
+<li>学习路径：如果你是内核新手，可以沿着图的结构逐步学习，从用户接口到底层驱动。</li>
+<li>调试与调优：了解模块间的依赖和数据流，有助于定位性能瓶颈或系统问题。</li>
+<li>架构理解：无论你是开发者、运维还是嵌入式工程师，都能从中获得对 Linux 内核整体架构的直观认识。</li>
+</ol>
+
+<p>
+链接：
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/makelinux/linux_kernel_map">github: linux_kernel_map</a></li>
+<li><a href="https://makelinux.github.io/kernel/map/">在线交互</a></li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:cf699c8b-b48e-4f44-a0f2-577ecad299b1" class="outline-2">
+<h2 id="h:cf699c8b-b48e-4f44-a0f2-577ecad299b1">内核模块管理和编译</h2>
+<div class="outline-text-2" id="text-h:cf699c8b-b48e-4f44-a0f2-577ecad299b1">
+<p>
+单内核体系设计、但充分借鉴了微内核设计体系的优点，为内核引入模块化机制
+</p>
+
+<p>
+内核组成部分：
+</p>
+
+<ul class="org-ul">
+<li>kernel：内核核心，一般为bzImage，通常在/boot目录下 , 名称为
+vmlinuz-VERSION-RELEASE</li>
+<li>kernel object：内核对象，一般放置于 <code>/lib/modules/VERSION-RELEASE/</code></li>
+<li>辅助文件：ramdisk
+<ul class="org-ul">
+<li>initrd：从CentOS 5 版本以前</li>
+<li>initramfs：从CentOS6 版本以后</li>
+</ul></li>
+</ul>
+</div>
+<div id="outline-container-h:4204a51c-b3f6-4d17-ab2e-fd819ae78ced" class="outline-3">
+<h3 id="h:4204a51c-b3f6-4d17-ab2e-fd819ae78ced">内核版本</h3>
+<div class="outline-text-3" id="text-h:4204a51c-b3f6-4d17-ab2e-fd819ae78ced">
+<p>
+运行中的内核：
+</p>
+
+<p>
+uname命令：
+</p>
+
+<p>
+uname - print system information
+</p>
+
+<p>
+uname [OPTION]&#x2026;
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-n: &#26174;&#31034;&#33410;&#28857;&#21517;&#31216;
+-r: &#26174;&#31034;VERSION-RELEASE
+-a:&#26174;&#31034;&#25152;&#26377;&#20449;&#24687;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8c326ac8-2293-4cd6-a4ed-0b8a19bf4157" class="outline-3">
+<h3 id="h:8c326ac8-2293-4cd6-a4ed-0b8a19bf4157">内核模块命令</h3>
+<div class="outline-text-3" id="text-h:8c326ac8-2293-4cd6-a4ed-0b8a19bf4157">
+<p>
+<b>lsmod命令：</b>
+</p>
+
+<ul class="org-ul">
+<li>显示由核心已经装载的内核模块</li>
+<li>显示的内容来自于: /proc/modules文件</li>
+</ul>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#lsmod 
+Module                 Size Used by
+uas                    28672  0
+usb_storage            73728  1 uas
+nls_utf8               16384  0
+isofs                  45056  0 <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26174;&#31034;&#65306;&#21517;&#31216;&#12289;&#22823;&#23567;&#65292;&#20351;&#29992;&#27425;&#25968;&#65292;&#34987;&#21738;&#20123;&#27169;&#22359;&#20381;&#36182;</span>
+</pre>
+</div>
+
+<p>
+<b>modinfo命令：</b>
+</p>
+
+<p>
+功能：管理内核模块
+</p>
+
+<p>
+配置文件：/etc/modprobe.conf, /etc/modprobe.d/*.conf
+</p>
+
+<ul class="org-ul">
+<li>显示模块的详细描述信息</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">modinfo [ -k kernel ] [ modulename|filename... ]
+</pre>
+</div>
+
+<p>
+常用选项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-n&#65306;&#21482;&#26174;&#31034;&#27169;&#22359;&#25991;&#20214;&#36335;&#24452;&#65307;&#30456;&#23545;&#20110;-F filename
+-p&#65306;&#26174;&#31034;&#27169;&#22359;&#21442;&#25968;
+-a&#65306;&#20316;&#32773;
+-d&#65306;&#25551;&#36848;
+-F field&#65306;&#20165;&#26174;&#31034;&#25351;&#23450;&#23383;&#27573;&#30340;&#20449;&#24687;&#65307;
+-k kernel&#65306;&#22810;&#20869;&#26680;&#24182;&#23384;&#26102;&#33509;&#35201;&#26597;&#35810;&#21478;&#22806;&#19968;&#20010;kernel&#19978;&#30340;&#27169;&#22359;&#20449;&#24687;
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8-A ~]#lsmod |grep xfs
+xfs                  1474560  2
+libcrc32c              16384  3 nf_conntrack,nf_nat,xfs
+[root@centos8-A ~]#modinfo xfs
+filename:       /lib/modules/4.18.0-147.el8.x86_64/kernel/fs/xfs/xfs.ko.xz
+license:        GPL
+description:    SGI XFS with ACLs, security attributes, no debug enabled
+author:         Silicon Graphics, Inc.
+<span style="color: #483d8b;">alias</span>:          fs-xfs
+rhelversion:    8.1
+srcversion:     947E2EDC226CFCEC0F1F71B
+depends:        libcrc32c
+intree:         Y
+name:           xfs
+vermagic:       4.18.0-147.el8.x86_64 SMP mod_unload modversions 
+sig_id:         PKCS#7
+signer:         CentOS Linux kernel signing key
+sig_key:        79:05:D0:5C:21:6F:8A:C5:DD:6E:19:BB:77:9D:05:F6:F2:21:B8:17
+sig_hashalgo:   sha256
+signature:      C9:68:71:F6:2D:2A:F9:83:AC:A8:12:30:29:E3:61:1C:0C:2F:1E:7E:
+        BC:1D:87:B9:56:00:4E:6F:87:9C:6F:22:78:09:D1:D9:C0:D0:21:C1:
+        8F:0F:62:11:C0:15:E5:6E:70:D4:A5:92:F7:15:D8:0F:C4:4E:F4:7E:
+        87:74:A9:32:CC:D7:97:1B:11:B9:3C:98:51:25:DD:99:1D:15:55:19:
+        C2:E4:67:58:AE:A0:7F:21:13:3C:F5:A1:8B:86:81:70:49:3F:62:3B:
+        F0:37:A9:8F:87:01:5D:7F:FA:5C:5A:1F:16:88:EE:87:DA:03:8C:9D:
+        92:7E:5E:F4:D6:56:AF:FF:DB:FA:8A:AC:D3:BE:2F:13:7A:1D:CB:BF:
+        A5:EB:2C:06:2C:7D:55:E6:AA:78:83:51:F4:CA:72:98:79:C1:55:E4:
+        80:C2:8D:4F:E5:CB:EC:A4:9D:AB:5A:AA:CB:8A:A5:FE:0C:E1:CC:1E:
+        26:A3:D1:E7:FA:F4:D2:66:12:1F:BB:4F:73:16:8A:A0:19:7E:A5:17:
+        3D:DF:2A:A5:B2:4F:64:44:2B:3E:06:A1:3A:5F:FF:DD:CC:6B:71:20:
+        A8:6E:83:AF:A6:C0:38:B6:3A:C3:72:2F:74:64:1F:E4:1C:EC:E5:B4:
+        77:AA:5D:38:3B:50:EB:1A:82:79:13:7C:A6:70:B1:37:A0:1E:4C:18:
+        C9:14:46:7A:0B:D4:2F:A3:29:E6:49:42:D4:A8:03:4F:33:FA:D7:3E:
+        C4:CE:F7:53:C7:1D:7F:28:4F:70:F5:67:71:29:2E:9C:E5:A6:60:02:
+        D2:49:7F:F1:6D:3D:E6:F9:FF:B0:01:F8:C2:50:C3:AB:23:50:F4:19:
+        A2:45:DC:9B:C3:1C:DA:C0:36:88:7C:C0:9B:D7:7D:B6:3A:D5:83:AD:
+        AD:7A:33:92:09:D2:7F:B0:0E:B4:21:2F:DB:F9:F7:50:E4:C8:94:D1:
+        29:E6:2D:C1:5D:51:94:14:1C:72:04:CB:BF:FC:DA:6E:A3:66:D2:0A:
+        C5:E0:F2:0F
+</pre>
+</div>
+
+<p>
+<b>装载或卸载内核模块</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">modprobe [ -C config-file ] [ modulename ] [ module parame-ters... ] 
+modprobe [ -r ] modulename&#8230; &#21368;&#36733;
+&#21516;&#26102;&#20250;&#25346;&#36733;&#20381;&#36182;&#30340;&#27169;&#22359;
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8-A ~]#lsmod |grep usb
+btusb                  53248  0
+btrtl                  16384  1 btusb
+btbcm                  16384  1 btusb
+btintel                24576  1 btusb
+bluetooth             630784  27 btrtl,btintel,btbcm,bnep,btusb,rfcomm
+[root@centos8-A ~]#modprobe usb_storage
+[root@centos8-A ~]#lsmod |grep usb
+usb_storage            73728  0
+btusb                  53248  0
+btrtl                  16384  1 btusb
+btbcm                  16384  1 btusb
+btintel                24576  1 btusb
+bluetooth             630784  27 btrtl,btintel,btbcm,bnep,btusb,rfcomm
+[root@centos8-A ~]#modprobe -r usb_storage
+[root@centos8-A ~]#lsmod |grep uas
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22240;&#20026;uas&#20381;&#36182;usb_storage,&#23433;&#35013;uas&#20250;&#33258;&#21160;&#21152;&#36733;usb_storage</span>
+[root@centos8-A ~]#modprobe uas
+[root@centos8-A ~]#lsmod |grep usb
+usb_storage            73728  1 uas
+btusb                  53248  0
+btrtl                  16384  1 btusb
+btbcm                  16384  1 btusb
+btintel                24576  1 btusb
+bluetooth             630784  27 btrtl,btintel,btbcm,bnep,btusb,rfcomm
+[root@centos8-A ~]#lsmod |grep -E <span style="color: #8b2252;">'usb|uas'</span>
+uas                    28672  0
+usb_storage            73728  1 uas
+btusb                  53248  0
+btrtl                  16384  1 btusb
+btbcm                  16384  1 btusb
+btintel                24576  1 btusb
+bluetooth             630784  27 btrtl,btintel,btbcm,bnep,btusb,rfcomm
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22240;&#20026;uas&#20381;&#36182;usb_storage&#65292;&#26080;&#27861;&#30452;&#25509;&#21368;&#36733;usb_storage</span>
+[root@centos8-A ~]#modprobe -r usb_storage
+modprobe: FATAL: Module usb_storage is<span style="color: #a020f0;"> in</span> use.
+
+[root@centos8-A ~]#modprobe -r uas
+[root@centos8-A ~]#modprobe -r usb_storage
+</pre>
+</div>
+
+<p>
+depmod命令：内核模块依赖关系文件及系统信息映射文件的生成工具
+</p>
+
+<p>
+insmod命令：可以安装模块，需要指定模块文件路径，并且不自动解决依赖模块
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">insmod [ filename ] [ module options... ]
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">insmod <span style="color: #ff00ff;">`modinfo &#8211;n exportfs`</span>
+insmod <span style="color: #ff00ff;">`modinfo &#8211;n xfs`</span>
+</pre>
+</div>
+
+<p>
+rmmod命令：卸载模块
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">rmmod [ modulename ]
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">rmmod xfs
+rmmod exportfs
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f30f3641-467f-49b3-a788-56a87a18d863" class="outline-3">
+<h3 id="h:f30f3641-467f-49b3-a788-56a87a18d863">编译内核</h3>
+<div class="outline-text-3" id="text-h:f30f3641-467f-49b3-a788-56a87a18d863">
+<p>
+编译安装内核准备：
+</p>
+<ol class="org-ol">
+<li>准备好开发环境</li>
+<li>获取目标主机上硬件设备的相关信息</li>
+<li>获取目标主机系统功能的相关信息，例如:需要启用相应的文件系统</li>
+<li>获取内核源代码包， www.kernel.org</li>
+</ol>
+
+<p>
+<b>编译准备</b>
+</p>
+
+<p>
+<b>目标主机硬件设备相关信息</b>
+</p>
+
+<p>
+CPU：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat /proc/cpuinfo
+x86info -a
+lscpu
+</pre>
+</div>
+
+<p>
+PCI设备：lspci -v ，-vv
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos7 ~]# lspci <span style="color: #b22222;">#</span><span style="color: #b22222;">&#26597;&#30475;&#24403;&#21069;PCI&#35774;&#22791;</span>
+00:00.0 Host bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX Host bridge (rev 01)
+00:01.0 PCI bridge&#65288;&#21271;&#26725;&#65289;: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX AGP bridge (rev 01)
+00:07.0 ISA bridge&#65288;&#21335;&#26725;&#65289;: Intel Corporation 82371AB/EB/MB PIIX4 ISA (rev 08)
+00:07.1 IDE interface(IDE&#25509;&#21475;): Intel Corporation 82371AB/EB/MB PIIX4 IDE (rev 01)
+00:07.3 Bridge(&#39640;&#32423;&#30005;&#28304;&#31649;&#29702;&#26725;): Intel Corporation 82371AB/EB/MB PIIX4 ACPI (rev 08)
+00:07.7 System peripheral&#65288;&#38598;&#25104;&#25509;&#21475;&#65289;: VMware Virtual Machine Communication Interface (rev 10)
+00:0f.0 VGA compatible controller&#65288;&#26174;&#21345;&#25509;&#21475;&#65289;: VMware SVGA II Adapter
+00:10.0 SCSI storage controller&#65288;&#23384;&#20648;&#25511;&#21046;&#22120;&#65289;: LSI Logic / Symbios Logic 53c1030 PCI-X Fusion-MPT Dual Ultra320 SCSI (rev 01)
+... ...
+00:18.7 PCI bridge: VMware PCI Express Root Port (rev 01)
+02:00.0 USB controller: VMware USB1.1 UHCI Controller&#65288;&#22411;&#21495;UHCI&#65292;USB1.1&#25511;&#21046;&#22120;&#65289;
+02:01.0 Ethernet controller: Intel Corporation 82545EM Gigabit Ethernet Controller (Copper) (rev 01)&#65288;&#21315;&#20806;&#20197;&#22826;&#32593;&#32593;&#25511;&#21046;&#22120;&#65289;
+02:02.0 Multimedia audio controller: Ensoniq ES1371 / Creative Labs CT2518 [AudioPCI-97] (rev 02)
+02:03.0 USB controller: VMware USB2 EHCI Controller&#65288;&#22411;&#21495;EHCI&#65292;USB2&#25511;&#21046;&#22120;&#65289;
+</pre>
+</div>
+
+<p>
+USB设备：lsusb -v，-vv
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8-A ~]#dnf install usbutils -y
+[root@centos8-A ~]#lsusb
+Bus 001 Device 004: ID 0951:1666 Kingston Technology DataTraveler 100 G3/G4/SE9 
+G2
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 003: ID 0e0f:0002 VMware, Inc. Virtual USB Hub
+Bus 002 Device 002: ID 0e0f:0003 VMware, Inc. Virtual Mouse
+Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+[root@centos8-A ~]#lsmod |grep usb
+usb_storage           73728 1 uas
+</pre>
+</div>
+
+<p>
+lsblk 块设备
+</p>
+
+<p>
+全部硬件设备信息：hal-device：CentOS 6
+</p>
+
+<p>
+<b>开发环境相关包</b>
+</p>
+
+<p>
+gcc make ncurses-devel flex bison openssl-devel elfutils-libelf-devel
+</p>
+
+<p>
+<b>内核编译安装实现</b>
+</p>
+
+<ul class="org-ul">
+<li>下载源码文件</li>
+<li>准备文本配置文件/boot/config-`uname -r`</li>
+<li>make menuconfig：配置内核选项 ，相当于./configure</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">[ ]: N
+[M]: M  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#29420;&#31435;&#27169;&#22359;&#26680;&#24515;&#25991;&#20214;</span>
+[*]: Y  <span style="color: #b22222;"># </span><span style="color: #b22222;">&#25171;&#21253;&#21040;&#20869;&#26680;&#25991;&#20214;&#20013;</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><p>
+make [-j #] 或者用以下两步实现：
+</p>
+
+<p>
+make -j # bzImage
+</p>
+
+<p>
+make -j # modules
+</p></li>
+
+<li>安装模块：make modules_install</li>
+<li>安装内核相关文件：make install
+<ul class="org-ul">
+<li>安装bzImage为 /boot/vmlinuz-VERSION-RELEASE</li>
+<li>生成initramfs文件</li>
+<li>编辑grub的配置文件</li>
+</ul></li>
+</ul>
+
+<p>
+范例：编译内核
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#33719;&#21462;&#28304;&#20195;&#30721;
+tar xf linux-
+<span style="color: #483d8b;">cd</span> /usr/src
+ln -sv linux-3.10.67 linux  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#32534;&#35793;&#39537;&#21160;&#26102;&#36890;&#24120;&#20250;&#25214;linux&#30446;&#24405;&#65292;&#36825;&#37324;&#21019;&#24314;&#20010;&#36719;&#36830;&#25509;</span>
+<span style="color: #483d8b;">cd</span> linux
+make menuconfig             <span style="color: #b22222;">#</span><span style="color: #b22222;">&#37197;&#32622;&#20869;&#26680;&#36873;&#39033;</span>
+make [-j <span style="color: #b22222;">#</span><span style="color: #b22222;">]                 #&#32534;&#35793;&#20869;&#26680;&#65292;&#21487;&#20351;&#29992;-j&#25351;&#23450;&#32534;&#35793;&#32447;&#31243;&#25968;&#25454;&#27969;</span>
+make modules_install        <span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;&#20869;&#26680;&#27169;&#22359;</span>
+make install                <span style="color: #b22222;">#</span><span style="color: #b22222;">&#23433;&#35013;&#20869;&#26680;</span>
+&#37325;&#21551;&#31995;&#32479;&#65292;&#36873;&#25321;&#20351;&#29992;&#26032;&#20869;&#26680;&#65307;
+</pre>
+</div>
+
+<p>
+<b>编译安装内核实战案例</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#23433;&#35013;&#20381;&#36182;</span>
+[root@centos8 ~]#yum -y install gcc make ncurses-devel flex bison openssl-devel elfutils-libelf-devel
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#19979;&#36733;&#20869;&#26680;</span>
+[root@centos8 ~]#tar xf linux-5.6.12.tar.xz -C /usr/local/src
+[root@centos8 ~]#cd /usr/local/src
+[root@centos8 ~]#ln -sv linux-5.6.12 linux
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#32534;&#35793;</span>
+[root@centos8 ~]#cd /usr/src/linux
+[root@centos8 linux]#cp /boot/config-$(<span style="color: #ff00ff;">uname -r</span>)   ./.config
+[root@centos8 linux]#vim .config 
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#20462;&#25913;&#19979;&#38754;&#20004;&#34892;&#65292;CentOS7&#26080;&#38656;&#20462;&#25913;</span>
+<span style="color: #b22222;"># </span><span style="color: #b22222;">CONFIG_MODULE_SIG is not set</span>
+<span style="color: #a0522d;">CONFIG_SYSTEM_TRUSTED_KEYS</span>=<span style="color: #8b2252;">""</span>
+
+[root@centos8 linux]#make help
+[root@centos8 linux]#make menuconfig  <span style="color: #b22222;">#</span><span style="color: #b22222;">&#22823;&#31383;&#21475;&#25165;&#33021;&#26174;&#31034;</span>
+[root@centos8 linux]#time make -j $(<span style="color: #ff00ff;">nproc</span>)  <span style="color: #b22222;"># </span><span style="color: #b22222;">nproc &#33719;&#21462;CPU&#20010;&#25968;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#25110;&#32773;&#20004;&#27493;&#23454;&#29616;&#65306;make -j 2 bzImage ; make -j 2 modules</span>
+......
+ LD [M] sound/xen/snd_xen_front.ko
+ LD [M] virt/lib/irqbypass.ko
+
+real 82m52.128s
+user 133m37.982s
+sys 25m46.311s
+[root@centos8 linux]#pwd
+/usr/local/src/linux
+[root@centos8 linux]#du -sh .
+15G .
+[root@centos8 linux]#make modules_install
+[root@centos8 linux]#ls /lib/modules
+4.18.0-147.el8.x86_64  5.6.12-cuilinux-6.6.6
+[root@centos8 linux]#du -sh /lib/modules/5.6.12-cuilinux-6.6.6/
+3.5G /lib/modules/5.6.12-cuilinux-6.6.6/
+
+[root@centos8 linux]#make install  <span style="color: #b22222;">#  </span><span style="color: #b22222;">&#20250;&#33258;&#21160;&#20462;&#25913;grub&#20449;&#24687;</span>
+[root@centos8 linux]#ls /boot
+System.map-4.18.0-147.el8.x86_64
+System.map-5.6.12-cuilinux-6.6.6
+vmlinuz-5.6.12-cuilinux-6.6.6
+
+[root@centos8 ~]#ls /boot/loader/entries/ 
+5b85fc7444b240a992c42ce2a9f65db5-0-rescue.conf
+5b85fc7444b240a992c42ce2a9f65db5-5.6.12-cuilinux-6.6.6.conf
+[root@centos8 ~]#cat /boot/loader/entries/5b85fc7444b240a992c42ce2a9f65db5-5.6.12-cuilinux-6.6.6.conf 
+title CentOS Linux (5.6.12-cuilinux-6.6.6) 8 (Core)
+version 5.6.12-cuilinux-6.6.6
+linux /vmlinuz-5.6.12-cuilinux-6.6.6
+initrd /initramfs-5.6.12-cuilinux-6.6.6.img $<span style="color: #a0522d;">tuned_initrd</span>
+options $<span style="color: #a0522d;">kernelopts</span> $<span style="color: #a0522d;">tuned_params</span>
+id centos-20200513060531-5.6.12-cuilinux-6.6.6
+grub_users $<span style="color: #a0522d;">grub_users</span>
+grub_arg --unrestricted
+grub_class kernel
+
+[root@centos8 ~]#reboot 
+[root@centos8 ~]#uname -r
+5.6.12-cuilinux-6.6.6
+</pre>
+</div>
+
+
+<figure id="org2dafb4a">
+<img src="./images/image-20210120113001460.png" alt="image-20210120113001460.png" width="50%">
+
+</figure>
+
+<p>
+centos7编译报错
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cc1: error: -Werror=date-time: no option -Wdate-time
+<span style="color: #b22222;"># </span><span style="color: #b22222;">4.9&#20197;&#21450;&#20043;&#21518;&#30340;gcc&#29256;&#26412;&#20013;&#25165;&#26377;&#36825;&#20004;&#20010;&#36873;&#39033;&#65292;&#22914;&#26524;&#20320;&#22312;gcc&#29256;&#26412;&#23567;&#20110;4.9&#30340;&#31995;&#32479;&#19978;&#32534;&#35793;&#65292;&#27604;&#22914;&#22312;centos7.2&#31995;&#32479;&#20013;&#65292;centos&#20013;&#40664;&#35748;&#30340;gcc&#29256;&#26412;&#26159;4.8.5&#65292;&#32534;&#35793;&#26102;&#23601;&#20250;&#25253;"cc1: &#38169;&#35823;&#65306;-Werror=date-time&#65306;&#27809;&#26377;&#36873;&#39033; -Wdate-time"&#38169;&#35823;&#65292;&#25152;&#20197;&#36825;&#31181;&#35299;&#20915;&#26041;&#27861;&#22914;&#26524;&#21482;&#26159;&#20351;&#29992;4.9&#20197;&#19978;&#30340;gcc&#29256;&#26412;&#26159;&#27809;&#26377;&#38382;&#39064;&#30340;&#65307;</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #b22222;"># </span><span style="color: #b22222;">&#26041;&#27861;1 &#21319;&#32423;gcc 4.9</span>
+yum install bzip2 -y
+wget -P /usr/src https://mirrors.aliyun.com/gnu/gcc/gcc-10.2.0/gcc-10.2.0.tar.gz
+<span style="color: #483d8b;">cd</span> /usr/src &amp;&amp; tar -xzvf gcc-10.2.0.tar.gz
+<span style="color: #483d8b;">cd</span> gcc-10.2.0/ &amp;&amp; ./contrib/download_prerequisites <span style="color: #b22222;"># </span><span style="color: #b22222;">&#37197;&#32622;&#20381;&#36182;&#39033;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#36825;&#19968;&#27493;&#21487;&#33021;&#22269;&#20869;&#20250;&#31561;&#24453;&#27604;&#36739;&#20037;&#65292;&#32784;&#24515;&#31561;&#24453;</span>
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#22914;&#26524;&#25253;&#38169;&#20854;&#20182;&#25991;&#20214;&#19981;&#33021;&#19979;&#36733;&#65292;&#21435;https://gcc.gnu.org/pub/gcc/infrastructure/&#19979;&#36733;&#23545;&#24212;&#25991;&#20214;&#65292;&#22797;&#21046;&#21040;/usr/src/gcc-10.2.0&#21363;&#21487;</span>
+
+<span style="color: #b22222;">#</span><span style="color: #b22222;">&#21019;&#24314;&#23433;&#35013;&#25991;&#20214;&#22841;&#21644;&#32534;&#35793;&#25991;&#20214;&#22841;</span>
+mkdir /usr/lib/gcc/x86_64-redhat-linux/10.2.0
+mkdir /usr/src/gcc-build-10.2.0
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#37197;&#32622;&#23433;&#35013;&#25991;&#20214;</span>
+<span style="color: #483d8b;">cd</span> /usr/src/gcc-10.2.0
+./configure --prefix=/usr/lib/gcc/x86_64-redhat-linux/10.2.0/ --enable-checking=release --enable-languages=c,c++ --disable-multilib
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#25191;&#34892;&#32534;&#35793;&#24182;&#23433;&#35013;(&#32534;&#35793;&#38656;&#35201;2-3&#23567;&#26102;&#65292;&#35831;&#32784;&#24515;&#31561;&#24453;)</span>
+<span style="color: #a020f0;">time</span> make -j $(<span style="color: #ff00ff;">nproc</span>) &amp;&amp; make install
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22791;&#20221;&#21407;gcc&#24182;&#38142;&#25509;&#26032;gcc</span>
+mv /usr/bin/gcc /usr/bin/gcc-4.8.5
+mv /usr/bin/g++ /usr/bin/g++-4.8.5
+alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8.5 88 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8.5
+alternatives --install /usr/bin/gcc gcc /usr/lib/gcc/x86_64-redhat-linux/10.2.0/bin/x86_64-pc-linux-gnu-gcc 99 --slave /usr/bin/g++ g++ /usr/lib/gcc/x86_64-redhat-linux/10.2.0/bin/x86_64-pc-linux-gnu-g++
+alternatives --config gcc
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#26597;&#35810;&#29256;&#26412;</span>
+gcc -v
+g++ -v
+
+<span style="color: #b22222;"># </span><span style="color: #b22222;">&#22914;&#26524;&#20986;&#29616;&#38169;&#35823;</span>
+/lib64/libstdc++.so.6: version <span style="color: #ff00ff;">`GLIBCXX_3.4.21' not found</span>
+<span style="color: #ff00ff;">/lib64/libstdc++.so.6: version `</span>GLIBCXX_3.4.22<span style="color: #8b2252;">' not found</span>
+<span style="color: #8b2252;">#&#25191;&#34892;&#38142;&#25509;&#26032;&#30340;libstdc++.so.6&#24211;&#25991;&#20214;</span>
+<span style="color: #8b2252;">rm -f /usr/lib64/libstdc++.so.6</span>
+<span style="color: #8b2252;">ln -s /usr/lib/gcc/x86_64-redhat-linux/10.2.0/lib64/libstdc++.so.6 /usr/lib64/libstdc++.so.6</span>
+<span style="color: #8b2252;">#&#21487;&#20197;&#29992;&#20197;&#19979;&#25351;&#20196;&#26597;&#30475;&#30446;&#21069;&#21253;&#21547;&#21738;&#20123;&#24211;</span>
+<span style="color: #8b2252;">strings /usr/lib64/libstdc++.so.6 | grep GLIBC</span>
+</pre>
+</div>
+
+<p>
+<b>内核编译说明</b>
+</p>
+
+<p>
+1.配置内核选项 
+</p>
+
+<p>
+支持“更新”模式进行配置：make help 
+</p>
+
+<ol class="org-ol">
+<li>make config：基于命令行以遍历的方式配置内核中可配置的每个选项</li>
+<li>make menuconfig：基于curses的文本窗口界面</li>
+<li>make gconfig：基于GTK(GNOME）环境窗口界面</li>
+<li>make xconfig：基于QT(KDE)环境的窗口界面</li>
+</ol>
+
+<p>
+支持“全新配置”模式进行配置 
+</p>
+<ol class="org-ol">
+<li>make defconfig：基于内核为目标平台提供的“默认”配置进行配置</li>
+<li>make allyesconfig: 所有选项均回答为“yes“</li>
+<li>make allnoconfig: 所有选项均回答为“no“</li>
+</ol>
+
+
+<p>
+2.编译内核
+</p>
+
+<ul class="org-ul">
+<li>全编译:</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">make [-j <span style="color: #b22222;">#</span><span style="color: #b22222;">]</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>编译内核的一部分功能：</li>
+</ul>
+
+<p>
+(a) 只编译某子目录中的相关代码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">cd</span> /usr/src/linux; make dir/
+</pre>
+</div>
+
+<p>
+(b) 只编译一个特定的模块
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span style="color: #483d8b;">cd</span> /usr/src/linux; make dir/file.ko
+</pre>
+</div>
+
+<p>
+范例：只为e1000编译驱动：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">make drivers/net/ethernet/intel/e1000/e1000.ko
+</pre>
+</div>
+
+<p>
+3 交叉编译内核
+</p>
+
+<p>
+编译的目标平台与当前平台不相同 make ARCH=arch_name
+</p>
+
+<p>
+要获取特定目标平台的使用帮助 make ARCH=arch_name help
+</p>
+
+<p>
+示例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">make <span style="color: #a0522d;">ARCH</span>=arm help
+</pre>
+</div>
+
+<p>
+4 重新编译需要事先清理操作
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">make clean&#65306;&#28165;&#29702;&#22823;&#22810;&#25968;&#32534;&#35793;&#29983;&#25104;&#30340;&#25991;&#20214;&#65292;&#20294;&#20250;&#20445;&#30041;.config&#25991;&#20214;&#31561;
+make mrproper: &#28165;&#29702;&#25152;&#26377;&#32534;&#35793;&#29983;&#25104;&#30340;&#25991;&#20214;&#12289;config&#21450;&#26576;&#20123;&#22791;&#20221;&#25991;&#20214;
+make distclean&#65306;&#21253;&#21547; make mrproper,&#24182;&#28165;&#29702;patches&#20197;&#21450;&#32534;&#36753;&#22120;&#22791;&#20221;&#25991;&#20214;
+</pre>
+</div>
+
+<p>
+<b>卸载内核</b>
+</p>
+
+<ul class="org-ul">
+<li>删除/usr/src/linux/目录下不需要的内核源码</li>
+<li>删除/lib/modules/目录下不需要的内核库文件</li>
+<li>删除/boot目录下启动的内核和内核映像文件</li>
+<li>更改grub的配置文件，删除不需要的内核启动列表 grub2-mkconfig -o
+/boot/grub2/grub.cfg</li>
+<li>CentOS 8 还需要删除
+/boot/loader/entries/5b85fc7444b240a992c42ce2a9f65db5-新内核版 本.conf</li>
+</ul>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>打赏</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+<!--
+<script type="text/javascript" src="https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js"></script>
+<div id="back-to-top" class=""><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div>
+-->
+</div>
+</body>
+</html>

@@ -58,7 +58,7 @@
 </ul>
 
 <p>
-[ 最后修订与导出时间： <b>2026-01-28 20:01:42 +0800</b>  ，总字数： <b>29148</b> ]
+[ 最后修订与导出时间： <b>2026-01-30 07:17:56 +0800</b>  ，总字数： <b>33499</b> ]
 </p>
 
 <p>
@@ -6307,85 +6307,677 @@ Emacs 中的核心搜索命令为 <code>incremental增量搜索</code> ：键入
 <div id="outline-container-Error-in-Isearch" class="outline-4">
 <h4 id="Error-in-Isearch"><span class="section-number-4">17.1.4.</span> 增量搜索错误处理</h4>
 <div class="outline-text-4" id="text-Error-in-Isearch">
+<p>
+若输入的搜索字符串完全无匹配结果，回显区会显示 “搜索失败（Failing I-Search）”，同时光标会移至 Emacs 能匹配到该字符串最长前缀的位置后方。例如，若你搜索 “FOOT” 但缓冲区中无该内容，光标可能会停在 “FOOL” 里的 “FOO” 后方。回显区中，搜索字符串里无匹配结果的部分，会使用 <code>isearch-fail</code> 文本外观高亮显示。
+</p>
+
+<p>
+此时你可执行多种操作：若输入的搜索字符串存在拼写错误，可按 <code>DEL</code> 键撤销上一个输入项（参见<a href="#Basic-Isearch">增量搜索基础操作</a>），按 <code>C-M-d</code> 键逐个删除字符，或按 <code>M-e</code> 键编辑搜索字符串；若你希望停留在当前匹配到的位置，按 <code>RET</code> 回车键即可；也可按 <code>C-g</code> 键，该操作会从搜索字符串中移除无匹配结果的字符（如 “FOOT” 中的 “T”），仅保留能匹配到的部分（如 “FOOT” 中的 “FOO”）。若此时再次按下 <code>C-g</code> 键，则会彻底取消本次搜索，将光标恢复至搜索启动时的位置。
+</p>
+
+<p>
+退出命令 <code>C-g</code> 在搜索过程中会执行特殊操作，具体行为取决于当前的搜索状态：若搜索已匹配到指定内容并处于等待输入状态，按 <code>C-g</code> 键会直接彻底取消搜索，将光标移回搜索启动的初始位置；若按下 <code>C-g</code> 键时，搜索字符串中仍有未匹配到的字符 —— 无论 Emacs 仍在尝试搜索该部分，还是已确认搜索失败 —— 这些未匹配的字符都会从搜索字符串中被移除。移除后搜索会恢复为成功状态并等待后续输入，因此再次按下 <code>C-g</code> 键，才会彻底取消本次搜索。
+</p>
 </div>
 </div>
 <div id="outline-container-Special-Isearch" class="outline-4">
 <h4 id="Special-Isearch"><span class="section-number-4">17.1.5.</span> 增量搜索的特殊输入</h4>
 <div class="outline-text-4" id="text-Special-Isearch">
+<p>
+除前文介绍的字符外，在增量搜索过程中键入部分其他字符会触发特殊功能，本节将对其逐一说明。
+</p>
+
+<p>
+按下 <code>M-s SPC</code> ，可切换宽松空格匹配的开启 / 关闭状态（参见<a href="#Lax-Search">宽松空格匹配</a>）。
+</p>
+
+<p>
+按下 <code>M-c</code> 或 <code>M-s c</code> ，可切换搜索的大小写敏感状态（参见<a href="#Lax-Search">大小写折叠</a>）。若搜索字符串中包含大写字母，搜索默认会开启大小写敏感模式。
+</p>
+
+<p>
+按下 <code>M-s '</code> ，可切换搜索是否将相似且等效的字符判定为匹配项（参见<a href="#Lax-Search">字符折叠</a>）。若搜索字符串中包含带重音的字符，本次搜索会自动禁用字符折叠功能。
+</p>
+
+<p>
+按下 <code>M-s i</code> (<code>isearch-toggle-invisible</code>) ，可切换搜索是否查找由覆盖属性隐藏的文本（参见<a href="#Outline-Visibility">大纲模式中的搜索</a>）。若希望所有增量搜索都能查找因文本属性或覆盖属性而隐藏的文本中的匹配项，可将变量 <code>search-invisible</code> 自定义为 <code>t</code> 。
+</p>
+
+<p>
+按下 <code>M-r</code> 或 <code>M-s r</code> (<code>isearch-toggle-regexp</code>) ，可在普通增量搜索与正则表达式增量搜索间切换（参见<a href="#Regexp-Search">正则表达式搜索</a>）。
+</p>
+
+<p>
+按下 <code>M-s _</code> ，可切换符号模式的开启 / 关闭状态（参见<a href="#Symbol-Search">符号搜索</a>）。
+</p>
+
+<p>
+若要搜索换行符，可在输入搜索字符串时按下 <code>C-j</code> 。
+</p>
+
+<p>
+若要搜索非 ASCII 字符，可在增量搜索过程中使用以下任意一种方法：
+</p>
+<ul class="org-ul">
+<li>按下 <code>C-q</code> (<code>isearch-quote-char</code>) ，随后键入非图形字符或一组八进制数字，即可将对应字符添加至搜索字符串，其用法与在缓冲区中使用 <code>C-q</code> 插入字符一致（参见<a href="#Inserting-Text">插入文本</a>）。例如，在增量搜索中按下 <code>C-q C-s</code> ，会将 'control-S' 控制字符 S 添加至搜索字符串。</li>
+<li><p>
+使用输入法（参见<a href="#Input-Methods">输入法</a>）。若启动搜索时当前缓冲区已启用某输入法，在输入搜索字符串时，迷你缓冲区会沿用该输入法。输入搜索字符串期间，可按下 <code>C-\</code> (<code>isearch-toggle-input-method</code>) 切换输入法状态；也可按下 <code>C-^</code> (<code>isearch-toggle-specified-input-method</code>) ，根据提示选择并启用非默认输入法。当增量搜索中启用输入法时，搜索提示会显示该输入法的助记符，格式如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">I-search [im]:
+</pre>
+</div>
+
+<p>
+其中的输入法助记符 <code>im</code> 为当前激活输入法的标识。在增量搜索中启用的任意输入法，后续会一直保持在当前缓冲区的启用状态。此外，可按下 <code>C-x \</code> (<code>isearch-transient-input-method</code>) 临时启用临时输入法（参见<a href="#Select-Input-Method">临时输入法</a>），通过该输入法向搜索字符串中插入单个字符，插入完成后输入法会自动禁用。
+</p></li>
+
+<li>按下 <code>C-x 8 RET</code> (<code>isearch-char-by-name</code>) ，随后键入字符的 Unicode 名称或十六进制编码点，即可将指定字符添加至搜索字符串，其用法与常规的 <code>insert-char</code> 命令一致（参见<a href="#Inserting-Text">插入文本</a>）。</li>
+</ul>
+
+
+<p>
+你也可在搜索字符串中包含表情符号序列：按下 <code>C-x 8 e RET</code> (<code>isearch-emoji-by-name</code>) ，随后键入表情符号的 Unicode 名称（例如 <code>smiling face</code> 微笑脸、 <code>heart with arrow</code> 带箭头的心形），即可将指定表情符号添加至搜索字符串。若不清楚目标表情符号的名称，可使用 <code>C-x 8 e l</code> (<code>emoji-list</code>) 和 <code>C-x 8 e d</code> (<code>emoji-describe</code>) 命令查询（参见<a href="#Input-Methods">输入法</a>）。
+</p>
+
+<p>
+在增量搜索中按下 <code>M-s o</code> ，会调用 <code>isearch-occur</code> 命令，该命令会以当前搜索字符串为检索条件执行 <code>occur</code> 命令（参见 <a href="#Other-Repeating-Search">occur 命令</a>）。
+</p>
+
+<p>
+在增量搜索中按下 <code>M-%</code> (<code>isearch-query-replace</code>) ，会调用查询替换或正则表达式查询替换命令（具体取决于当前搜索模式），并将当前搜索字符串设为待替换的目标字符串。若为该命令添加负的数字前缀参数，会执行反向替换（参见<a href="#Query-Replace">查询替换</a>）。按下 <code>C-M-%</code> (<code>isearch-query-replace-regexp</code>) ，会调用正则表达式查询替换命令，并将当前搜索字符串设为待替换的正则表达式。
+</p>
+
+<p>
+在增量搜索中按下 <code>M-TAB</code> ，会调用 <code>isearch-complete</code> 命令，该命令会以搜索环（你此前使用过的所有搜索字符串）为补全候选列表，尝试对当前搜索字符串进行补全（参见<a href="#Completion">补全功能</a>）。在许多操作系统中， <code>M-TAB</code> 快捷键会被窗口管理器拦截；若你需要使用该功能，需将 <code>isearch-complete</code> 命令重新绑定至其他快捷键（参见<a href="#Rebinding">交互式修改按键绑定</a>）。
+</p>
+
+<p>
+按下 <code>M-s h r</code> (<code>isearch-highlight-regexp</code>) ，可退出搜索并保持匹配项的高亮状态。该命令会调用 <code>highlight-regexp</code> 命令（参见<a href="#Highlight-Interactively">交互式高亮</a>），将由当前搜索字符串转换而来的正则表达式作为检索条件，并提示你选择用于高亮的文本外观。若希望高亮包含匹配项的整行文本（而非仅高亮匹配项本身），可按下 <code>M-s h l</code> (<code>isearch-highlight-lines-matching-regexp</code>) 。无论使用上述哪种高亮方式，按下 <code>M-s h u</code> (<code>unhighlight-regexp</code>) 即可取消所有高亮效果。
+</p>
+
+<p>
+当增量搜索处于激活状态时，按下 <code>C-h C-h</code> (<code>isearch-help-map</code>) 可打开交互式帮助选项，其中包含所有特殊快捷键的列表。这些快捷键均属于按键映射表 <code>isearch-mode-map</code> （参见<a href="#Keymaps">按键映射表</a>）。
+</p>
+
+<p>
+当增量搜索处于激活状态时，按下 <code>M-s M-&gt;</code> 会跳至搜索字符串的最后一个匹配项，按下 <code>M-s M-&lt;</code> 会跳至搜索字符串的第一个匹配项。若为这两个命令添加数字前缀参数 <code>n</code> ，会分别从缓冲区起始位置和末尾位置开始计数，跳至搜索字符串的第 <code>n</code> 个匹配项。
+</p>
 </div>
 </div>
 <div id="outline-container-Not-Exiting-Isearch" class="outline-4">
 <h4 id="Not-Exiting-Isearch"><span class="section-number-4">17.1.6.</span> 不退出增量搜索</h4>
 <div class="outline-text-4" id="text-Not-Exiting-Isearch">
+<p>
+本节介绍如何控制在键入 <b>搜索中无特定含义</b> 的命令时，是否先退出搜索再执行该命令；同时还将说明三类特殊命令，键入这类命令时无需退出当前增量搜索，尽管其本身并非增量搜索的内置命令。
+</p>
+
+<p>
+默认情况下，若键入的命令未被增量搜索绑定相关功能，Emacs 会 <b>先退出搜索，再执行该命令</b> ，因此该命令会作用于启动搜索的原缓冲区。但如果将变量 <code>search-exit-option</code> 自定义为 <code>append</code> ，增量搜索无法解析的键入字符会直接 <b>追加至搜索字符串中</b> 。借助该设置，你可将 <code>C-a</code> 等控制字符纳入搜索字符串 —— 这类字符在默认情况下会触发退出搜索，并在缓冲区中执行其绑定的命令。
+</p>
+
+<dl class="org-dl">
+<dt>前缀参数</dt><dd><p>
+在增量搜索中，当你键入用于指定数字前缀参数的命令时（参见<a href="#Arguments">数字参数</a>），该参数默认会作用于搜索的下一个操作，或退出搜索后执行的命令。换言之，输入前缀参数本身不会终止增量搜索。
+</p>
+
+<p>
+在早期的 Emacs 版本中，输入前缀参数总会终止搜索。若要恢复该旧版行为，可将变量 <code>isearch-allow-prefix</code> 设为 <code>nil</code> 。
+</p>
+
+<p>
+当 <code>isearch-allow-scroll</code> 为非 nil 值时（见下文），无论 <code>isearch-allow-prefix</code> 是否为 <code>nil</code> ，前缀参数均会遵循上述默认行为，即不会终止搜索。
+</p></dd>
+
+<dt>滚动命令</dt><dd><p>
+默认情况下，执行滚动命令会退出增量搜索。但如果将变量 <code>isearch-allow-scroll</code> 设为非 nil 值，即可在不退出搜索的前提下，使用滚动条，以及 <code>C-v</code> 、 <code>M-v</code> 、 <code>C-l</code> 等键盘滚动命令（参见<a href="#Scrolling">滚动</a>）—— 这类命令的 <code>scroll-command</code> 属性均为非 nil。该特性仅适用于通过 <b>绑定的快捷键</b> 调用这些命令，键入 <code>M-x</code> 仍会触发退出搜索。你可按常规方式为这些滚动命令添加前缀参数。
+</p>
+
+<p>
+该特性默认会防止当前匹配项被滚动至视野外；若将 <code>isearch-allow-scroll</code> 自定义为特殊值 <code>unlimited</code> ，则会取消该限制。
+</p>
+
+<p>
+<code>isearch-allow-scroll</code> 特性还会作用于其他部分命令，例如 <code>C-x 2</code> (<code>split-window-below</code>) 和 <code>C-x ^</code> (<code>enlarge-window</code>)（放大窗口）—— 这类命令并非严格意义上的滚动命令，但会影响文本在屏幕上的显示位置。事实上，所有 <code>isearch-scroll</code> 属性为非 nil 的命令，都会受该特性影响。因此，你可通过修改这些命令的属性，控制其是否被该特性作用。
+</p>
+
+<p>
+例如，若希望在后续所有 Emacs 会话的增量搜索中，均可使用 <code>C-h l</code> 命令，可先通过 <code>C-h c</code> 查询该快捷键绑定的命令（参见<a href="#Key-Help">按键的文档说明</a>），即 <code>view-lossage</code> ；随后在初始化文件中添加以下配置行（参见<a href="#Init-File">Emacs 初始化文件</a>）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(put 'view-lossage 'isearch-scroll t)
+</pre>
+</div>
+
+<p>
+该特性可应用于所有不会永久修改以下内容的命令：光标位置、缓冲区内容、匹配数据、当前缓冲区，以及选中的窗口和框架。且该命令本身不能尝试执行增量搜索。当 <code>isearch-allow-scroll</code> 为 <code>nil</code> 时（默认值），该特性会被禁用。
+</p>
+
+<p>
+同理，若将变量 <code>isearch-allow-motion</code> 设为非 nil 值，即可在不退出搜索的前提下，使用 <code>M-&lt;</code> 、 <code>M-&gt;</code> 、 <code>C-v</code> 、 <code>M-v</code> 等键盘移动命令，分别跳至缓冲区中当前搜索字符串的第一个匹配项、最后一个匹配项、当前窗口后方的第一个匹配项和当前窗口前方的最后一个匹配项。
+</p>
+
+<p>
+执行这些移动命令时，搜索方向默认不会改变；若将变量 <code>isearch-motion-changes-direction</code> 设为非 nil 值，则会改变搜索方向：执行 <code>M-&lt;</code> 和 <code>C-v</code> 后搜索方向为正向，执行 <code>M-&gt;</code> 和 <code>M-v</code> 后搜索方向为反向。
+</p></dd>
+
+<dt>移动命令</dt><dd><p>
+若将 <code>isearch-yank-on-move</code> 自定义为 <code>shift</code> ，你可在按住 <code>shift</code> 键的同时键入光标移动命令，以此扩展搜索字符串。该操作会将当前缓冲区中，光标移动后新位置之前的文本撷取并追加至搜索字符串。
+</p>
+
+<p>
+若将 <code>isearch-yank-on-move</code> 设为 <code>t</code> ，无需按住 <code>Shift</code> 键，键入光标移动命令即可扩展搜索字符串；但该效果仅适用于符号上带有 <code>isearch-move</code> 属性的特定移动命令。
+</p></dd>
+</dl>
 </div>
 </div>
 <div id="outline-container-Isearch-Minibuffer" class="outline-4">
 <h4 id="Isearch-Minibuffer"><span class="section-number-4">17.1.7.</span> 迷你缓冲区搜索</h4>
 <div class="outline-text-4" id="text-Isearch-Minibuffer">
+<p>
+若在迷你缓冲区处于激活状态时启动增量搜索，Emacs 会对迷你缓冲区的内容进行检索。与搜索普通缓冲区不同，搜索字符串不会显示在回显区中，因为该区域会被用于显示迷你缓冲区本身的内容。
+</p>
+
+<p>
+若在迷你缓冲区中执行增量搜索未找到匹配结果，Emacs 会尝试 <b>检索迷你缓冲区的历史记录</b> （参见<a href="#Minibuffer-History">迷你缓冲区历史记录</a>）。你可将迷你缓冲区及其历史记录视作一系列连续的页面：最早的历史记录项位于第一页，当前的迷你缓冲区内容则在最后一页。正向搜索（ <code>C-s</code> ）会向后检索后续页面的内容，反向搜索（ <code>C-r</code> ）则会向前检索更早页面的内容。与搜索普通缓冲区的规则一致，无匹配结果的搜索会执行循环检索，从最后一页跳转至第一页，或从第一页跳转至最后一页。
+</p>
+
+<p>
+当当前匹配项出现在某条历史记录项中时，该历史记录项会被调取至迷你缓冲区中。若你以常规方式退出增量搜索（例如按下 <code>RET</code> 回车键），该历史记录项会保留在迷你缓冲区中；若通过按下 <code>C-g</code> 取消搜索，迷你缓冲区的内容会恢复为启动搜索时的状态。
+</p>
 </div>
 </div>
 </div>
 <div id="outline-container-Nonincremental-Search" class="outline-3">
 <h3 id="Nonincremental-Search"><span class="section-number-3">17.2.</span> 非增量搜索（Nonincremental Search）</h3>
 <div class="outline-text-3" id="text-Nonincremental-Search">
+<p>
+Emacs 也提供常规的非增量搜索命令，这类命令要求你在搜索开始前输入 <b>完整的搜索字符串</b> 。
+</p>
+
+<dl class="org-dl">
+<dt><code>C-s RET string RET</code></dt><dd>搜索指定字符串。</dd>
+<dt><code>C-r RET string RET</code></dt><dd>反向搜索指定字符串。</dd>
+</dl>
+
+<p>
+启动非增量搜索时，先按下 <code>C-s RET</code> ，此时会调出迷你缓冲区用于输入搜索字符串；输入完成后按 <code>RET</code> 回车键确认，搜索随即执行。若未找到该字符串，搜索命令会触发错误提示。
+</p>
+
+<p>
+按下 <code>C-s RET</code> 时， <code>C-s</code> 会照常调用增量搜索功能，而该功能被专门设定为：当你输入的搜索字符串为空时，自动调用非增量搜索命令（空参在增量搜索中并无实际作用）。 <code>C-r RET</code> 的执行逻辑同理，会调用反向非增量搜索命令。
+</p>
+
+<p>
+非增量搜索也可通过菜单栏的 '<code>Edit-&gt;Search</code>' 菜单调用。
+</p>
+
+<p>
+你也可使用两个更简洁的命令： <code>M-x search-forward</code> （正向搜索）和 <code>M-x search-backward</code> （反向搜索）。这两个命令仅对指定的字面字符串进行检索，除了大小写折叠外，不支持任何宽松搜索相关特性（参见<a href="#Lax-Search">搜索中的宽松匹配</a>）。
+</p>
 </div>
 </div>
 <div id="outline-container-Word-Search" class="outline-3">
 <h3 id="Word-Search"><span class="section-number-3">17.3.</span> 单词搜索（Word Search）</h3>
 <div class="outline-text-3" id="text-Word-Search">
+<p>
+<code>ward search单词搜索</code> 会查找连续的单词序列，且忽略单词之间的标点符号类型。例如，若你输入的搜索字符串是由单个空格分隔的两个单词，该搜索会匹配这两个单词以一个或多个空格、换行符或其他标点符号分隔的任意序列。此功能在搜索文本文档时尤为实用，你无需担心目标单词之间是用换行符还是空格分隔。需注意，编程语言对应的主模式或其他专用模式可修改单词的定义，以适配其语法需求。
+</p>
+
+<dl class="org-dl">
+<dt><code>M-s w</code></dt><dd>若增量搜索已激活，切换单词搜索模式 (<code>isearch-toggle-word</code>)；若未激活，启动正向增量单词搜索 (<code>isearch-forward-word</code>) 。</dd>
+<dt><code>M-s w RET words RET</code></dt><dd>执行正向非增量单词搜索，查找指定单词序列。</dd>
+<dt><code>M-s w C-r RET words RET</code></dt><dd>执行反向非增量单词搜索，查找指定单词序列。</dd>
+<dt><code>M-s M-w</code></dt><dd>在网络上搜索选区中的文本内容。</dd>
+</dl>
+
+<p>
+启动正向增量单词搜索，按下 <code>M-s w</code> 即可。若增量搜索尚未激活，该快捷键会执行 <code>isearch-forward-word</code> 命令；若增量搜索已激活（无论正向还是反向）， <code>M-s w</code> 会执行 <code>isearch-toggle-word</code> 命令，切换为单词搜索模式，且保持搜索方向和当前搜索字符串不变。再次按下 <code>M-s w</code> ，可关闭单词搜索模式。
+</p>
+
+<p>
+启动非增量单词搜索，按下 <code>M-s w RET</code> 执行正向搜索，按下 <code>M-s w C-r RET</code> 执行反向搜索，二者分别对应 <code>word-search-forward</code> 和 <code>word-search-backward</code> 命令。
+</p>
+
+<p>
+增量单词搜索与非增量单词搜索的匹配规则略有不同：非增量单词搜索中，搜索字符串中的每个单词都必须与完整的单词精确匹配；增量单词搜索的匹配规则则更为宽松，在你输入搜索字符串的过程中，其首个和最后一个单词无需匹配完整单词，目的是让匹配过程能随你的输入实时增量进行。这一额外的宽松规则不适用于延迟高亮功能（参见<a href="#Incremental-Search">增量搜索</a>），该功能始终会匹配完整的单词。输入搜索字符串时，搜索提示中会显示 “待匹配（Pending）”，直至你按下 <code>C-s</code> 等重复搜索的快捷键。
+</p>
+
+<p>
+单词搜索命令不执行字符折叠，切换宽松空格匹配模式（参见<a href="#Lax-Search">宽松空格匹配</a>）对其也无任何效果。
+</p>
+
+<p>
+在网络上搜索选区中的文本，按下 <code>M-s M-w</code> 即可。该命令会通过互联网搜索选区中的单词，使用的搜索引擎地址由变量 <code>eww-search-prefix</code> 指定（参见《Emacs 网页浏览器手册》中的 <a href="https://www.gnu.org/software/emacs/manual/html_node/eww/Basics.html#Basics">EWW</a> 相关内容）。若选区未激活，或选区中无任何单词，该命令会提示用户输入待搜索的网址或关键词。
+</p>
+
+<p>
+你也可通过 <code>RFC</code> 2229 定义的 <code>DICT</code> 协议查询词典服务器，查找单词的释义。Emacs 内置了该协议的客户端，按下 <code>M-x dictionary-search RET</code> ，即可连接至 <code>DICT</code> 词典服务器，查询指定单词的所有可用释义。该命令会提示用户输入待查询单词，默认使用光标所在位置的单词，随后请求词典服务器在一个或多个词典中返回该单词的释义。默认情况下，该命令会先尝试连接本地主机上的 <code>DICT</code> 词典服务器，若连接失败，经用户确认后会尝试连接 <code>dict.org</code> 服务器；可自定义变量 <code>dictionary-server</code> ，将其设为字符串类型的服务器地址，指定唯一使用的词典服务器（若仅需查询本地服务器，设为 “localhost” 即可）。通常， <code>dictionary-search</code> 命令会让服务器在其所有可用词典中检索单词，若为该命令添加数字前缀参数，其会提示用户指定单个词典进行检索。服务器的所有可用词典列表，可通过下方所述的 <code>*Dictionary*</code> 缓冲区中显示的「选择词典（Select dictionary）」按钮查看。
+</p>
+
+<p>
+首次使用 <code>dictionary-search</code> 命令时，Emacs 会新建一个 <code>*Dictionary*</code> 缓冲区，并在其中启用专用模式。该缓冲区提供了选择词典、搜索其他单词释义等功能按钮，后续执行的 <code>dictionary-search</code> 命令会复用此缓冲区。若需新建一个同类缓冲区（例如在另一本词典中查询其他单词），按下 <code>M-x dictionary RET</code> 即可。
+</p>
+
+<p>
+若在某一缓冲区中启用 <code>dictionary-tooltip-mode</code> 模式，Emacs 会自动查询鼠标指针所在位置单词的释义，并在工具提示中显示。当你阅读包含大量陌生单词的文本时，该功能会非常实用。
+</p>
+
+<p>
+关于 dictionary-search 命令的其他配置选项，参见词典自定义组（参见<a href="#Specific-Customization">自定义特定项</a>）。
+</p>
 </div>
 </div>
 <div id="outline-container-Symbol-Search" class="outline-3">
 <h3 id="Symbol-Search"><span class="section-number-3">17.4.</span> 符号搜索（Symbol Search）</h3>
 <div class="outline-text-3" id="text-Symbol-Search">
+<p>
+<code>symbol search符号搜索</code> 与普通搜索极为相似，区别在于 <b>搜索内容的边界必须与符号的边界相匹配</b> 。此处的「symbol符号」含义由主模式决定，通常指源代码中的语法标记，例如 Emacs Lisp 模式中的 Lisp 符号。举例来说，若对 Lisp 符号 <code>forward-word</code> 执行增量符号搜索，该搜索不会匹配 <code>isearch-forward-word</code> 。因此，该功能主要适用于搜索源代码。
+</p>
+
+<dl class="org-dl">
+<dt><code>M-s _</code></dt><dd>若增量搜索已激活，切换符号搜索模式 (<code>isearch-toggle-symbol</code>) ；若未激活，启动正向增量符号搜 (<code>isearch-forward-symbol</code>) 。</dd>
+<dt><code>M-s .</code></dt><dd>启动正向增量符号搜索，且会将光标附近找到的符号预先加入搜索字符串。</dd>
+<dt><code>M-s _ RET symbol RET</code></dt><dd>执行正向非增量符号搜索，查找指定符号。</dd>
+<dt><code>M-s _ C-r RET symbol RET</code></dt><dd>执行反向非增量符号搜索，查找指定符号。</dd>
+</dl>
+
+<p>
+启动正向增量符号搜索，按下 <code>M-s _</code> 即可（若待搜索符号就在光标附近，也可按下 <code>M-s .</code> ）。若增量搜索尚未激活， <code>M-s _</code> 会执行 <code>isearch-forward-symbol</code> 命令， <code>M-s .</code> 会执行 <code>isearch-forward-symbol-at-point</code> 命令。为 <code>M-s .</code> 添加数字前缀参数 <code>n</code> 时，该命令会查找光标处符号的第 <code>n</code> 个后续匹配项；若 <code>n</code> 为负值，则执行反向搜索。若增量搜索已激活，按下 <code>M-s _</code> 会切换至符号搜索模式，同时保留原有的搜索方向和当前搜索字符串；再次按下 <code>M-s _</code> ，即可关闭符号搜索模式。在增量符号搜索中，输入搜索字符串的过程中， <b>仅要求搜索字符串的开头与符号的开头相匹配</b> ，且搜索提示中会显示「待匹配（Pending）」，直至按下 <code>C-s</code> 等重复搜索的快捷键。
+</p>
+
+<p>
+启动非增量符号搜索，按下 <code>M-s _ RET</code> 执行正向搜索，按下 <code>M-s _ C-r RET</code> 执行反向搜索。在非增量符号搜索中， <b>要求搜索字符串的开头与结尾分别与符号的开头和结尾严格匹配</b> 。
+</p>
+
+<p>
+符号搜索命令不执行字符折叠，切换宽松空格匹配模式（参见<a href="#Lax-Search">宽松空格匹配</a>）对其也无任何效果。
+</p>
 </div>
 </div>
 <div id="outline-container-Regexp-Search" class="outline-3">
 <h3 id="Regexp-Search"><span class="section-number-3">17.5.</span> 正则表达式搜索（Regular Expression Search）</h3>
 <div class="outline-text-3" id="text-Regexp-Search">
+<p>
+<code>regular expression</code> 正则表达式（简称regexp）是一种匹配模式，可匹配一类符合规则的备选字符串。Emacs 同时提供了增量和非增量两种正则表达式搜索方式，正则表达式的语法将在下一节中讲解。
+</p>
+
+<dl class="org-dl">
+<dt><code>C-M-s</code></dt><dd>启动正向增量正则表达式搜索 (<code>isearch-forward-regexp</code>) 。</dd>
+<dt><code>C-M-r</code></dt><dd>启动反向增量正则表达式搜索 (<code>isearch-backward-regexp</code>)。</dd>
+</dl>
+
+<p>
+启动正向增量正则表达式搜索可按下 <code>C-M-s</code> ，也可给 <code>C-s</code> 添加任意数值的前缀参数后执行，或在正向增量搜索中键入 <code>M-r</code> 切换。该命令与 <code>C-s</code> 的操作方式一致，会增量式读取输入的搜索字符串，但不会将其作为固定字符串去精确匹配缓冲区文本，而是将其视作正则表达式进行匹配。每向搜索字符串中添加字符，正则表达式就会相应延长，Emacs 也会用新的正则表达式重新执行搜索。执行反向增量正则表达式搜索，可按下 <code>C-M-r</code> 、给  <code>C-r</code> 添加前缀参数执行，或在反向增量搜索中键入 <code>M-r</code> 切换。
+</p>
+
+<p>
+普通增量搜索中的所有特殊快捷键（参见<a href="#Special-Isearch">增量搜索的特殊输入</a>），在增量正则表达式搜索中均有类似功能。例如，启动搜索后立即按下 <code>C-s</code> ，会调取上一次使用的增量正则表达式搜索串并执行正向搜索。增量正则表达式搜索和普通增量搜索拥有相互独立的默认搜索串，且各自配有独立的搜索环，均可通过 <code>M-p</code> 和 <code>M-n</code> 进行遍历。搜索环中可保存的正则表达式最大数量由变量 <code>regexp-search-ring-max</code> 指定，默认值为 16。
+</p>
+
+<p>
+与普通增量搜索不同，增量正则表达式搜索 <b>默认不启用lax space宽松空格匹配</b> ，可按下 <code>M-s SPC</code> (<code>isearch-toggle-lax-whitespace</code>) 切换该功能。启用后，在增量正则表达式搜索中键入的任意空格，均可匹配一个或多个空白字符组成的任意序列。变量 <code>search-whitespace-regexp</code> 用于指定宽松空格匹配所使用的正则表达式，详情参见<a href="#Special-Isearch">增量搜索的特殊输入</a>。
+</p>
+
+<p>
+此外，增量正则表达式搜索 <b>不支持字符折叠功能</b> （参见<a href="#Lax-Search">搜索中的宽松匹配</a>）。若在增量正则表达式搜索中按下 <code>M-s '</code> 尝试切换字符折叠，搜索会自动转为普通字符串搜索，此前输入的匹配模式也会被当作字面量字符串解析。
+</p>
+
+<p>
+在某些情况下，为增量正则表达式搜索的匹配串添加字符，可能会导致光标回退并重新执行搜索。例如，当你已搜索过 '<code>foo</code>' ，再为其添加 '<code>\|bar</code>' 后，光标会回退重新检索 —— 这是为了匹配出现在首个foo之前的首个bar（此时搜索提示会显示「待匹配（Pending）」，告知用户程序正在重新计算匹配结果），相关语法详情参见<a href="#Regexps">正则表达式语法</a>。
+</p>
+
+<p>
+正向和反向正则表达式搜索并非对称操作，因为 Emacs 中的正则表达式匹配始终 <b>正向执行</b> ，从正则表达式的起始位置开始匹配。因此，正向正则表达式搜索会正向扫描文本，在每个可能的起始位置尝试正向匹配；反向正则表达式搜索会反向扫描文本，但同样在每个可能的起始位置执行正向匹配，这两种搜索方式并非镜像关系。
+</p>
+
+<p>
+非增量正则表达式搜索可通过 <code>re-search-forward</code> 和 <code>re-search-backward</code> 命令实现，可通过 <code>M-x</code> 直接调用，也可在增量正则表达式搜索中按下 <code>C-M-s RET</code> 或 <code>C-M-r RET</code> 触发。通过 <code>M-x</code> 直接调用这两个命令时，程序会严格按照你指定的正则表达式执行搜索，因此除大小写折叠外，不支持任何宽松搜索特性（参见<a href="#Lax-Search">搜索中的宽松匹配</a>）。
+</p>
+
+<p>
+若为增量正则表达式搜索命令添加前缀参数执行，该命令会切换为普通字符串搜索，功能与 <code>isearch-forward</code> 和 <code>isearch-backward</code> 一致，详情参见<a href="#Incremental-Search">增量搜索</a>。
+</p>
 </div>
 </div>
 <div id="outline-container-Regexps" class="outline-3">
 <h3 id="Regexps"><span class="section-number-3">17.6.</span> 正则表达式语法</h3>
 <div class="outline-text-3" id="text-Regexps">
+<p>
+本节（以及本手册整体）介绍的是用户日常使用的正则表达式特性。更多主要用于 Lisp 程序的扩展特性，参见《Emacs Lisp 参考手册》中的<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Regular-Expressions.html#Regular-Expressions">正则表达式</a>相关章节。
+</p>
+
+<p>
+正则表达式拥有专属语法：其中少量字符为 <b>special constructs特殊构造符</b> ，其余均为 <b>ordinary普通字符</b> 。普通字符仅匹配其自身，无其他匹配效果。特殊字符包括 '<code>$^.*+?[\</code>' 仅在作为方括号表达式的结束符 '<code>]</code>' 时具有特殊性（见下文）； '-' 仅在方括号表达式内具有特殊性。正则表达式中出现的其他所有字符均为普通字符，除非其前带有反斜杠 '\' 转义（在 Lisp 程序中使用正则表达式时，每个 '\' 都必须写为双反斜杠 '\\' ，参见本节末尾示例）。
+</p>
+
+<p>
+例如， 'f'并非特殊字符，因此属于普通字符，正则表达式 'f' 仅匹配字符串 'f' ，不匹配其他任何字符串（也不匹配 'ff'）。同理， 'o' 作为正则表达式仅匹配 'o'。（当忽略大小写匹配时，这些正则表达式也会匹配 'F' 和 'O' ，我们将此视为「匹配相同字符串」的扩展规则，而非例外情况。）
+</p>
+
+<p>
+任意两个正则表达式 <code>a</code> 和 <code>b</code> 均可进行 <b>拼接</b> ，拼接后的正则表达式匹配规则为：若字符串的开头部分能匹配 <code>a</code> ，剩余部分能匹配 <code>b</code> ，则该字符串可被拼接后的正则表达式匹配。一个简单的例子是，将 'f' 和 'o' 拼接得到正则表达式 'fo'，其仅匹配字符串 'fo' 。若要实现更复杂的匹配效果，就需要使用特殊字符。以下是所有正则表达式特殊字符的说明：
+</p>
+
+<dl class="org-dl">
+<dt><code>.</code> (句点)</dt><dd>特殊字符，匹配除换行符外的任意单个字符。例如，正则表达式 ‘a.b’ 匹配以 ‘a’ 开头、以 ‘b’ 结尾的任意三字符字符串。</dd>
+<dt><code>*</code></dt><dd><p>
+本身并非独立构造符，而是后缀操作符，表示将其前面的正则表达式重复匹配任意次数（包括 0 次），且遵循 <b>贪婪匹配原则</b> （尽可能多匹配）。因此， ‘o*’ 匹配任意数量的 ‘o’，也包括空字符串。
+</p>
+
+<p>
+<code>*</code> 始终作用于其前方最小的有效正则表达式。因此， ‘fo*’ 表示 ‘o’ 可重复匹配，而非 ‘fo’整体，该表达式可匹配f、fo、foo等字符串。
+</p>
+
+<p>
+正则表达式匹配器处理 <code>*</code> 构造符的逻辑为：首先尽可能多地匹配 ‘*’ 修饰的表达式，再继续匹配模式的剩余部分；若剩余部分匹配失败，则进行 <b>回溯</b> ，舍弃部分 ’*‘ 的匹配结果，直至模式剩余部分能成功匹配。例如，用 ‘ca*ar’ 匹配字符串 ‘caaar’ 时， ‘a*’ 最初会匹配全部 3 个 ‘a’ ，但模式剩余部分为 ‘ar’ ，而字符串中仅剩 ‘r’ ，因此此次匹配失败；随后进行回溯， ‘a*’ 仅匹配 2 个 ‘a’，此时正则表达式的剩余部分可成功匹配，整体匹配完成。
+</p></dd>
+
+<dt><code>+</code></dt><dd>后缀操作符，与 ‘*’ 类似，但要求其前方的表达式至少匹配 1 次。因此， ‘ca+r’ 可匹配 ‘car’ 、 ‘caaaar’，但不匹配 ‘cr’ ；而 ‘ca*r’ 可匹配上述三个字符串。</dd>
+<dt><code>?</code></dt><dd>后缀操作符，与 ‘*’ 类似，但其前方的表达式匹配 0 次或 1 次，二者择一。因此， ‘ca?r’ 仅匹配 ‘car’ 或 ‘cr’ ，无其他匹配结果。</dd>
+<dt><code>*?、+?、??</code></dt><dd><p>
+上述操作符的 <b>non-greedy非贪婪匹配</b> 变体。默认的 ‘*’ 、 ‘+’ 、‘?’ 为贪婪匹配，即在保证整个正则表达式能匹配的前提下，尽可能多匹配字符；后缀添加 ‘?’ 后，变为非贪婪匹配，即在保证整个正则表达式能匹配的前提下， <b>尽可能少匹配字符</b> 。
+</p>
+
+<p>
+例如， ‘ab*’ 和 ‘ab*?’ 均可匹配字符串 ‘a’ 和 ‘abbbb’ ；但用二者匹配文本 ‘abbb’ 时， ‘ab*’ 会匹配整个字符串（ <b>贪婪匹配，最长有效匹配</b> ），而 ‘ab*?’ 仅匹配 ‘a’ （ <b>非贪婪匹配，最短有效匹配</b> ）。
+</p>
+
+<p>
+非贪婪操作符会在指定起始位置匹配 <b>最短的有效字符串</b> ；但在正向搜索中，始终会选择 <b>最早出现的有效起始位置</b> 进行匹配。例如，用 ‘a.*?$’ 匹配文本 ‘abbab’ （后接换行符）时，该表达式会匹配整个字符串 —— 因为从第一个 ‘a’ 开始即可完成匹配，匹配器会优先选择该起始位置。
+</p></dd>
+
+<dt><code>[…]</code></dt><dd><p>
+也称作 bracket expression备选字符集，匹配集合中的任意单个字符。
+</p>
+
+<p>
+最简单的情况是，方括号之间的所有字符即为该集合的匹配范围。例如， ‘[ad]’ 匹配单个 ‘a’ 或单个 ‘d’； ‘[ad]*’ 匹配由任意数量a和d组成的字符串（包括空字符串）。由此可得， ‘c[ad]*r’ 可匹配 ‘cr’ 、‘car’ 、 ‘cdr’ 、 ‘caddaar’ 等字符串。
+</p>
+
+<p>
+在字符集中，可通过 <b>连字符 ‘-’ 连接起始和结束字符，表示字符范围</b> 。例如， ‘[a-z]’ 匹配任意小写 ASCII 字母；字符范围可与单个字符自由混合，如 ‘[a-z\(%.]’ 匹配任意小写 ASCII 字母，或 ‘\)’ 、 ‘%’ 、 ‘.’ 。再如， ‘[α-ωί]’ 匹配所有小写希腊字母。
+</p>
+
+<p>
+字符集中还可包含 <b>special character classes特殊字符类</b> ，以 ‘[:’ 开头、 ‘:]’ 结尾的内容即为字符类，嵌在方括号表达式内使用。例如，  <code>[[:alnum:]]</code> 匹配任意字母或数字。字符类的完整列表参见《Emacs Lisp 参考手册》中的<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Char-Classes.html#Char-Classes">字符类</a>相关章节。
+</p>
+
+<p>
+若要在字符集中包含 ‘]’ ，必须将其设为 <b>第一个字符</b> ，例如 ‘[]a]’ 匹配 ‘]’ 或 ‘a’ ；若要包含 ‘-’ ，可将其设为字符集的 <b>最后一个字符</b> ，也可放在开头或字符范围之后，例如 ‘[]-]’ 匹配 ‘]’ 和 ‘-’ 。
+</p>
+
+<p>
+若要在字符集中包含 ‘^’ ，可将其放在 <b>除开头外的任意位置</b> （在开头时，字符集会变为补集 —— 见下文）。
+</p>
+
+<p>
+在 <b>忽略大小写</b> 的搜索中使用字符范围时，范围的首尾字符需统一大小写（均大写、均小写），或均为非字母字符。 ‘A-z’ 这类混合大小写的字符范围，其匹配行为未被明确定义，且在未来的 Emacs 版本中可能发生变化。
+</p></dd>
+
+<dt><code>[^ …]</code></dt><dd><p>
+以 ‘[^’ 开头的方括号表达式为 <b>complemented character set补集字符集</b> ，匹配 <b>除指定字符外的任意单个字符</b> 。例如， ‘ <code>[^a-z0-9A-Z]</code> ’ 匹配所有非 ASCII 字母和数字的字符。
+</p>
+
+<p>
+‘^’ 仅在字符集开头时具有特殊性，其余位置均为普通字符； ‘^’ 后的第一个字符，其 ‘-’ 和 ‘]’ 均无特殊性（即无需转义即可直接表示自身）。
+</p>
+
+<p>
+补集字符集 <b>可以匹配换行符</b> ，除非将换行符明确列入不匹配的字符中。这一点与 <code>grep</code> 等程序中的正则表达式处理逻辑不同。
+</p></dd>
+
+<dt><code>^</code></dt><dd><p>
+特殊字符，匹配空字符串，但 <b>仅在被匹配文本的行首生效</b> ，其余位置均匹配失败。因此， ‘ <code>^foo</code> ’ 仅匹配出现在行首的 ‘foo’ 。
+</p>
+
+<p>
+出于历史兼容性考虑， ‘^’ 仅在 <b>正则表达式的开头</b> ，或 ‘\(’ 、‘\|’ 之后使用时，才具有行首匹配的含义。
+</p></dd>
+
+<dt><code>$</code></dt><dd><p>
+其用法与脱字符 ‘^’ 类似，但仅在行尾位置完成匹配。例如，正则表达式 ‘x+$’ 可匹配行尾由一个或多个 ‘x’ 组成的字符串。
+</p>
+
+<p>
+出于历史兼容性考量， ‘$’ 仅在正则表达式的末尾，或在 ‘\)’ 、 ‘\|’ 之前使用时，才具备上述行尾匹配的含义。
+</p></dd>
+
+<dt><code>\</code></dt><dd><p>
+拥有两个功能：转义特殊字符（包括自身 ‘\’ ），以及引入扩展的特殊构造符。
+</p>
+
+<p>
+由于 ‘\’ 的转义作用， '<code>\$</code>' 作为正则表达式仅匹配 '<code>$</code>' ， ‘\[’ 仅匹配 ‘[’ ，依此类推。
+</p>
+
+<p>
+以 ‘\’ 开头的扩展特殊构造符，参见下一节内容。
+</p></dd>
+</dl>
+
+<p>
+注意：出于历史兼容性，若特殊字符出现在 <b>其特殊含义无意义的上下文</b> 中，会被当作普通字符处理。例如， ‘*foo’ 中的 ‘*’ 会被视为普通字符，因为其前方无任何可被修饰的表达式。不建议依赖此行为编写正则表达式，无论特殊字符出现在何处，都建议通过转义明确其普通字符的含义。
+</p>
+
+<p>
+’\‘ <b>反斜杠在方括号表达式内无特殊性</b> ，因此无法取消 ‘-’ 、 ‘^’ 、 ‘]’ 的特殊含义。当这些字符无特殊含义时，无需为其添加反斜杠——这一操作无任何实际意义；而当它们具有特殊含义时，反斜杠可合法地加在其前方，例如 ‘[^\]’ （在 Lisp 字符串语法中需写为 "<code>[^\\]</code>"），该表达式匹配除反斜杠外的任意单个字符。
+</p>
 </div>
 </div>
 <div id="outline-container-Regexp-Backslash" class="outline-3">
 <h3 id="Regexp-Backslash"><span class="section-number-3">17.7.</span> 正则表达式中的反斜杠</h3>
 <div class="outline-text-3" id="text-Regexp-Backslash">
+<p>
+在绝大多数情况下，反斜杠 '<code>\</code>' 后接任意字符，仅会匹配该字符本身。但存在若干例外情况：以 '<code>\</code>' 开头的双字符序列拥有特殊含义，而该序列的第二个字符单独使用时，始终为普通字符。以下是所有以 '<code>\</code>' 构成的特殊构造符说明：
+</p>
+
+<dl class="org-dl">
+<dt><code>\|</code></dt><dd><p>
+表示匹配备选项。在两个正则表达式 <code>a</code> 和 <code>b</code> 之间加入 '<code>\|</code>' ，构成的新表达式可匹配任意能被 <code>a</code> 或 <code>b</code> 匹配的文本。其匹配逻辑为：先尝试用 <code>a</code> 匹配，若匹配失败，再尝试用 <code>b</code> 匹配。
+</p>
+
+<p>
+例如， '<code>foo\|bar</code>' 仅匹配 'foo' 或 'bar' ，不匹配其他任何字符串。
+</p>
+
+<p>
+'<code>\|</code>' 的作用范围为 <b>其两侧最大的有效正则表达式</b> ，仅能通过圆括号组 '<code>\( … \)</code>' 限定其作用范围。
+</p>
+
+<p>
+正则表达式的完整回溯机制可处理 '<code>\|</code>' 的多次嵌套使用场景。
+</p></dd>
+
+<dt><code>\( … \)</code></dt><dd><p>
+表示分组构造符，主要有三项作用：
+</p>
+<ol class="org-ol">
+<li>为其他操作符包裹一组由 '<code>\|</code>' 分隔的备选项。例如， '<code>\(foo\|bar\)x</code>' 可匹配 'foox' 或 'barx' ；</li>
+<li>为后缀操作符 '<code>*</code>' 、 '<code>+</code>' 、 '<code>?</code>' 包裹复杂的表达式，使其成为操作符的作用对象。例如， '<code>ba\(na\)*</code>' 可匹配 'banana' 、 'bananana' 等包含任意数量（0 个及以上） 'na' 的字符串；</li>
+<li>记录匹配到的子串，供后续引用使用。</li>
+</ol>
+
+<p>
+上述第三项作用并非括号分组的固有属性，而是为同一 '<code>\( … \)</code>' 构造符赋予的另一重独立功能。实际使用中，这两种含义通常不会产生冲突；若出现冲突，可使用下文介绍的匿名分组解决。
+</p></dd>
+
+<dt><code>\(?: … \)</code></dt><dd>表示 <b>shy group匿名分组</b> ，该分组不会记录匹配到的子串，也无法通过后文的 '<code>\d</code>' 语法引用（见下文）。此构造符在正则表达式的机械拼接场景中十分实用，可仅为语法需求添加分组，而不会干扰需要被引用的分组的编号顺序。</dd>
+
+<dt><code>\d</code></dt><dd><p>
+表示反向引用，匹配第 <code>d</code> 个 '<code>\( … \)</code>' 分组此前匹配到的完全相同的文本。
+</p>
+
+<p>
+当 '<code>\( … \)</code>' 分组完成匹配后，正则表达式匹配器会记录该分组匹配到的文本的起始和结束位置。在正则表达式的后续位置，使用 '<code>\</code>' 后接数字 <code>d</code> ，即可表示「匹配第 <code>d</code> 个 '<code>\( … \)</code>' 分组匹配到的文本」。
+</p>
+
+<p>
+正则表达式中出现的前 9 个 '<code>\( … \)</code>' 分组，会按照左括号在表达式中出现的先后顺序，被依次分配编号1至9。因此，可使用 '<code>\1</code>' 至 '<code>\9</code>' 引用对应分组匹配到的文本。
+</p>
+
+<p>
+例如， '<code>\(.*\)\1</code>' 可匹配任意无换行符、且由两个完全相同的子串拼接而成的字符串。其中 '<code>\(.*\)</code>' 会匹配前半部分（可为任意内容），而后续的 '<code>\1</code>' 则必须匹配与前半部分完全一致的文本。
+</p>
+
+<p>
+若某个 '<code>\( … \)</code>' 分组因后接 '<code>*</code>' 等操作符而完成多次匹配，匹配器 <b>仅会记录最后一次的匹配结果</b> 。
+</p></dd>
+
+<dt><code>\{m\}</code></dt><dd>作为后缀操作符，表示 <b>精确匹配 m 次</b> ，即其前方的正则表达式必须连续匹配恰好 <code>m</code> 次。例如， '<code>x\{4\}'</code> 仅匹配字符串 'xxxx' ，不匹配其他任何内容。</dd>
+
+<dt><code>\{m,n\}</code></dt><dd>作为后缀操作符，表示 <b>匹配 m 至 n 次</b> ，即其前方的正则表达式必须连续匹配至少 <code>m</code> 次、至多 <code>n</code> 次。若省略 <code>n</code> ，则表示无上限，仅要求前方表达式匹配至少 <code>m</code> 次。
+
+<ul class="org-ul">
+<li>'<code>\{0,1\}</code>' 与 '<code>?</code>' 等价；</li>
+<li>'<code>\{0,\}</code>' 与 '<code>*</code>' 等价；</li>
+<li>'<code>\{1,\}</code>' 与 '<code>+</code>' 等价。</li>
+</ul></dd>
+
+<dt><code>\`</code></dt><dd>匹配空字符串，且仅在被匹配的字符串 或 缓冲区（或其可访问部分）的起始位置生效。</dd>
+
+<dt><code>\'</code></dt><dd>匹配空字符串，且仅在被匹配的字符串 或 缓冲区（或其可访问部分）的结束位置生效。</dd>
+
+<dt><code>\=</code></dt><dd>匹配空字符串，且仅在当前光标位置生效。</dd>
+
+<dt><code>\b</code></dt><dd><p>
+表示 <b>单词边界</b> ，匹配空字符串，且仅在单词的起始或结束位置生效。因此， '<code>\bfoo\b</code>' 可匹配作为独立单词出现的 'foo' ， '<code>\bballs?\b</code>' 可匹配作为独立单词出现的 'ball' 或 'balls' 。
+</p>
+
+<p>
+无论缓冲区首尾的相邻字符为何， '<code>\b</code>' 均可在缓冲区的起始和结束位置匹配。
+</p></dd>
+
+<dt><code>\B</code></dt><dd>匹配空字符串，且仅在非单词边界的位置生效（与 '<code>\b</code>' 含义相反）。</dd>
+<dt><code>\&lt;</code></dt><dd>匹配空字符串，且仅在单词的起始位置生效。仅当缓冲区起始位置后接单词构成字符时， '<code>\&lt;</code>' 才可在该位置匹配。</dd>
+<dt><code>\&gt;</code></dt><dd>匹配空字符串，且仅在单词的结束位置生效。仅当缓冲区的内容以单词构成字符结尾时， '<code>\&gt;</code>' 才可在缓冲区结束位置匹配。</dd>
+<dt><code>\w</code></dt><dd>匹配任意单词构成字符，具体的字符范围由 Emacs 的语法表定义，参见《Emacs Lisp 参考手册》中的《<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Tables.html#Syntax-Tables">语法表</a>》相关章节。</dd>
+
+<dt><code>\W</code></dt><dd>匹配任意非单词构成字符（与 '<code>\w</code>' 含义相反）。</dd>
+<dt><code>\_&lt;</code></dt><dd>表示符号边界，匹配空字符串，且仅在符号的起始位置生效。符号指由一个或多个符号构成字符组成的序列，而符号构成字符指语法类型为 '<code>w</code>' （单词）或 '<code>_</code>' （下划线）的字符。仅当缓冲区起始位置后接符号构成字符时， '<code>\_&lt;</code>' 才可在该位置匹配。与单词规则一致，符号构成字符的范围也由语法表定义。</dd>
+
+<dt><code>\_&gt;</code></dt><dd>匹配空字符串，且仅在符号的结束位置生效。仅当缓冲区的内容以符号构成字符结尾时， '<code>\_&gt;</code>' 才可在缓冲区结束位置匹配。</dd>
+
+<dt><code>\sc</code></dt><dd>匹配任意语法类型为 <code>c</code> 的字符。其中 <code>c</code> 为指定语法类别的标识字符，例如 '<code>w</code>' 代表单词构成字符、 '<code>-</code>' 或 ' ' 代表空白字符、 '<code>.</code>' 代表普通标点字符等。语法类别的完整列表参见《Emacs Lisp 参考手册》中的《<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Class-Table.html#Syntax-Class-Table">语法类代表格</a>》。</dd>
+
+<dt><code>\Sc</code></dt><dd>匹配任意语法类型非 <code>c</code> 的字符（与 '<code>\sc</code>' 含义相反）。</dd>
+
+<dt><code>\cc</code></dt><dd>匹配任意属于类别 <code>c</code> 的字符。例如， '<code>\cc</code>' 匹配中文字符、 '<code>\cg</code>' 匹配希腊字符等。若要查看所有已定义的字符类别，可执行命令 <code>M-x describe-categories RET</code> 。</dd>
+
+<dt><code>\Cc</code></dt><dd>匹配任意不属于类别 <code>c</code> 的字符（与 '<code>\cc</code>' 含义相反）。</dd>
+</dl>
+
+<p>
+所有与单词、语法相关的构造符，其行为均由语法表的配置决定，参见《Emacs Lisp 参考手册》中的<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Tables.html#Syntax-Tables">语法表</a>相关章节。
+</p>
 </div>
 </div>
 <div id="outline-container-Regexp-Example" class="outline-3">
 <h3 id="Regexp-Example"><span class="section-number-3">17.8.</span> 正则表达式示例</h3>
 <div class="outline-text-3" id="text-Regexp-Example">
+<p>
+以下为一个正则表达式示例 —— 该表达式与 Emacs 默认用于识别句子结尾（不含后续空格）的正则表达式类似，对应变量为 <code>sentence-end-base</code> ：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[.?!][]<span style="color: #8b2252;">\"')}]*</span>
+</pre>
+</div>
+
+<p>
+该表达式由两个连续的部分构成：第一部分是匹配句点、'?' 问号或 '!' 感叹号的字符集，第二部分是匹配 '<code>]</code>' 右括号、引号或 ')' 圆括号、'}'大括号的字符集，且第二部分可匹配零次或多次。
+</p>
 </div>
 </div>
 <div id="outline-container-Lax-Search" class="outline-3">
 <h3 id="Lax-Search"><span class="section-number-3">17.9.</span> 搜索中的宽松匹配（Lax Matching During Searching）</h3>
 <div class="outline-text-3" id="text-Lax-Search">
+<p>
+通常情况下，你会希望搜索命令忽略输入的搜索字符串与待搜索文本之间的某些细微差异。例如，不同长度的空白字符序列通常被视为等效；字母的大小写差异通常不影响匹配，这类规则被称为 <b>character equivalence字符等效性</b> 。
+</p>
+
+<p>
+本节将介绍 Emacs 的 <code>lax search 宽松搜索</code> 特性，以及如何根据自身需求对其进行定制。
+</p>
+
+<p>
+默认情况下，搜索命令会执行 <b>lax space matching宽松空格匹配</b> ：搜索字符串中的单个空格或连续空格序列，可匹配文本中任意一个或多个空白字符组成的序列。更准确地说，Emacs 会将搜索字符串中的每段空格序列，匹配为用户选项 <code>search-whitespace-regexp</code> 所指定的正则表达式。该选项的默认值将任意空格和制表符序列视为空白字符，因此搜索字符串 'foo bar' 可匹配文本中的 'foo bar' 、'foo  bar'、'foo   bar' 等形式（但不匹配 'foobar'）。若你希望让空格同时匹配换行符、空格和制表符组成的序列，可自定义该选项，将其值设为正则表达式 '<code>[ \t\n]+</code>' （增量正则表达式搜索的默认行为与此不同，参见<a href="#Regexp-Search">正则表达式搜索</a>章节）。
+</p>
+
+<p>
+若你需要让空白字符 <b>精确匹配</b> ，可在增量搜索过程中按下 <code>M-s SPC</code> (<code>isearch-toggle-lax-whitespace</code>) 关闭宽松空格匹配，再次按下该快捷键则可重新开启。若要对所有搜索禁用宽松空格匹配，可将 <code>search-whitespace-regexp</code> 设为 <code>nil</code> ，此时搜索字符串中的每个空格将仅匹配文本中的单个空格。
+</p>
+
+<p>
+在 Emacs 中，若你输入的搜索字符串均为小写字母，搜索命令默认 <b>会忽略待搜索文本的大小写</b> 。例如，搜索 'foo' 时，文本中的 'Foo' 和 'fOO' 也会被匹配。正则表达式（尤其是字符集）的匹配规则同理， '<code>[ab]</code>' 会匹配'a' 、 'A' 、 'b' 、 'B' 。该特性被称为 <b>case folding大小写折叠</b> ，增量搜索和非增量搜索模式均支持此特性。
+</p>
+
+<p>
+若搜索字符串中 <b>任意位置包含大写字母</b> ，则搜索会变为 <b>大小写敏感</b> 模式。例如，搜索 'Foo' 时，不会匹配文本中的 'foo' 或 'FOO' 。该规则同时适用于正则表达式搜索和字面字符串搜索，若将搜索字符串中的大写字母删除，大小写敏感的效果也会随之消失。变量 <code>search-upper-case</code> 用于控制该特性：若其值为非nil，搜索字符串中的大写字母会触发大小写敏感搜索；若设为 <code>nil</code> ，则会禁用大写字母的该作用。该变量的默认值为 <code>not-yanks</code> ，此配置下，若搜索字符串包含大写字母则开启大小写敏感，同时会将撷取到搜索字符串中的文本（参见<a href="#Isearch-Yank">增量搜索中的文本撷取</a>）转换为小写，使这类搜索默认保持大小写不敏感。
+</p>
+
+<p>
+若将变量 <code>case-fold-search</code> 设为 <code>nil</code> ，则所有字符 <b>必须完全精确匹配</b> （包括大小写）。该变量为缓冲区局部变量，修改其值通常仅对当前缓冲区生效，除非你更改其默认值（参见<a href="#Locals">局部变量</a>章节）。该变量同样适用于非增量搜索，包括替换命令（参见<a href="#Replace">替换命令</a>章节）和迷你缓冲区历史记录匹配命令（参见<a href="#Minibuffer-History">迷你缓冲区历史记录</a>章节）执行的搜索。
+</p>
+
+<p>
+在增量搜索过程中，按下 <code>M-c</code> 或 <code>M-s c</code> (<code>isearch-toggle-case-fold</code>) 可切换本次搜索的大小写敏感状态。该切换效果仅对当前增量搜索有效，但会覆盖因在当前搜索字符串中添加或删除大写字母而产生的大小写匹配规则。
+</p>
+
+<p>
+另有多个相关变量用于控制特定命令或操作的搜索与匹配大小写敏感性，例如 <code>tags-case-fold-search</code> 控制 <code>find-tag</code> 命令的大小写敏感性。若要查找这类变量，可执行 <code>M-x apropos-variable RET case-fold-search RET</code> 。
+</p>
+
+<p>
+大小写折叠会忽略字符间的大小写差异，使大写字符与对应小写字符相互匹配。 <b>character folding字符折叠</b> 是大小写折叠的扩展特性，它会忽略相似字符之间更广泛的差异。例如，开启字符折叠后，字母 <code>a</code> 会匹配其所有带重音的变体（如 <code>ä</code> 和 <code>á</code> ），即匹配时会忽略区分这些变体的变音符号；此外， <code>a</code> 还会匹配其他外形相似、或在图形表示中包含 <code>a</code> 的字符，如 Unicode 字符 U+00AA（阴性序数指示符）和 U+24D0（圆形小写字母 a）。同理，ASCII 双引号 <code>"</code> 会匹配 Unicode 标准中定义的所有双引号变体。字符折叠甚至可让一个或多个字符组成的序列，匹配另一个不同长度的字符序列，例如双字符序列 <code>ff</code> 会匹配 Unicode 字符 U+FB00（拉丁文连字小写 ff），序列 <code>(a)</code> 会匹配 U+249C（带圆括号的拉丁文小写字母 a）。那些并非完全相同、但在字符折叠规则下可相互匹配的字符序列，被称为 <b>equivalent character sequences等效字符序列</b> 。
+</p>
+
+<p>
+通常情况下，Emacs 的搜索命令 <b>默认不执行字符折叠</b> ，即不会匹配等效字符序列。你可通过将变量 <code>search-default-mode</code> 自定义为 <code>char-fold-to-regexp</code> 来启用该特性（参见<a href="#Search-Customizations">根据需求自定义搜索行为</a>章节）。在增量搜索过程中，按下 <code>M-s '</code> (<code>isearch-toggle-char-fold</code>) 可切换本次搜索的字符折叠状态，该效果仅对当前搜索有效（替换命令的默认行为与此不同，由独立选项控制，参见<a href="#Replacement-and-Lax-Matches">替换命令与宽松匹配</a>章节）。
+</p>
+
+<p>
+默认情况下，若在搜索字符串中输入某字符的显式变体（如 <code>ä</code> ），不会匹配其基础字符（如 <code>a</code> ）。但如果将变量 <code>char-fold-symmetric</code> 自定义为 <code>t</code> ，搜索命令会将等效字符同等对待：在搜索字符串中使用任意一个等效字符，都会匹配待搜索文本中的所有等效字符，因此输入带重音的 <code>ä</code> 时，会同时匹配基础字母a及其所有变体（如 <code>á</code> ）。
+</p>
+
+<p>
+你可通过可自定义变量 <code>char-fold-include</code> 添加新的字符折叠规则，或通过 <code>char-fold-exclude</code> 移除现有规则；也可将 <code>char-fold-override</code> 自定义为 <code>t</code> ，此时会禁用所有默认字符等效性规则，仅保留你通过 <code>char-fold-include</code> 自行添加的规则。
+</p>
 </div>
 </div>
 <div id="outline-container-Replace" class="outline-3">
 <h3 id="Replace"><span class="section-number-3">17.10.</span> 替换命令</h3>
 <div class="outline-text-3" id="text-Replace">
+<p>
+Emacs 提供了多个用于执行查找替换操作的命令。除简单的 <code>M-x replace-string</code> （字符串替换）命令外，还有 <code>M-%</code> （查询替换）命令，该命令会逐个定位搜索模式的匹配项，并询问你是否执行替换。
+</p>
+
+<p>
+替换命令默认对 <b>从光标位置到缓冲区末尾</b> 的文本生效 ；当选区处于激活状态时，替换操作将仅作用于选区内的文本（参见<a href="#Mark">标记与选区</a>）。基础替换命令可将一个 <code>search string搜索字符串</code> （或正则表达式）替换为一个指定的 <code>replacement string替换字符串</code> 。你也可以使用 <code>expand-region-abbrevs</code> 命令（参见<a href="#Expanding-Abbrevs">缩写展开的控制</a>），并行执行多项替换操作。
+</p>
+
+<ul class="org-ul">
+<li><a href="#Unconditional-Replace">无条件替换</a></li>
+<li><a href="#Regexp-Replace">正则表达式替换</a></li>
+<li><a href="#Replacement-and-Lax-Matches">替换命令与宽松匹配</a></li>
+<li><a href="#Query-Replace">查询替换（Query Replace）</a></li>
+</ul>
 </div>
 <div id="outline-container-Unconditional-Replace" class="outline-4">
 <h4 id="Unconditional-Replace"><span class="section-number-4">17.10.1.</span> 无条件替换</h4>
 <div class="outline-text-4" id="text-Unconditional-Replace">
+<dl class="org-dl">
+<dt><code>M-x replace-string RET string RET newstring RET</code></dt><dd>将字符串的每一处匹配项替换为新字符串。</dd>
+</dl>
+
 <p>
-M-x replace-string 回车 字符串 回车 新字符串 回车
+若要将光标位置之后的所有 'foo' 替换为 'bar' ，可执行命令 <code>M-x replace-string</code> ，并传入两个参数 'foo' 和 'bar' 。替换操作仅作用于光标位置之后的文本，因此如果需要覆盖整个缓冲区，必须先将光标移至缓冲区起始位置。从光标处到缓冲区末尾的所有匹配项都会被替换；若要将替换范围限定在缓冲区的某一部分，需先选中该区域。当区域处于激活状态时，替换操作将仅在该区域内进行（详见《<a href="#Mark">标记与区域</a>》章节）。
 </p>
 
 <p>
-将字符串的每一处匹配项替换为新字符串。
-</p>
-
-<p>
-若要将光标位置之后的所有foo替换为bar，可执行命令 M-x replace-string，并传入两个参数foo和bar。替换操作仅作用于光标位置之后的文本，因此如果需要覆盖整个缓冲区，必须先将光标移至缓冲区起始位置。从光标处到缓冲区末尾的所有匹配项都会被替换；若要将替换范围限定在缓冲区的某一部分，需先选中该区域。当区域处于激活状态时，替换操作将仅在该区域内进行（详见《标记与区域》章节）。
-</p>
-
-<p>
-replace-string 命令执行完毕后，光标会停留在最后一个被替换的匹配项位置。该命令执行前的光标位置会被添加到标记环中，但不会激活标记；可使用 C-u C-SPC 快捷键返回该位置（详见《标记环》章节）。
+<code>replace-string</code> 命令执行完毕后，光标会停留在最后一个被替换的匹配项位置。该命令执行前的光标位置会被添加到标记环中，但不会激活标记；可使用 <code>C-u C-SPC</code> 快捷键返回该位置（详见《<a href="#Mark-Ring">标记环</a>》章节）。
 </p>
 
 <p>
@@ -6393,7 +6985,7 @@ replace-string 命令执行完毕后，光标会停留在最后一个被替换�
 </p>
 
 <p>
-关于替换命令中大小写敏感性与字符折叠的详细说明，详见《替换命令与宽松匹配》章节。
+关于替换命令中大小写敏感性与字符折叠的详细说明，详见《<a href="#Replacement-and-Lax-Matches">替换命令与宽松匹配</a>》章节。
 </p>
 </div>
 </div>
@@ -6401,19 +6993,15 @@ replace-string 命令执行完毕后，光标会停留在最后一个被替换�
 <h4 id="Regexp-Replace"><span class="section-number-4">17.10.2.</span> 正则表达式替换</h4>
 <div class="outline-text-4" id="text-Regexp-Replace">
 <p>
-M-x replace-string 命令用于替换指定字符串的精确匹配项。与之类似的命令 M-x replace-regexp，则可替换符合指定正则表达式模式的任意匹配内容（详见《正则表达式语法》章节）。
+<code>M-x replace-string</code> 命令用于替换指定字符串的 <b>精确匹配项</b> 。与之类似的命令 <code>M-x replace-regexp</code> ，则可替换符合指定正则表达式模式的 <b>任意匹配</b> 内容（详见《<a href="#Regexps">正则表达式语法</a>》章节）。
 </p>
 
-<p>
-M-x replace-regexp 回车 正则表达式 回车 新字符串 回车
-</p>
+<dl class="org-dl">
+<dt><code>M-x replace-regexp RET regexp RET newstring RET</code></dt><dd>将所有匹配该正则表达式的内容替换为新字符串。</dd>
+</dl>
 
 <p>
-将所有匹配该正则表达式的内容替换为新字符串。
-</p>
-
-<p>
-在 replace-regexp 命令中，新字符串并非必须是固定文本：它可以引用正则表达式匹配结果的全部或部分内容。新字符串中的 \&amp; 代表被替换的整个匹配内容；新字符串中的 \d（其中 d 是从 1 开始的数字），代表正则表达式中第 d 个带括号的分组所匹配的内容（这一用法被称为 “反向引用”）。\# 代表当前命令已完成的替换次数，以十进制数字表示 —— 第一次替换时，\# 代表 0；第二次替换时，代表 1，依此类推。例如：
+在 <code>replace-regexp</code> 命令中， newstring新字符串并非必须是固定文本：它可以 <b>引用正则表达式匹配结果的全部或部分内容</b> 。新字符串中的 '<code>\&amp;</code>' 代表被替换的 <b>整个匹配内容</b> ；新字符串中的 '<code>\d</code>' （其中 <code>d</code> 是从 1 开始的数字），代表正则表达式中 <b>第 d 个带括号的分组所匹配的内容</b> （这一用法被称为 “反向引用”）。 '<code>\#</code>' 代表当前命令 <b>已完成的替换次数</b> ，以十进制数字表示 —— 第一次替换时， '<code>\#</code>' 代表 0；第二次替换时，代表 1，依此类推。例如：
 </p>
 
 
@@ -6423,7 +7011,7 @@ M-x replace-regexp 回车 正则表达式 回车 新字符串 回车
 </div>
 
 <p>
-可将（例如）cadr 替换为 cadr-safe，将 cddr 替换为 cddr-safe。
+可将（例如） 'cadr' 替换为 'cadr-safe' ，将 'cddr' 替换为 'cddr-safe' 。
 </p>
 
 <div class="org-src-container">
@@ -6432,23 +7020,23 @@ M-x replace-regexp 回车 正则表达式 回车 新字符串 回车
 </div>
 
 <p>
-则可实现上述操作的逆向转换。若需在替换文本中包含反斜杠 \，必须输入 \\。
+则可实现上述操作的逆向转换。若需在替换文本中包含反斜杠 '<code>\</code>' ，必须输入 '<code>\\</code>' 。
 </p>
 
 <p>
-如果希望在每次替换时手动输入部分替换字符串，可在替换字符串中使用 \?。执行替换时，Emacs 会在迷你缓冲区中打开替换字符串供你编辑，光标会自动定位在 \? 所在的位置。
+如果希望在 <b>每次替换时手动输入部分替换字符串</b> ，可在替换字符串中使用 '<code>\?</code>' 。执行替换时，Emacs 会在迷你缓冲区中打开替换字符串供你编辑，光标会自动定位在 '<code>\?</code>' 所在的位置。
 </p>
 
 <p>
-本小节的剩余内容适用于特定专业任务，且需要掌握 Lisp 语言相关知识，多数读者可跳过此部分。
+本小节的剩余内容适用于 <b>特定专业任务</b> ，且需要掌握 Lisp 语言相关知识，多数读者可跳过此部分。
 </p>
 
 <p>
-你可以使用 Lisp 表达式来计算替换字符串的部分内容。具体方法是，在替换字符串中写入 \,，并在其后跟上对应的表达式。每次替换时，Emacs 会计算该表达式的值，将其直接转换为文本（若表达式的值为字符串，则直接使用字符串内容），并将该文本代入替换字符串，替代原表达式的位置。若表达式为一个符号，那么符号名称后的一个空格会被视为符号名称的一部分，表达式的值会同时替换符号名称与该空格。
+你可以使用 Lisp 表达式来计算替换字符串的部分内容。具体方法是，在替换字符串中写入 '<code>\,</code>' ，并在其后跟上对应的表达式。每次替换时，Emacs 会计算该表达式的值，将其直接转换为文本（若表达式的值为字符串，则直接使用字符串内容），并将该文本代入替换字符串，替代原表达式的位置。若表达式为一个符号，那么符号名称后的一个空格会被视为符号名称的一部分，表达式的值会同时替换符号名称与该空格。
 </p>
 
 <p>
-在这类表达式内部，你可以使用一些特殊序列。与常规用法一致，\&amp; 和 \d 分别代表整个匹配内容的字符串形式，以及对应子匹配内容的字符串形式。其中 d 可以是多位数字；若第 d 个带括号的分组未匹配到任何内容，\d 的值则为 nil。你也可以使用 \#&amp; 和 \#d，将对应匹配内容以数字形式引用（此用法仅在匹配内容或子匹配内容为数字格式时有效）。此处的 \# 同样代表已完成的替换次数。
+在这类表达式内部，你可以使用一些特殊序列。与常规用法一致， '<code>\&amp;</code>' 和 '<code>\d</code>' 分别代表整个匹配内容的字符串形式，以及对应子匹配内容的字符串形式。其中 <code>d</code> 可以是多位数字；若第 <code>d</code> 个带括号的分组未匹配到任何内容， '<code>\d</code>' 的值则为 <code>nil</code> 。你也可以使用 '<code>\#&amp;</code>' 和 '<code>\#d</code>'，将对应匹配内容 <b>以数字形式引用</b> （此用法仅在匹配内容或子匹配内容为数字格式时有效）。此处的 '<code>\#</code>' 同样代表已完成的替换次数。
 </p>
 
 <p>
@@ -6462,7 +7050,7 @@ M-x replace-regexp 回车 正则表达式 回车 新字符串 回车
 </div>
 
 <p>
-在通过 \, 构造替换字符串时，format 函数往往能发挥重要作用（详见《Emacs Lisp 参考手册》中的《格式化字符串》章节）。例如，要在第 73 至 80 列的位置添加连续编号的字符串（如 ABC00042），且仅在这些列原本无内容时执行添加操作，可执行以下命令：
+在通过 '<code>\</code>' , 构造替换字符串时， <code>format</code> 函数往往能发挥重要作用（详见《Emacs Lisp 参考手册》中的《<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Formatting-Strings.html#Formatting-Strings">格式化字符串</a>》章节）。例如，要在第 73 至 80 列的位置添加连续编号的字符串（如 'ABC00042'），且仅在这些列原本无内容时执行添加操作，可执行以下命令：
 </p>
 
 <div class="org-src-container">
@@ -6475,22 +7063,316 @@ M-x replace-regexp 回车 正则表达式 回车 新字符串 回车
 <div id="outline-container-Replacement-and-Lax-Matches" class="outline-4">
 <h4 id="Replacement-and-Lax-Matches"><span class="section-number-4">17.10.3.</span> 替换命令与宽松匹配</h4>
 <div class="outline-text-4" id="text-Replacement-and-Lax-Matches">
+<p>
+本节介绍替换命令在宽松匹配下的行为（参见<a href="#Lax-Search">搜索中的宽松匹配</a>）及其自定义方法。总体而言，替换命令的默认匹配规则，相较于对应的搜索命令会更为严格。
+</p>
+
+<p>
+与增量搜索不同，替换命令默认不启用宽松空格匹配（参见<a href="#Lax-Search">宽松空格匹配</a>）。若要为替换操作启用该功能，需将变量 <code>replace-lax-whitespace</code> 设为非nil值（该设置仅影响 Emacs 查找待替换文本的方式，不作用于替换文本本身）。
+</p>
+
+<p>
+配套变量 <code>replace-regexp-lax-whitespace</code> ，用于控制 <code>query-replace-regexp</code> 命令在查找匹配模式时，是否启用宽松空格匹配。
+</p>
+
+<p>
+若替换命令的第一个参数（搜索串） <b>全部由小写字母组成</b> ，则在查找待替换匹配项时会忽略大小写 —— 此行为的前提是 <code>case-fold-search</code> 和 <code>search-upper-case</code> 均为非nil值。若 <code>search-upper-case</code> （参见 <a href="#Lax-Search">search-upper-case</a>）设为 <code>nil</code> ，则搜索是否忽略大小写仅由 <code>case-fold-search</code> 单独决定，与第一个参数的字母大小写无关。若 <code>case-fold-search</code> 设为 <code>nil</code> ，则所有搜索均始终区分大小写。
+</p>
+
+<p>
+此外，若替换命令的第二个参数（替换串） <b>全部或部分为小写字母</b> ， <b>替换命令会尝试保留每个匹配项的大小写格式</b> 。例如执行命令：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">M-x replace-string RET foo RET bar RET
+</pre>
+</div>
+
+<p>
+会将小写的 'foo' 替换为小写的 'bar' 、全大写的 'FOO' 替换为 'BAR' 、首字母大写的 'Foo' 替换为 'Bar' （小写、全大写、首字母大写，是 <code>replace-string</code> 命令唯一能识别的三种大小写格式）。
+</p>
+
+<p>
+需注意，Emacs 会通过分析 <b>待替换文本中的每个单词</b> ，决定是否对替换文本进行大写或首字母大写转换；仅当待替换文本的所有单词采用 <b>相同的大小写格式</b> 时，才会保留其格式。例如执行命令：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">M-x replace-string RET foo bar RET baz quux RET
+</pre>
+</div>
+
+<p>
+会将 'Foo Bar' 替换为 'Baz Quux' ，原因是 'Foo Bar' 中的两个单词均为首字母大写格式；而对于 'Foo bar' ，该命令会将其替换为 'baz quux' （即保持替换文本的原始大小写不变），因为 'Foo bar' 中的两个单词大小写格式不同。
+</p>
+
+<p>
+关于何为 “word单词”，由当前缓冲区生效的语法表决定（参见《Emacs Lisp 参考手册》中的<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Syntax-Tables.html#Syntax-Tables">语法表</a>章节）；例如在文本模式中， 'Foo_Bar' 会被视为两个单词，而在部分支持编程语言的主模式中，它可能被视作单个单词。
+</p>
+
+<p>
+若替换串中包含 <b>大写字母</b> ，则该部分内容在每次插入时，均会保持大写形式。若第一个参数（搜索串）中包含大写字母，第二个参数（替换串）会 <b>严格按照输入内容原样替换</b> ，不进行任何大小写转换。同理，若 <code>case-replace</code> 或 <code>case-fold-search</code> 任一变量设为 <code>nil</code> ，替换操作也会直接执行，不做大小写转换。
+</p>
+
+<p>
+替换命令在查找待替换文本时， <b>默认不启用字符折叠</b> （参见<a href="#Lax-Search">字符折叠</a>）。若要在 <code>query-replace</code> 和 <code>replace-string</code> 命令的匹配过程中启用字符折叠，需将变量 <code>replace-char-fold</code> 设为非nil值（该设置仅影响 Emacs 查找待替换文本的方式，不作用于替换文本本身，也对 <code>replace-regexp</code> 命令无效）。
+</p>
 </div>
 </div>
 <div id="outline-container-Query-Replace" class="outline-4">
 <h4 id="Query-Replace"><span class="section-number-4">17.10.4.</span> 查询替换（Query Replace）</h4>
 <div class="outline-text-4" id="text-Query-Replace">
+<dl class="org-dl">
+<dt><code>M-% string RET newstring RET</code></dt><dd>将指定字符串的部分匹配项替换为新字符串。</dd>
+<dt><code>C-M-% regexp RET newstring RET</code></dt><dd>将指定正则表达式的部分匹配项替换为新字符串。</dd>
+</dl>
+
+<p>
+若你无需替换foo的所有匹配项，仅需修改其中一部分为bar，可使用 <code>M-%</code> (<code>query-replace</code>) 命令。该命令会逐个查找foo的匹配项，高亮展示每个匹配项并询问是否执行替换。除了交互式确认这一特性，该命令的其余行为与 <code>replace-string</code> （无条件替换）完全一致（参见<a href="#Unconditional-Replace">无条件替换</a>）；特别地，在默认开启 <code>case-replace</code> 的情况下，命令会自动保留匹配项的大小写格式（参见<a href="#Replacement-and-Lax-Matches">替换命令与宽松匹配</a>）。带数字前缀参数执行该命令时，仅会匹配以单词分隔符为边界的完整单词匹配项；带负的前缀参数执行时，会反向向前查找并替换匹配项。
+</p>
+
+<p>
+<code>C-M-%</code> 命令执行的是正则表达式的交互式查询替换 (<code>query-replace-regexp</code>) ，其行为与 <code>replace-regexp</code> （正则表达式替换）一致，仅增加了交互式确认替换的步骤。
+</p>
+
+<p>
+你可复用上述命令的历史替换规则：当 <code>query-replace</code> 或 <code>query-replace-regexp</code> 命令提示输入搜索串时，按下 <code>M-p</code> 和 <code>M-n</code> 可翻阅历史替换记录，记录将以 '<code>from -&gt; to</code>' 原内容 -&gt; 替换内容的形式展示（其中原内容为搜索模式，替换内容为目标字符串，分隔符由变量 <code>query-replace-from-to-separator</code> 定义），按下 <code>RET</code> 回车键即可选中并复用该条替换规则。若将该变量设为 <code>nil</code> ，替换记录将不会被加入命令历史，也无法被复用。
+</p>
+
+<p>
+这类交互式替换命令会通过 <code>query-replace</code> 高亮样式标记当前匹配项，将变量 <code>query-replace-highlight</code> 设为 <code>nil</code> 可关闭该高亮；同时会像增量搜索一样，通过 <code>lazy-hightlight</code> 延迟高亮标记其他匹配项（参见<a href="#Incremental-Search">增量搜索</a>），将 <code>query-replace-lazy-highlight</code> 设为 <code>nil</code> 可关闭此效果。默认情况下， <code>query-replace-regexp</code> 会在迷你缓冲区中展示当前匹配项经替换后的结果；若希望保留 '<code>\&amp;</code>' 、 '<code>\n</code>' 等特殊序列不被展开，可自定义 <code>query-replace-show-replacement</code> 变量。与增量搜索中通过 <code>search-highlight-submatches</code> 高亮子表达式匹配项的功能类似（参见<a href="#Search-Customizations">根据需求自定义搜索行为</a>），变量 <code>query-replace-highlight-submatches</code> 用于控制正则表达式替换命令是否高亮子表达式的匹配项。
+</p>
+
+<p>
+将变量 <code>query-replace-skip-read-only</code> 设为非 nil 值后，替换命令会忽略只读文本中的匹配项，该变量默认值为 <code>nil</code> （即不忽略只读文本中的匹配项）。
+</p>
+
+<p>
+当命令定位到字符串或正则表达式的匹配项并发出询问时，可输入以下字符执行对应操作：
+</p>
+
+<dl class="org-dl">
+<dt><code>SPC</code></dt><dd></dd>
+
+<dt><code>y</code></dt><dd>将当前匹配项替换为新字符串，继续查找下一个匹配项。</dd>
+
+<dt><code>DEL</code></dt><dd></dd>
+
+<dt><code>Delete</code></dt><dd></dd>
+
+<dt><code>BACKSPACE</code></dt><dd></dd>
+
+<dt><code>n</code></dt><dd>跳过当前匹配项，不执行替换，直接查找下一个。</dd>
+
+<dt><code>, (逗号)</code></dt><dd><p>
+替换当前匹配项并展示替换结果，随后需再次输入字符决定后续操作。因替换已完成，此场景下删除键和空格的作用一致，均为跳至下一个匹配项。
+</p>
+
+<p>
+此时可按下 <code>C-r</code> （详见下文）编辑已替换的文本，也可使用撤销命令（如 <code>C-x u=，参见[[#Undo][撤销操作]]）撤销本次替换； *撤销操作会直接退出交互式查询替换* ，若需继续替换，需通过 =C-x ESC ESC RET</code> 重新启动命令（参见<a href="#Repetition">重复迷你缓冲区命令</a>）。
+</p></dd>
+
+<dt><code>RET</code></dt><dd></dd>
+
+<dt><code>q</code></dt><dd>直接退出命令，不再执行后续任何替换。</dd>
+
+<dt><code>. (句点)</code></dt><dd>替换当前匹配项，且替换后直接退出命令，不再查找后续匹配项。</dd>
+
+<dt><code>! (感叹号)</code></dt><dd>无需再次确认，直接替换剩余所有匹配项。</dd>
+
+<dt><code>^ (脱字符)</code></dt><dd>返回上一个匹配项的位置（或原匹配项的位置），适用于误操作修改匹配项，或需要重新检查上一个匹配项的场景。</dd>
+
+<dt><code>u</code></dt><dd>撤销最后一次的替换操作，并回到该次替换的匹配项位置。</dd>
+
+<dt><code>U</code></dt><dd>撤销本次命令中所有的替换操作，回到第一次替换的匹配项位置。</dd>
+
+<dt><code>C-r</code></dt><dd>进入递归编辑模式，适用于无需直接替换、需手动编辑当前匹配项的场景。编辑完成后，按下 <code>C-M-c</code> 退出递归编辑模式，继续查找下一个匹配项（参见<a href="#Recursive-Edit">递归编辑模式</a>）。</dd>
+
+<dt><code>C-w</code></dt><dd>删除当前匹配项，随后进入与 <code>C-r</code> 相同的递归编辑模式，可手动输入文本替代被删除的匹配项；编辑完成后，按下 <code>C-M-c</code> 退出递归编辑模式，继续查找下一个匹配项。</dd>
+
+<dt><code>e</code></dt><dd>在迷你缓冲区中编辑新的替换字符串，按下回车键退出迷你缓冲区后，会用编辑后的内容替换当前匹配项，且该内容会成为后续所有匹配项的默认替换字符串。</dd>
+
+<dt><code>E</code></dt><dd>功能与 <code>e</code> 类似，但本次替换会 <b>严格按替换串的原始大小写执行</b> 。例如，原替换规则为将foo替换为bar时，Foo会默认被替换为Bar；按下 <code>E</code> 后，当前匹配项会直接替换为小写的bar，不做大小写适配。</dd>
+
+<dt><code>C-l</code></dt><dd>重绘屏幕刷新显示，操作后需再次输入字符，决定当前匹配项的处理方式。</dd>
+
+<dt><code>Y (大写)</code></dt><dd>在多缓冲区替换场景中（如 <code>Dired</code> 的 <code>Q</code> 命令，对选中文件执行交互式查询替换），替换当前缓冲区及剩余所有缓冲区中的全部未处理匹配项。该操作会对本次及后续所有替换询问均自动回答 “yes”，无需用户再手动确认。</dd>
+
+<dt><code>N (大写)</code></dt><dd>在多缓冲区替换场景中，跳过当前缓冲区的剩余所有匹配项，直接切换至下一个缓冲区。该操作会对当前替换询问回答 “no”，并放弃当前缓冲区的所有后续替换询问，继续处理序列中的下一个缓冲区。</dd>
+
+<dt><code>C-h</code></dt><dd></dd>
+
+<dt><code>?</code></dt><dd></dd>
+
+<dt><code>F1</code></dt><dd>展示上述所有操作选项的汇总提示信息，查看后需再次输入字符，决定当前匹配项的处理方式。</dd>
+</dl>
+
+<p>
+除上述字符外，输入 <b>其他任意字符都会直接退出 query-replace交互式查询替换</b> ，且该字符会被重新读取作为按键序列的一部分执行对应操作。例如，输入 <code>C-k</code> 会先退出 <code>query-replace</code> 命令，再执行 “删除至行尾” 的操作；输入 <code>C-g</code> 则会直接退出 <code>query-replace</code> ，无其他后续操作。
+</p>
+
+<p>
+若替换命令已退出，需重新启动时，可按下 <code>C-x ESC ESC</code> —— 该快捷键会重复执行上一次的交互式查询替换（因命令的参数均通过迷你缓冲区读取），详见 <a href="#Repetition">C-x ESC ESC</a> 相关说明。
+</p>
+
+<p>
+变量 <code>search-invisible</code> 决定了交互式查询替换命令对隐藏文本的处理方式，参见<a href="#Outline-Visibility">大纲模式中的搜索</a>。
+</p>
+
+<p>
+关于对选中文件执行交互式查询替换的 Dired <code>Q</code> 命令，参见<a href="#Operating-on-Files">文件操作</a>相关章节；此外，在 Dired 中通过正则表达式匹配重命名、复制或创建文件链接的相关命令，参见 <a href="#Transforming-File-Names">Dired 中的文件名转换</a>。
+</p>
 </div>
 </div>
 </div>
 <div id="outline-container-Other-Repeating-Search" class="outline-3">
 <h3 id="Other-Repeating-Search"><span class="section-number-3">17.11.</span> 其他搜索与循环命令</h3>
 <div class="outline-text-3" id="text-Other-Repeating-Search">
+<p>
+以下是一些用于查找正则表达式匹配项的其他命令。若模式中不包含大写字母且 <code>case-fold-search</code> 变量非空，这些命令在匹配时均忽略大小写。除始终搜索整个缓冲区的 <code>multi-occur</code> 和 <code>multi-occur-in-matching-buffers</code> 外，所有命令均作用于 <b>从光标位置到缓冲区末尾</b> 的文本；若选区处于激活状态，则作用于选区。
+</p>
+
+<dl class="org-dl">
+<dt><code>M-x multi-isearch-buffers</code></dt><dd>提示输入一个或多个缓冲区名称，按 <code>RET</code> 回车键结束；随后在这些缓冲区中 <b>启动多缓冲区增量搜索</b> 。（若在某个缓冲区中搜索失败，按下下一个 <code>C-s</code> 会尝试在指定的下一个缓冲区中继续搜索，依此类推。）带前缀参数执行时，会提示输入一个正则表达式，并在匹配该正则表达式的所有缓冲区中启动多缓冲区增量搜索。</dd>
+<dt><code>M-x multi-isearch-buffers-regexp</code></dt><dd>该命令与 <code>multi-isearch-buffers</code> 功能基本一致，区别在于它执行的是 <b>多缓冲区增量正则表达式搜索</b> 。</dd>
+<dt><code>M-x multi-isearch-files</code></dt><dd>提示输入一个或多个文件名，按 <code>RET</code> 回车键结束；随后在这些文件中启动 <b>多文件增量搜索</b> 。（若在某个文件中搜索失败，按下下一个 <code>C-s</code> 会尝试在指定的下一个文件中继续搜索，依此类推。）带前缀参数执行时，会提示输入一个正则表达式，并在匹配该正则表达式的所有文件中启动多文件增量搜索。</dd>
+<dt><code>M-x multi-isearch-files-regexp</code></dt><dd><p>
+该命令与 <code>multi-isearch-files</code> 功能基本一致，区别在于它执行的是 <b>多文件增量正则表达式搜索</b> 。
+</p>
+
+<p>
+在部分设置了缓冲区局部变量 <code>multi-isearch-next-buffer-function</code> 的模式中（例如Change Log mode变更日志模式），多文件增量搜索会被自动激活。
+</p></dd>
+
+<dt><code>M-x occur</code></dt><dd></dd>
+
+<dt><code>M-s o</code></dt><dd><p>
+提示输入一个正则表达式，随后显示缓冲区中 <b>所有包含该匹配项的行</b> 的列表。在提示界面按下 <code>M-n</code> ，可复用之前增量搜索使用过的搜索字符串。匹配到的文本会通过 <code>match</code> （字体样式）高亮显示。带数字参数 <code>n</code> 执行时，会在每个匹配行的前后各显示 <code>n</code> 行上下文内容。
+</p>
+
+<p>
+上下文的默认行数由变量 <code>list-matching-lines-default-context-lines</code> 指定。当变量 <code>list-matching-lines-jump-to-current-line</code> 非空时，当前行会以 <code>list-matching-lines-current-line-face</code> 样式高亮显示，且光标会定位到该行后的第一个匹配项处。
+</p>
+
+<p>
+若增量搜索正在进行，直接按下 <code>M-s o</code> 即可基于 <b>当前的搜索字符串</b> 执行该命令。
+</p>
+
+<p>
+注意：输入的正则表达式匹配项会被扩展为 <b>整行匹配</b> ，且若某个匹配项的起始位置在前一个匹配项的结束位置之前，该匹配项将不被计入。
+</p>
+
+<p>
+<code>*Occur*</code> 缓冲区以Occur 模式作为主模式：
+</p>
+<ul class="org-ul">
+<li>按下 <code>n</code> 和 <code>p</code> 键可跳至下一个 / 上一个匹配项；带数字前缀参数时，可按指定次数跳至对应匹配项（数字键绑定了 ～digit-argument～ ，因此输入 <code>5 n</code> 即可跳至后面第 <code>5</code> 个匹配项，无需先按 <code>C-u</code> ）；</li>
+<li>按下空格键（ <code>SPC</code> ）和删除键（ <code>DEL</code> ）可上下滚动 <code>*Occur*</code> 缓冲区；</li>
+<li>点击某个匹配项，或将光标移至该匹配项处并按回车键，会跳转到被搜索的原始缓冲区中对应的位置；</li>
+<li>按下 <code>o</code> 和 <code>C-o</code> 可在另一个窗口中显示该匹配项（=C-o= 不会选中新窗口）；</li>
+<li>也可使用 M-g M-n（next-error，下一个错误）命令逐个访问所有匹配项（参见编译模式）；</li>
+<li>按下 <code>q</code> 可关闭显示 <code>*Occur*</code> 缓冲区的窗口，并将该缓冲区隐藏。</li>
+</ul>
+
+<p>
+在 <code>*Occur*</code> 缓冲区中按下 <code>e</code> ，会将该缓冲区设为可写状态并进入Occur 编辑模式，此时可编辑匹配行，且所有编辑操作会同步至原始缓冲区的对应文本。按下 <code>C-c C-c</code> 可退出 Occur 编辑模式，恢复为普通 Occur 模式。
+</p>
+
+<p>
+命令 <code>M-x list-matching-lines</code> 是 <code>M-x occur</code> 的同义词。
+</p></dd>
+
+<dt><code>M-x multi-occur</code></dt><dd>该命令与 <code>occur</code> 功能基本一致，区别在于它可在 <b>多个缓冲区中同时搜索</b> ，执行时会提示逐个指定需要搜索的缓冲区名称。</dd>
+<dt><code>M-x multi-occur-in-matching-buffers</code></dt><dd>该命令与 ～multi-occur～ 功能类似，区别在于 <b>待搜索的缓冲区</b> 通过 <b>匹配已访问文件名的正则表达式</b> 指定；带前缀参数执行时，会改为通过正则表达式匹配 <b>缓冲区名称</b> 来指定待搜索缓冲区。</dd>
+<dt><code>M-x how-many</code></dt><dd>提示输入一个正则表达式，随后 <b>统计并打印</b> 光标位置之后的缓冲区中该表达式的匹配次数；若选区处于激活状态，则仅统计选区中的匹配次数。</dd>
+<dt><code>M-x flush-lines</code></dt><dd>提示输入一个正则表达式，随后 <b>删除</b> 光标位置之后的文本中 <b>所有包含该匹配项的行</b> ；命令执行完毕后，会打印被删除的匹配行数量。
+
+<ul class="org-ul">
+<li>若当前行中光标位置之后存在匹配项，该行会被删除；</li>
+<li>若选区处于激活状态，则仅对选区生效：若某行部分包含在选区内，且其匹配项 <b>完全位于选区内</b> ，该行会被删除；</li>
+<li>若某个匹配项跨越多行，这些行都会被一并删除；该命令会先删除匹配行，再继续查找下一个匹配项，因此会忽略在前一个匹配项结束行的同一行起始的新匹配项。</li>
+</ul></dd>
+
+<dt><code>M-x keep-lines</code></dt><dd>提示输入一个正则表达式，随后 <b>删除</b> 光标位置之后的文本中 <b>所有不包含该匹配项的行</b> ；
+<ul class="org-ul">
+<li>若光标未位于行首，该命令始终保留当前行；</li>
+<li>若选区处于激活状态，则仅对选区生效：永远不会删除仅部分包含在选区内的行（行尾的换行符视为该行的一部分）；</li>
+<li>若某个匹配项跨越多行，这些行都会被一并保留。</li>
+</ul></dd>
+
+<dt><code>M-x kill-matching-lines</code></dt><dd>功能与 <code>flush-lines</code> 一致，区别在于该命令会 <b>将被删除的匹配行</b> 添加至 <b>删除环（kill ring）</b> 中，且所有匹配行会被合并为单个字符串（包含行之间的换行符）后存入删除环。</dd>
+<dt><code>M-x copy-matching-lines</code></dt><dd>功能与 <code>kill-matching-lines</code> 一致，区别在于该命令不会 <b>从缓冲区中删除匹配行</b> ，仅将其复制至删除环。</dd>
+</dl>
 </div>
 </div>
 <div id="outline-container-Search-Customizations" class="outline-3">
 <h3 id="Search-Customizations"><span class="section-number-3">17.12.</span> 根据需求定制搜索</h3>
 <div class="outline-text-3" id="text-Search-Customizations">
+<p>
+本节介绍其他章节未提及的各类搜索相关自定义配置。
+</p>
+
+<p>
+增量搜索的默认模式由变量 <code>search-default-mode</code> 指定，其值可为 <code>nil</code> 、 <code>t</code> 或一个函数：
+</p>
+
+<ul class="org-ul">
+<li>若值为 <code>nil</code> ，默认执行 <b>字面量搜索</b> ，不进行字符折叠，但会根据 <code>case-fold-search</code> 和~search-whitespace-regexp~ 分别开启大小写折叠和宽松空白匹配（参见「<a href="#Lax-Search">搜索中的宽松匹配</a>」）；</li>
+<li>若值为 <code>t</code> ，增量搜索默认执行 <b>正则表达式搜索</b> ；</li>
+<li>该变量的默认值为一个函数，仅会执行大小写折叠和宽松空白匹配。</li>
+</ul>
+
+<p>
+正在进行的增量搜索中， <b>当前匹配项</b> 会通过 <code>isearch</code> 面（字体样式）高亮显示，将变量 <code>search-highlight</code> 设为 <code>nil</code> 可关闭该高亮效果。
+</p>
+
+<p>
+当搜索正则表达式时（例如使用快捷键 <code>C-M-s</code> ），子表达式的高亮规则由变量 <code>search-highlight-submatches</code> 决定：
+</p>
+
+<ul class="org-ul">
+<li>若该变量值为 <code>nil</code> ，子表达式无特殊高亮；</li>
+<li>若值非nil，正则表达式中由 '<code>\( … \)</code>' 定义的子表达式匹配到的文本，会用不同的面进行高亮。</li>
+</ul>
+
+<p>
+默认情况下，Emacs 定义了两个专用高亮面： <code>isearch-group-1</code> 和 <code>isearch-group-2</code> 。基于这两个面的规则： <b>奇数序号的子表达式</b> 由 <code>isearch-group-1</code> 高亮， <b>偶数序号的子表达式</b> 由 <code>isearch-group-2</code> 高亮。例如搜索正则表达式 '<code>foo-\([0-9]+\)\([a-z]+\)</code>' 时， '<code>[0-9]+</code>' 匹配的内容会显示 <code>isearch-group-1</code> 样式， '<code>[a-z]+</code>' 匹配的内容会显示 <code>isearch-group-2</code> 样式。
+</p>
+
+<p>
+若按相同命名规则自定义更多高亮面（如 <code>isearch-group-3</code> 、 <code>isearch-group-4</code> 等），则第 <code>M</code> 、 <code>N+M</code> 、 <code>2N+M</code> 个（以此类推）子表达式会由 <code>isearch-group-M</code> 高亮，其中 <code>N</code> 为所有 <code>isearch-group-M</code> 格式高亮面的总数。
+</p>
+
+<p>
+当前屏幕中 <b>可见的其他匹配项</b> ，会通过 <code>lazy-highlight</code> 面样式进行高亮，将变量 <code>isearch-lazy-highlight</code> 设为 <code>nil</code> 可关闭该懒高亮效果。以下是用于自定义懒高亮的其他变量：
+</p>
+
+<dl class="org-dl">
+<dt><code>lazy-highlight-initial-delay</code></dt><dd>高亮可见匹配项前的等待时间，单位为秒。仅当搜索字符串的长度小于 <code>lazy-highlight-no-delay-length</code> 的取值时，该配置才生效。</dd>
+<dt><code>lazy-highlight-no-delay-length</code></dt><dd>当搜索字符串的长度大于或等于该变量的取值时，懒高亮会立即触发，无等待时间。</dd>
+<dt><code>lazy-highlight-interval</code></dt><dd>依次高亮多个匹配项时的时间间隔，单位为秒。</dd>
+<dt><code>lazy-highlight-max-at-a-time</code></dt><dd>一次最多高亮的匹配项数量，达到该数量后会先检查用户输入再继续。若该值设置过大，高亮过程会耗时较久；此期间若按下 <code>C-s</code> 或 <code>C-r</code> 继续搜索，Emacs 需完成所有高亮后才会响应，因此 <b>更小的取值</b> 能提升 Emacs 的响应速度。</dd>
+<dt><code>isearch-lazy-count</code></dt><dd>在搜索提示栏中显示当前匹配项的序号和匹配项的总数。</dd>
+<dt><code>lazy-count-prefix-format</code></dt><dd></dd>
+
+<dt><code>lazy-count-suffix-format</code></dt><dd>这两个变量共同决定了 <code>isearch-lazy-count</code> 的显示格式，用于定义当前匹配数和总匹配数的前后缀样式。</dd>
+</dl>
+
+<p>
+默认情况下，若增量搜索中搜索字符串为空，按下回车键（ <code>RET</code> ）会启动非增量搜索（实际流程为：先允许编辑搜索字符串，再次按下回车键后执行搜索）。若将变量 <code>search-nonincremental-instead</code> 设为 <code>nil</code> ，则无论搜索字符串是否为空，按下回车键都会直接退出增量搜索。
+</p>
+
+<p>
+默认情况下，增量搜索和查询替换命令会 <b>匹配不可见文本</b> ，但当当前匹配项离开该不可见文本区域后，会立即隐藏相关匹配的高亮。若将变量 <code>isearch-hide-immediately</code> 设为 <code>nil</code> ，则找到匹配项的不可见文本会保持显示，直到搜索或替换命令执行完毕。
+</p>
+
+<p>
+在低速终端中进行增量搜索（例如通过低速网络连接远程机器的显示器），搜索过程中需要重绘屏幕的大部分区域，操作体验会较差。Emacs 为低速终端提供了专用的显示模式：搜索时会弹出一个独立的小窗口，仅在该窗口中显示匹配项周边的文本。小窗口的重绘速度更快，能有效缓解低速终端的操作卡顿问题。相关配置变量如下：
+</p>
+
+<ul class="org-ul">
+<li><code>search-slow-speed</code> ：设置波特率阈值，当终端波特率低于该值时，Emacs 会自动启用该低速终端显示模式；</li>
+<li><code>search-slow-window-lines</code> ：控制搜索结果弹出窗口的行数，默认值为 1 行。该窗口默认出现在启动 <b>搜索的缓冲区窗口底部</b> ；若该变量取负值，则窗口会显示在顶部，且窗口行数为该负值的绝对值。</li>
+</ul>
 </div>
 </div>
 </section>

@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Garbage Collection (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Garbage Collection (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Garbage Collection (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="GNU-Emacs-Internals.html" rel="up" title="GNU Emacs Internals">
+<link href="Stack_002dallocated-Objects.html" rel="next" title="Stack-allocated Objects">
+<link href="Pure-Storage.html" rel="prev" title="Pure Storage">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Garbage-Collection">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Stack_002dallocated-Objects.html" accesskey="n" rel="next">Stack-allocated Objects</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Pure-Storage.html" accesskey="p" rel="prev">Pure Storage</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html" accesskey="u" rel="up">GNU Emacs Internals</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="Garbage-Collection-1"><span>E.3 Garbage Collection<a class="copiable-link" href="#Garbage-Collection-1"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-memory-allocation"></a>
+<p>When a program creates a list or the user defines a new function
+(such as by loading a library), that data is placed in normal storage.
+If normal storage runs low, then Emacs asks the operating system to
+allocate more memory.  Different types of Lisp objects, such as
+symbols, cons cells, small vectors, markers, etc., are segregated in
+distinct blocks in memory.  (Large vectors, long strings, buffers and
+certain other editing types, which are fairly large, are allocated in
+individual blocks, one per object; small strings are packed into blocks
+of 8k bytes, and small vectors are packed into blocks of 4k bytes).
+</p>
+<a class="index-entry-id" id="index-vector_002dlike-objects_002c-storage"></a>
+<a class="index-entry-id" id="index-storage-of-vector_002dlike-Lisp-objects"></a>
+<p>Beyond the basic vector, a lot of objects like markers, overlays and
+buffers are managed as if they were vectors.  The corresponding C data
+structures include the <code class="code">union vectorlike_header</code> field whose
+<code class="code">size</code> member contains the subtype enumerated by <code class="code">enum pvec_type</code>
+and an information about how many <code class="code">Lisp_Object</code> fields this structure
+contains and what the size of the rest data is.  This information is
+needed to calculate the memory footprint of an object, and used
+by the vector allocation code while iterating over the vector blocks.
+</p>
+<a class="index-entry-id" id="index-garbage-collection"></a>
+<p>It is quite common to use some storage for a while, then release it
+by (for example) killing a buffer or deleting the last pointer to an
+object.  Emacs provides a <em class="dfn">garbage collector</em> to reclaim this
+abandoned storage.  The garbage collector operates, in essence, by
+finding and marking all Lisp objects that are still accessible to Lisp
+programs.  To begin with, it assumes all the symbols, their values and
+associated function definitions, and any data presently on the stack,
+are accessible.  Any objects that can be reached indirectly through
+other accessible objects are also accessible, but this calculation is
+done &ldquo;conservatively&rdquo;, so it may slightly overestimate how many
+objects that are accessible.
+</p>
+<p>When marking is finished, all objects still unmarked are garbage.  No
+matter what the Lisp program or the user does, it is impossible to refer
+to them, since there is no longer a way to reach them.  Their space
+might as well be reused, since no one will miss them.  The second
+(sweep) phase of the garbage collector arranges to reuse them.  (But
+since the marking was done &ldquo;conservatively&rdquo;, not all unused objects
+are guaranteed to be garbage-collected by any one sweep.)
+</p>
+
+<a class="index-entry-id" id="index-free-list"></a>
+<p>The sweep phase puts unused cons cells onto a <em class="dfn">free list</em>
+for future allocation; likewise for symbols and markers.  It compacts
+the accessible strings so they occupy fewer 8k blocks; then it frees the
+other 8k blocks.  Unreachable vectors from vector blocks are coalesced
+to create largest possible free areas; if a free area spans a complete
+4k block, that block is freed.  Otherwise, the free area is recorded
+in a free list array, where each entry corresponds to a free list
+of areas of the same size.  Large vectors, buffers, and other large
+objects are allocated and freed individually.
+</p>
+<a class="index-entry-id" id="index-CL-note_002d_002d_002dallocate-more-storage"></a>
+<blockquote class="quotation">
+<p><b class="b">Common Lisp note:</b> Unlike other Lisps, GNU Emacs Lisp does not
+call the garbage collector when the free list is empty.  Instead, it
+simply requests the operating system to allocate more storage, and
+processing continues until <code class="code">gc-cons-threshold</code> bytes have been
+used.
+</p>
+<p>This means that you can make sure that the garbage collector will not
+run during a certain portion of a Lisp program by calling the garbage
+collector explicitly just before it (provided that portion of the
+program does not use so much space as to force a second garbage
+collection).
+</p></blockquote>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-garbage_002dcollect"><span class="category-def">Command: </span><span><strong class="def-name">garbage-collect</strong><a class="copiable-link" href="#index-garbage_002dcollect"> &para;</a></span></dt>
+<dd><p>This command runs a garbage collection, and returns information on
+the amount of space in use.  (Garbage collection can also occur
+spontaneously if you use more than <code class="code">gc-cons-threshold</code> bytes of
+Lisp data since the previous garbage collection.)
+</p>
+<p><code class="code">garbage-collect</code> returns a list with information on amount of space in
+use, where each entry has the form &lsquo;<samp class="samp">(<var class="var">name</var> <var class="var">size</var> <var class="var">used</var>)</samp>&rsquo;
+or &lsquo;<samp class="samp">(<var class="var">name</var> <var class="var">size</var> <var class="var">used</var> <var class="var">free</var>)</samp>&rsquo;.  In the entry,
+<var class="var">name</var> is a symbol describing the kind of objects this entry represents,
+<var class="var">size</var> is the number of bytes used by each one, <var class="var">used</var> is the number
+of those objects that were found live in the heap, and optional <var class="var">free</var> is
+the number of those objects that are not live but that Emacs keeps around for
+future allocations.  So an overall result is:
+</p>
+<div class="example">
+<pre class="example-preformatted">((<code class="code">conses</code> <var class="var">cons-size</var> <var class="var">used-conses</var> <var class="var">free-conses</var>)
+ (<code class="code">symbols</code> <var class="var">symbol-size</var> <var class="var">used-symbols</var> <var class="var">free-symbols</var>)
+ (<code class="code">strings</code> <var class="var">string-size</var> <var class="var">used-strings</var> <var class="var">free-strings</var>)
+ (<code class="code">string-bytes</code> <var class="var">byte-size</var> <var class="var">used-bytes</var>)
+ (<code class="code">vectors</code> <var class="var">vector-size</var> <var class="var">used-vectors</var>)
+ (<code class="code">vector-slots</code> <var class="var">slot-size</var> <var class="var">used-slots</var> <var class="var">free-slots</var>)
+ (<code class="code">floats</code> <var class="var">float-size</var> <var class="var">used-floats</var> <var class="var">free-floats</var>)
+ (<code class="code">intervals</code> <var class="var">interval-size</var> <var class="var">used-intervals</var> <var class="var">free-intervals</var>)
+ (<code class="code">buffers</code> <var class="var">buffer-size</var> <var class="var">used-buffers</var>)
+ (<code class="code">heap</code> <var class="var">unit-size</var> <var class="var">total-size</var> <var class="var">free-size</var>))
+</pre></div>
+
+<p>Here is an example:
+</p>
+<div class="example">
+<pre class="example-preformatted">(garbage-collect)
+      &rArr; ((conses 16 49126 8058) (symbols 48 14607 0)
+                 (strings 32 2942 2607)
+                 (string-bytes 1 78607) (vectors 16 7247)
+                 (vector-slots 8 341609 29474) (floats 8 71 102)
+                 (intervals 56 27 26) (buffers 944 8)
+                 (heap 1024 11715 2678))
+</pre></div>
+
+<p>Below is a table explaining each element.  Note that last <code class="code">heap</code> entry
+is optional and present only if an underlying <code class="code">malloc</code> implementation
+provides <code class="code">mallinfo</code> function.
+</p>
+<dl class="table">
+<dt><var class="var">cons-size</var></dt>
+<dd><p>Internal size of a cons cell, i.e., <code class="code">sizeof (struct Lisp_Cons)</code>.
+</p>
+</dd>
+<dt><var class="var">used-conses</var></dt>
+<dd><p>The number of cons cells in use.
+</p>
+</dd>
+<dt><var class="var">free-conses</var></dt>
+<dd><p>The number of cons cells for which space has been obtained from
+the operating system, but that are not currently being used.
+</p>
+</dd>
+<dt><var class="var">symbol-size</var></dt>
+<dd><p>Internal size of a symbol, i.e., <code class="code">sizeof (struct Lisp_Symbol)</code>.
+</p>
+</dd>
+<dt><var class="var">used-symbols</var></dt>
+<dd><p>The number of symbols in use.
+</p>
+</dd>
+<dt><var class="var">free-symbols</var></dt>
+<dd><p>The number of symbols for which space has been obtained from
+the operating system, but that are not currently being used.
+</p>
+</dd>
+<dt><var class="var">string-size</var></dt>
+<dd><p>Internal size of a string header, i.e., <code class="code">sizeof (struct Lisp_String)</code>.
+</p>
+</dd>
+<dt><var class="var">used-strings</var></dt>
+<dd><p>The number of string headers in use.
+</p>
+</dd>
+<dt><var class="var">free-strings</var></dt>
+<dd><p>The number of string headers for which space has been obtained
+from the operating system, but that are not currently being used.
+</p>
+</dd>
+<dt><var class="var">byte-size</var></dt>
+<dd><p>This is used for convenience and equals to <code class="code">sizeof (char)</code>.
+</p>
+</dd>
+<dt><var class="var">used-bytes</var></dt>
+<dd><p>The total size of all string data in bytes.
+</p>
+</dd>
+<dt><var class="var">vector-size</var></dt>
+<dd><p>Size in bytes of a vector of length 1, including its header.
+</p>
+</dd>
+<dt><var class="var">used-vectors</var></dt>
+<dd><p>The number of vector headers allocated from the vector blocks.
+</p>
+</dd>
+<dt><var class="var">slot-size</var></dt>
+<dd><p>Internal size of a vector slot, always equal to <code class="code">sizeof (Lisp_Object)</code>.
+</p>
+</dd>
+<dt><var class="var">used-slots</var></dt>
+<dd><p>The number of slots in all used vectors.
+Slot counts might include some or all overhead from vector headers,
+depending on the platform.
+</p>
+</dd>
+<dt><var class="var">free-slots</var></dt>
+<dd><p>The number of free slots in all vector blocks.
+</p>
+</dd>
+<dt><var class="var">float-size</var></dt>
+<dd><p>Internal size of a float object, i.e., <code class="code">sizeof (struct Lisp_Float)</code>.
+(Do not confuse it with the native platform <code class="code">float</code> or <code class="code">double</code>.)
+</p>
+</dd>
+<dt><var class="var">used-floats</var></dt>
+<dd><p>The number of floats in use.
+</p>
+</dd>
+<dt><var class="var">free-floats</var></dt>
+<dd><p>The number of floats for which space has been obtained from
+the operating system, but that are not currently being used.
+</p>
+</dd>
+<dt><var class="var">interval-size</var></dt>
+<dd><p>Internal size of an interval object, i.e., <code class="code">sizeof (struct interval)</code>.
+</p>
+</dd>
+<dt><var class="var">used-intervals</var></dt>
+<dd><p>The number of intervals in use.
+</p>
+</dd>
+<dt><var class="var">free-intervals</var></dt>
+<dd><p>The number of intervals for which space has been obtained from
+the operating system, but that are not currently being used.
+</p>
+</dd>
+<dt><var class="var">buffer-size</var></dt>
+<dd><p>Internal size of a buffer, i.e., <code class="code">sizeof (struct buffer)</code>.
+(Do not confuse with the value returned by <code class="code">buffer-size</code> function.)
+</p>
+</dd>
+<dt><var class="var">used-buffers</var></dt>
+<dd><p>The number of buffer objects in use.  This includes killed buffers
+invisible to users, i.e., all buffers in <code class="code">all_buffers</code> list.
+</p>
+</dd>
+<dt><var class="var">unit-size</var></dt>
+<dd><p>The unit of heap space measurement, always equal to 1024 bytes.
+</p>
+</dd>
+<dt><var class="var">total-size</var></dt>
+<dd><p>Total heap size, in <var class="var">unit-size</var> units.
+</p>
+</dd>
+<dt><var class="var">free-size</var></dt>
+<dd><p>Heap space which is not currently used, in <var class="var">unit-size</var> units.
+</p></dd>
+</dl>
+
+<p>If there was overflow in pure space (see <a class="pxref" href="Pure-Storage.html">Pure Storage</a>), and Emacs
+was dumped using the (now obsolete) <code class="code">unexec</code> method
+(see <a class="pxref" href="Building-Emacs.html">Building Emacs</a>), then <code class="code">garbage-collect</code> returns
+<code class="code">nil</code>, because a real garbage collection cannot be done in that
+case.
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-garbage_002dcollection_002dmessages"><span class="category-def">User Option: </span><span><strong class="def-name">garbage-collection-messages</strong><a class="copiable-link" href="#index-garbage_002dcollection_002dmessages"> &para;</a></span></dt>
+<dd><p>If this variable is non-<code class="code">nil</code>, Emacs displays a message at the
+beginning and end of garbage collection.  The default value is
+<code class="code">nil</code>.
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-post_002dgc_002dhook"><span class="category-def">Variable: </span><span><strong class="def-name">post-gc-hook</strong><a class="copiable-link" href="#index-post_002dgc_002dhook"> &para;</a></span></dt>
+<dd><p>This is a normal hook that is run at the end of garbage collection.
+Garbage collection is inhibited while the hook functions run, so be
+careful writing them.
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-gc_002dcons_002dthreshold"><span class="category-def">User Option: </span><span><strong class="def-name">gc-cons-threshold</strong><a class="copiable-link" href="#index-gc_002dcons_002dthreshold"> &para;</a></span></dt>
+<dd><p>The value of this variable is the number of bytes of storage that must
+be allocated for Lisp objects after one garbage collection in order to
+trigger another garbage collection.  You can use the result returned by
+<code class="code">garbage-collect</code> to get an information about size of the particular
+object type; space allocated to the contents of buffers does not count.
+</p>
+<p>The initial threshold value is <code class="code">GC_DEFAULT_THRESHOLD</code>, defined in
+<samp class="file">alloc.c</samp>.  Since it&rsquo;s defined in <code class="code">word_size</code> units, the
+value is 400,000 for the default 32-bit configuration, and 800,000 for
+the 64-bit one and for 32-bit builds configured with the
+<samp class="option">--with-wide-int</samp> option.  If you specify a larger value, garbage
+collection will happen less often.  This reduces the amount of time
+spent garbage collecting (so Lisp programs will run faster between
+cycles of garbage collection that happen more rarely), but increases
+total memory use.  You may want to do this when running a program that
+creates lots of Lisp data, especially if you need it to run faster.
+However, we recommend against increasing the threshold for prolonged
+periods of time, and advise that you never set it higher than needed for
+the program to run in reasonable time.  Using thresholds higher than
+necessary could potentially cause higher system-wide memory pressure,
+and also make each garbage-collection cycle take much more time, and
+should therefore be avoided.
+</p>
+<p>You can make collections more frequent by specifying a smaller value, down
+to 1/10th of <code class="code">GC_DEFAULT_THRESHOLD</code>.  A value less than this minimum
+will remain in effect only until the subsequent garbage collection, at which
+time <code class="code">garbage-collect</code> will set the threshold back to the minimum.
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-gc_002dcons_002dpercentage"><span class="category-def">User Option: </span><span><strong class="def-name">gc-cons-percentage</strong><a class="copiable-link" href="#index-gc_002dcons_002dpercentage"> &para;</a></span></dt>
+<dd><p>The value of this variable specifies the amount of consing before a
+garbage collection occurs, as a fraction of the current heap size.
+This criterion and <code class="code">gc-cons-threshold</code> apply in parallel, and
+garbage collection occurs only when both criteria are satisfied.
+</p>
+<p>As the heap size increases, the time to perform a garbage collection
+increases.  Thus, it can be desirable to do them less frequently in
+proportion.
+</p>
+<p>The initial percentage value is 0.1 in interactive sessions and while
+dumping Emacs (see <a class="pxref" href="Building-Emacs.html">Building Emacs</a>), and 1.0 in non-interactive
+(a.k.a. &ldquo;batch&rdquo;) sessions.
+</p>
+<p>As with <code class="code">gc-cons-threshold</code>, do not enlarge this more than
+necessary, and never for prolonged periods of time.
+</p></dd></dl>
+
+<p>Control over the garbage collector via <code class="code">gc-cons-threshold</code> and
+<code class="code">gc-cons-percentage</code> is only approximate.  Although Emacs checks
+for threshold exhaustion regularly, for efficiency reasons it does not
+do so immediately after every change to the heap or to
+<code class="code">gc-cons-threshold</code> or <code class="code">gc-cons-percentage</code>, so exhausting
+the threshold does not immediately trigger garbage collection.  Also,
+for efficiency in threshold calculations Emacs approximates the heap
+size, which counts the bytes used by currently-accessible objects in
+the heap.
+</p>
+<p>The value returned by <code class="code">garbage-collect</code> describes the amount of
+memory used by Lisp data, broken down by data type.  By contrast, the
+function <code class="code">memory-limit</code> provides information on the total amount of
+memory Emacs is currently using.
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002dlimit"><span class="category-def">Function: </span><span><strong class="def-name">memory-limit</strong><a class="copiable-link" href="#index-memory_002dlimit"> &para;</a></span></dt>
+<dd><p>This function returns an estimate of the total amount of bytes of
+virtual memory that Emacs is currently using, divided by 1024.
+You can use this to get a general idea of how your actions affect the
+memory usage.
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-memory_002dfull"><span class="category-def">Variable: </span><span><strong class="def-name">memory-full</strong><a class="copiable-link" href="#index-memory_002dfull"> &para;</a></span></dt>
+<dd><p>This variable is <code class="code">t</code> if Emacs is nearly out of memory for Lisp
+objects, and <code class="code">nil</code> otherwise.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002duse_002dcounts"><span class="category-def">Function: </span><span><strong class="def-name">memory-use-counts</strong><a class="copiable-link" href="#index-memory_002duse_002dcounts"> &para;</a></span></dt>
+<dd><p>This returns a list of numbers that count the number of objects
+created in this Emacs session.  Each of these counters increments for
+a certain kind of object.  See the documentation string for details.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002dinfo"><span class="category-def">Function: </span><span><strong class="def-name">memory-info</strong><a class="copiable-link" href="#index-memory_002dinfo"> &para;</a></span></dt>
+<dd><p>This functions returns an amount of total system memory and how much
+of it is free.  On an unsupported system, the value may be <code class="code">nil</code>.
+</p>
+<p>If <code class="code">default-directory</code> points to a remote host, memory
+information of that host is returned.
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-gcs_002ddone"><span class="category-def">Variable: </span><span><strong class="def-name">gcs-done</strong><a class="copiable-link" href="#index-gcs_002ddone"> &para;</a></span></dt>
+<dd><p>This variable contains the total number of garbage collections
+done so far in this Emacs session.
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-gc_002delapsed"><span class="category-def">Variable: </span><span><strong class="def-name">gc-elapsed</strong><a class="copiable-link" href="#index-gc_002delapsed"> &para;</a></span></dt>
+<dd><p>This variable contains the total number of seconds of elapsed time
+during garbage collection so far in this Emacs session, as a
+floating-point number.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002dreport"><span class="category-def">Function: </span><span><strong class="def-name">memory-report</strong><a class="copiable-link" href="#index-memory_002dreport"> &para;</a></span></dt>
+<dd><p>It can sometimes be useful to see where Emacs is using memory (in
+various variables, buffers, and caches).  This command will open a new
+buffer (called &lsquo;<samp class="samp">&quot;*Memory Report*&quot;</samp>&rsquo;) that will give an overview,
+in addition to listing the &ldquo;largest&rdquo; buffers and variables.
+</p>
+<p>All the data here is approximate, because there&rsquo;s really no consistent
+way to compute the size of a variable.  For instance, two variables
+may share parts of a data structure, and this will be counted twice,
+but this command may still give a useful high-level overview of which
+parts of Emacs are using memory.
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Stack_002dallocated-Objects.html">Stack-allocated Objects</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Pure-Storage.html">Pure Storage</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html">GNU Emacs Internals</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>æèµ</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Â© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+
+</body>
+</html>

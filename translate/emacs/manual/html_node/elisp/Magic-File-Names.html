@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Magic File Names (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Magic File Names (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Magic File Names (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Files.html" rel="up" title="Files">
+<link href="Format-Conversion.html" rel="next" title="Format Conversion">
+<link href="Create_002fDelete-Dirs.html" rel="prev" title="Create/Delete Dirs">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Magic-File-Names">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Format-Conversion.html" accesskey="n" rel="next">File Format Conversion</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Create_002fDelete-Dirs.html" accesskey="p" rel="prev">Creating, Copying and Deleting Directories</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Files.html" accesskey="u" rel="up">Files</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="Making-Certain-File-Names-_0060_0060Magic_0027_0027"><span>26.12 Making Certain File Names &ldquo;Magic&rdquo;<a class="copiable-link" href="#Making-Certain-File-Names-_0060_0060Magic_0027_0027"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-magic-file-names"></a>
+
+<p>You can implement special handling for certain file names.  This is
+called making those names <em class="dfn">magic</em>.  The principal use for this
+feature is in implementing access to remote files (see <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Remote-Files.html#Remote-Files">Remote Files</a> in <cite class="cite">The GNU Emacs Manual</cite>).
+</p>
+<p>To define a kind of magic file name, you must supply a regular
+expression to define the class of names (all those that match the
+regular expression), plus a handler that implements all the primitive
+Emacs file operations for file names that match.
+</p>
+<a class="index-entry-id" id="index-file-name-handler"></a>
+<a class="index-entry-id" id="index-file_002dname_002dhandler_002dalist"></a>
+<p>The variable <code class="code">file-name-handler-alist</code> holds a list of handlers,
+together with regular expressions that determine when to apply each
+handler.  Each element has this form:
+</p>
+<div class="example">
+<pre class="example-preformatted">(<var class="var">regexp</var> . <var class="var">handler</var>)
+</pre></div>
+
+<p>All the Emacs primitives for file access and file name transformation
+check the given file name against <code class="code">file-name-handler-alist</code>.  If
+the file name matches <var class="var">regexp</var>, the primitives handle that file by
+calling <var class="var">handler</var>.
+</p>
+<p>The first argument given to <var class="var">handler</var> is the name of the
+primitive, as a symbol; the remaining arguments are the arguments that
+were passed to that primitive.  (The first of these arguments is most
+often the file name itself.)  For example, if you do this:
+</p>
+<div class="example">
+<pre class="example-preformatted">(file-exists-p <var class="var">filename</var>)
+</pre></div>
+
+<p>and <var class="var">filename</var> has handler <var class="var">handler</var>, then <var class="var">handler</var> is
+called like this:
+</p>
+<div class="example">
+<pre class="example-preformatted">(funcall <var class="var">handler</var> 'file-exists-p <var class="var">filename</var>)
+</pre></div>
+
+<p>When a function takes two or more arguments that must be file names,
+it checks each of those names for a handler.  For example, if you do
+this:
+</p>
+<div class="example">
+<pre class="example-preformatted">(expand-file-name <var class="var">filename</var> <var class="var">dirname</var>)
+</pre></div>
+
+<p>then it checks for a handler for <var class="var">filename</var> and then for a handler
+for <var class="var">dirname</var>.  In either case, the <var class="var">handler</var> is called like
+this:
+</p>
+<div class="example">
+<pre class="example-preformatted">(funcall <var class="var">handler</var> 'expand-file-name <var class="var">filename</var> <var class="var">dirname</var>)
+</pre></div>
+
+<p>The <var class="var">handler</var> then needs to figure out whether to handle
+<var class="var">filename</var> or <var class="var">dirname</var>.
+</p>
+<p>If the specified file name matches more than one handler, the one
+whose match starts last in the file name gets precedence.  This rule
+is chosen so that handlers for jobs such as uncompression are handled
+first, before handlers for jobs such as remote file access.
+</p>
+<p>Here are the operations that a magic file name handler gets to handle:
+</p>
+<p><code class="code">abbreviate-file-name</code>, <code class="code">access-file</code>,
+<code class="code">add-name-to-file</code>, <code class="code">byte-compiler-base-file-name</code>,<br>
+<code class="code">copy-directory</code>, <code class="code">copy-file</code>,
+<code class="code">delete-directory</code>, <code class="code">delete-file</code>,
+<code class="code">diff-latest-backup-file</code>,
+<code class="code">directory-file-name</code>,
+<code class="code">directory-files</code>,
+<code class="code">directory-files-and-attributes</code>,
+<code class="code">dired-compress-file</code>, <code class="code">dired-uncache</code>,
+<code class="code">exec-path</code>, <code class="code">expand-file-name</code>,<br>
+<code class="code">file-accessible-directory-p</code>,
+<code class="code">file-acl</code>,
+<code class="code">file-attributes</code>,
+<code class="code">file-directory-p</code>,
+<code class="code">file-equal-p</code>,
+<code class="code">file-executable-p</code>, <code class="code">file-exists-p</code>,
+<code class="code">file-group-gid</code>, <code class="code">file-in-directory-p</code>,
+<code class="code">file-local-copy</code>, <code class="code">file-locked-p</code>,
+<code class="code">file-modes</code>, <code class="code">file-name-all-completions</code>,
+<code class="code">file-name-as-directory</code>,
+<code class="code">file-name-case-insensitive-p</code>,
+<code class="code">file-name-completion</code>,
+<code class="code">file-name-directory</code>,
+<code class="code">file-name-nondirectory</code>,
+<code class="code">file-name-sans-versions</code>, <code class="code">file-newer-than-file-p</code>,
+<code class="code">file-notify-add-watch</code>, <code class="code">file-notify-rm-watch</code>,
+<code class="code">file-notify-valid-p</code>,
+<code class="code">file-ownership-preserved-p</code>,
+<code class="code">file-readable-p</code>, <code class="code">file-regular-p</code>,
+<code class="code">file-remote-p</code>, <code class="code">file-selinux-context</code>,
+<code class="code">file-symlink-p</code>, <code class="code">file-system-info</code>,
+<code class="code">file-truename</code>, <code class="code">file-user-uid</code>,
+<code class="code">file-writable-p</code>,
+<code class="code">find-backup-file-name</code>,<br>
+<code class="code">get-file-buffer</code>,
+<code class="code">insert-directory</code>,
+<code class="code">insert-file-contents</code>,<br>
+<code class="code">list-system-processes</code>,
+<code class="code">load</code>, <code class="code">lock-file</code>,
+<code class="code">make-auto-save-file-name</code>,
+<code class="code">make-directory</code>,
+<code class="code">make-lock-file-name</code>,
+<code class="code">make-nearby-temp-file</code>,
+<code class="code">make-process</code>,
+<code class="code">make-symbolic-link</code>,<br>
+<code class="code">memory-info</code>, <code class="code">process-attributes</code>, <code class="code">process-file</code>,
+<code class="code">rename-file</code>, <code class="code">set-file-acl</code>, <code class="code">set-file-modes</code>,
+<code class="code">set-file-selinux-context</code>, <code class="code">set-file-times</code>,
+<code class="code">set-visited-file-modtime</code>, <code class="code">shell-command</code>,
+<code class="code">start-file-process</code>,
+<code class="code">substitute-in-file-name</code>,<br>
+<code class="code">temporary-file-directory</code>,
+<code class="code">unhandled-file-name-directory</code>,
+<code class="code">unlock-file</code>,
+<code class="code">vc-registered</code>,
+<code class="code">verify-visited-file-modtime</code>,<br>
+<code class="code">write-region</code>.
+</p>
+<p>Handlers for <code class="code">insert-file-contents</code> typically need to clear the
+buffer&rsquo;s modified flag, with <code class="code">(set-buffer-modified-p nil)</code>, if the
+<var class="var">visit</var> argument is non-<code class="code">nil</code>.  This also has the effect of
+unlocking the buffer if it is locked.
+</p>
+<p>The handler function must handle all of the above operations, and
+possibly others to be added in the future.  It need not implement all
+these operations itself&mdash;when it has nothing special to do for a
+certain operation, it can reinvoke the primitive, to handle the
+operation in the usual way.  It should always reinvoke the primitive
+for an operation it does not recognize.  Here&rsquo;s one way to do this:
+</p>
+<div class="example smallexample">
+<pre class="example-preformatted">(defun my-file-handler (operation &amp;rest args)
+  ;; <span class="r">First check for the specific operations</span>
+  ;; <span class="r">that we have special handling for.</span>
+  (cond ((eq operation 'insert-file-contents) ...)
+        ((eq operation 'write-region) ...)
+        ...
+        ;; <span class="r">Handle any operation we don&rsquo;t know about.</span>
+        (t (let ((inhibit-file-name-handlers
+                  (cons 'my-file-handler
+                        (and (eq inhibit-file-name-operation operation)
+                             inhibit-file-name-handlers)))
+                 (inhibit-file-name-operation operation))
+             (apply operation args)))))
+</pre></div>
+
+<p>When a handler function decides to call the ordinary Emacs primitive for
+the operation at hand, it needs to prevent the primitive from calling
+the same handler once again, thus leading to an infinite recursion.  The
+example above shows how to do this, with the variables
+<code class="code">inhibit-file-name-handlers</code> and
+<code class="code">inhibit-file-name-operation</code>.  Be careful to use them exactly as
+shown above; the details are crucial for proper behavior in the case of
+multiple handlers, and for operations that have two file names that may
+each have handlers.
+</p>
+<a class="index-entry-id" id="index-safe_002dmagic-_0028property_0029"></a>
+<p>Handlers that don&rsquo;t really do anything special for actual access to the
+file&mdash;such as the ones that implement completion of host names for
+remote file names&mdash;should have a non-<code class="code">nil</code> <code class="code">safe-magic</code>
+property.  For instance, Emacs normally protects directory names
+it finds in <code class="code">PATH</code> from becoming magic, if they look like magic
+file names, by prefixing them with &lsquo;<samp class="samp">/:</samp>&rsquo;.  But if the handler that
+would be used for them has a non-<code class="code">nil</code> <code class="code">safe-magic</code>
+property, the &lsquo;<samp class="samp">/:</samp>&rsquo; is not added.
+</p>
+<a class="index-entry-id" id="index-operations-_0028property_0029"></a>
+<p>A file name handler can have an <code class="code">operations</code> property to
+declare which operations it handles in a nontrivial way.  If this
+property has a non-<code class="code">nil</code> value, it should be a list of
+operations; then only those operations will call the handler.  This
+avoids inefficiency, but its main purpose is for autoloaded handler
+functions, so that they won&rsquo;t be loaded except when they have real
+work to do.
+</p>
+<p>Simply deferring all operations to the usual primitives does not
+work.  For instance, if the file name handler applies to
+<code class="code">file-exists-p</code>, then it must handle <code class="code">load</code> itself, because
+the usual <code class="code">load</code> code won&rsquo;t work properly in that case.  However,
+if the handler uses the <code class="code">operations</code> property to say it doesn&rsquo;t
+handle <code class="code">file-exists-p</code>, then it need not handle <code class="code">load</code>
+nontrivially.
+</p>
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-inhibit_002dfile_002dname_002dhandlers"><span class="category-def">Variable: </span><span><strong class="def-name">inhibit-file-name-handlers</strong><a class="copiable-link" href="#index-inhibit_002dfile_002dname_002dhandlers"> &para;</a></span></dt>
+<dd><p>This variable holds a list of handlers whose use is presently inhibited
+for a certain operation.
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-inhibit_002dfile_002dname_002doperation"><span class="category-def">Variable: </span><span><strong class="def-name">inhibit-file-name-operation</strong><a class="copiable-link" href="#index-inhibit_002dfile_002dname_002doperation"> &para;</a></span></dt>
+<dd><p>The operation for which certain handlers are presently inhibited.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-find_002dfile_002dname_002dhandler"><span class="category-def">Function: </span><span><strong class="def-name">find-file-name-handler</strong> <var class="def-var-arguments">file operation</var><a class="copiable-link" href="#index-find_002dfile_002dname_002dhandler"> &para;</a></span></dt>
+<dd><p>This function returns the handler function for file name <var class="var">file</var>,
+or <code class="code">nil</code> if there is none.  The argument <var class="var">operation</var> should
+be the operation to be performed on the file&mdash;the value you will pass
+to the handler as its first argument when you call it.  If
+<var class="var">operation</var> equals <code class="code">inhibit-file-name-operation</code>, or if it is
+not found in the <code class="code">operations</code> property of the handler, this
+function returns <code class="code">nil</code>.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-file_002dlocal_002dcopy"><span class="category-def">Function: </span><span><strong class="def-name">file-local-copy</strong> <var class="def-var-arguments">filename</var><a class="copiable-link" href="#index-file_002dlocal_002dcopy"> &para;</a></span></dt>
+<dd><p>This function copies file <var class="var">filename</var> to an ordinary non-magic file
+on the local machine, if it isn&rsquo;t on the local machine already.  Magic
+file names should handle the <code class="code">file-local-copy</code> operation if they
+refer to files on other machines.  A magic file name that is used for
+other purposes than remote file access should not handle
+<code class="code">file-local-copy</code>; then this function will treat the file as
+local.
+</p>
+<p>If <var class="var">filename</var> is local, whether magic or not, this function does
+nothing and returns <code class="code">nil</code>.  Otherwise it returns the file name
+of the local copy file.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-file_002dremote_002dp"><span class="category-def">Function: </span><span><strong class="def-name">file-remote-p</strong> <var class="def-var-arguments">filename &amp;optional identification connected</var><a class="copiable-link" href="#index-file_002dremote_002dp"> &para;</a></span></dt>
+<dd><p>This function tests whether <var class="var">filename</var> is a remote file.  If
+<var class="var">filename</var> is local (not remote), the return value is <code class="code">nil</code>.
+If <var class="var">filename</var> is indeed remote, the return value is a string that
+identifies the remote system.
+</p>
+<p>This identifier string can include a host name and a user name, as
+well as characters designating the method used to access the remote
+system.  For example, the remote identifier string for the file name
+<code class="code">/sudo::/some/file</code> is <code class="code">/sudo:root@localhost:</code>.
+</p>
+<p>If <code class="code">file-remote-p</code> returns the same identifier for two different
+file names, that means they are stored on the same file system and can
+be accessed locally with respect to each other.  This means, for
+example, that it is possible to start a remote process accessing both
+files at the same time.  Implementers of file name handlers need to
+ensure this principle is valid.
+</p>
+<p><var class="var">identification</var> specifies which part of the identifier shall be
+returned as string.  <var class="var">identification</var> can be the symbol
+<code class="code">method</code>, <code class="code">user</code>, <code class="code">host</code> or <code class="code">localname</code>; any other
+value is handled like <code class="code">nil</code> and means to return the complete
+identifier string.  In the example above, the remote <code class="code">user</code>
+identifier string would be <code class="code">root</code>.
+</p>
+<p>If the remote <var class="var">file</var> does not contain a method, a user name, or a
+host name, the respective default value is returned.  The string
+returned for <var class="var">identification</var> <code class="code">localname</code> can differ depending
+on whether there is an existing connection.  File name handler specific
+implementations could support further <var class="var">identification</var> symbols;
+See <a data-manual="tramp" href="https://www.gnu.org/software/emacs/manual/html_node/tramp/index.html#Top">Tramp</a>, for example, knows also the <code class="code">hop</code>
+symbol.
+</p>
+<p>If <var class="var">connected</var> is non-<code class="code">nil</code>, this function returns <code class="code">nil</code>
+even if <var class="var">filename</var> is remote, if Emacs has no network connection
+to its host.  This is useful when you want to avoid the delay of
+making connections when they don&rsquo;t exist.  If <var class="var">connected</var> is
+<code class="code">never</code>, <em class="emph">never</em> use an existing connection to return the
+identification, even if one is already present (this is otherwise like
+a value of <code class="code">nil</code>).  This lets you prevent any connection-specific
+logic, such as expanding the local part of the file name.
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-unhandled_002dfile_002dname_002ddirectory"><span class="category-def">Function: </span><span><strong class="def-name">unhandled-file-name-directory</strong> <var class="def-var-arguments">filename</var><a class="copiable-link" href="#index-unhandled_002dfile_002dname_002ddirectory"> &para;</a></span></dt>
+<dd><p>This function returns the name of a directory that is not magic.  For
+a non-magic <var class="var">filename</var> it returns the corresponding directory name
+(see <a class="pxref" href="Directory-Names.html">Directory Names</a>).  For a magic <var class="var">filename</var>, it invokes the
+file name handler, which therefore decides what value to return.  If
+<var class="var">filename</var> is not accessible from a local process, then the file
+name handler should indicate that by returning <code class="code">nil</code>.
+</p>
+<p>This is useful for running a subprocess; every subprocess must have a
+non-magic directory to serve as its current directory, and this function
+is a good way to come up with one.
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-local-part-of-remote-file-name"></a>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-file_002dlocal_002dname"><span class="category-def">Function: </span><span><strong class="def-name">file-local-name</strong> <var class="def-var-arguments">filename</var><a class="copiable-link" href="#index-file_002dlocal_002dname"> &para;</a></span></dt>
+<dd><p>This function returns the <em class="dfn">local part</em> of <var class="var">filename</var>.  This is
+the part of the file&rsquo;s name that identifies it on the remote host, and
+is typically obtained by removing from the remote file name the parts
+that specify the remote host and the method of accessing it.  For
+example:
+</p>
+<div class="example smallexample">
+<pre class="example-preformatted">(file-local-name &quot;/ssh:<var class="var">user</var>@<var class="var">host</var>:/foo/bar&quot;)
+     &rArr; &quot;/foo/bar&quot;
+</pre></div>
+
+<p>For a remote <var class="var">filename</var>, this function returns a file name which
+could be used directly as an argument of a remote process
+(see <a class="pxref" href="Asynchronous-Processes.html">Creating an Asynchronous Process</a>, and see <a class="pxref" href="Synchronous-Processes.html">Creating a Synchronous Process</a>),
+and as the program to run on the remote host.  If <var class="var">filename</var> is
+local, this function returns it unchanged.
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-remote_002dfile_002dname_002dinhibit_002dcache"><span class="category-def">User Option: </span><span><strong class="def-name">remote-file-name-inhibit-cache</strong><a class="copiable-link" href="#index-remote_002dfile_002dname_002dinhibit_002dcache"> &para;</a></span></dt>
+<dd><p>The attributes of remote files can be cached for better performance.  If
+they are changed outside of Emacs&rsquo;s control, the cached values become
+invalid, and must be reread.
+</p>
+<p>When this variable is set to <code class="code">nil</code>, cached values are never
+expired.  Use this setting with caution, only if you are sure nothing
+other than Emacs ever changes the remote files.  If it is set to
+<code class="code">t</code>, cached values are never used.  This is the safest value, but
+could result in performance degradation.
+</p>
+<p>A compromise is to set it to a positive number.  This means that
+cached values are used for that amount of seconds since they were
+cached.  If a remote file is checked regularly, it might be a good
+idea to let-bind this variable to a value less than the time period
+between consecutive checks.  For example:
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun display-time-file-nonempty-p (file)
+  (let ((remote-file-name-inhibit-cache
+         (- display-time-interval 5)))
+    (and (file-exists-p file)
+         (&lt; 0 (file-attribute-size
+               (file-attributes
+                (file-chase-links file)))))))
+</pre></div>
+</dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-without_002dremote_002dfiles"><span class="category-def">Macro: </span><span><strong class="def-name">without-remote-files</strong> <var class="def-var-arguments">body&hellip;</var><a class="copiable-link" href="#index-without_002dremote_002dfiles"> &para;</a></span></dt>
+<dd><p>The <code class="code">without-remote-files</code> macro evaluates the <var class="var">body</var> forms
+with deactivated file name handlers for remote files.  Those file
+names would be handled literally.
+</p>
+<p>The macro should be used only in forms where it is obvious, that
+remote files cannot appear or where it is intended not to handle
+remote file names.  It also reduces checks with
+<code class="code">file-name-handler-alist</code>, resulting in more performant code.
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Format-Conversion.html">File Format Conversion</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Create_002fDelete-Dirs.html">Creating, Copying and Deleting Directories</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Files.html">Files</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+    <div class=bar data-astro-cid-p3givckg>
+        <div class=list data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:gnuemacs height=1em viewBox="0 0 24 24" width=1em>
+                    <title>emacs</title>
+                    <symbol id=ai:simple-icons:gnuemacs>
+                        <path d="M12 24C5.448 24 .118 18.617.118 12S5.448 0 12 0s11.882 5.383 11.882 12S18.552 24 12 24zM12 .661C5.813.661.779 5.748.779 12S5.813 23.339 12 23.339S23.221 18.253 23.221 12S18.187.661 12 .661zM8.03 20.197s.978.069 2.236-.042c.51-.045 2.444-.235 3.891-.552c0 0 1.764-.377 2.707-.725c.987-.364 1.524-.673 1.766-1.11c-.011-.09.074-.408-.381-.599c-1.164-.488-2.514-.4-5.185-.457c-2.962-.102-3.948-.598-4.472-.997c-.503-.405-.25-1.526 1.907-2.513c1.086-.526 5.345-1.496 5.345-1.496c-1.434-.709-4.109-1.955-4.659-2.224c-.482-.236-1.254-.591-1.421-1.021c-.19-.413.448-.768.804-.87c1.147-.331 2.766-.536 4.24-.56c.741-.012.861-.059.861-.059c1.022-.17 1.695-.869 1.414-1.976c-.252-1.13-1.579-1.795-2.84-1.565c-1.188.217-4.05 1.048-4.05 1.048c3.539-.031 4.131.028 4.395.398c.156.218-.071.518-1.015.672c-1.027.168-3.163.37-3.163.37c-2.049.122-3.492.13-3.925 1.046c-.283.599.302 1.129.558 1.46c1.082 1.204 2.646 1.853 3.652 2.331c.379.18 1.49.52 1.49.52c-3.265-.18-5.619.823-7.001 1.977c-1.562 1.445-.871 3.168 2.33 4.228c1.891.626 2.828.921 5.648.667c1.661-.09 1.923-.036 1.939.1c.023.192-1.845.669-2.355.816c-1.298.374-4.699 1.129-4.716 1.133z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:gnuemacs></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Emacs</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:org height=1em viewBox="0 0 24 24" width=1em>
+                    <title>org-mode</title>
+                    <symbol id=ai:simple-icons:org>
+                        <path d="M17.169 0c-.566.004-2.16 3.312-3.376 5.94a2.19 2.19 0 0 1-.408-1.267c-.03-.582-1.089.237-.936 1.275c-.068-.035-1.26.227-1.26.23c-.23-.93-.802-1.618-1.15-.563c-.701 1.663-.88 2.984.115 4.585c-.908 4.058-6.948 6.053-6.32 9.33c.175.004 1.634 3.48 6.337 2.057c5.557-1.577 8.624 2.116 8.978 2.375c.52.526-1.348-4.573-5.302-6.865c-2.339-1.276-.87-3.474-.703-4.25c0 0 1.874 1.312 3.232-.692c1.227.316 2.05-.224 3.105.158c.64.28 3.336.11 2.334-1.396c-.148.129.07.27-.075.46c-.043.056-.128.232-.408.315c-.314.149-.83.27-1.43-.37c-.434-.32-.748-.04-.992-.063c.152-.098.577-.315 1.264-.315c.388 0 .594.336.854.338c.174 0 .685-.262.787-.365c.63-.41.697-.278 1.012-.905c.17-.759-.215-.92-.332-1.129c-.032-.483-.436-.67-.919-.326c-1.106-.198-2.192-.105-2.728-.15c-1.175-.164-2.153-.786-2.153-.786c.143-.19.075-.6-.842-.628c-.315-.104-.45-.2-.745-.307c.61-1.37.674-2.007 1.418-4.004c.261-1.053 1.039-2.685.643-2.682zm-4.297 8.093c.03-.086.443.138.952.176c.395.03.805.048 1.296-.025c.03-.005.172.095-.15.194c-.02.01-.062-.01-.065.196c0 .022-.01.04-.02.046c-.15.152-.708.223-1.065.1c-.436-.17-.482-.316-.517-.443c-.305-.147-.47-.123-.43-.244zM9.685 10.2C8.86 9 8.929 8.36 8.96 7.256C7.961 8.288 6.855 8.3 5.18 8.58c-1.299.234-3.657 2.447-4.025 4.742c-.043.608-.08 2.183.424 3.498c.492 1.13.828 1.727 1.844 2.335c-.882-3.169 5.296-5.33 6.263-8.955z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:org></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Orgmode</p>
+                </div>
+            </span>
+            <a href=/donations.html class=entry data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=simple-icons:astro height=1em viewBox="0 0 24 24" width=1em>
+                    <title>Donations</title>
+                    <symbol id=ai:simple-icons:astro>
+                        <path d="M8.358 20.162c-1.186-1.07-1.532-3.316-1.038-4.944c.856 1.026 2.043 1.352 3.272 1.535c1.897.283 3.76.177 5.522-.678c.202-.098.388-.229.608-.36c.166.473.209.95.151 1.437c-.14 1.185-.738 2.1-1.688 2.794c-.38.277-.782.525-1.175.787c-1.205.804-1.531 1.747-1.078 3.119l.044.148a3.158 3.158 0 0 1-1.407-1.188a3.31 3.31 0 0 1-.544-1.815c-.004-.32-.004-.642-.048-.958c-.106-.769-.472-1.113-1.161-1.133c-.707-.02-1.267.411-1.415 1.09c-.012.053-.028.104-.045.165h.002zm-5.961-4.445s3.24-1.575 6.49-1.575l2.451-7.565c.092-.366.36-.614.662-.614c.302 0 .57.248.662.614l2.45 7.565c3.85 0 6.491 1.575 6.491 1.575L16.088.727C15.93.285 15.663 0 15.303 0H8.697c-.36 0-.615.285-.784.727l-5.516 14.99z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:simple-icons:astro></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>æèµ</p>
+                </div>
+            </span>
+            </a>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg xmlns="http://www.w3.org/2000/svg" class=heading data-astro-cid-p3givckg data-icon=simple-icons:copyright width="1em" height="1em" viewBox="0 0 24 24">
+                    <title>Copyright</title>
+                    <path fill="currentColor" d="M19 2a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm-5 5h-4a1 1 0 0 0-1 1l.007.117A1 1 0 0 0 10 9h3v5a1 1 0 0 1-1.993.117L11 14a1 1 0 0 0-2 0a3 3 0 0 0 6 0V8a1 1 0 0 0-1-1" />
+                    <use xlink:href=#ai:simple-icons:copyright></use>
+                </svg>
+                <div class="content left" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Â© 2025 Jasper Hsu</p>
+                </div>
+            </span>
+        </div>
+        <a href=https://creativecommons.org/licenses/by-nc-sa/4.0/ class="list license" data-astro-cid-p3givckg>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Creative Commons</title>
+                    <symbol id=ai:fa6-brands:creative-commons>
+                        <path d="m245.83 214.87l-33.22 17.28c-9.43-19.58-25.24-19.93-27.46-19.93c-22.13 0-33.22 14.61-33.22 43.84c0 23.57 9.21 43.84 33.22 43.84c14.47 0 24.65-7.09 30.57-21.26l30.55 15.5c-6.17 11.51-25.69 38.98-65.1 38.98c-22.6 0-73.96-10.32-73.96-77.05c0-58.69 43-77.06 72.63-77.06c30.72-.01 52.7 11.95 65.99 35.86zm143.05 0l-32.78 17.28c-9.5-19.77-25.72-19.93-27.9-19.93c-22.14 0-33.22 14.61-33.22 43.84c0 23.55 9.23 43.84 33.22 43.84c14.45 0 24.65-7.09 30.54-21.26l31 15.5c-2.1 3.75-21.39 38.98-65.09 38.98c-22.69 0-73.96-9.87-73.96-77.05c0-58.67 42.97-77.06 72.63-77.06c30.71-.01 52.58 11.95 65.56 35.86zM247.56 8.05C104.74 8.05 0 123.11 0 256.05c0 138.49 113.6 248 247.56 248c129.93 0 248.44-100.87 248.44-248c0-137.87-106.62-248-248.44-248zm.87 450.81c-112.54 0-203.7-93.04-203.7-202.81c0-105.42 85.43-203.27 203.72-203.27c112.53 0 202.82 89.46 202.82 203.26c-.01 121.69-99.68 202.82-202.84 202.82z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Creative Commons</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-by height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Attribute</title>
+                    <symbol id=ai:fa6-brands:creative-commons-by>
+                        <path d="M314.9 194.4v101.4h-28.3v120.5h-77.1V295.9h-28.3V194.4c0-4.4 1.6-8.2 4.6-11.3c3.1-3.1 6.9-4.7 11.3-4.7H299c4.1 0 7.8 1.6 11.1 4.7c3.1 3.2 4.8 6.9 4.8 11.3zm-101.5-63.7c0-23.3 11.5-35 34.5-35s34.5 11.7 34.5 35c0 23-11.5 34.5-34.5 34.5s-34.5-11.5-34.5-34.5zM247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-by></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Attribute</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-nc height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Noncommercial</title>
+                    <symbol id=ai:fa6-brands:creative-commons-nc>
+                        <path d="M247.6 8C387.4 8 496 115.9 496 256c0 147.2-118.5 248-248.4 248C113.1 504 0 393.2 0 256C0 123.1 104.7 8 247.6 8zM55.8 189.1c-7.4 20.4-11.1 42.7-11.1 66.9c0 110.9 92.1 202.4 203.7 202.4c122.4 0 177.2-101.8 178.5-104.1l-93.4-41.6c-7.7 37.1-41.2 53-68.2 55.4v38.1h-28.8V368c-27.5-.3-52.6-10.2-75.3-29.7l34.1-34.5c31.7 29.4 86.4 31.8 86.4-2.2c0-6.2-2.2-11.2-6.6-15.1c-14.2-6-1.8-.1-219.3-97.4zM248.4 52.3c-38.4 0-112.4 8.7-170.5 93l94.8 42.5c10-31.3 40.4-42.9 63.8-44.3v-38.1h28.8v38.1c22.7 1.2 43.4 8.9 62 23L295 199.7c-42.7-29.9-83.5-8-70 11.1c53.4 24.1 43.8 19.8 93 41.6l127.1 56.7c4.1-17.4 6.2-35.1 6.2-53.1c0-57-19.8-105-59.3-143.9c-39.3-39.9-87.2-59.8-143.6-59.8z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-nc></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Noncommercial</p>
+                </div>
+            </span>
+            <span class=entry data-astro-cid-p3givckg>
+                <svg class=heading data-astro-cid-p3givckg data-icon=fa6-brands:creative-commons-sa height=1em viewBox="0 0 496 512" width=0.97em>
+                    <title>Share Alike</title>
+                    <symbol id=ai:fa6-brands:creative-commons-sa>
+                        <path d="M247.6 8C389.4 8 496 118.1 496 256c0 147.1-118.5 248-248.4 248C113.6 504 0 394.5 0 256C0 123.1 104.7 8 247.6 8zm.8 44.7C130.2 52.7 44.7 150.6 44.7 256c0 109.8 91.2 202.8 203.7 202.8c103.2 0 202.8-81.1 202.8-202.8c.1-113.8-90.2-203.3-202.8-203.3zM137.7 221c13-83.9 80.5-95.7 108.9-95.7c99.8 0 127.5 82.5 127.5 134.2c0 63.6-41 132.9-128.9 132.9c-38.9 0-99.1-20-109.4-97h62.5c1.5 30.1 19.6 45.2 54.5 45.2c23.3 0 58-18.2 58-82.8c0-82.5-49.1-80.6-56.7-80.6c-33.1 0-51.7 14.6-55.8 43.8h18.2l-49.2 49.2l-49-49.2h19.4z" fill=currentColor/>
+                    </symbol>
+                    <use xlink:href=#ai:fa6-brands:creative-commons-sa></use>
+                </svg>
+                <div class="content right" data-astro-cid-p3givckg>
+                    <p data-astro-cid-p3givckg>Share Alike</p>
+                </div>
+            </span>
+        </a>
+    </div>
+
+</body>
+</html>

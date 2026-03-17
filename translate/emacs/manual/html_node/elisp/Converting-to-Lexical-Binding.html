@@ -46,71 +46,38 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsection-level-extent" id="Converting-to-Lexical-Binding">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Selecting-Lisp-Dialect.html" accesskey="p" rel="prev">Selecting Lisp Dialect</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Variable-Scoping.html" accesskey="u" rel="up">Scoping Rules for Variable Bindings</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Selecting-Lisp-Dialect.html" accesskey="p" rel="prev">选择 Lisp 方言</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Variable-Scoping.html" accesskey="u" rel="up">Scoping 变量绑定的作用域规则</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Converting-to-Lexical-Binding-1"><span>12.10.5 Converting to Lexical Binding<a class="copiable-link" href="#Converting-to-Lexical-Binding-1"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_8fc1_79fb_81f3_8bcd_6cd5_7ed1_5b9a"><span>12.10.5 迁移至词法绑定<a class="copiable-link" href="#g_t_8fc1_79fb_81f3_8bcd_6cd5_7ed1_5b9a"> &para;</a></span></h4>
 
-<p>Converting an Emacs Lisp program to lexical binding is easy.  First,
-add a file-local variable setting of <code class="code">lexical-binding</code> to
-<code class="code">t</code> in the header line of the Emacs Lisp source file (see <a class="pxref" href="File-Local-Variables.html">File Local Variables</a>).  Second, check that every variable in the program
-which needs to be dynamically bound has a variable definition, so that
-it is not inadvertently bound lexically.
+<p>将 Emacs Lisp 程序迁移为词法绑定的过程很简单：
+首先，在 Emacs Lisp 源文件的头部行中，添加文件局部变量设置，将 <code class="code">lexical-binding</code> 设为 <code class="code">t</code>（see <a class="pxref" href="File-Local-Variables.html">文件局部变量</a>）；
+其次，检查程序中所有需要动态绑定的变量：确保这些变量都有对应的变量定义，避免被意外地词法绑定。
 </p>
 <a class="index-entry-id" id="index-free-variable"></a>
 <a class="index-entry-id" id="index-unused-lexical-variable"></a>
-<p>A simple way to find out which variables need a variable definition
-is to byte-compile the source file.  See <a class="xref" href="Byte-Compilation.html">Byte Compilation</a>.  If a
-non-special variable is used outside of a <code class="code">let</code> form, the
-byte-compiler will warn about reference or assignment to a free
-variable.  If a non-special variable is bound but not used within a
-<code class="code">let</code> form, the byte-compiler will warn about an unused lexical
-variable.  The byte-compiler will also issue a warning if you use a
-special variable as a function argument.
+<p>判断哪些变量需要定义的一种简单方法，是对源文件进行字节编译。See <a class="xref" href="Byte-Compilation.html">Byte Compilation</a>。如果一个非特殊变量在 <code class="code">let</code> 表达式之外被使用，字节编译器会警告：对自由变量的引用或赋值。如果一个非特殊变量在 <code class="code">let</code> 表达式中被绑定但未被使用，字节编译器会警告：存在未使用的词法变量。如果你将特殊变量用作函数参数，字节编译器同样会发出警告。
 </p>
-<p>A warning about a reference or an assignment to a free variable is
-usually a clear sign that that variable should be marked as
-dynamically scoped, so you need to add an appropriate <code class="code">defvar</code>
-before the first use of that variable.
+<p>出现对自由变量的引用或赋值这类警告，通常明确说明：该变量应当被标记为动态作用域，因此你需要在变量第一次使用之前，添加合适的 <code class="code">defvar</code> 声明。
 </p>
-<p>A warning about an unused variable may be a good hint that the
-variable was intended to be dynamically scoped (because it is actually
-used, but in another function), but it may also be an indication that
-the variable is simply really not used and could simply be removed.
-So you need to find out which case it is, and based on that, either
-add a <code class="code">defvar</code> or remove the variable altogether.  If removal is
-not possible or not desirable (typically because it is a formal
-argument and that we cannot or don&rsquo;t want to change all the callers),
-you can also add a leading underscore to the variable&rsquo;s name to
-indicate to the compiler that this is a variable known not to
-be used.)
+<p>未使用变量的警告，可能是一个很好的提示：该变量本意是要使用动态作用域（因为它确实在其他函数中被使用），但也可能只是说明：该变量确实完全没用，可以直接删除。
+所以你需要判断属于哪种情况，然后据此要么添加 <code class="code">defvar</code>，要么彻底删除该变量。如果无法或不希望删除（通常因为它是形式参数，而你不能或不想修改所有调用处），也可以在变量名前加一个下划线，用来告诉编译器：这个变量是故意不使用的。
 </p>
 <h4 class="subsubheading" id="Cross_002dfile-variable-checking"><span>Cross-file variable checking<a class="copiable-link" href="#Cross_002dfile-variable-checking"> &para;</a></span></h4>
 
-<p><strong class="strong">Caution:</strong> This is an experimental feature that may change or
-disappear without prior notice.
+<p><strong class="strong">警告：</strong> 这是一项实验性特性，可能会在未经预先通知的情况下发生变更或被移除。
 </p>
-<p>The byte-compiler can also warn about lexical variables that are
-special in other Emacs Lisp files, often indicating a missing
-<code class="code">defvar</code> declaration.  This useful but somewhat specialized check
-requires three steps:
+<p>字节编译器还可以对在其他 Emacs Lisp 文件中被声明为特殊变量的词法变量发出警告，这种情况通常意味着缺少了 <code class="code">defvar</code> 声明。这项实用但较为专业的检查需要三个步骤：
 </p>
 <ol class="enumerate">
-<li> Byte-compile all files whose special variable declarations may be of
-interest, with the environment variable <code class="env">EMACS_GENERATE_DYNVARS</code>
-set to a nonempty string.  These are typically all the files in the
-same package or related packages or Emacs subsystems.  The process
-will generate a file whose name ends in <samp class="file">.dynvars</samp> for each
-compiled Emacs Lisp file.
+<li> 将环境变量 <code class="env">EMACS_GENERATE_DYNVARS</code> 设置为非空字符串，然后对所有你关心其特殊变量声明的文件进行字节编译。这些文件通常是同一个软件包、相关软件包或 Emacs 子系统中的所有文件。此过程会为每个被编译的 Emacs Lisp 文件生成一个以 <samp class="file">.dynvars</samp> 结尾的文件。
 
-</li><li> Concatenate the <samp class="file">.dynvars</samp> files into a single file.
+</li><li> 将所有 <samp class="file">.dynvars</samp> 文件合并为一个单独的文件。
 
-</li><li> Byte-compile the files that need to be checked, this time with
-the environment variable <code class="env">EMACS_DYNVARS_FILE</code> set to the name
-of the aggregated file created in step 2.
+</li><li> 对需要检查的文件再次进行字节编译，这次将环境变量 <code class="env">EMACS_DYNVARS_FILE</code>设置为步骤 2 中生成的合并文件的文件名。
 </li></ol>
 
-<p>Here is an example illustrating how this could be done, assuming that
-a Unix shell and <code class="command">make</code> are used for byte-compilation:
+<p>下面是一个示例，演示具体如何操作，假设使用 Unix Shell 和 <code class="command">make</code> 工具进行字节编译：
 </p>
 <div class="example">
 <pre class="example-preformatted">$ rm *.elc                                # force recompilation
@@ -121,9 +88,6 @@ $ EMACS_DYNVARS_FILE=~/my-dynvars make    # perform checks
 </pre></div>
 
 </div>
-<hr>
-<p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Selecting-Lisp-Dialect.html">Selecting Lisp Dialect</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Variable-Scoping.html">Scoping Rules for Variable Bindings</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

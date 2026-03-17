@@ -47,67 +47,26 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsection-level-extent" id="Intro-to-Buffer_002dLocal">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Creating-Buffer_002dLocal.html" accesskey="n" rel="next">Creating and Deleting Buffer-Local Bindings</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Buffer_002dLocal-Variables.html" accesskey="u" rel="up">Buffer-Local Variables</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Creating-Buffer_002dLocal.html" accesskey="n" rel="next">创建与删除缓冲区局部绑定</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Buffer_002dLocal-Variables.html" accesskey="u" rel="up">缓冲区局部变量</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Introduction-to-Buffer_002dLocal-Variables"><span>12.11.1 Introduction to Buffer-Local Variables<a class="copiable-link" href="#Introduction-to-Buffer_002dLocal-Variables"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_7f13_51b2_533a_5c40_90e8_53d8_91cf_7b80_4ecb"><span>12.11.1 缓冲区局部变量简介<a class="copiable-link" href="#g_t_7f13_51b2_533a_5c40_90e8_53d8_91cf_7b80_4ecb"> &para;</a></span></h4>
 
-<p>A buffer-local variable has a buffer-local binding associated with a
-particular buffer.  The binding is in effect when that buffer is
-current; otherwise, it is not in effect.  If you set the variable while
-a buffer-local binding is in effect, the new value goes in that binding,
-so its other bindings are unchanged.  This means that the change is
-visible only in the buffer where you made it.
+<p>缓冲区局部变量拥有与特定缓冲区关联的缓冲区局部绑定。当该缓冲区成为当前缓冲区时，该绑定生效；否则不生效。如果你在缓冲区局部绑定生效时修改变量，新值只会存入该绑定，其他绑定保持不变。也就是说，修改只在你执行操作的这个缓冲区中可见。
 </p>
-<p>The variable&rsquo;s ordinary binding, which is not associated with any
-specific buffer, is called the <em class="dfn">default binding</em>.  In most cases,
-this is the global binding.
+<p>变量不与任何特定缓冲区关联的普通绑定，称为 <em class="dfn">默认绑定(default binding)</em>。大多数情况下，默认绑定就是全局绑定。
 </p>
-<p>A variable can have buffer-local bindings in some buffers but not in
-other buffers.  The default binding is shared by all the buffers that
-don&rsquo;t have their own bindings for the variable.  (This includes all
-newly-created buffers.)  If you set the variable in a buffer that does
-not have a buffer-local binding for it, this sets the default binding,
-so the new value is visible in all the buffers that see the default
-binding.
+<p>一个变量可以在部分缓冲区中拥有缓冲区局部绑定，在其他缓冲区中则没有。所有没有为该变量建立自身绑定的缓冲区（包括所有新建的缓冲区），都会共享默认绑定。如果你在一个没有为该变量建立缓冲区局部绑定的缓冲区中修改它，修改的是默认绑定，因此新值会在所有使用默认绑定的缓冲区中生效。
 </p>
-<p>The most common use of buffer-local bindings is for major modes to change
-variables that control the behavior of commands.  For example, C mode and
-Lisp mode both set the variable <code class="code">paragraph-start</code> to specify that only
-blank lines separate paragraphs.  They do this by making the variable
-buffer-local in the buffer that is being put into C mode or Lisp mode, and
-then setting it to the new value for that mode.  See <a class="xref" href="Major-Modes.html">Major Modes</a>.
+<p>缓冲区局部绑定最常见的用途，是让主模式修改控制命令行为的相关变量。例如，C 模式和 Lisp 模式都会修改变量 <code class="code">paragraph-start</code>，用来规定只有空行才能分隔段落。它们的实现方式是：在切换到 C 模式或 Lisp 模式的缓冲区中，将该变量设为缓冲区局部变量，然后为该模式设置新值。See <a class="xref" href="Major-Modes.html">Major Modes</a>。
 </p>
-<p>The usual way to make a buffer-local binding is with
-<code class="code">make-local-variable</code>, which is what major mode commands typically
-use.  This affects just the current buffer; all other buffers (including
-those yet to be created) will continue to share the default value unless
-they are explicitly given their own buffer-local bindings.
+<p>创建缓冲区局部绑定的常规方式是使用 <code class="code">make-local-variable</code> 函数，这也是主模式命令最常采用的方式。该操作仅作用于当前缓冲区；所有其他缓冲区（包括尚未创建的缓冲区）会继续共享默认值，除非显式为它们创建专属的缓冲区局部绑定。
 </p>
 <a class="index-entry-id" id="index-automatically-buffer_002dlocal"></a>
-<p>A more powerful operation is to mark the variable as
-<em class="dfn">automatically buffer-local</em> by calling
-<code class="code">make-variable-buffer-local</code>.  You can think of this as making the
-variable local in all buffers, even those yet to be created.  More
-precisely, the effect is that setting the variable automatically makes
-the variable local to the current buffer if it is not already so.  All
-buffers start out by sharing the default value of the variable as usual,
-but setting the variable creates a buffer-local binding for the current
-buffer.  The new value is stored in the buffer-local binding, leaving
-the default binding untouched.  This means that the default value cannot
-be changed with <code class="code">setq</code> in any buffer; the only way to change it is
-with <code class="code">setq-default</code>.
+<p>一种功能更强的操作是调用 <code class="code">make-variable-buffer-local</code>，将变量标记为 <em class="dfn">自动缓冲区局部（automatically buffer-local）</em> 变量。你可以理解为：这会让该变量在所有缓冲区（甚至尚未创建的缓冲区）中都成为局部变量。更准确地说，其效果是：当修改变量时，如果该变量尚未成为当前缓冲区的局部变量，会自动将其设为当前缓冲区的局部变量。
+所有缓冲区初始时都会像往常一样共享该变量的默认值，但对变量的赋值操作会为当前缓冲区创建缓冲区局部绑定。新值会存入这个缓冲区局部绑定中，而默认绑定保持不变。这意味着：无法通过 <code class="code">setq</code> 在任何缓冲区中修改默认值；修改默认值的唯一方式是使用 <code class="code">setq-default</code>。
 </p>
-<p><strong class="strong">Warning:</strong> When a variable has buffer-local
-bindings in one or more buffers, <code class="code">let</code> rebinds the binding that&rsquo;s
-currently in effect.  For instance, if the current buffer has a
-buffer-local value, <code class="code">let</code> temporarily rebinds that.  If no
-buffer-local bindings are in effect, <code class="code">let</code> rebinds
-the default value.  If inside the <code class="code">let</code> you then change to a
-different current buffer in which a different binding is in effect,
-you won&rsquo;t see the <code class="code">let</code> binding any more.  And if you exit the
-<code class="code">let</code> while still in the other buffer, you won&rsquo;t see the
-unbinding occur (though it will occur properly).  Here is an example
-to illustrate:
+<p><strong class="strong">警告：</strong> 当一个变量在一个或多个缓冲区中存在缓冲区局部绑定时，<code class="code">let</code> 会对当前生效的绑定进行临时重绑定。例如：如果当前缓冲区有缓冲区局部值，<code class="code">let</code> 会临时重绑定这个局部值；如果没有生效的缓冲区局部绑定，<code class="code">let</code> 会重绑定默认值。
+若在 <code class="code">let</code> 块内切换到另一个当前缓冲区（该缓冲区中生效的是另一套绑定），你将无法再看到 <code class="code">let</code> 创建的临时绑定。而如果在切换后的缓冲区中退出 <code class="code">let</code> 块，你不会看到解绑操作的直观效果（尽管解绑会正常执行）。以下示例可说明这一点：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(setq foo 'g)
@@ -125,20 +84,16 @@ to illustrate:
 foo &rArr; 'a
 </pre></div></div>
 
-<p>Note that references to <code class="code">foo</code> in <var class="var">body</var> access the
-buffer-local binding of buffer &lsquo;<samp class="samp">b</samp>&rsquo;.
+<p>注意，在 <var class="var">body</var> 中对 <code class="code">foo</code> 的引用会访问缓冲区 &lsquo;<samp class="samp">b</samp>&rsquo; 的缓冲区局部绑定。
 </p>
-<p>When a file specifies local variable values, these become buffer-local
-values when you visit the file.  See <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/File-Variables.html#File-Variables">File Variables</a> in <cite class="cite">The
-GNU Emacs Manual</cite>.
+<p>当文件指定了局部变量值时，在你打开该文件时，这些值会成为缓冲区局部值。See <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/File-Variables.html#File-Variables">File Variables</a> in <cite class="cite">The GNU Emacs Manual</cite>。
 </p>
-<p>A terminal-local variable cannot be made buffer-local
-(see <a class="pxref" href="Multiple-Terminals.html">Multiple Terminals</a>).
+<p>终端局部变量无法被设为缓冲区局部变量(see <a class="pxref" href="Multiple-Terminals.html">Multiple Terminals</a>)。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Creating-Buffer_002dLocal.html">Creating and Deleting Buffer-Local Bindings</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Buffer_002dLocal-Variables.html">Buffer-Local Variables</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Creating-Buffer_002dLocal.html">创建与删除缓冲区局部绑定</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Buffer_002dLocal-Variables.html">缓冲区局部变量</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

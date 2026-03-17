@@ -46,35 +46,18 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsection-level-extent" id="Repeated-Expansion">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Eval-During-Expansion.html" accesskey="p" rel="prev">Evaluating Macro Arguments in Expansion</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html" accesskey="u" rel="up">Common Problems Using Macros</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Eval-During-Expansion.html" accesskey="p" rel="prev">在展开过程中求值宏参数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html" accesskey="u" rel="up">使用宏的常见问题</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="How-Many-Times-is-the-Macro-Expanded_003f"><span>14.5.5 How Many Times is the Macro Expanded?<a class="copiable-link" href="#How-Many-Times-is-the-Macro-Expanded_003f"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_5b8f_4f1a_88ab_5c55_5f00_591a_5c11_6b21_ff1f"><span>14.5.5 宏会被展开多少次？<a class="copiable-link" href="#g_t_5b8f_4f1a_88ab_5c55_5f00_591a_5c11_6b21_ff1f"> &para;</a></span></h4>
 
-<p>Occasionally problems result from the fact that a macro call is
-expanded each time it is evaluated in an interpreted function, but is
-expanded only once (during compilation) for a compiled function.  If the
-macro definition has side effects, they will work differently depending
-on how many times the macro is expanded.
+<p>有时候会出现这样的问题：在解释执行的函数里，宏调用每次被求值时都会重新展开；而在编译后的函数里，宏只会在编译阶段展开一次。如果宏定义本身带有副作用，执行效果就会因为展开次数不同而不一致。
+  因此，你应该避免在计算宏展开的过程中产生副作用，除非你非常清楚自己在做什么。
 </p>
-<p>Therefore, you should avoid side effects in computation of the
-macro expansion, unless you really know what you are doing.
+<p>有一种特殊的 “副作用” 是无法避免的：构造 Lisp 对象。几乎所有宏展开都会构造列表，这也是大多数宏存在的意义。这通常是安全的，只有一种情况需要格外小心：当你构造的对象会成为宏展开式中被引用常量（quoted constant） 的一部分时。
 </p>
-<p>One special kind of side effect can&rsquo;t be avoided: constructing Lisp
-objects.  Almost all macro expansions include constructed lists; that is
-the whole point of most macros.  This is usually safe; there is just one
-case where you must be careful: when the object you construct is part of a
-quoted constant in the macro expansion.
+<p>如果宏只在编译时被展开一次，那么对应的对象也只会在编译期间被构造一次。但在解释执行时，宏每次被调用都会重新展开，这意味着每次都会构造一个新对象。
 </p>
-<p>If the macro is expanded just once, in compilation, then the object is
-constructed just once, during compilation.  But in interpreted
-execution, the macro is expanded each time the macro call runs, and this
-means a new object is constructed each time.
-</p>
-<p>In most clean Lisp code, this difference won&rsquo;t matter.  It can matter
-only if you perform side-effects on the objects constructed by the macro
-definition.  Thus, to avoid trouble, <strong class="strong">avoid side effects on
-objects constructed by macro definitions</strong>.  Here is an example of how
-such side effects can get you into trouble:
+<p>在大多数规范的 Lisp 代码中，这种差异并不会产生影响。只有当你对宏构造出来的对象执行副作用操作时，才会引发问题。因此，为避免麻烦，<strong class="strong">请避免对宏定义所构造的对象施加副作用</strong>。下面这个例子展示了这类副作用是如何引发问题的：
 </p>
 <div class="example lisp">
 <div class="group"><pre class="lisp-preformatted">(defmacro empty-object ()
@@ -88,23 +71,11 @@ such side effects can get you into trouble:
     object))
 </pre></div></div>
 
-<p>If <code class="code">initialize</code> is interpreted, a new list <code class="code">(nil)</code> is
-constructed each time <code class="code">initialize</code> is called.  Thus, no side effect
-survives between calls.  If <code class="code">initialize</code> is compiled, then the
-macro <code class="code">empty-object</code> is expanded during compilation, producing a
-single constant <code class="code">(nil)</code> that is reused and altered each time
-<code class="code">initialize</code> is called.
+<p>如果 <code class="code">initialize</code> 是解释执行的，那么每次调用它时，都会新建一个列表 <code class="code">(nil)</code>。因此，多次调用之间不会保留副作用。如果 <code class="code">initialize</code> 是编译执行的，那么宏 <code class="code">empty-object</code> 会在编译时就展开，生成一个常量 <code class="code">(nil)</code>；之后每次调用 <code class="code">initialize</code>，都会复用并修改这个同一个对象。
 </p>
-<p>One way to avoid pathological cases like this is to think of
-<code class="code">empty-object</code> as a funny kind of constant, not as a memory
-allocation construct.  You wouldn&rsquo;t use <code class="code">setcar</code> on a constant such
-as <code class="code">'(nil)</code>, so naturally you won&rsquo;t use it on <code class="code">(empty-object)</code>
-either.
+<p>避免出现这类极端问题的一种思路是：把 <code class="code">empty-object</code> 看成一种特殊常量，而不是用来分配内存的结构。你不会对 <code class="code">'(nil)</code> 这样的常量使用 <code class="code">setcar</code>，自然也不应该对 <code class="code">(empty-object)</code> 使用它。
 </p>
 </div>
-<hr>
-<p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Eval-During-Expansion.html">Evaluating Macro Arguments in Expansion</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html">Common Problems Using Macros</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

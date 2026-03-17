@@ -49,112 +49,60 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="subsection-level-extent" id="Advising-Named-Functions">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Advice-Combinators.html" accesskey="n" rel="next">Ways to compose advice</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Core-Advising-Primitives.html" accesskey="p" rel="prev">Primitives to manipulate advices</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Advising-Functions.html" accesskey="u" rel="up">Advising Emacs Lisp Functions</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Advice-Combinators.html" accesskey="n" rel="next">建议的组合方式</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Core-Advising-Primitives.html" accesskey="p" rel="prev">操作建议的原语</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Advising-Functions.html" accesskey="u" rel="up">为 Emacs Lisp 函数添加建议</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Advising-Named-Functions-1"><span>13.12.2 Advising Named Functions<a class="copiable-link" href="#Advising-Named-Functions-1"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_4e3a_547d_540d_51fd_6570_6dfb_52a0_5efa_8bae"><span>13.12.2 为命名函数添加建议<a class="copiable-link" href="#g_t_4e3a_547d_540d_51fd_6570_6dfb_52a0_5efa_8bae"> &para;</a></span></h4>
 <a class="index-entry-id" id="index-advising-named-functions"></a>
 
-<p>A common use of advice is for named functions and macros.
-You could just use <code class="code">add-function</code> as in:
+<p>建议（advice）的一个常见用途是作用于命名函数与宏。你可以直接像下面这样使用 <code class="code">add-function</code>：
 </p>
 <div class="example">
 <pre class="example-preformatted">(add-function :around (symbol-function '<var class="var">fun</var>) #'his-tracing-function)
 </pre></div>
 
-<p>But you should use <code class="code">advice-add</code> and <code class="code">advice-remove</code> for that
-instead.  This separate set of functions to manipulate pieces of advice applied
-to named functions, offers the following extra features compared to
-<code class="code">add-function</code>: they know how to deal with macros and autoloaded
-functions, they let <code class="code">describe-function</code> preserve the original docstring as
-well as document the added advice, and they let you add and remove advice
-before a function is even defined.
+<p>但对此你应该改用 <code class="code">advice-add</code> 和 <code class="code">advice-remove</code>。这套专门用于操作命名函数上附加建议的函数，相比 <code class="code">add-function</code> 提供了以下额外特性：它们能正确处理宏和自动加载函数，能让 <code class="code">describe-function</code> 保留原始文档字符串并同时记录附加的建议，还允许你在函数尚未定义时就提前添加或移除建议。
 </p>
-<p><code class="code">advice-add</code> can be useful for altering the behavior of existing calls
-to an existing function without having to redefine the whole function.
-However, it can be a source of bugs, since existing callers to the function may
-assume the old behavior, and work incorrectly when the behavior is changed by
-advice.  Advice can also cause confusion in debugging, if the person doing the
-debugging does not notice or remember that the function has been modified
-by advice.
+<p><code class="code">advice-add</code> 适用于在不重新定义整个函数的前提下，修改现有函数被调用时的行为。但它也可能成为 bug 的来源，因为调用该函数的原有代码可能会假设函数保持旧有行为，一旦行为被建议修改，就可能运行出错。如果调试者没有注意到或忘记该函数已被建议修改，建议机制还会给调试带来困惑。
 </p>
-<p>Note that the problems are not due to advice per se, but to the act
-of modifying a named function.  It is even more problematic to modify
-a named function via lower-level primitives like <code class="code">fset</code>,
-<code class="code">defalias</code>, or <code class="code">cl-letf</code>.  From that point of view, advice
-is the better way to modify a named function because it keeps track of
-the modifications, so they can be listed and undone.
+<p>需要注意的是，这些问题并非源于建议机制本身，而是源于修改命名函数这一行为。如果通过 <code class="code">fset</code>、<code class="code">defalias</code> 或 <code class="code">cl-letf</code> 这类底层原语来修改命名函数，问题会更加严重。从这个角度来看，使用建议是修改命名函数的更好方式，因为它会记录所有修改，便于查看与撤销。
 </p>
-<p>Modifying a named function should be reserved for
-the cases where you cannot modify Emacs&rsquo;s behavior in any other way.
-If it is possible to do the same thing via a hook, that is preferable
-(see <a class="pxref" href="Hooks.html">Hooks</a>).  If you simply want to change what a particular key
-does, it may be better to write a new command, and remap the old
-command&rsquo;s key bindings to the new one (see <a class="pxref" href="Remapping-Commands.html">Remapping Commands</a>).
+<p>修改命名函数应当只用于没有其他办法改变 Emacs 行为的场景。如果可以通过钩子（hook）实现相同效果，优先使用钩子（see <a class="pxref" href="Hooks.html">Hooks</a>）。如果你只是想修改某个按键的功能，更好的做法通常是：编写一个新命令，并将旧命令的按键绑定重映射到新命令上（see <a class="pxref" href="Remapping-Commands.html">Remapping Commands</a>）。
 </p>
-<p>If you are writing code for release, for others to use, try to avoid
-including advice in it.  If the function you want to advise has no
-hook to do the job, please talk with the Emacs developers about adding
-a suitable hook.  Especially, Emacs&rsquo;s own source files should not put
-advice on functions in Emacs.  (There are currently a few exceptions
-to this convention, but we aim to correct them.)  It is generally
-cleaner to create a new hook in <code class="code">foo</code>, and make <code class="code">bar</code> use
-the hook, than to have <code class="code">bar</code> put advice in <code class="code">foo</code>.
+<p>如果你在编写供他人使用的发布代码，请尽量避免在其中使用建议。如果你想添加建议的函数没有对应的钩子来完成需求，请与 Emacs 开发者沟通，添加合适的钩子。特别注意：Emacs 自身的源码不应对内置函数添加建议。（这一惯例目前存在少数例外，但我们计划逐步修正。）通常来说，更清晰的做法是：在 <code class="code">foo</code> 中创建一个新钩子，然后让 <code class="code">bar</code> 使用这个钩子，而不是让 <code class="code">bar</code> 为 <code class="code">foo</code> 添加建议。
 </p>
-<p>Special forms (see <a class="pxref" href="Special-Forms.html">特殊形式</a>) cannot be advised, however macros can
-be advised, in much the same way as functions.  Of course, this will not affect
-code that has already been macro-expanded, so you need to make sure the advice
-is installed before the macro is expanded.
+<p>特殊形式（see <a class="pxref" href="Special-Forms.html">特殊形式</a>）无法被添加建议，但宏可以像函数一样被添加建议。当然，这不会影响已经完成宏展开的代码，因此你需要确保建议在宏展开之前就已安装。
 </p>
-<p>It is possible to advise a primitive (see <a class="pxref" href="What-Is-a-Function.html">What Is a Function?</a>),
-but one should typically <em class="emph">not</em> do so, for two reasons.  Firstly,
-some primitives are used by the advice mechanism, and advising them
-could cause an infinite recursion.  Secondly, many primitives are
-called directly from C, and such calls ignore advice; hence, one ends
-up in a confusing situation where some calls (occurring from Lisp
-code) obey the advice and other calls (from C code) do not.
+<p>尽管可以为原语（see <a class="pxref" href="What-Is-a-Function.html">什么是函数？</a>）添加建议，但通常不建议这样做，原因有二：其一，部分原语会被建议机制自身调用，为它们添加建议可能导致无限递归；其二，许多原语会被 C 代码直接调用，而这类调用会忽略建议 —— 最终会出现一种混乱的情况：有些调用（来自 Lisp 代码）会遵循建议，而另一些调用（来自 C 代码）则不会。
 </p>
 <dl class="first-deffn first-defmac-alias-first-deffn def-block">
 <dt class="deffn defmac-alias-deffn def-line" id="index-define_002dadvice"><span class="category-def">Macro: </span><span><strong class="def-name">define-advice</strong> <var class="def-var-arguments">symbol (where lambda-list &amp;optional name depth) &amp;rest body</var><a class="copiable-link" href="#index-define_002dadvice"> &para;</a></span></dt>
-<dd><p>This macro defines a piece of advice and adds it to the function named
-<var class="var">symbol</var>.  If <var class="var">name</var> is non-<code class="code">nil</code>, the advice is named
-<code class="code"><var class="var">symbol</var>@<var class="var">name</var></code> and installed with the name <var class="var">name</var>; otherwise,
-the advice is anonymous.  See <code class="code">advice-add</code> for explanation of
-other arguments.
+<dd><p>该宏用于定义一段建议，并将其添加到名为 <var class="var">symbol</var> 的函数上。若 <var class="var">name</var> 为非 <code class="code">nil</code> 值，这段建议会被命名为 <code class="code"><var class="var">symbol</var>@<var class="var">name</var></code>，且会以 <var class="var">name</var> 作为标识安装；否则，该建议为匿名建议。其他参数的说明参见 <code class="code">advice-add</code>。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-advice_002dadd"><span class="category-def">Function: </span><span><strong class="def-name">advice-add</strong> <var class="def-var-arguments">symbol where function &amp;optional props</var><a class="copiable-link" href="#index-advice_002dadd"> &para;</a></span></dt>
-<dd><p>Add the advice <var class="var">function</var> to the named function <var class="var">symbol</var>.
-<var class="var">where</var> and <var class="var">props</var> have the same meaning as for <code class="code">add-function</code>
-(see <a class="pxref" href="Core-Advising-Primitives.html">Primitives to manipulate advices</a>).
+<dd><p>将建议函数 <var class="var">function</var> 添加到命名函数 <var class="var">symbol</var> 上。其中 <var class="var">where</var> 和 <var class="var">props</var> 的含义与 <code class="code">add-function</code> 中一致（see <a class="pxref" href="Core-Advising-Primitives.html">操作建议的原语</a>）。
 </p></dd></dl>
 
 <dl class="first-deffn def-block">
 <dt class="deffn def-line" id="index-advice_002dremove"><span class="category-def">Command: </span><span><strong class="def-name">advice-remove</strong> <var class="def-var-arguments">symbol function</var><a class="copiable-link" href="#index-advice_002dremove"> &para;</a></span></dt>
-<dd><p>Remove the advice <var class="var">function</var> from the named function <var class="var">symbol</var>.
-<var class="var">function</var> can also be the <code class="code">name</code> of a piece of advice.  When
-called interactively, prompt for both an advised <var class="var">function</var> and
-the advice to remove.
+<dd><p>从命名函数 <var class="var">symbol</var> 中移除建议函数 <var class="var">function</var>。<var class="var">function</var> 也可以是某段建议的 <code class="code">name</code>（名称）。交互式调用时，会分别提示输入已添加建议的函数 <var class="var">function</var> 以及要移除的建议。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-advice_002dmember_002dp"><span class="category-def">Function: </span><span><strong class="def-name">advice-member-p</strong> <var class="def-var-arguments">function symbol</var><a class="copiable-link" href="#index-advice_002dmember_002dp"> &para;</a></span></dt>
-<dd><p>Return non-<code class="code">nil</code> if the advice <var class="var">function</var> is already in the named
-function <var class="var">symbol</var>.  <var class="var">function</var> can also be the <code class="code">name</code> of
-a piece of advice.
+<dd><p>如果建议函数 <var class="var">function</var> 已经存在于命名函数 <var class="var">symbol</var> 中，则返回非 <code class="code">nil</code>。<var class="var">function</var> 也可以是某段建议的 <code class="code">name</code>（名称）。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-advice_002dmapc"><span class="category-def">Function: </span><span><strong class="def-name">advice-mapc</strong> <var class="def-var-arguments">function symbol</var><a class="copiable-link" href="#index-advice_002dmapc"> &para;</a></span></dt>
-<dd><p>Call <var class="var">function</var> for every piece of advice that was added to the
-named function <var class="var">symbol</var>.  <var class="var">function</var> is called with two
-arguments: the advice function and its properties.
+<dd><p>对添加到命名函数 <var class="var">symbol</var> 上的每一段建议，都调用一次 <var class="var">function</var>。调用 <var class="var">function</var> 时会传入两个参数：建议函数本身及其属性列表。
 </p></dd></dl>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Advice-Combinators.html">Ways to compose advice</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Core-Advising-Primitives.html">Primitives to manipulate advices</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Advising-Functions.html">Advising Emacs Lisp Functions</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Advice-Combinators.html">建议的组合方式</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Core-Advising-Primitives.html">操作建议的原语</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Advising-Functions.html">为 Emacs Lisp 函数添加建议</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

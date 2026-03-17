@@ -47,14 +47,11 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsection-level-extent" id="Argument-Evaluation">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Surprising-Local-Vars.html" accesskey="n" rel="next">Local Variables in Macro Expansions</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Wrong-Time.html" accesskey="p" rel="prev">Wrong Time</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html" accesskey="u" rel="up">Common Problems Using Macros</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Surprising-Local-Vars.html" accesskey="n" rel="next">Local Variables in Macro Expansions</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Wrong-Time.html" accesskey="p" rel="prev">时机错误</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html" accesskey="u" rel="up">使用宏的常见问题</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Evaluating-Macro-Arguments-Repeatedly"><span>14.5.2 Evaluating Macro Arguments Repeatedly<a class="copiable-link" href="#Evaluating-Macro-Arguments-Repeatedly"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_5b8f_53c2_6570_7684_91cd_590d_6c42_503c_95ee_9898"><span>14.5.2 宏参数的重复求值问题<a class="copiable-link" href="#g_t_5b8f_53c2_6570_7684_91cd_590d_6c42_503c_95ee_9898"> &para;</a></span></h4>
 
-<p>When defining a macro you must pay attention to the number of times
-the arguments will be evaluated when the expansion is executed.  The
-following macro (used to facilitate iteration) illustrates the
-problem.  This macro allows us to write a for-loop construct.
+<p>定义宏时，必须留意参数在展开代码执行时会被求值多少次。下面这个用于简化循环的宏示例，就展示了这类问题。该宏可以让我们写出类似 for 循环的结构。
 </p>
 <a class="index-entry-id" id="index-for"></a>
 <div class="example">
@@ -84,12 +81,9 @@ For example, (for i from 1 to 10 do (print i)).&quot;
 &rArr; nil
 </pre></div></div>
 
-<p>The arguments <code class="code">from</code>, <code class="code">to</code>, and <code class="code">do</code> in this macro are
-syntactic sugar; they are entirely ignored.  The idea is that you
-will write noise words (such as <code class="code">from</code>, <code class="code">to</code>, and <code class="code">do</code>)
-in those positions in the macro call.
+<p>该宏中的 <code class="code">from</code>、<code class="code">to</code> 和 <code class="code">do</code> 参数仅作为语法糖（syntactic sugar） 存在 —— 它们会被完全忽略。设计思路是让你在宏调用的这些位置写入这类 “无实际作用的辅助词”（例如 <code class="code">from</code>、<code class="code">to</code>、<code class="code">do</code>），仅用于提升代码可读性。
 </p>
-<p>Here&rsquo;s an equivalent definition simplified through use of backquote:
+<p>以下是使用反引号简化后的等效定义：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(defmacro for (var from init to final do &amp;rest body)
@@ -101,18 +95,10 @@ For example, (for i from 1 to 10 do (print i)).&quot;
        (inc ,var))))
 </pre></div></div>
 
-<p>Both forms of this definition (with backquote and without) suffer from
-the defect that <var class="var">final</var> is evaluated on every iteration.  If
-<var class="var">final</var> is a constant, this is not a problem.  If it is a more
-complex form, say <code class="code">(long-complex-calculation x)</code>, this can slow
-down the execution significantly.  If <var class="var">final</var> has side effects,
-executing it more than once is probably incorrect.
+<p>该定义的两种写法（使用反引号和不使用反引号）都存在一个缺陷：<var class="var">final</var> 会在每次循环迭代时都被求值。若 <var class="var">final</var> 是常量，这不会有问题；但如果它是更复杂的表达式（例如 <code class="code">(long-complex-calculation x)</code>），则会显著降低执行速度；若 <var class="var">final</var> 带有副作用，多次执行它很可能导致逻辑错误。
 </p>
 <a class="index-entry-id" id="index-macro-argument-evaluation"></a>
-<p>A well-designed macro definition takes steps to avoid this problem by
-producing an expansion that evaluates the argument expressions exactly
-once unless repeated evaluation is part of the intended purpose of the
-macro.  Here is a correct expansion for the <code class="code">for</code> macro:
+<p>一个设计良好的宏定义会主动规避这类问题：生成的展开式会确保参数表达式仅被求值一次（除非重复求值是该宏的设计意图）。以下是 <code class="code">for</code> 宏的正确展开版本：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(let ((i 1)
@@ -123,7 +109,7 @@ macro.  Here is a correct expansion for the <code class="code">for</code> macro:
     (inc i)))
 </pre></div></div>
 
-<p>Here is a macro definition that creates this expansion:
+<p>以下是能生成该展开式的宏定义：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(defmacro for (var from init to final do &amp;rest body)
@@ -135,13 +121,12 @@ macro.  Here is a correct expansion for the <code class="code">for</code> macro:
        (inc ,var))))
 </pre></div></div>
 
-<p>Unfortunately, this fix introduces another problem,
-described in the following section.
+<p>遗憾的是，这一修复方案引入了另一个问题，具体将在下一节说明。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Surprising-Local-Vars.html">Local Variables in Macro Expansions</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Wrong-Time.html">Wrong Time</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html">Common Problems Using Macros</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Surprising-Local-Vars.html">Local Variables in Macro Expansions</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Wrong-Time.html">时机错误</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html">使用宏的常见问题</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

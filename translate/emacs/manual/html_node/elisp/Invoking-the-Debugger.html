@@ -50,84 +50,69 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="subsection-level-extent" id="Invoking-the-Debugger">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Internals-of-Debugger.html" accesskey="n" rel="next">Internals of the Debugger</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Debugger-Commands.html" accesskey="p" rel="prev">Debugger Commands</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Debugger.html" accesskey="u" rel="up">The Lisp Debugger</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Internals-of-Debugger.html" accesskey="n" rel="next">调试器的内部实现</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Debugger-Commands.html" accesskey="p" rel="prev">调试器命令</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Debugger.html" accesskey="u" rel="up">Lisp 调试器</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Invoking-the-Debugger-1"><span>19.1.10 Invoking the Debugger<a class="copiable-link" href="#Invoking-the-Debugger-1"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_8c03_7528_8c03_8bd5_5668"><span>19.1.10 调用调试器<a class="copiable-link" href="#g_t_8c03_7528_8c03_8bd5_5668"> &para;</a></span></h4>
 <a class="index-entry-id" id="index-invoking-lisp-debugger"></a>
 
-<p>Here we describe in full detail the function <code class="code">debug</code> that is used
-to invoke the debugger.
+<p>本节详细介绍用于调用调试器的 <code class="code">debug</code> 函数。
 </p>
 <dl class="first-deffn def-block">
 <dt class="deffn def-line" id="index-debug"><span class="category-def">Command: </span><span><strong class="def-name">debug</strong> <var class="def-var-arguments">&amp;rest debugger-args</var><a class="copiable-link" href="#index-debug"> &para;</a></span></dt>
-<dd><p>This function enters the debugger.  In interactive sessions, it
-switches to a buffer named <samp class="file">*Backtrace*</samp> (or
-<samp class="file">*Backtrace*&lt;2&gt;</samp> if it is the second recursive entry to the
-debugger, etc.), and fills it with information about the stack of Lisp
-function calls.  It then enters a recursive edit, showing the
-backtrace buffer in Debugger mode.  In batch mode (more generally,
-when <code class="code">noninteractive</code> is non-<code class="code">nil</code>, see <a class="pxref" href="Batch-Mode.html">Batch Mode</a>),
-this function shows the Lisp backtrace on the standard error stream,
-and then kills Emacs, causing it to exit with a non-zero exit code
-(see <a class="pxref" href="Killing-Emacs.html">Killing Emacs</a>).  Binding
-<code class="code">backtrace-on-error-noninteractive</code> to <code class="code">nil</code> suppresses the
-backtrace in batch mode, see below.
+<dd><p>该函数进入调试器。
+在交互式会话中，它会切换到名为 <samp class="file">*Backtrace*</samp> 的缓冲区
+（如果是递归进入调试器的第二次调用，则为 <samp class="file">*Backtrace*&lt;2&gt;</samp>，依此类推），
+并填充 Lisp 函数调用栈的相关信息。
+随后进入递归编辑状态，以调试器模式显示调用栈缓冲区。
+在批处理模式下（更一般地，当 <code class="code">noninteractive</code> 为非<code class="code">nil</code> 时，see <a class="pxref" href="Batch-Mode.html">Batch Mode</a>），
+该函数会在标准错误流中显示 Lisp 调用栈，
+然后终止 Emacs 并使其以非零退出码退出（see <a class="pxref" href="Killing-Emacs.html">Killing Emacs</a>）。
+将 <code class="code">backtrace-on-error-noninteractive</code> 绑定为 <code class="code">nil</code> 可抑制批处理模式下的调用栈输出，详见下文。
 </p>
-<p>The Debugger mode <kbd class="kbd">c</kbd>, <kbd class="kbd">d</kbd>, <kbd class="kbd">j</kbd>, and <kbd class="kbd">r</kbd> commands exit
-the recursive edit; then <code class="code">debug</code> switches back to the previous
-buffer and returns to whatever called <code class="code">debug</code>.  This is the only
-way the function <code class="code">debug</code> can return to its caller.
+<p>调试器模式的 <kbd class="kbd">c</kbd>、<kbd class="kbd">d</kbd>、<kbd class="kbd">j</kbd> 和 <kbd class="kbd">r</kbd> 命令会退出递归编辑；
+之后 <code class="code">debug</code> 切换回之前的缓冲区，并返回到调用 <code class="code">debug</code> 的位置。
+这是 <code class="code">debug</code> 函数唯一能返回给调用者的方式。
 </p>
-<p>The use of the <var class="var">debugger-args</var> is that <code class="code">debug</code> displays the
-rest of its arguments at the top of the <samp class="file">*Backtrace*</samp> buffer, so
-that the user can see them.  Except as described below, this is the
-<em class="emph">only</em> way these arguments are used.
+<p><var class="var">debugger-args</var> 参数的作用是：<code class="code">debug</code> 会将剩余参数显示在 <samp class="file">*Backtrace*</samp> 缓冲区顶部，供用户查看。
+除下文所述情况外，这是这些参数的**唯一**用途。
 </p>
-<p>However, certain values for first argument to <code class="code">debug</code> have a
-special significance.  (Normally, these values are used only by the
-internals of Emacs, and not by programmers calling <code class="code">debug</code>.)  Here
-is a table of these special values:
+<p>但 <code class="code">debug</code> 的第一个参数若为特定值，则具有特殊含义。
+（通常这些值仅由 Emacs 内部使用，而非程序员调用 <code class="code">debug</code> 时使用。）
+以下是这些特殊值的说明：
 </p>
 <dl class="table">
 <dt><a id="index-lambda-in-debug"></a><span><code class="code">lambda</code><a class="copiable-link" href="#index-lambda-in-debug"> &para;</a></span></dt>
-<dd><p>A first argument of <code class="code">lambda</code> means <code class="code">debug</code> was called
-because of entry to a function when <code class="code">debug-on-next-call</code> was
-non-<code class="code">nil</code>.  The debugger displays &lsquo;<samp class="samp">Debugger
-entered--entering a function:</samp>&rsquo; as a line of text at the top of the
-buffer.
+<dd><p>第一个参数为 <code class="code">lambda</code> 表示：
+因 <code class="code">debug-on-next-call</code> 为非<code class="code">nil</code>，在进入某个函数时调用了 <code class="code">debug</code>。
+调试器会在缓冲区顶部显示一行文本：&lsquo;<samp class="samp">调试器进入--进入函数：(Debugger entered--entering a function:)</samp>&rsquo;。
 </p>
 </dd>
 <dt><code class="code">debug</code></dt>
-<dd><p><code class="code">debug</code> as first argument means <code class="code">debug</code> was called because
-of entry to a function that was set to debug on entry.  The debugger
-displays the string &lsquo;<samp class="samp">Debugger entered--entering a function:</samp>&rsquo;,
-just as in the <code class="code">lambda</code> case.  It also marks the stack frame for
-that function so that it will invoke the debugger when exited.
+<dd><p>第一个参数为 <code class="code">debug</code> 表示：
+因进入了设置了入口断点的函数，调用了 <code class="code">debug</code>。
+调试器会像 <code class="code">lambda</code> 情况一样显示字符串 &lsquo;<samp class="samp">调试器进入--进入函数：(Debugger entered--entering a function:)</samp>&rsquo;，
+同时标记该函数的栈帧，使其在退出时触发调试器。
 </p>
 </dd>
 <dt><code class="code">t</code></dt>
-<dd><p>When the first argument is <code class="code">t</code>, this indicates a call to
-<code class="code">debug</code> due to evaluation of a function call form when
-<code class="code">debug-on-next-call</code> is non-<code class="code">nil</code>.  The debugger displays
-&lsquo;<samp class="samp">Debugger entered--beginning evaluation of function call form:</samp>&rsquo;
-as the top line in the buffer.
+<dd><p>第一个参数为 <code class="code">t</code> 表示：
+因 <code class="code">debug-on-next-call</code> 为非<code class="code">nil</code>，在求值某个函数调用表达式时调用了 <code class="code">debug</code>。
+调试器会在缓冲区顶部显示：&lsquo;<samp class="samp">调试器进入--开始求值函数调用表达式：(Debugger entered--beginning evaluation of function call form:)</samp>&rsquo;。
 </p>
 </dd>
 <dt><code class="code">exit</code></dt>
-<dd><p>When the first argument is <code class="code">exit</code>, it indicates the exit of a
-stack frame previously marked to invoke the debugger on exit.  The
-second argument given to <code class="code">debug</code> in this case is the value being
-returned from the frame.  The debugger displays &lsquo;<samp class="samp">Debugger
-entered--returning value:</samp>&rsquo; in the top line of the buffer, followed by
-the value being returned.
+<dd><p>第一个参数为 <code class="code">exit</code> 表示：
+退出之前标记为“退出时触发调试器”的栈帧时调用了 <code class="code">debug</code>。
+此时 <code class="code">debug</code> 的第二个参数是该栈帧要返回的值。
+调试器会在缓冲区顶部显示 &lsquo;<samp class="samp">调试器进入--返回值：(Debugger entered--returning value:)</samp>&rsquo;，后跟要返回的值。
 </p>
 </dd>
-<dt><a id="index-error-in-debug"></a><span><code class="code">error</code><a class="copiable-link" href="#index-error-in-debug"> &para;</a></span></dt>
-<dd><p>When the first argument is <code class="code">error</code>, the debugger indicates that
-it is being entered because an error or <code class="code">quit</code> was signaled and
-not handled, by displaying &lsquo;<samp class="samp">Debugger entered--Lisp error:</samp>&rsquo;
-followed by the error signaled and any arguments to <code class="code">signal</code>.
-For example,
+<dt><a class="index-entry-id" id="index-error-Zai-debug-Zhong-"></a>
+<a id="index-error-in-debug"></a><span><code class="code">error</code><a class="copiable-link" href="#index-error-in-debug"> &para;</a></span></dt>
+<dd><p>第一个参数为 <code class="code">error</code> 表示：
+因错误或 <code class="code">quit</code> 信号被触发且未被处理，进入调试器。
+调试器会显示 &lsquo;<samp class="samp">调试器进入--Lisp 错误：(Debugger entered--Lisp error:)</samp>&rsquo;，
+后跟触发的错误及 <code class="code">signal</code> 的所有参数。例如：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(let ((debug-on-error t))
@@ -141,33 +126,28 @@ Debugger entered--Lisp error: (arith-error)
 ------ Buffer: *Backtrace* ------
 </pre></div></div>
 
-<p>If an error was signaled, presumably the variable
-<code class="code">debug-on-error</code> is non-<code class="code">nil</code>.  If <code class="code">quit</code> was signaled,
-then presumably the variable <code class="code">debug-on-quit</code> is non-<code class="code">nil</code>.
+<p>若触发的是错误信号，通常 <code class="code">debug-on-error</code> 为非<code class="code">nil</code>；
+若触发的是 <code class="code">quit</code> 信号，通常 <code class="code">debug-on-quit</code> 为非<code class="code">nil</code>。
 </p>
 </dd>
 <dt><code class="code">nil</code></dt>
-<dd><p>Use <code class="code">nil</code> as the first of the <var class="var">debugger-args</var> when you want
-to enter the debugger explicitly.  The rest of the <var class="var">debugger-args</var>
-are printed on the top line of the buffer.  You can use this feature to
-display messages&mdash;for example, to remind yourself of the conditions
-under which <code class="code">debug</code> is called.
+<dd><p>当你希望显式进入调试器时，可将 <var class="var">debugger-args</var> 的第一个参数设为 <code class="code">nil</code>。
+剩余的 <var class="var">debugger-args</var> 会打印在缓冲区首行。
+你可利用此特性显示自定义消息——例如，提醒自己调用 <code class="code">debug</code> 的触发条件。
 </p></dd>
 </dl>
 </dd></dl>
 
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-backtrace_002don_002derror_002dnoninteractive"><span class="category-def">Variable: </span><span><strong class="def-name">backtrace-on-error-noninteractive</strong><a class="copiable-link" href="#index-backtrace_002don_002derror_002dnoninteractive"> &para;</a></span></dt>
-<dd><p>If this variable is non-<code class="code">nil</code>, the default, entering the debugger
-in batch mode shows the backtrace of Lisp functions calls.  Binding
-the variable to the <code class="code">nil</code> value suppresses the backtrace and
-shows only the error message.
+<dd><p>该变量默认值为非<code class="code">nil</code>，表示批处理模式下进入调试器时会显示 Lisp 函数调用栈。
+将该变量绑定为 <code class="code">nil</code> 会抑制调用栈输出，仅显示错误消息。
 </p></dd></dl>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Internals-of-Debugger.html">Internals of the Debugger</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Debugger-Commands.html">Debugger Commands</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Debugger.html">The Lisp Debugger</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Internals-of-Debugger.html">调试器的内部实现</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Debugger-Commands.html">调试器命令</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Debugger.html">Lisp 调试器</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

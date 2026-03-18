@@ -48,22 +48,15 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="subsubsection-level-extent" id="Instrumenting-Macro-Calls">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Specification-List.html" accesskey="n" rel="next">Specification List</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Edebug-and-Macros.html" accesskey="u" rel="up">Edebug and Macros</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Specification-List.html" accesskey="n" rel="next">规范列表</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Edebug-and-Macros.html" accesskey="u" rel="up">Edebug 和 宏</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsubsection" id="Instrumenting-Macro-Calls-1"><span>19.2.15.1 Instrumenting Macro Calls<a class="copiable-link" href="#Instrumenting-Macro-Calls-1"> &para;</a></span></h4>
+<h4 class="subsubsection" id="g_t_5b8f_8c03_7528_63d2_6869"><span>19.2.15.1 宏调用插桩<a class="copiable-link" href="#g_t_5b8f_8c03_7528_63d2_6869"> &para;</a></span></h4>
 
-<p>When Edebug instruments an expression that calls a Lisp macro, it needs
-additional information about the macro to do the job properly.  This is
-because there is no a-priori way to tell which subexpressions of the
-macro call are forms to be evaluated.  (Evaluation may occur explicitly
-in the macro body, or when the resulting expansion is evaluated, or any
-time later.)
+<p>当 Edebug 对调用 Lisp 宏的表达式进行插桩时，需要该宏的额外信息才能正确完成工作。
+这是因为无法仅凭宏调用本身判断其哪些子表达式是需要求值的形式（求值可能发生在宏体内部、宏展开结果求值时，或后续任意时机）。
 </p>
-<p>Therefore, you must define an Edebug specification for each macro
-that Edebug will encounter, to explain the format of calls to that
-macro.  To do this, add a <code class="code">debug</code> declaration to the macro
-definition.  Here is a simple example that shows the specification for
-the <code class="code">for</code> example macro (see <a class="pxref" href="Argument-Evaluation.html">宏参数的重复求值问题</a>).
+<p>因此，你必须为 Edebug 可能遇到的每个宏定义 Edebug 规范，以说明该宏调用的格式。
+实现方式是在宏定义中添加 <code class="code">debug</code> 声明。以下是为 <code class="code">for</code> 示例宏指定规范的简单例子（see <a class="pxref" href="Argument-Evaluation.html">宏参数的重复求值问题</a>）：
 </p>
 <div class="example smallexample">
 <pre class="example-preformatted">(defmacro for (var from init to final do &amp;rest body)
@@ -73,75 +66,56 @@ For example, (for i from 1 to 10 do (print i)).&quot;
   ...)
 </pre></div>
 
-<p>The Edebug specification says which parts of a call to the macro are
-forms to be evaluated.  For simple macros, the specification
-often looks very similar to the formal argument list of the macro
-definition, but specifications are much more general than macro
-arguments.  See <a class="xref" href="Defining-Macros.html">定义宏</a>, for more explanation of
-the <code class="code">declare</code> form.
+<p>Edebug 规范用于标识宏调用中哪些部分是需要求值的表达式。
+对于简单宏，规范通常与宏定义的形参列表非常相似，但规范的表达能力远强于宏参数。
+关于 <code class="code">declare</code> 形式的更多说明见 See <a class="xref" href="Defining-Macros.html">定义宏</a>。
 </p>
-<p>Take care to ensure that the specifications are known to Edebug when
-you instrument code.  If you are instrumenting a function which uses a
-macro defined in another file, you may first need to either evaluate
-the <code class="code">require</code> forms in the file containing your function, or
-explicitly load the file containing the macro.  If the definition of a
-macro is wrapped by <code class="code">eval-when-compile</code>, you may need to evaluate
-it.
+<p>请注意确保在插桩代码时，Edebug 能够识别对应的规范。
+如果要插桩的函数使用了定义在其他文件中的宏，你可能需要先求值该函数所在文件中的 <code class="code">require</code> 形式，
+或显式加载包含该宏的文件。如果宏定义被 <code class="code">eval-when-compile</code> 包裹，你可能需要手动求值该定义。
 </p>
-<p>You can also define an edebug specification for a macro separately
-from the macro definition with <code class="code">def-edebug-spec</code>.  Adding
-<code class="code">debug</code> declarations is preferred, and more convenient, for macro
-definitions in Lisp, but <code class="code">def-edebug-spec</code> makes it possible to
-define Edebug specifications for special forms implemented in C.
+<p>你也可以通过 <code class="code">def-edebug-spec</code> 为宏单独定义 Edebug 规范，而不依赖宏定义本身。
+对于 Lisp 编写的宏定义，添加 <code class="code">debug</code> 声明是更推荐、更便捷的方式；
+但 <code class="code">def-edebug-spec</code> 使得为 C 实现的特殊形式定义 Edebug 规范成为可能。
 </p>
 <dl class="first-deffn first-defmac-alias-first-deffn def-block">
 <dt class="deffn defmac-alias-deffn def-line" id="index-def_002dedebug_002dspec"><span class="category-def">Macro: </span><span><strong class="def-name">def-edebug-spec</strong> <var class="def-var-arguments">macro specification</var><a class="copiable-link" href="#index-def_002dedebug_002dspec"> &para;</a></span></dt>
-<dd><p>Specify which expressions of a call to macro <var class="var">macro</var> are forms to be
-evaluated.  <var class="var">specification</var> should be the Edebug specification.
-Neither argument is evaluated.
+<dd><p>指定宏 <var class="var">macro</var> 调用中的哪些表达式是需要求值的形式。
+<var class="var">specification</var> 应为 Edebug 规范，两个参数均不求值。
 </p>
-<p>The <var class="var">macro</var> argument can actually be any symbol, not just a macro
-name.
+<p>参数 <var class="var">macro</var> 实际上可以是任意符号，不限于宏名。
 </p></dd></dl>
 
-<p>Here is a table of the possibilities for <var class="var">specification</var> and how each
-directs processing of arguments.
+<p>以下表格列出 <var class="var">specification</var> 的可选类型，以及每种类型对参数处理方式的说明：
 </p>
 <dl class="table">
 <dt><code class="code">t</code></dt>
-<dd><p>All arguments are instrumented for evaluation.
-This is short for <code class="code">(body)</code>.
+<dd><p>所有参数均被插桩以支持求值。这是 <code class="code">(body)</code> 的简写形式。
 </p>
 </dd>
-<dt>a symbol</dt>
-<dd><p>The symbol must have an Edebug specification, which is used instead.
-This indirection is repeated until another kind of specification is
-found.  This allows you to inherit the specification from another macro.
+<dt>符号</dt>
+<dd><p>该符号必须具有 Edebug 规范，Edebug 会使用该规范替代当前符号。
+这种间接引用会持续到找到其他类型的规范为止，允许你从其他宏继承规范。
 </p>
 </dd>
-<dt>a list</dt>
-<dd><p>The elements of the list describe the types of the arguments of a
-calling form.  The possible elements of a specification list are
-described in the following sections.
+<dt>列表</dt>
+<dd><p>列表元素描述调用形式中各参数的类型。规范列表的可选元素将在后续章节说明。
 </p></dd>
 </dl>
 
-<p>If a macro has no Edebug specification, neither through a <code class="code">debug</code>
-declaration nor through a <code class="code">def-edebug-spec</code> call, the variable
-<code class="code">edebug-eval-macro-args</code> comes into play.
+<p>如果一个宏既没有通过 <code class="code">debug</code> 声明，也没有通过 <code class="code">def-edebug-spec</code> 调用定义 Edebug 规范，
+则变量 <code class="code">edebug-eval-macro-args</code> 将生效：
 </p>
 <dl class="first-defvr first-defopt-alias-first-defvr def-block">
 <dt class="defvr defopt-alias-defvr def-line" id="index-edebug_002deval_002dmacro_002dargs"><span class="category-def">User Option: </span><span><strong class="def-name">edebug-eval-macro-args</strong><a class="copiable-link" href="#index-edebug_002deval_002dmacro_002dargs"> &para;</a></span></dt>
-<dd><p>This controls the way Edebug treats macro arguments with no explicit
-Edebug specification.  If it is <code class="code">nil</code> (the default), none of the
-arguments is instrumented for evaluation.  Otherwise, all arguments
-are instrumented.
+<dd><p>该变量控制 Edebug 处理无显式规范的宏参数的方式。
+若值为 <code class="code">nil</code>（默认），则不对任何参数进行求值插桩；否则，所有参数都会被插桩。
 </p></dd></dl>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Specification-List.html">Specification List</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Edebug-and-Macros.html">Edebug and Macros</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Specification-List.html">规范列表</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Edebug-and-Macros.html">Edebug 和 宏</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

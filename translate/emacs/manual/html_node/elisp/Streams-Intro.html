@@ -46,57 +46,45 @@ ul.mark-bullet {list-style-type: disc}
 <body>
 <div class="section-level-extent" id="Streams-Intro">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Input-Streams.html" accesskey="n" rel="next">Input Streams</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Read-and-Print.html" accesskey="u" rel="up">Reading and Printing Lisp Objects</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Input-Streams.html" accesskey="n" rel="next">输入流</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Read-and-Print.html" accesskey="u" rel="up">Lisp 对象的读取与打印</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Introduction-to-Reading-and-Printing"><span>20.1 Introduction to Reading and Printing<a class="copiable-link" href="#Introduction-to-Reading-and-Printing"> &para;</a></span></h3>
+<h3 class="section" id="g_t_8bfb_53d6_4e0e_6253_5370_7b80_4ecb"><span>20.1 读取与打印简介<a class="copiable-link" href="#g_t_8bfb_53d6_4e0e_6253_5370_7b80_4ecb"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-Lisp-reader"></a>
 <a class="index-entry-id" id="index-printing"></a>
 <a class="index-entry-id" id="index-reading"></a>
 
-<p><em class="dfn">Reading</em> a Lisp object means parsing a Lisp expression in textual
-form and producing a corresponding Lisp object.  This is how Lisp
-programs get into Lisp from files of Lisp code.  We call the text the
-<em class="dfn">read syntax</em> of the object.  For example, the text &lsquo;<samp class="samp">(a . 5)</samp>&rsquo;
-is the read syntax for a cons cell whose <small class="sc">CAR</small> is <code class="code">a</code> and whose
-<small class="sc">CDR</small> is the number 5.
+<p><em class="dfn">读取(reading)</em> 一个 Lisp 对象，是指将文本形式的 Lisp 表达式解析为对应的 Lisp 对象。
+Lisp 程序正是通过这种方式从代码文件加载到 Lisp 环境中的。
+我们把这段文本称为该对象的 <em class="dfn">读取语法（read syntax）</em>。
+例如，文本 &lsquo;<samp class="samp">(a . 5)</samp>&rsquo; 是一个 cons 单元的读取语法，其 <small class="sc">CAR</small> 为 <code class="code">a</code>，<small class="sc">CDR</small> 为数字 5。
 </p>
-<p><em class="dfn">Printing</em> a Lisp object means producing text that represents that
-object&mdash;converting the object to its <em class="dfn">printed representation</em>
-(see <a class="pxref" href="Printed-Representation.html">打印表示与读入语法</a>).  Printing the cons cell described
-above produces the text &lsquo;<samp class="samp">(a . 5)</samp>&rsquo;.
+<p><em class="dfn">打印(printing)</em> 一个 Lisp 对象，是指生成表示该对象的文本——
+将对象转换为它的 <em class="dfn">打印表示（printed representation）</em> （see <a class="pxref" href="Printed-Representation.html">打印表示与读入语法</a>）。
+打印上面所说的 cons 单元会得到文本 &lsquo;<samp class="samp">(a . 5)</samp>&rsquo;。
 </p>
-<p>Reading and printing are more or less inverse operations: printing the
-object that results from reading a given piece of text often produces
-the same text, and reading the text that results from printing an object
-usually produces a similar-looking object.  For example, printing the
-symbol <code class="code">foo</code> produces the text &lsquo;<samp class="samp">foo</samp>&rsquo;, and reading that text
-returns the symbol <code class="code">foo</code>.  Printing a list whose elements are
-<code class="code">a</code> and <code class="code">b</code> produces the text &lsquo;<samp class="samp">(a b)</samp>&rsquo;, and reading that
-text produces a list (but not the same list) with elements <code class="code">a</code>
-and <code class="code">b</code>.
+<p>读取与打印大致互为逆操作：
+打印一段文本读取后得到的对象，通常会得到相同的文本；
+读取一个对象打印后得到的文本，通常会得到外观相似的对象。
+例如，打印符号 <code class="code">foo</code> 得到文本 &lsquo;<samp class="samp">foo</samp>&rsquo;，读取该文本会返回符号 <code class="code">foo</code>。
+打印元素为 <code class="code">a</code> 和 <code class="code">b</code> 的列表得到文本 &lsquo;<samp class="samp">(a b)</samp>&rsquo;，
+读取该文本会得到一个元素为 <code class="code">a</code> 和 <code class="code">b</code> 的列表（但不是同一个列表对象）。
 </p>
-<p>However, these two operations are not precisely inverse to each other.
-There are three kinds of exceptions:
+<p>不过，这两种操作并非严格互逆，主要有三类例外：
 </p>
 <ul class="itemize mark-bullet">
-<li>Printing can produce text that cannot be read.  For example, buffers,
-windows, frames, subprocesses and markers print as text that starts
-with &lsquo;<samp class="samp">#</samp>&rsquo;; if you try to read this text, you get an error.  There is
-no way to read those data types.
+<li>打印可能生成无法被读取的文本。
+例如，缓冲区、窗口、帧、子进程、标记等对象打印后会以 &lsquo;<samp class="samp">#</samp>&rsquo; 开头；
+如果你尝试读取这段文本，会报错。这些数据类型没有对应的可读形式。
 
-</li><li>One object can have multiple textual representations.  For example,
-&lsquo;<samp class="samp">1</samp>&rsquo; and &lsquo;<samp class="samp">01</samp>&rsquo; represent the same integer, and &lsquo;<samp class="samp">(a b)</samp>&rsquo; and
-&lsquo;<samp class="samp">(a . (b))</samp>&rsquo; represent the same list.  Reading will accept any of
-the alternatives, but printing must choose one of them.
+</li><li>同一个对象可以有多种文本表示。
+例如，&lsquo;<samp class="samp">1</samp>&rsquo; 和 &lsquo;<samp class="samp">01</samp>&rsquo; 表示同一个整数，
+&lsquo;<samp class="samp">(a b)</samp>&rsquo; 和 &lsquo;<samp class="samp">(a . (b))</samp>&rsquo; 表示同一个列表。
+读取可以接受任意一种写法，但打印必须选择其中一种。
 
-</li><li>Comments can appear at certain points in the middle of an object&rsquo;s
-read sequence without affecting the result of reading it.
+</li><li>注释可以出现在对象读取序列中间的某些位置，且不影响读取结果。
 </li></ul>
 
 </div>
-<hr>
-<p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Input-Streams.html">Input Streams</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Read-and-Print.html">Reading and Printing Lisp Objects</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

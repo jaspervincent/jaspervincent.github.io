@@ -47,18 +47,15 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsubsection-level-extent" id="SMIE-Tricks">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="SMIE-Indentation.html" accesskey="n" rel="next">Specifying Indentation Rules</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="SMIE-Lexer.html" accesskey="p" rel="prev">Defining Tokens</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="SMIE.html" accesskey="u" rel="up">Simple Minded Indentation Engine</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="SMIE-Indentation.html" accesskey="n" rel="next">指定缩进规则</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="SMIE-Lexer.html" accesskey="p" rel="prev">定义标记</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="SMIE.html" accesskey="u" rel="up">简易缩进引擎（SMIE）</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsubsection" id="Living-With-a-Weak-Parser"><span>24.8.1.5 Living With a Weak Parser<a class="copiable-link" href="#Living-With-a-Weak-Parser"> &para;</a></span></h4>
+<h4 class="subsubsection" id="g_t_9002_914d_7b80_6613_89e3_6790_5668"><span>24.8.1.5 适配简易解析器<a class="copiable-link" href="#g_t_9002_914d_7b80_6613_89e3_6790_5668"> &para;</a></span></h4>
 
-<p>The parsing technique used by SMIE does not allow tokens to behave
-differently in different contexts.  For most programming languages, this
-manifests itself by precedence conflicts when converting the
-BNF grammar.
+<p>SMIE 采用的解析技术不允许标记在不同语境下表现出不同行为。
+对多数编程语言而言，这会在转换 BNF 语法时产生优先级冲突。
 </p>
-<p>Sometimes, those conflicts can be worked around by expressing the
-grammar slightly differently.  For example, for Modula-2 it might seem
-natural to have a BNF grammar that looks like this:
+<p>有时，可通过略微调整语法写法规避这类冲突。
+例如，对 Modula-2 而言，直观的 BNF 语法可能如下：
 </p>
 <div class="example">
 <pre class="example-preformatted">  ...
@@ -71,12 +68,13 @@ natural to have a BNF grammar that looks like this:
   ...
 </pre></div>
 
-<p>But this will create conflicts for <code class="code">&quot;ELSE&quot;</code>: on the one hand, the
-IF rule implies (among many other things) that <code class="code">&quot;ELSE&quot; = &quot;END&quot;</code>;
-but on the other hand, since <code class="code">&quot;ELSE&quot;</code> appears within <code class="code">cases</code>,
-which appears left of <code class="code">&quot;END&quot;</code>, we also have <code class="code">&quot;ELSE&quot; &gt; &quot;END&quot;</code>.
-We can solve the conflict either by using:
-</p><div class="example">
+<p>但这会为 <code class="code">&quot;ELSE&quot;</code> 带来冲突：
+一方面，IF 规则隐含（诸多关系中）<code class="code">&quot;ELSE&quot; = &quot;END&quot;</code>；
+另一方面，由于 <code class="code">&quot;ELSE&quot;</code> 出现在 <code class="code">cases</code> 内部，
+而 <code class="code">cases</code> 位于 <code class="code">&quot;END&quot;</code> 左侧，因此又有 <code class="code">&quot;ELSE&quot; &gt; &quot;END&quot;</code>。
+可通过以下方式解决该冲突：
+</p>
+<div class="example">
 <pre class="example-preformatted">  ...
   (inst (&quot;IF&quot; exp &quot;THEN&quot; insts &quot;ELSE&quot; insts &quot;END&quot;)
         (&quot;CASE&quot; exp &quot;OF&quot; cases &quot;END&quot;)
@@ -85,7 +83,7 @@ We can solve the conflict either by using:
   (cases (cases &quot;|&quot; cases) (caselabel &quot;:&quot; insts))
   ...
 </pre></div>
-<p>or
+<p>或
 </p><div class="example">
 <pre class="example-preformatted">  ...
   (inst (&quot;IF&quot; exp &quot;THEN&quot; else &quot;END&quot;)
@@ -96,40 +94,33 @@ We can solve the conflict either by using:
   ...
 </pre></div>
 
-<p>Reworking the grammar to try and solve conflicts has its downsides, tho,
-because SMIE assumes that the grammar reflects the logical structure of
-the code, so it is preferable to keep the BNF closer to the intended
-abstract syntax tree.
+<p>不过，调整语法以解决冲突也存在弊端，
+因为 SMIE 假定语法反映代码的逻辑结构，
+因此更推荐让 BNF 尽量贴近预期的抽象语法树。
 </p>
-<p>Other times, after careful consideration you may conclude that those
-conflicts are not serious and simply resolve them via the
-<var class="var">resolvers</var> argument of <code class="code">smie-bnf-&gt;prec2</code>.  Usually this is
-because the grammar is simply ambiguous: the conflict does not affect
-the set of programs described by the grammar, but only the way those
-programs are parsed.  This is typically the case for separators and
-associative infix operators, where you want to add a resolver like
-<code class="code">'((assoc &quot;|&quot;))</code>.  Another case where this can happen is for the
-classic <em class="emph">dangling else</em> problem, where you will use <code class="code">'((assoc
-&quot;else&quot; &quot;then&quot;))</code>.  It can also happen for cases where the conflict is
-real and cannot really be resolved, but it is unlikely to pose a problem
-in practice.
+<p>另一些情况下，经仔细分析后你可能判定这类冲突并不严重，
+直接通过 <code class="code">smie-bnf-&gt;prec2</code> 的 <var class="var">resolvers</var> 参数解决即可。
+这通常是因为语法本身存在歧义：冲突不影响语法描述的程序集合，
+仅影响程序的解析方式。
+分隔符与可结合中缀运算符便属于典型场景，
+此时可添加类似 <code class="code">'((assoc &quot;|&quot;))</code> 的解析规则。
+另一个典型场景是经典的 <em class="emph">悬垂 else</em> 问题，
+可使用 <code class="code">'((assoc &quot;else&quot; &quot;then&quot;))</code> 解决。
+冲突真实存在且无法真正解决、但在实际使用中几乎不会引发问题时，也可采用此方式。
 </p>
-<p>Finally, in many cases some conflicts will remain despite all efforts to
-restructure the grammar.  Do not despair: while the parser cannot be
-made more clever, you can make the lexer as smart as you want.  So, the
-solution is then to look at the tokens involved in the conflict and to
-split one of those tokens into 2 (or more) different tokens.  E.g., if
-the grammar needs to distinguish between two incompatible uses of the
-token <code class="code">&quot;begin&quot;</code>, make the lexer return different tokens (say
-<code class="code">&quot;begin-fun&quot;</code> and <code class="code">&quot;begin-plain&quot;</code>) depending on which kind of
-<code class="code">&quot;begin&quot;</code> it finds.  This pushes the work of distinguishing the
-different cases to the lexer, which will thus have to look at the
-surrounding text to find ad-hoc clues.
+<p>最后，很多时候即便尽力重构语法，仍会残留部分冲突。
+不必气馁：解析器无法变得更智能，但你可以让词法分析器尽可能灵活。
+因此解决方案是：找到冲突涉及的标记，
+将其中一个拆分为两个（或更多）不同标记。
+例如，若语法需要区分 <code class="code">&quot;begin&quot;</code> 的两种不兼容用法，
+可让词法分析器根据识别到的 <code class="code">&quot;begin&quot;</code> 类型返回不同标记（如 <code class="code">&quot;begin-fun&quot;</code> 和 <code class="code">&quot;begin-plain&quot;</code>）。
+这会将区分不同场景的工作转移给词法分析器，
+使其需要根据上下文文本寻找特定线索完成判断。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="SMIE-Indentation.html">Specifying Indentation Rules</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="SMIE-Lexer.html">Defining Tokens</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="SMIE.html">Simple Minded Indentation Engine</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="SMIE-Indentation.html">指定缩进规则</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="SMIE-Lexer.html">定义标记</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="SMIE.html">简易缩进引擎（SMIE）</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 
@@ -180,7 +171,7 @@ surrounding text to find ad-hoc clues.
                     <use xlink:href=#ai:simple-icons:copyright></use>
                 </svg>
                 <div class="content left" data-astro-cid-p3givckg>
-                    <p data-astro-cid-p3givckg>Â© 2025 Jasper Hsu</p>
+                    <p data-astro-cid-p3givckg>Â© <span id="current-year"></span> Jasper Hsu</p>
                 </div>
             </span>
         </div>
@@ -235,6 +226,9 @@ surrounding text to find ad-hoc clues.
             </span>
         </a>
     </div>
+    <script>
+        document.getElementById("current-year").textContent = new Date().getFullYear();
+    </script>
 
 </body>
 </html>

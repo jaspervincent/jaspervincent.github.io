@@ -47,122 +47,116 @@ ul.mark-bullet {list-style-type: disc}
 <body>
 <div class="section-level-extent" id="Key-Lookup">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Functions-for-Key-Lookup.html" accesskey="n" rel="next">Functions for Key Lookup</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Controlling-Active-Maps.html" accesskey="p" rel="prev">Controlling the Active Keymaps</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Keymaps.html" accesskey="u" rel="up">Keymaps</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Functions-for-Key-Lookup.html" accesskey="n" rel="next">按键查找函数</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Controlling-Active-Maps.html" accesskey="p" rel="prev">控制活跃按键映射表</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Keymaps.html" accesskey="u" rel="up">按键映射</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Key-Lookup-1"><span>23.10 Key Lookup<a class="copiable-link" href="#Key-Lookup-1"> &para;</a></span></h3>
+<h3 class="section" id="g_t_6309_952e_67e5_627e"><span>23.10 按键查找<a class="copiable-link" href="#g_t_6309_952e_67e5_627e"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-key-lookup"></a>
 <a class="index-entry-id" id="index-keymap-entry"></a>
 
-<p><em class="dfn">Key lookup</em> is the process of finding the binding of a key
-sequence from a given keymap.  The execution or use of the binding is
-not part of key lookup.
+<p><em class="dfn">按键查找(Key lookup)</em>是从指定键盘映射中查找按键序列绑定的过程。
+绑定的执行或使用不属于按键查找的范畴。
 </p>
-<p>Key lookup uses just the event type of each event in the key sequence;
-the rest of the event is ignored.  In fact, a key sequence used for key
-lookup may designate a mouse event with just its types (a symbol)
-instead of the entire event (a list).  See <a class="xref" href="Input-Events.html">Input Events</a>.  Such
-a key sequence is insufficient for <code class="code">command-execute</code> to run,
-but it is sufficient for looking up or rebinding a key.
+<p>按键查找仅使用按键序列中每个事件的事件类型；
+事件的其余部分会被忽略。实际上，用于按键查找的按键序列可以仅通过其类型（一个符号）
+来指定鼠标事件，而非完整的事件（一个列表）。See <a class="xref" href="Input-Events.html">输入事件</a>。
+这样的按键序列不足以让 <code class="code">command-execute</code> 运行，
+但足以用于按键查找或重新绑定。
 </p>
-<p>When the key sequence consists of multiple events, key lookup
-processes the events sequentially: the binding of the first event is
-found, and must be a keymap; then the second event&rsquo;s binding is found in
-that keymap, and so on until all the events in the key sequence are used
-up.  (The binding thus found for the last event may or may not be a
-keymap.)  Thus, the process of key lookup is defined in terms of a
-simpler process for looking up a single event in a keymap.  How that is
-done depends on the type of object associated with the event in that
-keymap.
+<p>当按键序列包含多个事件时，按键查找会按顺序处理事件：
+先找到第一个事件的绑定，且该绑定必须是键盘映射；
+然后在该键盘映射中查找第二个事件的绑定，依此类推，
+直到按键序列中的所有事件处理完毕。
+（为最后一个事件查找到的绑定可以是键盘映射，也可以不是。）
+因此，按键查找过程是基于在键盘映射中查找单个事件这一更简单的过程定义的。
+具体行为取决于该键盘映射中与事件关联的对象类型。
 </p>
-<p>Let&rsquo;s use the term <em class="dfn">keymap entry</em> to describe the value found by
-looking up an event type in a keymap.  (This doesn&rsquo;t include the item
-string and other extra elements in a keymap element for a menu item, because
-<code class="code">keymap-lookup</code> and other key lookup functions don&rsquo;t include them in
-the returned value.)  While any Lisp object may be stored in a keymap
-as a keymap entry, not all make sense for key lookup.  Here is a table
-of the meaningful types of keymap entries:
+<p>我们使用术语 <em class="dfn">keymap entry</em> 来描述在键盘映射中查找事件类型所得到的值。
+（这不包括菜单项的键盘映射元素中的项字符串和其他附加元素，
+因为 <code class="code">keymap-lookup</code> 及其他按键查找函数不会在返回值中包含这些内容。）
+虽然任意 Lisp 对象都可以作为键盘映射项存入键盘映射，
+但并非所有对象对按键查找都有意义。
+以下是有意义的键盘映射项类型表：
 </p>
 <dl class="table">
 <dt><a id="index-nil-in-keymap"></a><span><code class="code">nil</code><a class="copiable-link" href="#index-nil-in-keymap"> &para;</a></span></dt>
-<dd><p><code class="code">nil</code> means that the events used so far in the lookup form an
-undefined key.  When a keymap fails to mention an event type at all, and
-has no default binding, that is equivalent to a binding of <code class="code">nil</code>
-for that event type.
+<dd><p><code class="code">nil</code> 表示查找过程中已使用的事件构成了未定义按键。
+当键盘映射完全未提及某事件类型且无默认绑定时，
+等价于该事件类型的绑定为 <code class="code">nil</code>。
 </p>
 </dd>
 <dt><a id="index-command-in-keymap"></a><span><var class="var">command</var><a class="copiable-link" href="#index-command-in-keymap"> &para;</a></span></dt>
-<dd><p>The events used so far in the lookup form a complete key,
-and <var class="var">command</var> is its binding.  See <a class="xref" href="What-Is-a-Function.html">什么是函数？</a>.
+<dd><p>至此在查找过程中使用的事件构成了一个完整的键，
+而 <var class="var">command</var> 是该键的绑定。See <a class="xref" href="What-Is-a-Function.html">什么是函数？</a>。
 </p>
 </dd>
 <dt><a id="index-string-in-keymap"></a><span><var class="var">array</var><a class="copiable-link" href="#index-string-in-keymap"> &para;</a></span></dt>
-<dd><p>The array (either a string or a vector) is a keyboard macro.  The events
-used so far in the lookup form a complete key, and the array is its
-binding.  See <a class="ref" href="Keyboard-Macros.html">Keyboard Macros</a>, for more information.
+<dd><p>该数组（可以是字符串或向量）是一个键盘宏。至此在查找过程中使用的事件
+构成了一个完整的键，而该数组是该键的绑定。更多信息参见 <a class="ref" href="Keyboard-Macros.html">键盘宏</a>。
 </p>
+
 </dd>
 <dt><a id="index-keymap-in-keymap"></a><span><var class="var">keymap</var><a class="copiable-link" href="#index-keymap-in-keymap"> &para;</a></span></dt>
-<dd><p>The events used so far in the lookup form a prefix key.  The next
-event of the key sequence is looked up in <var class="var">keymap</var>.
+<dd><p>至此在查找过程中使用的事件构成了一个前缀键。按键序列的下一个
+事件将在 <var class="var">keymap</var> 中进行查找。
 </p>
 </dd>
 <dt><a id="index-list-in-keymap"></a><span><var class="var">list</var><a class="copiable-link" href="#index-list-in-keymap"> &para;</a></span></dt>
-<dd><p>The meaning of a list depends on what it contains:
+<dd><p>列表的含义取决于其包含的内容：
 </p>
 <ul class="itemize mark-bullet">
-<li>If the <small class="sc">CAR</small> of <var class="var">list</var> is the symbol <code class="code">keymap</code>, then the list
-is a keymap, and is treated as a keymap (see above).
+<li>如果 <var class="var">list</var> 的 <small class="sc">CAR</small> 部分是符号 <code class="code">keymap</code>，那么该列表
+是一个按键映射表，并会被当作按键映射表处理（见上文）。
 
 </li><li><a class="index-entry-id" id="index-lambda-in-keymap"></a>
-If the <small class="sc">CAR</small> of <var class="var">list</var> is <code class="code">lambda</code>, then the list is a
-lambda expression.  This is presumed to be a function, and is treated
-as such (see above).  In order to execute properly as a key binding,
-this function must be a command&mdash;it must have an <code class="code">interactive</code>
-specification.  See <a class="xref" href="Defining-Commands.html">Defining Commands</a>.
+如果 <var class="var">list</var> 的 <small class="sc">CAR</small> 部分是 <code class="code">lambda</code>，那么该列表是一个
+lambda 表达式。它会被认定为一个函数，并按函数方式处理（见上文）。
+为了能作为按键绑定正常执行，
+该函数必须是一个命令&mdash;即它必须包含 <code class="code">interactive</code>
+规范说明。See <a class="xref" href="Defining-Commands.html">定义命令</a>。
 </li></ul>
 
 </dd>
 <dt><a id="index-symbol-in-keymap"></a><span><var class="var">symbol</var><a class="copiable-link" href="#index-symbol-in-keymap"> &para;</a></span></dt>
-<dd><p>The function definition of <var class="var">symbol</var> is used in place of
-<var class="var">symbol</var>.  If that too is a symbol, then this process is repeated,
-any number of times.  Ultimately this should lead to an object that is
-a keymap, a command, or a keyboard macro.
+<dd><p><var class="var">symbol</var> 的函数定义会被用来替代
+<var class="var">symbol</var> 本身。如果该函数定义同样是一个符号，
+则此过程会重复进行，次数不限。
+最终这一过程应指向一个属于按键映射表、命令
+或键盘宏的对象。
 </p>
-<p>Note that keymaps and keyboard macros (strings and vectors) are not
-valid functions, so a symbol with a keymap, string, or vector as its
-function definition is invalid as a function.  It is, however, valid as
-a key binding.  If the definition is a keyboard macro, then the symbol
-is also valid as an argument to <code class="code">command-execute</code>
-(see <a class="pxref" href="Interactive-Call.html">Interactive Call</a>).
+<p>需要注意的是，按键映射表和键盘宏（字符串及向量）并非
+有效的函数，因此若一个符号的函数定义是按键映射表、字符串或向量，
+则该符号作为函数是无效的。但作为
+按键绑定，它是有效的。如果该定义是一个键盘宏，
+那么该符号也可作为 <code class="code">command-execute</code> 的有效参数
+（see <a class="pxref" href="Interactive-Call.html">交互式调用</a>）。
 </p>
+
 <a class="index-entry-id" id="index-undefined-in-keymap"></a>
-<p>The symbol <code class="code">undefined</code> is worth special mention: it means to treat
-the key as undefined.  Strictly speaking, the key is defined, and its
-binding is the command <code class="code">undefined</code>; but that command does the same
-thing that is done automatically for an undefined key: it rings the bell
-(by calling <code class="code">ding</code>) but does not signal an error.
+<p>符号 <code class="code">undefined</code> 值得特别说明：它表示将该键视为未定义状态。
+严格来说，该键是已定义的，其绑定的命令就是 <code class="code">undefined</code>；
+但该命令的行为与未定义键的默认行为一致：
+它会响铃（通过调用 <code class="code">ding</code> 函数），但不会触发错误信号。
 </p>
 <a class="index-entry-id" id="index-preventing-prefix-key"></a>
-<p><code class="code">undefined</code> is used in local keymaps to override a global key
-binding and make the key undefined locally.  A local binding of
-<code class="code">nil</code> would fail to do this because it would not override the
-global binding.
+<p><code class="code">undefined</code> 用于局部按键映射表中，以覆盖全局按键
+绑定并使该键在局部变为未定义状态。若将局部绑定设为
+<code class="code">nil</code> 则无法实现此效果，因为 <code class="code">nil</code> 不会覆盖全局绑定。
 </p>
 </dd>
 <dt><var class="var">anything else</var></dt>
-<dd><p>If any other type of object is found, the events used so far in the
-lookup form a complete key, and the object is its binding, but the
-binding is not executable as a command.
+<dd><p>如果找到任何其他类型的对象，至此在查找过程中使用的事件
+构成了一个完整的键，该对象即为该键的绑定，但
+此绑定无法作为命令执行。
 </p></dd>
 </dl>
 
-<p>In short, a keymap entry may be a keymap, a command, a keyboard
-macro, a symbol that leads to one of them, or <code class="code">nil</code>.
+<p>简而言之，按键映射表条目可以是按键映射表、命令、键盘宏、
+指向上述任一类型的符号，或 <code class="code">nil</code>。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Functions-for-Key-Lookup.html">Functions for Key Lookup</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Controlling-Active-Maps.html">Controlling the Active Keymaps</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Keymaps.html">Keymaps</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Functions-for-Key-Lookup.html">按键查找函数</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Controlling-Active-Maps.html">控制活跃按键映射表</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Keymaps.html">按键映射</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 
@@ -213,7 +207,7 @@ macro, a symbol that leads to one of them, or <code class="code">nil</code>.
                     <use xlink:href=#ai:simple-icons:copyright></use>
                 </svg>
                 <div class="content left" data-astro-cid-p3givckg>
-                    <p data-astro-cid-p3givckg>Â© 2025 Jasper Hsu</p>
+                    <p data-astro-cid-p3givckg>Â© <span id="current-year"></span> Jasper Hsu</p>
                 </div>
             </span>
         </div>
@@ -268,6 +262,9 @@ macro, a symbol that leads to one of them, or <code class="code">nil</code>.
             </span>
         </a>
     </div>
+    <script>
+        document.getElementById("current-year").textContent = new Date().getFullYear();
+    </script>
 
 </body>
 </html>

@@ -47,111 +47,81 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="subsection-level-extent" id="Format-Conversion-Piecemeal">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Format-Conversion-Round_002dTrip.html" accesskey="p" rel="prev">Round-Trip Specification</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Format-Conversion.html" accesskey="u" rel="up">File Format Conversion</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Format-Conversion-Round_002dTrip.html" accesskey="p" rel="prev">往返格式规范</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Format-Conversion.html" accesskey="u" rel="up">文件格式转换</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Piecemeal-Specification"><span>26.13.3 Piecemeal Specification<a class="copiable-link" href="#Piecemeal-Specification"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_5206_6b65_683c_5f0f_89c4_8303"><span>26.13.3 分步格式规范<a class="copiable-link" href="#g_t_5206_6b65_683c_5f0f_89c4_8303"> &para;</a></span></h4>
 
-<p>In contrast to the round-trip specification described in the previous
-subsection (see <a class="pxref" href="Format-Conversion-Round_002dTrip.html">Round-Trip Specification</a>), you can use the variables
-<code class="code">after-insert-file-functions</code> and <code class="code">write-region-annotate-functions</code>
-to separately control the respective reading and writing conversions.
+<p>与上一小节介绍的往返格式规范不同（see <a class="pxref" href="Format-Conversion-Round_002dTrip.html">往返格式规范</a>），你可以使用变量
+<code class="code">after-insert-file-functions</code> 和 <code class="code">write-region-annotate-functions</code>
+分别控制读取和写入时的转换过程。
 </p>
-<p>Conversion starts with one representation and produces another
-representation.  When there is only one conversion to do, there is no
-conflict about what to start with.  However, when there are multiple
-conversions involved, conflict may arise when two conversions need to
-start with the same data.
+<p>转换从一种表示形式开始，并生成另一种表示形式。如果只需要执行一次转换，就不会出现起始数据的冲突。
+但如果涉及多次转换，当两个转换都需要以同一份原始数据为起点时，就可能产生冲突。
 </p>
-<p>This situation is best understood in the context of converting text
-properties during <code class="code">write-region</code>.  For example, the character at
-position 42 in a buffer is &lsquo;<samp class="samp">X</samp>&rsquo; with a text property <code class="code">foo</code>.  If
-the conversion for <code class="code">foo</code> is done by inserting into the buffer, say,
-&lsquo;<samp class="samp">FOO:</samp>&rsquo;, then that changes the character at position 42 from
-&lsquo;<samp class="samp">X</samp>&rsquo; to &lsquo;<samp class="samp">F</samp>&rsquo;.  The next conversion will start with the wrong
-data straight away.
+<p>这种情况在 <code class="code">write-region</code> 处理文本属性转换时最容易理解。例如，缓冲区中第 42 位的字符是
+&lsquo;<samp class="samp">X</samp>&rsquo;，并带有文本属性 <code class="code">foo</code>。如果对 <code class="code">foo</code> 的转换是向缓冲区插入类似
+&lsquo;<samp class="samp">FOO:</samp>&rsquo; 的内容，那么第 42 位的字符就会从 &lsquo;<samp class="samp">X</samp>&rsquo; 变成 &lsquo;<samp class="samp">F</samp>&rsquo;，
+下一次转换将直接从错误的数据开始。
 </p>
-<p>To avoid conflict, cooperative conversions do not modify the buffer,
-but instead specify <em class="dfn">annotations</em>, a list of elements of the form
-<code class="code">(<var class="var">position</var> . <var class="var">string</var>)</code>, sorted in order of increasing
-<var class="var">position</var>.
+<p>为避免冲突，协作式转换不会修改缓冲区，而是通过指定<em class="dfn">注解(annotations)</em>来实现。注解是形如
+<code class="code">(<var class="var">position</var> . <var class="var">string</var>)</code> 的列表，并按 <var class="var">position</var> 升序排列。
 </p>
-<p>If there is more than one conversion, <code class="code">write-region</code> merges their
-annotations destructively into one sorted list.  Later, when the text
-from the buffer is actually written to the file, it intermixes the
-specified annotations at the corresponding positions.  All this takes
-place without modifying the buffer.
+<p>如果存在多个转换，<code class="code">write-region</code> 会将它们的注解合并为一个有序列表。
+之后，当缓冲区中的文本真正写入文件时，会在对应位置插入这些注解。
+整个过程不会修改缓冲区内容。
 </p>
 
-<p>In contrast, when reading, the annotations intermixed with the text
-are handled immediately.  <code class="code">insert-file-contents</code> sets point to
-the beginning of some text to be converted, then calls the conversion
-functions with the length of that text.  These functions should always
-return with point at the beginning of the inserted text.  This
-approach makes sense for reading because annotations removed by the
-first converter can&rsquo;t be mistakenly processed by a later converter.
-Each conversion function should scan for the annotations it
-recognizes, remove the annotation, modify the buffer text (to set a
-text property, for example), and return the updated length of the
-text, as it stands after those changes.  The value returned by one
-function becomes the argument to the next function.
+<p>与之相反，读取时，与文本混合在一起的注解会被立即处理。
+<code class="code">insert-file-contents</code> 会将光标移到待转换文本的开头，
+然后以该文本长度为参数调用转换函数。这些函数执行完毕后应保持光标位于插入文本的开头。
+这种读取方式是合理的，因为第一个转换器移除的注解不会被后续转换器误处理。
+每个转换函数应当扫描并识别自己关心的注解，移除该注解，修改缓冲区文本（例如设置文本属性），
+然后返回修改后的文本长度。一个函数的返回值会作为下一个函数的参数。
 </p>
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-write_002dregion_002dannotate_002dfunctions"><span class="category-def">Variable: </span><span><strong class="def-name">write-region-annotate-functions</strong><a class="copiable-link" href="#index-write_002dregion_002dannotate_002dfunctions"> &para;</a></span></dt>
-<dd><p>A list of functions for <code class="code">write-region</code> to call.  Each function in
-the list is called with two arguments: the start and end of the region
-to be written.  These functions should not alter the contents of the
-buffer.  Instead, they should return annotations.
+<dd><p><code class="code">write-region</code> 要调用的函数列表。列表中的每个函数会接收两个参数：
+待写入区域的起始位置和结束位置。这些函数不应修改缓冲区内容，而应返回注解。
 </p>
-<p>As a special case, a function may return with a different buffer
-current.  Emacs takes this to mean that the current buffer contains
-altered text to be output.  It therefore changes the <var class="var">start</var> and
-<var class="var">end</var> arguments of the <code class="code">write-region</code> call, giving them the
-values of <code class="code">point-min</code> and <code class="code">point-max</code> in the new buffer,
-respectively.  It also discards all previous annotations, because they
-should have been dealt with by this function.
+<p>特殊情况下，函数返回时可以切换当前缓冲区。Emacs 会认为该当前缓冲区包含需要输出的修改后文本，
+因此会将 <code class="code">write-region</code> 的 <var class="var">start</var> 和 <var class="var">end</var> 参数
+分别改为新缓冲区的 <code class="code">point-min</code> 和 <code class="code">point-max</code>，
+同时丢弃之前所有注解，视为已由该函数处理完毕。
 </p></dd></dl>
 
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-write_002dregion_002dpost_002dannotation_002dfunction"><span class="category-def">Variable: </span><span><strong class="def-name">write-region-post-annotation-function</strong><a class="copiable-link" href="#index-write_002dregion_002dpost_002dannotation_002dfunction"> &para;</a></span></dt>
-<dd><p>The value of this variable, if non-<code class="code">nil</code>, should be a function.
-This function is called, with no arguments, after <code class="code">write-region</code>
-has completed.
+<dd><p>如果该变量非 <code class="code">nil</code>，其值应为一个函数。
+该函数会在 <code class="code">write-region</code> 执行完成后被无参调用。
 </p>
-<p>If any function in <code class="code">write-region-annotate-functions</code> returns with
-a different buffer current, Emacs calls
-<code class="code">write-region-post-annotation-function</code> more than once.  Emacs
-calls it with the last buffer that was current, and again with the
-buffer before that, and so on back to the original buffer.
+<p>如果 <code class="code">write-region-annotate-functions</code> 中的某个函数返回时切换了当前缓冲区，
+Emacs 会多次调用 <code class="code">write-region-post-annotation-function</code>，
+依次从最后一个当前缓冲区往回调用，直到原始缓冲区。
 </p>
-<p>Thus, a function in <code class="code">write-region-annotate-functions</code> can create
-a buffer, give this variable the local value of <code class="code">kill-buffer</code> in
-that buffer, set up the buffer with altered text, and make the buffer
-current.  The buffer will be killed after <code class="code">write-region</code> is done.
+<p>因此，<code class="code">write-region-annotate-functions</code> 中的函数可以创建一个缓冲区，
+在该缓冲区内将此变量局部设为 <code class="code">kill-buffer</code>，
+填入修改后的文本并设为当前缓冲区，该缓冲区会在 <code class="code">write-region</code> 结束后被自动杀死。
 </p></dd></dl>
 
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-after_002dinsert_002dfile_002dfunctions"><span class="category-def">Variable: </span><span><strong class="def-name">after-insert-file-functions</strong><a class="copiable-link" href="#index-after_002dinsert_002dfile_002dfunctions"> &para;</a></span></dt>
-<dd><p>Each function in this list is called by <code class="code">insert-file-contents</code>
-with one argument, the number of characters inserted, and with point
-at the beginning of the inserted text.  Each function should leave
-point unchanged, and return the new character count describing the
-inserted text as modified by the function.
+<dd><p><code class="code">insert-file-contents</code> 调用此列表中的每个函数时，
+会传入一个参数：已插入的字符数，并且光标位于插入文本的开头。
+每个函数应保持光标位置不变，并返回经该函数修改后插入文本的新字符数。
 </p></dd></dl>
 
-<p>We invite users to write Lisp programs to store and retrieve text
-properties in files, using these hooks, and thus to experiment with
-various data formats and find good ones.  Eventually we hope users
-will produce good, general extensions we can install in Emacs.
+<p>我们欢迎用户编写 Lisp 程序，利用这些钩子在文件中保存和读取文本属性，
+从而尝试各种数据格式并找到优秀的方案。最终我们希望用户能开发出通用、好用的扩展，
+以便集成到 Emacs 中。
 </p>
-<p>We suggest not trying to handle arbitrary Lisp objects as text property
-names or values&mdash;because a program that general is probably difficult
-to write, and slow.  Instead, choose a set of possible data types that
-are reasonably flexible, and not too hard to encode.
+<p>我们建议不要尝试将任意 Lisp 对象作为文本属性的名称或值——
+因为通用性过强的程序往往难以编写，且运行缓慢。
+更好的做法是选择一组既灵活又易于编码的数据类型。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Format-Conversion-Round_002dTrip.html">Round-Trip Specification</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Format-Conversion.html">File Format Conversion</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Format-Conversion-Round_002dTrip.html">往返格式规范</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Format-Conversion.html">文件格式转换</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 
@@ -202,7 +172,7 @@ are reasonably flexible, and not too hard to encode.
                     <use xlink:href=#ai:simple-icons:copyright></use>
                 </svg>
                 <div class="content left" data-astro-cid-p3givckg>
-                    <p data-astro-cid-p3givckg>Â© 2025 Jasper Hsu</p>
+                    <p data-astro-cid-p3givckg>Â© <span id="current-year"></span> Jasper Hsu</p>
                 </div>
             </span>
         </div>
@@ -257,6 +227,9 @@ are reasonably flexible, and not too hard to encode.
             </span>
         </a>
     </div>
+    <script>
+        document.getElementById("current-year").textContent = new Date().getFullYear();
+    </script>
 
 </body>
 </html>

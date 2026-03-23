@@ -46,83 +46,52 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsection-level-extent" id="The-Zen-of-Buffer-Display">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Precedence-of-Action-Functions.html" accesskey="p" rel="prev">Precedence of Action Functions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Displaying-Buffers.html" accesskey="u" rel="up">Displaying a Buffer in a Suitable Window</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Precedence-of-Action-Functions.html" accesskey="p" rel="prev">动作函数的优先级</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Displaying-Buffers.html" accesskey="u" rel="up">在合适窗口中显示缓冲区</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="The-Zen-of-Buffer-Display-1"><span>29.13.6 The Zen of Buffer Display<a class="copiable-link" href="#The-Zen-of-Buffer-Display-1"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_51b2_533a_663e_793a_7684_6838_5fc3_539f_5219"><span>29.13.6 冲区显示的核心原则<a class="copiable-link" href="#g_t_51b2_533a_663e_793a_7684_6838_5fc3_539f_5219"> &para;</a></span></h4>
 <a class="index-entry-id" id="index-guidelines-for-buffer-display"></a>
 <a class="index-entry-id" id="index-writing-buffer-display-actions"></a>
 <a class="index-entry-id" id="index-buffer-display-conventions"></a>
 
-<p>In its most simplistic form, a frame accommodates always one single
-window that can be used for displaying a buffer.  As a consequence, it
-is always the latest call of <code class="code">display-buffer</code> that will have
-succeeded in placing its buffer there.
+<p>最简单的情况下，一个框架始终只容纳一个单独的窗口，可用于显示缓冲区。因此，最后一次调用的 <code class="code">display-buffer</code> 总会成功将其缓冲区放置在该窗口中。
 </p>
-<p>Since working with such a frame is not very practical, Emacs by
-default allows for more complex frame layouts controlled by the
-default values of the frame size and the <code class="code">split-height-threshold</code>
-and <code class="code">split-width-threshold</code> options.  Displaying a buffer not yet
-shown on a frame then either splits the single window on that frame or
-(re-)uses one of its two windows.
+<p>由于只使用这样的框架并不实用，Emacs 默认允许更复杂的框架布局，由框架尺寸默认值以及 <code class="code">split-height-threshold</code> 和 <code class="code">split-width-threshold</code> 选项控制。此时显示一个尚未在框架中出现的缓冲区，要么分割框架上的唯一窗口，要么复用已有的两个窗口之一。
 </p>
-<p>The default behavior is abandoned as soon as the user customizes
-one of these thresholds or manually changes the frame&rsquo;s layout.  The
-default behavior is also abandoned when calling <code class="code">display-buffer</code>
-with a non-<code class="code">nil</code> <var class="var">action</var> argument or the user customizes one
-of the options mentioned in the previous subsections.  Mastering
-<code class="code">display-buffer</code> soon may become a frustrating experience due to
-the plethora of applicable display actions and the resulting frame
-layouts.
+<p>一旦用户自定义了这些阈值，或手动修改了框架布局，默认行为就会失效。当使用非 <code class="code">nil</code> 的 <var class="var">action</var> 参数调用 <code class="code">display-buffer</code>，或用户自定义了前面小节提到的任一选项时，默认行为同样会失效。由于可用的显示动作繁多，最终产生的框架布局也多种多样，熟练掌握 <code class="code">display-buffer</code> 很容易变成一件令人沮丧的事情。
 </p>
-<p>However, refraining from using buffer display functions and falling
-back on a split &amp; delete windows metaphor is not a good idea either.
-Buffer display functions give Lisp programs and users a framework to
-reconcile their different needs; no comparable framework exists for
-splitting and deleting windows.  Buffer display functions also allow
-to at least partially restore the layout of a frame when removing a
-buffer from it later (see <a class="pxref" href="Quitting-Windows.html">Quitting Windows</a>).
+<p>但是，放弃使用缓冲区显示函数，退回到手动分割、删除窗口的方式也并非良策。缓冲区显示函数为 Lisp 程序和用户提供了协调不同需求的框架，而单纯分割删除窗口并没有对应的机制。缓冲区显示函数还能在后续移除缓冲区时，至少部分恢复框架的布局 (see <a class="pxref" href="Quitting-Windows.html">退出窗口</a>)。
 </p>
-<p>Below we will give a number of guidelines to redeem the frustration
-mentioned above and thus to avoid literally losing buffers in-between
-the windows of a frame.
+<p>下面我们给出若干指导原则，以缓解上述困扰，避免缓冲区在框架的多个窗口之间“消失不见”。
 </p>
 <dl class="table">
-<dt>Write display actions without stress</dt>
-<dd><p>Writing display actions can be a pain because one has to lump together
-action functions and action alists in one huge list.  (Historical
-reasons prevented us from having <code class="code">display-buffer</code> support
-separate arguments for these.)  It might help to memorize some basic
-forms like the ones listed below:
+<dt>从容编写显示动作</dt>
+<dd><p>编写显示动作有时很麻烦，因为必须把动作函数和动作关联列表塞进同一个大列表中（历史原因导致 <code class="code">display-buffer</code> 无法为它们提供独立参数）。记住下面几种基本形式会很有帮助：
 </p>
 <div class="example">
 <pre class="example-preformatted">'(nil (inhibit-same-window . t))
 </pre></div>
 
-<p>specifies an action alist entry only and no action function.  Its sole
-purpose is to inhibit a <code class="code">display-buffer-same-window</code> function
-specified elsewhere from showing the buffer in the same window, see
-also the last example of the preceding subsection.
+<p>只指定动作关联列表条目，不指定动作函数。它唯一的作用是阻止其他地方指定的 <code class="code">display-buffer-same-window</code> 在当前窗口显示缓冲区，参见上一小节最后一个示例。
 </p>
 <div class="example">
 <pre class="example-preformatted">'(display-buffer-below-selected)
 </pre></div>
 
-<p>on the other hand, specifies one action function and an empty action
-alist.  To combine the effects of the above two specifications one
-would write the form
+<p>与之相反，这段代码只指定一个动作函数，动作关联列表为空。
+要合并以上两种效果，可以写成：
 </p>
 <div class="example">
 <pre class="example-preformatted">'(display-buffer-below-selected (inhibit-same-window . t))
 </pre></div>
 
-<p>to add another action function one would write
+<p>要再添加一个动作函数，可以写成：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">'((display-buffer-below-selected display-buffer-at-bottom)
   (inhibit-same-window . t))
 </pre></div></div>
 
-<p>and to add another alist entry one would write
+<p>要再添加一个关联列表条目，可以写成：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">'((display-buffer-below-selected display-buffer-at-bottom)
@@ -130,8 +99,7 @@ would write the form
   (window-height . fit-window-to-buffer))
 </pre></div></div>
 
-<p>That last form can be used as <var class="var">action</var> argument of
-<code class="code">display-buffer</code> in the following way:
+<p>最后这种形式可以作为 <code class="code">display-buffer</code> 的 <var class="var">action</var> 参数使用，示例如下：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(display-buffer
@@ -141,8 +109,7 @@ would write the form
    (window-height . fit-window-to-buffer)))
 </pre></div></div>
 
-<p>In a customization of <code class="code">display-buffer-alist</code> it would be used as
-follows:
+<p>在自定义 <code class="code">display-buffer-alist</code> 时可以这样使用：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(setopt
@@ -153,7 +120,7 @@ follows:
     (window-height . fit-window-to-buffer))))
 </pre></div></div>
 
-<p>To add a customization for a second buffer one would then write:
+<p>要为第二个缓冲区添加自定义规则，可以继续写成：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(setopt
@@ -168,92 +135,35 @@ follows:
 </pre></div></div>
 
 </dd>
-<dt>Treat each other with respect</dt>
-<dd><p><code class="code">display-buffer-alist</code> and <code class="code">display-buffer-base-action</code> are
-user options&mdash;Lisp programs must never set or rebind them.
-<code class="code">display-buffer-overriding-action</code>, on the other hand, is
-reserved for applications&mdash;who seldom use that option and if they use
-it, then with utmost care.
+<dt>相互尊重，互不干扰</dt>
+<dd><p><code class="code">display-buffer-alist</code> 和 <code class="code">display-buffer-base-action</code> 是用户选项，Lisp 程序绝不应该设置或重新绑定它们。而 <code class="code">display-buffer-overriding-action</code> 则是为应用程序保留的，应用程序极少使用，即便使用也必须极为谨慎。
 </p>
-<p>Older implementations of <code class="code">display-buffer</code> frequently caused
-users and applications to fight over the settings of user options like
-<code class="code">pop-up-frames</code> and <code class="code">pop-up-windows</code> (see <a class="pxref" href="Choosing-Window-Options.html">Additional Options for Displaying Buffers</a>).  This was one major reason for redesigning
-<code class="code">display-buffer</code>&mdash;to provide a clear framework specifying what
-users and applications should be allowed to do.
+<p>旧版 <code class="code">display-buffer</code> 经常导致用户和应用程序在 <code class="code">pop-up-frames</code>、<code class="code">pop-up-windows</code> 等用户选项上产生冲突 (see <a class="pxref" href="Choosing-Window-Options.html">显示缓冲区的附加选项</a>)。这也是重新设计 <code class="code">display-buffer</code> 的主要原因之一：提供一套清晰的规则，明确用户和应用程序各自的权限。
 </p>
-<p>Lisp programs must be prepared that user customizations may
-cause buffers to get displayed in an unexpected way.  They should
-never assume in their subsequent behavior, that the buffer has been
-shown precisely the way they asked for in the <var class="var">action</var> argument of
-<code class="code">display-buffer</code>.
+<p>Lisp 程序必须做好准备：用户的自定义设置可能会让缓冲区以意料之外的方式显示。程序在后续行为中绝不应该假设缓冲区一定按照 <code class="code">display-buffer</code> 的 <var class="var">action</var> 参数所要求的方式精确显示。
 </p>
-<p>Users should not pose too many and too severe restrictions on how
-arbitrary buffers get displayed.  Otherwise, they will risk to lose
-the characteristics of showing a buffer for a certain purpose.
-Suppose a Lisp program has been written to compare different versions
-of a buffer in two windows side-by-side.  If the customization of
-<code class="code">display-buffer-alist</code> prescribes that any such buffer should be
-always shown in or below the selected window, the program will have a
-hard time to set up the desired window configuration via
-<code class="code">display-buffer</code>.
+<p>用户也不应对任意缓冲区的显示施加过多、过严苛的限制，否则可能会丢失特定用途下的显示特性。假设某个 Lisp 程序用于在两个窗口中并排对比缓冲区的不同版本，而用户的 <code class="code">display-buffer-alist</code> 规则强制所有此类缓冲区必须在选中窗口内部或下方显示，那么该程序就很难通过 <code class="code">display-buffer</code> 搭建出期望的窗口布局。
 </p>
-<p>To specify a preference for showing an arbitrary buffer, users
-should customize <code class="code">display-buffer-base-action</code>.  An example of how
-users who prefer working with multiple frames would do that was given
-in the previous subsection.  <code class="code">display-buffer-alist</code> should be
-reserved for displaying specific buffers in a specific way.
+<p>若要指定通用缓冲区的显示偏好，用户应自定义 <code class="code">display-buffer-base-action</code>。上一小节已经给出偏好多框架用户的设置示例。<code class="code">display-buffer-alist</code> 则应专门用于对特定缓冲区指定特定显示方式。
 </p>
 </dd>
-<dt>Consider reusing a window that already shows the buffer</dt>
-<dd><p>Generally, it&rsquo;s always a good idea for users and Lisp
-programmers to be prepared for the case that a window already shows
-the buffer in question and to reuse that window.  In the preceding
-subsection we have shown that failing to do so properly may cause
-<code class="code">display-buffer</code> to continuously pop up a new frame although a
-frame showing that buffer existed already.  In a few cases only, it
-might be undesirable to reuse a window, for example, when a different
-portion of the buffer should be shown in that window.
+<dt>优先复用已显示该缓冲区的窗口</dt>
+<dd><p>通常来说，无论用户还是 Lisp 程序员，都应优先考虑复用已经显示目标缓冲区的窗口。上一小节已经说明，如果没有正确做到这一点，即使已有框架显示该缓冲区，<code class="code">display-buffer</code> 仍可能不断弹出新框架。只有少数情况不适合复用窗口，例如需要在该窗口显示缓冲区的另一部分内容时。
 </p>
-<p>Hence, <code class="code">display-buffer-reuse-window</code> is one action function
-that should be used as often as possible, both in <var class="var">action</var>
-arguments and customizations.  An <code class="code">inhibit-same-window</code> entry in
-the <var class="var">action</var> argument usually takes care of the most common case
-where reusing a window showing the buffer should be avoided&mdash;that
-where the window in question is the selected one.
+<p>因此，<code class="code">display-buffer-reuse-window</code> 是一个应尽可能多用的动作函数，无论是在 <var class="var">action</var> 参数中还是自定义设置里。<var class="var">action</var> 参数中的 <code class="code">inhibit-same-window</code> 条目通常可以处理最常见的例外情况&mdash;避免复用当前选中的窗口。
 </p>
 </dd>
-<dt>Attract focus to the window chosen</dt>
-<dd><p>This is a no-brainer for people working with multiple frames&mdash;the
-frame showing the buffer will automatically raise and get focus unless
-an <code class="code">inhibit-switch-frame</code> entry forbids it.  For single frame
-users this task can be considerably more difficult.  In particular,
-<code class="code">display-buffer-pop-up-window</code> and
-<code class="code">display-buffer-use-some-window</code> can become obtrusive in this
-regard.  They split or use a seemingly arbitrary (often the largest or
-least recently used) window, distracting the user&rsquo;s attention.
+<dt>让选中的窗口获得焦点</dt>
+<dd><p>对于使用多框架的用户来说这很简单：显示缓冲区的框架会自动前置并获得焦点，除非 <code class="code">inhibit-switch-frame</code> 条目禁止这一行为。但对单框架用户来说，这一需求会困难得多。尤其是 <code class="code">display-buffer-pop-up-window</code> 和 <code class="code">display-buffer-use-some-window</code>，它们会分割或使用看似随机的窗口（通常是最大或最近最少使用的窗口），容易分散用户注意力。
 </p>
-<p>Some Lisp programs therefore try to choose a window at the bottom of
-the frame, for example, in order to display the buffer in vicinity of
-the minibuffer window where the user is expected to answer a question
-related to the new window.  For non-input related actions
-<code class="code">display-buffer-below-selected</code> might be preferable because the
-selected window usually already has the user&rsquo;s attention.
+<p>因此一些 Lisp 程序会尝试选择框架底部的窗口，例如在迷你缓冲区附近显示缓冲区，方便用户对新窗口相关内容做出回应。对于非输入相关的操作，<code class="code">display-buffer-below-selected</code> 往往更合适，因为选中窗口通常已经处于用户的关注范围内。
 </p>
 </dd>
-<dt>Take care which window is selected</dt>
-<dd><p>Many applications call <code class="code">display-buffer</code> from within window
-excursions produced by <code class="code">with-selected-window</code> or
-<code class="code">select-window</code> calls with a non-<code class="code">nil</code> <var class="var">norecord</var>
-argument.  This is almost always a bad idea because the window selected
-within such an excursion is usually not the window selected in the
-configuration presented to the user.
+<dt>留意哪个窗口会被选中</dt>
+<dd><p>很多应用程序会在窗口切换环境中调用 <code class="code">display-buffer</code>，例如在 <code class="code">with-selected-window</code> 内部，或使用带非 <code class="code">nil</code> <var class="var">norecord</var> 参数的 <code class="code">select-window</code>。这通常是个坏主意，因为在这种切换环境中选中的窗口，往往不是最终呈现给用户的选中窗口。
 </p>
-<p>If, for example, a user had added an <code class="code">inhibit-same-window</code> alist
-entry, that entry would have avoided the window selected within the
-scope of the excursion and not the window selected in the resulting
-configuration.  Even if no such entry has been added, the resulting
-behavior might be strange.  While in a frame containing one live
-window, evaluating the following form
+<p>例如，如果用户添加了 <code class="code">inhibit-same-window</code> 条目，它会阻止在切换环境内选中的窗口显示，而不是阻止最终配置中的选中窗口。即使没有添加该条目，行为也可能异常。
+在只有一个活动窗口的框架中执行以下代码：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(progn
@@ -261,18 +171,17 @@ window, evaluating the following form
   (display-buffer &quot;*Messages*&quot;))
 </pre></div></div>
 
-<p>will display a window showing the <samp class="file">*Messages*</samp> buffer at the bottom
-and leave the other window selected.  Evaluating the next form
+<p>会在底部显示 <samp class="file">*Messages*</samp> 缓冲区，并保持另一个窗口为选中状态。
+执行下一段代码：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(with-selected-window (split-window)
   (display-buffer &quot;*Messages*&quot;))
 </pre></div></div>
 
-<p>will display <samp class="file">*Messages*</samp> in a window on the top and select it
-which is usually not what <code class="code">display-buffer</code> is supposed to do.
+<p>则会在顶部窗口显示 <samp class="file">*Messages*</samp> 并选中该窗口，这通常不是 <code class="code">display-buffer</code> 应有的行为。
 </p>
-<p>On the other hand, while evaluating the following form
+<p>另一方面，执行下面这段代码：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(progn
@@ -280,7 +189,8 @@ which is usually not what <code class="code">display-buffer</code> is supposed t
   (pop-to-buffer &quot;*Messages*&quot;))
 </pre></div></div>
 
-<p>will correctly select the <samp class="file">*Messages*</samp> buffer, the next form
+<p>会正确选中 <samp class="file">*Messages*</samp> 缓冲区，
+但下一段代码：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(progn
@@ -289,24 +199,19 @@ which is usually not what <code class="code">display-buffer</code> is supposed t
     (pop-to-buffer &quot;*Messages*&quot;)))
 </pre></div></div>
 
-<p>will not.
+<p>则不会达到预期效果。
 </p>
-<p>Also, invocations of action functions like
-<code class="code">display-buffer-use-some-window</code> and
-<code class="code">display-buffer-use-least-recent-window</code> that expect the selected
-window to have the highest use time among all windows, may fail to
-produce a window according to their specifications.
+<p>同时，像 <code class="code">display-buffer-use-some-window</code> 和 <code class="code">display-buffer-use-least-recent-window</code> 这类依赖选中窗口拥有最高使用时间的动作函数，也可能无法按预期选择窗口。
 </p>
-<p>Hence, an application that relies on using a window excursion should try
-to postpone the <code class="code">display-buffer</code> call until after the excursion has
-terminated.
+<p>因此，如果应用程序需要使用窗口切换，应尽量将 <code class="code">display-buffer</code> 调用推迟到窗口切换结束之后。
 </p></dd>
 </dl>
+
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Precedence-of-Action-Functions.html">Precedence of Action Functions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Displaying-Buffers.html">Displaying a Buffer in a Suitable Window</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Precedence-of-Action-Functions.html">动作函数的优先级</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Displaying-Buffers.html">在合适窗口中显示缓冲区</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

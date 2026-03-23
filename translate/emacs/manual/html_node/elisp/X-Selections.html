@@ -48,328 +48,198 @@ ul.mark-bullet {list-style-type: disc}
 <body>
 <div class="subsection-level-extent" id="X-Selections">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Other-Selections.html" accesskey="n" rel="next">Other Selections</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Accessing-Selections.html" accesskey="u" rel="up">Accessing Selections</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Other-Selections.html" accesskey="n" rel="next">其他选区</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Accessing-Selections.html" accesskey="u" rel="up">选择区访问</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="X-Selections-1"><span>30.22.1 X Selections<a class="copiable-link" href="#X-Selections-1"> &para;</a></span></h4>
+<h4 class="subsection" id="X-_9009_62e9_533a"><span>30.22.1 X 选择区<a class="copiable-link" href="#X-_9009_62e9_533a"> &para;</a></span></h4>
 
-<p>X refrains from defining fixed data types for selection data or a
-fixed number of selections.  Selections are identified by X &ldquo;atoms&rdquo;,
-which are unique 29-bit identifiers issued by the X server for string
-names.  This complexity is hidden by Emacs: when Lisp provides a
-symbol whose name is that of the atom, Emacs will request these
-identifiers without further intervention.
+<p>X 窗口系统并未为选择区数据定义固定的数据类型，也没有限定选择区的固定数量。选择区由 X &ldquo;原子(atoms)&rdquo; 标识，原子是 X 服务器为字符串名称分配的唯一 29 位标识符。Emacs 隐藏了这一复杂性：当 Lisp 传入一个符号，其名称对应某个原子名时，Emacs 会自动请求这些标识符，无需额外干预。
 </p>
-<p>When a program &ldquo;sets&rdquo; a selection under X, it actually makes
-itself the &ldquo;owner&rdquo; of the selection&mdash;the X server will then deliver
-selection requests to the program, which is obliged to respond to the
-requesting client with the selection data.
+<p>在 X 中，当一个程序 &ldquo;设置(sets)&rdquo; 选择区时，它实际上成为了该选择区的 &ldquo;所有者(owner)&rdquo; &mdash;随后 X 服务器会将选择区请求转发给该程序，程序必须向请求客户端返回选择区数据。
 </p>
-<p>Similarly, a program does not &ldquo;get&rdquo; selection data from the X
-server.  Instead, its selection requests are sent to the client with
-the window which last asserted ownership over the selection, which is
-expected to respond with the requested data.
+<p>同理，程序并非直接从 X 服务器 &ldquo;获取(get)&rdquo; 选择区数据，而是将选择区请求发送给最后声明拥有该选择区的窗口所属客户端，由其返回所请求的数据。
 </p>
-<p>Each selection request incorporates three parameters:
+<p>每个选择区请求包含三个参数：
 </p>
 <ul class="itemize mark-bullet">
-<li>The window which requested the selection, which identifies the
-requesting program, otherwise known as the <em class="dfn">requestor</em>.
+<li>发起选择区请求的窗口，用于标识请求程序，也称为 <em class="dfn">请求方(requestor)</em>。
 
-</li><li>An atom identifying the <em class="dfn">target</em> to which the owner should convert
-the selection.  It is easiest to think of the conversion target as the
-kind of data that the requestor wants: in selection requests made by
-Emacs, the target is determined by the <var class="var">type</var> argument to
-<code class="code">gui-get-selection</code>.
+</li><li>一个原子，用于标识 <em class="dfn">目标类型(target)</em>，即选择区所有者应将选择区转换为何种格式。可以简单理解为：请求方想要的数据类型。在 Emacs 发起的选择区请求中，目标类型由 <code class="code">gui-get-selection</code> 的 <var class="var">type</var> 参数决定。
 
-</li><li>A 32-bit timestamp representing the X server time at which the
-requestor last received input; this parameter is not relevant to Lisp
-code, for it&rsquo;s only meant to abet synchronization between the X
-server, owner and requestor.
+</li><li>一个 32 位时间戳，表示请求方最后一次接收输入时的 X 服务器时间。该参数与 Lisp 代码无关，仅用于协助 X 服务器、所有者与请求方之间同步。
 </li></ul>
 
-<p>The selection owner responds by transferring to the requestor a
-series of bytes, 16 bit words, or 32 bit words, along with another
-atom identifying the type of those words.  After requesting a
-selection, Emacs then applies its own interpretation of the data
-format and data type to convert the data transferred by the selection
-owner to a Lisp representation, which <code class="code">gui-get-selection</code>
-returns.
+<p>选择区所有者会向请求方传输一系列字节、16 位字或 32 位字，并附带另一个标识这些字类型的原子。请求选择区后，Emacs 会按照自身对数据格式和类型的解析规则，将选择区所有者传来的数据转换为 Lisp 表示形式，并由 <code class="code">gui-get-selection</code> 返回。
 </p>
-<p>Emacs converts selection data consisting of any series of bytes to a
-unibyte string holding those bytes, that consisting of a single 16-bit
-or 32-bit word as an unsigned number, and that consisting of multiple
-such words as a vector of unsigned numbers.  The exceptions to this
-general pattern are that Emacs applies special treatment for data from
-the following conversion targets:
+<p>Emacs 会将任意字节序列的选择区数据转换为保存这些字节的单字节字符串；将单个 16 位或 32 位字转换为无符号数；将多个此类字转换为无符号数向量。这一通用规则存在例外，Emacs 会对以下转换目标的数据做特殊处理：
 </p>
 <dl class="table">
 <dt><code class="code">INTEGER</code></dt>
-<dd><p>16-bit or 32-bit words of this type are treated as signed rather than
-unsigned integers.  If there are multiple words in the selection data,
-a vector is returned; otherwise, the integer is returned by itself.
+<dd><p>该类型的 16 位或 32 位字按有符号整数处理，而非无符号数。若选择区数据包含多个字，则返回向量；否则直接返回整数。
 </p>
 </dd>
 <dt><code class="code">ATOM</code></dt>
-<dd><p>32-bit words of this type are treated as X atoms, and returned (either
-alone or as vectors) as Lisp symbols by the names they identify.
-Invalid atoms are replaced by <code class="code">nil</code>.
+<dd><p>该类型的 32 位字被视为 X 原子，并以其名称对应的 Lisp 符号返回（单独返回或作为向量返回）。无效原子替换为 <code class="code">nil</code>。
 </p>
 </dd>
 <dt><code class="code">COMPOUND_TEXT</code></dt>
 <dt><code class="code">UTF8_STRING</code></dt>
 <dt><code class="code">STRING</code></dt>
-<dd><p>A single <code class="code">foreign-selection</code> text property set to the type of the
-selection data will be placed in unibyte strings derived from a
-request for these data types.
+<dd><p>从这些数据类型请求得到的单字节字符串，会被设置一个名为 <code class="code">foreign-selection</code> 的文本属性，值为选择区数据的类型。
 </p></dd>
 </dl>
 
-<p>Each selection owner must return at least two selection targets:
-<code class="code">TARGETS</code>, which returns a number of atoms describing the
-selection targets that the owner supports, and <code class="code">MULTIPLE</code>, used
-for internal purposes by X clients.  A selection owner may support any
-number of other targets, some of which may be standardized by the X
-Consortium&rsquo;s
-<a class="url" href="https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html">Inter-Client Communication Conventions Manual</a>, while others, such as
-<code class="code">UTF8_STRING</code>, were meant to be standardized by the XFree86
-Project, but their standardization was never completed.
+<p>每个选择区所有者必须至少返回两种选择区目标：<code class="code">TARGETS</code>，返回所有者支持的若干原子类型；以及 <code class="code">MULTIPLE</code>，供 X 客户端内部使用。选择区所有者还可支持任意数量的其他目标，部分由 X 协会的
+<a class="url" href="https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html">客户端间通信约定手册</a> 标准化，另一些（如 <code class="code">UTF8_STRING</code>）本应由 XFree86 项目标准化，但最终并未完成。
 </p>
-<p>Requests for a given selection target may, by convention, return
-data in a specific type, or it may return data in one of several
-types, whichever is most convenient for the selection owner; the
-latter type of selection target is dubbed a <em class="dfn">polymorphic target</em>.
-In response to a request, a selection target may also return no data
-at all, whereafter the selection owner executes some action as a side
-effect.  Targets that are thus replied to are termed <em class="dfn">side-effect
-targets</em>.
+<p>按照惯例，对某个选择区目标的请求可以返回特定类型的数据，也可返回多种类型之一（以选择区所有者最方便为准）；后一类选择区目标称为 <em class="dfn">多态目标(polymorphic target)</em>。对某个目标的请求也可能完全不返回数据，而是由选择区所有者执行某个附带动作，这类目标称为 <em class="dfn">副作用目标(side-effect targets)</em>。
 </p>
-<p>Here are some selection targets whose behavior is generally
-consistent with a standard when requested from the <code class="code">CLIPBOARD</code>,
-<code class="code">PRIMARY</code>, or <code class="code">SECONDARY</code> selections.
+<p>以下是一些选择区目标，从 <code class="code">CLIPBOARD</code>、<code class="code">PRIMARY</code> 或 <code class="code">SECONDARY</code> 请求时，其行为通常符合标准：
 </p>
 <dl class="table">
 <dt><code class="code">ADOBE_PORTABLE_DOCUMENT_FORMAT</code></dt>
-<dd><p>This target returns data in Adobe System&rsquo;s &ldquo;Portable Document
-Format&rdquo; format, as a string.
+<dd><p>该目标以字符串形式返回 Adobe &ldquo;可移植文档格式(Portable Document Format)&rdquo; （PDF）数据。
 </p>
 </dd>
 <dt><code class="code">APPLE_PICT</code></dt>
-<dd><p>This target returns data in the &ldquo;PICT&rdquo; image format used on
-Macintosh computers, as a string.
+<dd><p>该目标以字符串形式返回 Mac 计算机使用的 &ldquo;PICT&rdquo; 图像格式数据。
 </p>
 </dd>
 <dt><code class="code">BACKGROUND</code></dt>
 <dt><code class="code">BITMAP</code></dt>
 <dt><code class="code">COLORMAP</code></dt>
 <dt><code class="code">FOREGROUND</code></dt>
-<dd><p>Together, these four targets return integer data necessary to make use
-of a bitmap image stored on the X server: the pixel value of the
-bitmap&rsquo;s background color, the X identifier of the bitmap, the
-colormap inside which the background and foreground are allocated, and
-the pixel value of the bitmap&rsquo;s foreground color.
+<dd><p>这四个目标共同返回使用 X 服务器上位图图像所需的整数数据：位图背景色像素值、位图的 X 标识符、分配前景与背景色的颜色表、位图前景色像素值。
 </p>
 </dd>
 <dt><code class="code">CHARACTER_POSITION</code></dt>
-<dd><p>This target returns two unsigned 32-bit integers of type <code class="code">SPAN</code>
-describing the start and end positions of the selection data in the
-text field containing it, in bytes.
+<dd><p>该目标返回两个 <code class="code">SPAN</code> 类型的无符号 32 位整数，以字节为单位表示选择区数据在其文本域中的起始与结束位置。
 </p>
 </dd>
 <dt><code class="code">COMPOUND_TEXT</code></dt>
-<dd><p>This target returns a string of type <code class="code">COMPOUND_TEXT</code> in the X
-Consortium&rsquo;s multi-byte text encoding system.
+<dd><p>该目标返回 X 协会多字节文本编码系统中的 <code class="code">COMPOUND_TEXT</code> 类型字符串。
 </p>
 </dd>
 <dt><code class="code">DELETE</code></dt>
-<dd><p>This target returns nothing, but as a side-effect deletes the
-selection contents from any text field containing them.
+<dd><p>该目标不返回数据，但会附带删除包含选择区内容的文本域中的数据。
 </p>
 </dd>
 <dt><code class="code">DRAWABLE</code></dt>
 <dt><code class="code">PIXMAP</code></dt>
-<dd><p>This target returns a list of unsigned 32-bit integers, each of which
-corresponds to an X server drawable or pixmap.
+<dd><p>该目标返回无符号 32 位整数列表，每个整数对应一个 X 服务器可绘制对象或像素图。
 </p>
 </dd>
 <dt><code class="code">ENCAPSULATED_POSTSCRIPT</code></dt>
 <dt><code class="code">_ADOBE_EPS</code></dt>
-<dd><p>This target returns a string containing encapsulated Postscript code.
+<dd><p>该目标返回包含封装 PostScript 代码的字符串。
 </p>
 </dd>
 <dt><code class="code">FILE_NAME</code></dt>
-<dd><p>This target returns a string containing one or more file names,
-separated by NULL characters.
+<dd><p>该目标返回包含一个或多个文件名的字符串，以空字符分隔。
 </p>
 </dd>
 <dt><code class="code">HOST_NAME</code></dt>
-<dd><p>This target returns a string containing the fully-qualified domain
-name of the machine on which the selection owner is running.
+<dd><p>该目标返回运行选择区所有者的机器的完整域名。
 </p>
 </dd>
 <dt><code class="code">USER</code></dt>
-<dd><p>This target returns a string containing the user name of the machine
-on which the selection owner is running.
+<dd><p>该目标返回运行选择区所有者的机器的用户名。
 </p>
 </dd>
 <dt><code class="code">LENGTH</code></dt>
-<dd><p>This target returns an unsigned 32-bit or 16-bit integer containing
-the length of the selection data.
+<dd><p>该目标返回一个无符号 32 位或 16 位整数，表示选择区数据长度。
 </p>
 </dd>
 <dt><code class="code">LINE_NUMBER</code></dt>
-<dd><p>This target returns two unsigned 32-bit integers of type <code class="code">SPAN</code>
-describing the line numbers corresponding to the start and end
-positions of the selection data in the text field containing it.
+<dd><p>该目标返回两个 <code class="code">SPAN</code> 类型的无符号 32 位整数，表示选择区数据在其文本域中对应起始与结束行号。
 </p>
 </dd>
 <dt><code class="code">MODULE</code></dt>
-<dd><p>This target returns the name of any function containing the selection
-data.  It is principally requested by text editors.
+<dd><p>该目标返回包含选择区数据的函数名称，主要由文本编辑器请求。
 </p>
 </dd>
 <dt><code class="code">STRING</code></dt>
-<dd><p>This target returns the selection data as a string of type
-<code class="code">STRING</code>, encoded in ISO Latin-1 format, with Unix newline
-characters.
+<dd><p>该目标以 <code class="code">STRING</code> 类型字符串返回选择区数据，采用 ISO Latin-1 编码与 Unix 换行符。
 </p>
 </dd>
 <dt><code class="code">C_STRING</code></dt>
-<dd><p>This target returns the selection data as a &ldquo;C string&rdquo;.  This has
-been interpreted as meaning the raw selection data in whatever
-encoding used by the owner, either terminated with a NULL byte or not
-at all, or an ASCII string which may or may not be terminated.
+<dd><p>该目标以 &ldquo;C 字符串&rdquo; 形式返回选择区数据，通常解释为所有者使用的任意编码原始数据，可能以空字节结尾或无结尾，也可能是 ASCII 字符串。
 </p>
 </dd>
 <dt><code class="code">UTF8_STRING</code></dt>
-<dd><p>This returns the selection data as a string of type
-<code class="code">UTF8_STRING</code>, encoded in UTF-8, with unspecified EOL format.
+<dd><p>该目标以 <code class="code">UTF8_STRING</code> 类型字符串返回选择区数据，采用 UTF-8 编码，换行格式未指定。
 </p>
 </dd>
 <dt><code class="code">TIMESTAMP</code></dt>
-<dd><p>This target returns the X server time at which the selection owner
-took ownership over the selection as a 16-bit or 32-bit word of type
-<code class="code">CARDINAL</code>.
+<dd><p>该目标以 <code class="code">CARDINAL</code> 类型的 16 位或 32 位字返回选择区所有者获得所有权时的 X 服务器时间。
 </p>
 </dd>
 <dt><code class="code">TEXT</code></dt>
-<dd><p>This polymorphic target returns selection data as a string, either
-<code class="code">COMPOUND_TEXT</code>, <code class="code">STRING</code>, <code class="code">C_STRING</code>, or
-<code class="code">UTF8_STRING</code>, whichever data type is convenient for the
-selection owner.
+<dd><p>这一多态目标以字符串形式返回选择区数据，可为 <code class="code">COMPOUND_TEXT</code>、<code class="code">STRING</code>、<code class="code">C_STRING</code> 或 <code class="code">UTF8_STRING</code>，由选择区所有者自行决定。
 </p></dd>
 </dl>
 
-<p>When a request for the targets <code class="code">STRING</code>, <code class="code">COMPOUND_TEXT</code>,
-or <code class="code">UTF8_STRING</code> is made using the function
-<code class="code">gui-get-selection</code>, and neither <code class="code">selection-coding-system</code>
-nor <code class="code">next-selection-coding-system</code> is set, the resultant strings
-are decoded by the proper coding systems for those targets:
-<code class="code">iso-8859-1</code>, <code class="code">compound-text-with-extensions</code> and
-<code class="code">utf-8</code> respectively.
+<p>当使用 <code class="code">gui-get-selection</code> 请求 <code class="code">STRING</code>、<code class="code">COMPOUND_TEXT</code> 或 <code class="code">UTF8_STRING</code> 目标，且未设置 <code class="code">selection-coding-system</code> 与 <code class="code">next-selection-coding-system</code> 时，结果字符串会分别使用对应编码系统解码：<code class="code">iso-8859-1</code>、<code class="code">compound-text-with-extensions</code> 与 <code class="code">utf-8</code>。
 </p>
-<p>In addition to the targets specified above (and the many targets
-used by various programs for their own purposes), several popular
-programs and toolkits have defined selection data types of their own,
-without consulting the appropriate X standards bodies.  These targets
-are generally named after such MIME types as <code class="code">text/html</code> or
-<code class="code">image/jpeg</code>; they have been witnessed returning the following
-forms of data:
+<p>除上述目标（以及各类程序自用的大量目标）外，许多流行程序与工具包未咨询 X 标准组织便自行定义了选择区数据类型。这些目标通常以 MIME 类型命名，如 <code class="code">text/html</code> 或 <code class="code">image/jpeg</code>，它们返回的数据形式如下：
 </p>
 <ul class="itemize mark-bullet">
-<li>Unterminated, newline terminated, or NULL character terminated file
-names of an image or text file.
+<li>无结尾、换行结尾或空字符结尾的图像或文本文件名。
 
-</li><li>Image or text data in the appropriate format.
+</li><li>对应格式的图像或文本数据。
 
-</li><li><code class="code">file://</code> URIs (or conceivably newline or NUL terminated lists of
-URIs) identifying files in the appropriate format.
+</li><li><code class="code">file://</code> 格式 URI（或换行/空字符分隔的 URI 列表），标识对应格式文件。
 </li></ul>
 
-<p>These selection targets were first used by Netscape, but are now
-proffered by all kinds of programs, especially those based on recent
-versions of the GTK+ or Qt toolkits.
+<p>这类选择区目标最早由网景浏览器使用，如今各类程序均提供支持，尤其是基于新版 GTK+ 或 Qt 工具包的程序。
 </p>
-<p>Emacs is also capable of serving as a selection owner.  When
-<code class="code">gui-set-selection</code> is called, the selection data provided is
-recorded internally and Emacs obtains ownership of the selection being
-set.
+<p>Emacs 也可作为选择区所有者。调用 <code class="code">gui-set-selection</code> 时，传入的选择区数据会被内部记录，Emacs 获得对应选择区的所有权。
 </p>
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-selection_002dconverter_002dalist"><span class="category-def">Variable: </span><span><strong class="def-name">selection-converter-alist</strong><a class="copiable-link" href="#index-selection_002dconverter_002dalist"> &para;</a></span></dt>
-<dd><p>Alist of selection targets to &ldquo;selection converter&rdquo; functions.  When
-a selection request is received, Emacs looks up the selection
-converter pertaining to the requested selection target.
+<dd><p>从选择区目标到 &ldquo;选择区转换器(selection converter)&rdquo; 函数的关联列表。收到选择区请求时，Emacs 根据请求的目标查找对应的转换器。
 </p>
-<p>Selection converters are called with three arguments: the symbol
-corresponding to the atom identifying the selection being requested,
-the selection target that is being requested, and the value set with
-<code class="code">gui-set-selection</code>.  The values which they must return are
-either conses of symbols designating the data type and numbers,
-symbols, vectors of numbers or symbols, or the cdrs of such conses by
-themselves.
+<p>选择区转换器接收三个参数：对应所请求选择区原子的符号、所请求的选择区目标，以及通过 <code class="code">gui-set-selection</code> 设置的值。其返回值必须为以下形式之一：表示数据类型与数值的符号 cons、符号、数值或符号向量，或此类 cons 的 cdr 部分。
 </p>
-<p>If a selection converter&rsquo;s value is the special symbol <code class="code">NULL</code>,
-the data type returned to its requestor is set to <code class="code">NULL</code>, and no
-data is sent in response.
+<p>若选择区转换器返回特殊符号 <code class="code">NULL</code>，则向请求方返回的数据类型设为 <code class="code">NULL</code>，且不发送任何数据。
 </p>
-<p>If such a value is a string, it must be a unibyte string; should no
-data type be explicitly specified, the data is transferred to its
-requestor with the type <code class="code">STRING</code>.
+<p>若返回字符串，必须为单字节字符串；若未显式指定数据类型，则以 <code class="code">STRING</code> 类型传输。
 </p>
-<p>If it is a symbol, its &ldquo;atom&rdquo; is retrieved, and it is transferred to
-its requestor as a 32-bit value&mdash;if no data type is specified, its
-type is <code class="code">ATOM</code>.
+<p>若返回符号，会获取其对应 &ldquo;原子(atom)&rdquo;，并以 32 位值传输；未指定类型时默认为 <code class="code">ATOM</code>。
 </p>
-<p>If it is a number between <code class="code">-32769</code> and <code class="code">32768</code>, it is
-transferred to its requestor as a 16 bit value&mdash;if no data type is
-specified, its type is <code class="code">INTEGER</code>.
+<p>若返回数值在 <code class="code">-32769</code> 到 <code class="code">32768</code> 之间，以 16 位值传输；未指定类型时默认为 <code class="code">INTEGER</code>。
 </p>
-<p>If it is any other number, it is accounted a 32 bit value.  Even if
-the number returned is unsigned, its requestor will treat words of
-type <code class="code">INTEGER</code> as signed.  To return an unsigned value, specify
-the type <code class="code">CARDINAL</code> in its place.
+<p>若为其他数值，按 32 位值处理。即使返回无符号数，请求方仍会将 <code class="code">INTEGER</code> 类型字视为有符号。如需返回无符号值，应指定类型为 <code class="code">CARDINAL</code>。
 </p>
-<p>If it is a vector of symbols or numbers, the response to its requestor
-will be a list of multiple atoms or numbers.  The data type returned
-when not expressly set is that of the list&rsquo;s first element.
+<p>若返回符号或数值向量，向请求方返回多个原子或数值列表。未显式设置时，返回类型为列表首个元素的类型。
 </p></dd></dl>
 
-<p>By default, Emacs is configured with selection converters for the
-following selection targets:
+<p>默认情况下，Emacs 为以下选择区目标配置了转换器：
 </p>
 <dl class="table">
 <dt><code class="code">TEXT</code></dt>
-<dd><p>This selection converter returns selection data as:
+<dd><p>该选择区转换器按以下规则返回选择区数据：
 </p>
 <ul class="itemize mark-bullet">
-<li>A string of type <code class="code">C_STRING</code>, if the selection contents contain no
-multibyte characters, or contain &ldquo;raw 8-bit bytes&rdquo; (see <a class="pxref" href="Text-Representations.html">Text Representations</a>).
+<li>若选择区内容不含多字节字符或仅含 &ldquo;原始 8 位字节&rdquo;，返回 <code class="code">C_STRING</code> 类型字符串。(see <a class="pxref" href="Text-Representations.html">Text Representations</a>)。
 
-</li><li>A string of type <code class="code">STRING</code>, if the selection contents can be
-represented as ISO-Latin-1 text.
+</li><li>若选择区内容可表示为 ISO-Latin-1 文本，返回 <code class="code">STRING</code> 类型字符串。
 
-</li><li>A string of type <code class="code">COMPOUND_TEXT</code>, if the selection contents can
-be encoded in the X Consortium&rsquo;s Compound Text Encoding, and
-<code class="code">selection-coding-system</code> or <code class="code">next-selection-coding-system</code>
-is set to a coding system whose <code class="code">:mime-charset</code> property is
-<code class="code">x-ctext</code>.
+</li><li>若选择区内容可使用 X 协会复合文本编码，且 <code class="code">selection-coding-system</code> 或 <code class="code">next-selection-coding-system</code> 设为 <code class="code">:mime-charset</code> 属性为 <code class="code">x-ctext</code> 的编码系统，返回 <code class="code">COMPOUND_TEXT</code> 类型字符串。
 
-</li><li>A string of type <code class="code">UTF8_STRING</code> otherwise.
+</li><li>其他情况返回 <code class="code">UTF8_STRING</code> 类型字符串。
 </li></ul>
 
 </dd>
 <dt><code class="code">COMPOUND_TEXT</code></dt>
-<dd><p>This selection converter returns selection data as a string of type
-<code class="code">COMPOUND_TEXT</code>.
+<dd><p>该选择区转换器以 <code class="code">COMPOUND_TEXT</code> 类型字符串返回选择区数据。
 </p>
 </dd>
 <dt><code class="code">STRING</code></dt>
-<dd><p>This selection converter returns selection data as a string of type
-<code class="code">STRING</code>, encoded in ISO-Latin-1 format.
+<dd><p>该选择区转换器以 <code class="code">STRING</code> 类型字符串返回选择区数据，采用 ISO-Latin-1 编码。
 </p>
 </dd>
 <dt><code class="code">UTF8_STRING</code></dt>
-<dd><p>This selection converter returns selection data in UTF-8 format.
+<dd><p>该选择区转换器以 UTF-8 格式返回选择区数据。
 </p>
 </dd>
 <dt><code class="code">text/plain</code></dt>
@@ -380,61 +250,48 @@ is set to a coding system whose <code class="code">:mime-charset</code> property
 <dt><code class="code">XmTRANSFER_FAILURE</code></dt>
 <dt><code class="code">FILE</code></dt>
 <dt><code class="code">_DT_NETFILE</code></dt>
-<dd><p>These selection converters are used for internal purposes during
-drag-and-drop operations and are not available for selections other
-than <code class="code">XdndSelection</code>.
+<dd><p>这些选择区转换器用于拖放操作内部，仅对 <code class="code">XdndSelection</code> 有效。
 </p>
 </dd>
 <dt><code class="code">TARGETS</code></dt>
-<dd><p>This selection converter returns a list of atoms, one for each
-selection target understood by Emacs.
+<dd><p>该选择区转换器返回原子列表，每个原子对应 Emacs 支持的一种选择区目标。
 </p>
 </dd>
 <dt><code class="code">MULTIPLE</code></dt>
-<dd><p>This selection converter is implemented in C code and is used to
-implement efficient transfer of selection requests which specify
-multiple selection targets at the same time.
+<dd><p>该选择区转换器由 C 代码实现，用于高效处理同时指定多个目标的选择区请求。
 </p>
 </dd>
 <dt><code class="code">LENGTH</code></dt>
-<dd><p>This selection converter returns the length of the selection data, in
-bytes.
+<dd><p>该选择区转换器返回选择区数据的字节长度。
 </p>
 </dd>
 <dt><code class="code">DELETE</code></dt>
-<dd><p>This selection converter is used for internal purposes during
-drag-and-drop operations.
+<dd><p>该选择区转换器用于拖放操作内部。
 </p>
 </dd>
 <dt><code class="code">FILE_NAME</code></dt>
-<dd><p>This selection converter returns the file name of the buffer
-containing the selection data.
+<dd><p>该选择区转换器返回包含选择区数据的缓冲区文件名。
 </p>
 </dd>
 <dt><code class="code">CHARACTER_POSITION</code></dt>
-<dd><p>This selection converter returns the character positions of each end
-of the selection in the buffer containing the selection data.
+<dd><p>该选择区转换器返回选择区在对应缓冲区中的起止字符位置。
 </p>
 </dd>
 <dt><code class="code">LINE_NUMBER</code></dt>
 <dt><code class="code">COLUMN_NUMBER</code></dt>
-<dd><p>This selection converter returns the line and column numbers of each
-end of the selection in the buffer containing the selection data.
+<dd><p>该选择区转换器返回选择区在对应缓冲区中的起止行号与列号。
 </p>
 </dd>
 <dt><code class="code">OWNER_OS</code></dt>
-<dd><p>This selection converter returns the name of the operating system on
-which Emacs is running.
+<dd><p>该选择区转换器返回 Emacs 运行的操作系统名称。
 </p>
 </dd>
 <dt><code class="code">HOST_NAME</code></dt>
-<dd><p>This selection converter returns the fully-qualified domain name of
-the machine on which Emacs is running.
+<dd><p>该选择区转换器返回 Emacs 运行机器的完整域名。
 </p>
 </dd>
 <dt><code class="code">USER</code></dt>
-<dd><p>This selection converter returns the username of the user account
-under which Emacs is running.
+<dd><p>该选择区转换器返回运行 Emacs 的用户账号名。
 </p>
 </dd>
 <dt><code class="code">CLASS</code></dt>
@@ -449,26 +306,31 @@ Emacs.
 </dd>
 <dt><code class="code">SAVE_TARGETS</code></dt>
 <dt><code class="code">_EMACS_INTERNAL</code></dt>
-<dd><p>These selection converters are used for internal purposes.
+<dd><p>这些选择区转换器返回 Emacs 使用的资源类与资源名。
+</p>
+</dd>
+<dt><code class="code">INTEGER</code></dt>
+<dd><p>该选择区转换器原样返回整数值。
+</p>
+</dd>
+<dt><code class="code">SAVE_TARGETS</code></dt>
+<dt><code class="code">_EMACS_INTERNAL</code></dt>
+<dd><p>这些选择区转换器用于内部用途。
 </p></dd>
 </dl>
 
-<p>With the exception of <code class="code">INTEGER</code>, all selection converters
-expect the data provided to <code class="code">gui-set-selection</code> to be one of the
-following:
+<p>除 <code class="code">INTEGER</code> 外，所有选择区转换器均要求 <code class="code">gui-set-selection</code> 提供的数据为以下形式之一：
 </p>
 <ul class="itemize mark-bullet">
-<li>A string.
+<li>字符串。
 
-</li><li>A list of the form <code class="code">(<var class="var">beg</var>&nbsp;<var class="var">end</var>&nbsp;<var class="var">buf</var>)</code><!-- /@w -->, where
-<var class="var">beg</var> and <var class="var">end</var> are two markers or overlays describing the
-bounds of the selection data in the buffer <var class="var">buf</var>.
+</li><li>格式为 <code class="code">(<var class="var">beg</var> <var class="var">end</var> <var class="var">buf</var>)</code> 的列表，其中 <var class="var">beg</var> 与 <var class="var">end</var> 为标记或覆盖区，表示缓冲区 <var class="var">buf</var> 中选择区数据的范围。
 </li></ul>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Other-Selections.html">Other Selections</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Accessing-Selections.html">Accessing Selections</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Other-Selections.html">其他选区</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Accessing-Selections.html">选择区访问</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

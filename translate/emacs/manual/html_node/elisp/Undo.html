@@ -49,67 +49,50 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="section-level-extent" id="Undo">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Maintaining-Undo.html" accesskey="n" rel="next">Maintaining Undo Lists</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="The-Kill-Ring.html" accesskey="p" rel="prev">The Kill Ring</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Text.html" accesskey="u" rel="up">文本</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Maintaining-Undo.html" accesskey="n" rel="next">维护撤销列表</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="The-Kill-Ring.html" accesskey="p" rel="prev">删除环</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Text.html" accesskey="u" rel="up">文本</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Undo-1"><span>33.9 Undo<a class="copiable-link" href="#Undo-1"> &para;</a></span></h3>
+<h3 class="section" id="g_t_64a4_9500"><span>33.9 撤销<a class="copiable-link" href="#g_t_64a4_9500"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-redo"></a>
 
-<p>Most buffers have an <em class="dfn">undo list</em>, which records all changes made
-to the buffer&rsquo;s text so that they can be undone.  (The buffers that
-don&rsquo;t have one are usually special-purpose buffers for which Emacs
-assumes that undoing is not useful.  In particular, any buffer whose
-name begins with a space has its undo recording off by default;
-see <a class="ref" href="Buffer-Names.html">缓冲区名称</a>.)  All the primitives that modify the
-text in the buffer automatically add elements to the front of the undo
-list, which is in the variable <code class="code">buffer-undo-list</code>.
+<p>大多数缓冲区都拥有一个<em class="dfn">撤销列表(undo list)</em>，用于记录对缓冲区文本所做的所有修改，以便将这些修改撤销。
+（不具备撤销列表的缓冲区通常是专用缓冲区，Emacs 认为对其执行撤销操作没有意义。
+特别地，任何名称以空格开头的缓冲区默认关闭撤销记录；详见 <a class="ref" href="Buffer-Names.html">缓冲区名称</a>。）
+所有修改缓冲区文本的基本函数都会自动向变量 <code class="code">buffer-undo-list</code> 所保存的撤销列表首部添加元素。
 </p>
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-buffer_002dundo_002dlist"><span class="category-def">Variable: </span><span><strong class="def-name">buffer-undo-list</strong><a class="copiable-link" href="#index-buffer_002dundo_002dlist"> &para;</a></span></dt>
-<dd><p>This buffer-local variable&rsquo;s value is the undo list of the current
-buffer.  A value of <code class="code">t</code> disables the recording of undo information.
+<dd><p>这个缓冲区局部变量的值为当前缓冲区的撤销列表。若值为 <code class="code">t</code>，则禁止记录撤销信息。
 </p></dd></dl>
 
-<p>Here are the kinds of elements an undo list can have:
+<p>撤销列表可以包含以下类型的元素：
 </p>
 <dl class="table">
 <dt><code class="code"><var class="var">position</var></code></dt>
-<dd><p>This kind of element records a previous value of point; undoing this
-element moves point to <var class="var">position</var>.  Ordinary cursor motion does not
-make any sort of undo record, but deletion operations use these entries
-to record where point was before the command.
+<dd><p>此类元素记录光标之前的位置；撤销该元素会将光标移动至 <var class="var">position</var>。
+普通的光标移动不会生成任何撤销记录，但删除操作会使用此类条目记录命令执行前的光标位置。
 </p>
 </dd>
 <dt><code class="code">(<var class="var">beg</var> . <var class="var">end</var>)</code></dt>
-<dd><p>This kind of element indicates how to delete text that was inserted.
-Upon insertion, the text occupied the range <var class="var">beg</var>&ndash;<var class="var">end</var> in the
-buffer.
+<dd><p>此类元素说明如何删除已插入的文本。插入时，该文本占据缓冲区中从 <var class="var">beg</var> 到 <var class="var">end</var> 的范围。
 </p>
 </dd>
 <dt><code class="code">(<var class="var">text</var> . <var class="var">position</var>)</code></dt>
-<dd><p>This kind of element indicates how to reinsert text that was deleted.
-The deleted text itself is the string <var class="var">text</var>.  The place to
-reinsert it is <code class="code">(abs <var class="var">position</var>)</code>.  If <var class="var">position</var> is
-positive, point was at the beginning of the deleted text, otherwise it
-was at the end.  Zero or more (<var class="var">marker</var> . <var class="var">adjustment</var>)
-elements follow immediately after this element.
+<dd><p>此类元素说明如何重新插入已删除的文本。被删除的文本本身为字符串 <var class="var">text</var>，
+重新插入的位置为 <code class="code">(abs <var class="var">position</var>)</code>。若 <var class="var">position</var> 为正数，
+表示删除前光标位于文本开头；否则位于文本末尾。该元素后会紧跟零个或多个 (<var class="var">marker</var> . <var class="var">adjustment</var>) 元素。
 </p>
 </dd>
 <dt><code class="code">(t . <var class="var">time-flag</var>)</code></dt>
-<dd><p>This kind of element indicates that an unmodified buffer became
-modified.  A <var class="var">time-flag</var> that is a non-integer Lisp timestamp
-represents the visited file&rsquo;s modification time as of
-when it was previously visited or saved, using the same format as
-<code class="code">current-time</code>; see <a class="ref" href="Time-of-Day.html">Time of Day</a>.
-A <var class="var">time-flag</var> of 0 means the buffer does not correspond to any file;
-&minus;1 means the visited file previously did not exist.
-<code class="code">primitive-undo</code> uses these
-values to determine whether to mark the buffer as unmodified once again;
-it does so only if the file&rsquo;s status matches that of <var class="var">time-flag</var>.
+<dd><p>此类元素表示一个未修改状态的缓冲区变为已修改状态。
+若 <var class="var">time-flag</var> 为非整数型 Lisp 时间戳，则代表上次访问或保存时所访问文件的修改时间，
+格式与 <code class="code">current-time</code> 相同；详见 <a class="ref" href="Time-of-Day.html">Time of Day</a>。
+若 <var class="var">time-flag</var> 为 0，表示缓冲区不对应任何文件；&minus;1 表示所访问的文件此前不存在。
+<code class="code">primitive-undo</code> 使用这些值判断是否要再次将缓冲区标记为未修改状态；
+仅当文件状态与 <var class="var">time-flag</var> 匹配时才会执行此操作。
 </p>
 </dd>
 <dt><code class="code">(nil <var class="var">property</var> <var class="var">value</var> <var class="var">beg</var> . <var class="var">end</var>)</code></dt>
-<dd><p>This kind of element records a change in a text property.
-Here&rsquo;s how you might undo the change:
+<dd><p>此类元素记录文本属性的变化。可通过如下方式撤销该修改：
 </p>
 <div class="example">
 <pre class="example-preformatted">(put-text-property <var class="var">beg</var> <var class="var">end</var> <var class="var">property</var> <var class="var">value</var>)
@@ -117,130 +100,99 @@ Here&rsquo;s how you might undo the change:
 
 </dd>
 <dt><code class="code">(<var class="var">marker</var> . <var class="var">adjustment</var>)</code></dt>
-<dd><p>This kind of element records the fact that the marker <var class="var">marker</var> was
-relocated due to deletion of surrounding text, and that it moved
-<var class="var">adjustment</var> character positions.  If the marker&rsquo;s location is
-consistent with the (<var class="var">text</var> . <var class="var">position</var>) element preceding it
-in the undo list, then undoing this element moves <var class="var">marker</var>
-&minus; <var class="var">adjustment</var> characters.
+<dd><p>此类元素记录标记 <var class="var">marker</var> 因周围文本被删除而发生了重定位，
+并移动了 <var class="var">adjustment</var> 个字符位置。若标记位置与撤销列表中位于其前方的
+(<var class="var">text</var> . <var class="var">position</var>) 元素一致，则撤销该元素会将 <var class="var">marker</var>
+反向移动 &minus; <var class="var">adjustment</var> 个字符。
 </p>
 </dd>
 <dt><code class="code">(apply <var class="var">funname</var> . <var class="var">args</var>)</code></dt>
-<dd><p>This is an extensible undo item, which is undone by calling
-<var class="var">funname</var> with arguments <var class="var">args</var>.
+<dd><p>这是可扩展的撤销项，通过以参数 <var class="var">args</var> 调用 <var class="var">funname</var> 完成撤销。
 </p>
 </dd>
 <dt><code class="code">(apply <var class="var">delta</var> <var class="var">beg</var> <var class="var">end</var> <var class="var">funname</var> . <var class="var">args</var>)</code></dt>
-<dd><p>This is an extensible undo item, which records a change limited to the
-range <var class="var">beg</var> to <var class="var">end</var>, which increased the size of the buffer
-by <var class="var">delta</var> characters.  It is undone by calling <var class="var">funname</var> with
-arguments <var class="var">args</var>.
+<dd><p>这是可扩展的撤销项，记录了作用于 <var class="var">beg</var> 至 <var class="var">end</var> 范围、使缓冲区大小增加 <var class="var">delta</var> 个字符的修改。
+通过以参数 <var class="var">args</var> 调用 <var class="var">funname</var> 完成撤销。
 </p>
-<p>This kind of element enables undo limited to a region to determine
-whether the element pertains to that region.
+<p>此类元素允许针对指定区域的撤销操作判断该元素是否属于该区域。
 </p>
 </dd>
 <dt><code class="code">nil</code></dt>
-<dd><p>This element is a boundary.  The elements between two boundaries are
-called a <em class="dfn">change group</em>; normally, each change group corresponds to
-one keyboard command, and undo commands normally undo an entire group as
-a unit.
+<dd><p>该元素为边界标记。两个边界之间的元素称为一个<em class="dfn">修改组(change group)</em>；
+通常每个修改组对应一次键盘命令，撤销命令会将整个修改组作为一个单元进行撤销。
 </p></dd>
 </dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-undo_002dboundary"><span class="category-def">Function: </span><span><strong class="def-name">undo-boundary</strong><a class="copiable-link" href="#index-undo_002dboundary"> &para;</a></span></dt>
-<dd><p>This function places a boundary element in the undo list.  The undo
-command stops at such a boundary, and successive undo commands undo
-to earlier and earlier boundaries.  This function returns <code class="code">nil</code>.
+<dd><p>该函数在撤销列表中插入一个边界元素。撤销命令会在该边界处停止，
+连续执行撤销命令会依次撤销更早的边界之前的操作。本函数返回 <code class="code">nil</code>。
 </p>
-<p>Calling this function explicitly is useful for splitting the effects of
-a command into more than one unit.  For example, <code class="code">query-replace</code>
-calls <code class="code">undo-boundary</code> after each replacement, so that the user can
-undo individual replacements one by one.
+<p>显式调用该函数可将一条命令的效果拆分为多个撤销单元。
+例如，<code class="code">query-replace</code> 在每次替换后调用 <code class="code">undo-boundary</code>，
+使用户可以逐个撤销单次替换操作。
 </p>
-<p>Mostly, however, this function is called automatically at an
-appropriate time.
+<p>不过多数情况下，该函数会在合适的时机被自动调用。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-undo_002dauto_002damalgamate"><span class="category-def">Function: </span><span><strong class="def-name">undo-auto-amalgamate</strong><a class="copiable-link" href="#index-undo_002dauto_002damalgamate"> &para;</a></span></dt>
 <dd><a class="index-entry-id" id="index-amalgamating-commands_002c-and-undo"></a>
 <a class="index-entry-id" id="index-amalgamating_002dundo_002dlimit"></a>
-<p>The editor command loop automatically calls <code class="code">undo-boundary</code> just
-before executing each key sequence, so that each undo normally undoes
-the effects of one command.  A few exceptional commands are
-<em class="dfn">amalgamating</em>: these commands generally cause small changes to
-buffers, so with these a boundary is inserted only every 20th command,
-allowing the changes to be undone as a group.  By default, the commands
-<code class="code">self-insert-command</code>, which produces self-inserting input
-characters (see <a class="pxref" href="Commands-for-Insertion.html">User-Level Insertion Commands</a>), and <code class="code">delete-char</code>,
-which deletes characters (see <a class="pxref" href="Deletion.html">Deleting Text</a>), are amalgamating.
-Where a command affects the contents of several buffers, as may happen,
-for example, when a function on the <code class="code">post-command-hook</code> affects a
-buffer other than the <code class="code">current-buffer</code>, then <code class="code">undo-boundary</code>
-will be called in each of the affected buffers.
+<p>编辑器命令循环会在执行每个按键序列前自动调用 <code class="code">undo-boundary</code>，
+因此每次撤销通常会撤销一条命令的效果。少数特殊命令属于<em class="dfn">可合并(amalgamating)</em>类型：
+这类命令通常只对缓冲区做微小修改，因此仅每执行 20 条此类命令才插入一个边界，
+允许多次修改合并撤销。默认情况下，<code class="code">self-insert-command</code>（用于输入字符，see <a class="pxref" href="Commands-for-Insertion.html">用户级插入命令</a>）
+和 <code class="code">delete-char</code>（用于删除字符，see <a class="pxref" href="Deletion.html">删除文本</a>）属于可合并命令。
+若一条命令影响多个缓冲区的内容（例如 <code class="code">post-command-hook</code> 中的函数影响非当前缓冲区时），
+则会在所有受影响的缓冲区中调用 <code class="code">undo-boundary</code>。
 </p>
-<p>This function can be called before an amalgamating command.  It
-removes the previous <code class="code">undo-boundary</code> if a series of such calls
-have been made.
+<p>可在执行可合并命令前调用该函数。若已连续执行多次此类调用，该函数会移除上一个 <code class="code">undo-boundary</code>。
 </p>
-<p>The maximum number of changes that can be amalgamated is controlled by
-the <code class="code">amalgamating-undo-limit</code> variable.  If this variable is 1,
-no changes are amalgamated.
+<p>可合并修改的最大次数由变量 <code class="code">amalgamating-undo-limit</code> 控制。
+若该变量为 1，则不合并任何修改。
 </p></dd></dl>
 
-<p>A Lisp program can amalgamate a series of changes into a single change
-group by calling <code class="code">undo-amalgamate-change-group</code> (see <a class="pxref" href="Atomic-Changes.html">Atomic Change Groups</a>).  Note that <code class="code">amalgamating-undo-limit</code> has no effect on
-the groups produced by that function.
+<p>Lisp 程序可通过调用 <code class="code">undo-amalgamate-change-group</code> 将一系列修改合并为单个修改组（see <a class="pxref" href="Atomic-Changes.html">原子变更组</a>）。
+注意 <code class="code">amalgamating-undo-limit</code> 对该函数生成的修改组无效。
 </p>
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-undo_002dauto_002dcurrent_002dboundary_002dtimer"><span class="category-def">Variable: </span><span><strong class="def-name">undo-auto-current-boundary-timer</strong><a class="copiable-link" href="#index-undo_002dauto_002dcurrent_002dboundary_002dtimer"> &para;</a></span></dt>
-<dd><p>Some buffers, such as process buffers, can change even when no
-commands are executing.  In these cases, <code class="code">undo-boundary</code> is
-normally called periodically by the timer in this variable.  Setting
-this variable to non-<code class="code">nil</code> prevents this behavior.
+<dd><p>部分缓冲区（如进程缓冲区）即使在未执行命令时也可能发生变化。
+这类情况下，<code class="code">undo-boundary</code> 通常由该变量中的定时器定期调用。
+将该变量设为非空值可禁止此行为。
 </p></dd></dl>
 
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-undo_002din_002dprogress"><span class="category-def">Variable: </span><span><strong class="def-name">undo-in-progress</strong><a class="copiable-link" href="#index-undo_002din_002dprogress"> &para;</a></span></dt>
-<dd><p>This variable is normally <code class="code">nil</code>, but the undo commands bind it to
-<code class="code">t</code>.  This is so that various kinds of change hooks can tell when
-they&rsquo;re being called for the sake of undoing.
+<dd><p>该变量通常为 <code class="code">nil</code>，但撤销命令会将其绑定为 <code class="code">t</code>。
+各类修改钩子可借此判断自身是否因撤销操作而被调用。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-primitive_002dundo"><span class="category-def">Function: </span><span><strong class="def-name">primitive-undo</strong> <var class="def-var-arguments">count list</var><a class="copiable-link" href="#index-primitive_002dundo"> &para;</a></span></dt>
-<dd><p>This is the basic function for undoing elements of an undo list.
-It undoes the first <var class="var">count</var> elements of <var class="var">list</var>, returning
-the rest of <var class="var">list</var>.
+<dd><p>这是撤销撤销列表元素的基础函数。它撤销 <var class="var">list</var> 中前 <var class="var">count</var> 个元素，并返回列表剩余部分。
 </p>
-<p><code class="code">primitive-undo</code> adds elements to the buffer&rsquo;s undo list when it
-changes the buffer.  Undo commands avoid confusion by saving the undo
-list value at the beginning of a sequence of undo operations.  Then the
-undo operations use and update the saved value.  The new elements added
-by undoing are not part of this saved value, so they don&rsquo;t interfere with
-continuing to undo.
+<p><code class="code">primitive-undo</code> 在修改缓冲区时会向缓冲区撤销列表添加元素。
+撤销命令会在一系列撤销操作开始时保存撤销列表的值以避免混乱，
+后续撤销操作使用并更新该保存值。撤销操作新增的元素不属于该保存值，因此不会干扰后续撤销。
 </p>
-<p>This function does not bind <code class="code">undo-in-progress</code>.
+<p>该函数不会绑定 <code class="code">undo-in-progress</code>。
 </p></dd></dl>
 
 <dl class="first-deffn first-defmac-alias-first-deffn def-block">
 <dt class="deffn defmac-alias-deffn def-line" id="index-with_002dundo_002damalgamate"><span class="category-def">Macro: </span><span><strong class="def-name">with-undo-amalgamate</strong> <var class="def-var-arguments">body&hellip;</var><a class="copiable-link" href="#index-with_002dundo_002damalgamate"> &para;</a></span></dt>
-<dd><p>This macro removes all the undo boundaries inserted during the
-execution of <var class="var">body</var> so that it can be undone as a single step.
+<dd><p>该宏会移除执行 <var class="var">body</var> 期间插入的所有撤销边界，使整体可作为一步撤销。
 </p></dd></dl>
 
-<p>Some commands leave the region active after execution in such a way that
-it interferes with selective undo of that command.  To make <code class="code">undo</code>
-ignore the active region when invoked immediately after such a command,
-set the property <code class="code">undo-inhibit-region</code> of the command&rsquo;s function
-symbol to a non-<code class="code">nil</code> value.  See <a class="xref" href="Standard-Properties.html">标准符号属性</a>.
+<p>部分命令执行后会保持选区激活状态，从而干扰该命令的选择性撤销。
+若要让 <code class="code">undo</code> 在该命令后立即执行时忽略激活选区，
+可将该命令函数符号的 <code class="code">undo-inhibit-region</code> 属性设为非空值。See <a class="xref" href="Standard-Properties.html">标准符号属性</a>。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Maintaining-Undo.html">Maintaining Undo Lists</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="The-Kill-Ring.html">The Kill Ring</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Text.html">文本</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Maintaining-Undo.html">维护撤销列表</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="The-Kill-Ring.html">删除环</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Text.html">文本</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

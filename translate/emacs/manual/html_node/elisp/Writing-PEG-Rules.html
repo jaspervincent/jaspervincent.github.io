@@ -46,56 +46,46 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="section-level-extent" id="Writing-PEG-Rules">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Parsing-Actions.html" accesskey="p" rel="prev">Parsing Actions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html" accesskey="u" rel="up">Parsing Expression Grammars</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Parsing-Actions.html" accesskey="p" rel="prev">解析动作</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html" accesskey="u" rel="up">解析表达式文法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Writing-PEG-Rules-1"><span>37.3 Writing PEG Rules<a class="copiable-link" href="#Writing-PEG-Rules-1"> &para;</a></span></h3>
+<h3 class="section" id="g_t_7f16_5199-PEG-_89c4_5219"><span>37.3 编写 PEG 规则<a class="copiable-link" href="#g_t_7f16_5199-PEG-_89c4_5219"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-PEG-rules_002c-pitfalls"></a>
 <a class="index-entry-id" id="index-Parsing-Expression-Grammar_002c-pitfalls-in-rules"></a>
 
-<p>Something to be aware of when writing PEG rules is that they are
-greedy.  Rules which can consume a variable amount of text will always
-consume the maximum amount possible, even if that causes a rule that
-might otherwise have matched to fail later on &ndash; there is no
-backtracking.  For instance, this rule will never succeed:
+<p>编写 PEG 规则时需要注意它们是贪婪的。
+可以消耗可变长度文本的规则总会尽可能消耗最多内容，
+即使这会导致后续原本可能匹配的规则失败——不存在回溯。
+例如，这条规则永远不会成功：
 </p>
 <div class="example">
 <pre class="example-preformatted">(forest (+ &quot;tree&quot; (* [blank])) &quot;tree&quot; (eol))
 </pre></div>
 
-<p>The <abbr class="acronym">PEX</abbr> <code class="code">(+&nbsp;&quot;tree&quot;&nbsp;(*&nbsp;[blank]))</code><!-- /@w --> will consume all
-the repetitions of the word &lsquo;<samp class="samp">tree</samp>&rsquo;, leaving none to match the final
-&lsquo;<samp class="samp">tree</samp>&rsquo;.
+<p><abbr class="acronym">PEX</abbr> <code class="code">(+&nbsp;&quot;tree&quot;&nbsp;(*&nbsp;[blank]))</code><!-- /@w --> 会消耗掉所有单词 &lsquo;<samp class="samp">tree</samp>&rsquo; 的重复出现，
+导致没有剩余内容匹配最后的 &lsquo;<samp class="samp">tree</samp>&rsquo;。
 </p>
-<p>In these situations, the desired result can be obtained by using
-predicates and guards &ndash; namely the <code class="code">not</code>, <code class="code">if</code> and
-<code class="code">guard</code> expressions &ndash; to constrain behavior.  For instance:
+<p>在这类场景中，可以通过使用谓词与守卫（即 <code class="code">not</code>、<code class="code">if</code> 与 <code class="code">guard</code> 表达式）
+约束行为以获得预期结果。例如：
 </p>
 <div class="example">
 <pre class="example-preformatted">(forest (+ &quot;tree&quot; (* [blank])) (not (eol)) &quot;tree&quot; (eol))
 </pre></div>
 
-<p>The <code class="code">if</code> and <code class="code">not</code> operators accept a parsing expression and
-interpret it as a boolean, without moving point.  The contents of a
-<code class="code">guard</code> operator are evaluated as regular Lisp (not a
-<abbr class="acronym">PEX</abbr>) and should return a boolean value.  A <code class="code">nil</code> value
-causes the match to fail.
+<p><code class="code">if</code> 与 <code class="code">not</code> 运算符接收一个解析表达式并将其解释为布尔值，
+且不会移动点位置。<code class="code">guard</code> 运算符中的内容会作为普通 Lisp 代码
+（而非 <abbr class="acronym">PEX</abbr>）求值，并应返回布尔值。<code class="code">nil</code> 值会导致匹配失败。
 </p>
-<p>Another potentially unexpected behavior is that parsing will move
-point as far as possible, even if the parsing ultimately fails.  This
-rule:
+<p>另一个可能出乎意料的行为是，即使解析最终失败，
+解析过程仍会尽可能移动点位置。这条规则：
 </p>
 <div class="example">
 <pre class="example-preformatted">(end-game &quot;game&quot; (eob))
 </pre></div>
 
-<p>when run in a buffer containing the text &ldquo;game over&rdquo; after point,
-will move point to just after &ldquo;game&rdquo; then halt parsing, returning
-<code class="code">nil</code>.  Successful parsing will always return <code class="code">t</code>, or the
-contexts of the parsing stack.
+<p>在点之后包含文本 &ldquo;game over&rdquo; 的缓冲区中运行时，
+会将点移动到 &ldquo;game&rdquo; 之后，然后停止解析并返回 <code class="code">nil</code>。
+成功的解析总会返回 <code class="code">t</code>，或是解析栈中的内容。
 </p></div>
-<hr>
-<p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Parsing-Actions.html">Parsing Actions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html">Parsing Expression Grammars</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

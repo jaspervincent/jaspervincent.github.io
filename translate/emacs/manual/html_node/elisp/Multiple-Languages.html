@@ -49,58 +49,50 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="section-level-extent" id="Multiple-Languages">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Tree_002dsitter-Major-Modes.html" accesskey="n" rel="next">Developing major modes with tree-sitter</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="User_002ddefined-Things.html" accesskey="p" rel="prev">User-defined &ldquo;Things&rdquo; and Navigation</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Program-Source.html" accesskey="u" rel="up">Parsing Program Source</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Tree_002dsitter-Major-Modes.html" accesskey="n" rel="next">使用 tree-sitter 开发主模式</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="User_002ddefined-Things.html" accesskey="p" rel="prev">用户自定义 &ldquo;对象(Things)&rdquo; 与导航</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Program-Source.html" accesskey="u" rel="up">解析程序源代码</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Parsing-Text-in-Multiple-Languages"><span>38.7 Parsing Text in Multiple Languages<a class="copiable-link" href="#Parsing-Text-in-Multiple-Languages"> &para;</a></span></h3>
+<h3 class="section" id="g_t_591a_8bed_8a00_6587_672c_89e3_6790"><span>38.7 多语言文本解析<a class="copiable-link" href="#g_t_591a_8bed_8a00_6587_672c_89e3_6790"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-multiple-languages_002c-parsing-with-tree_002dsitter"></a>
 <a class="index-entry-id" id="index-parsing-multiple-languages-with-tree_002dsitter"></a>
-<p>Sometimes, the source of a programming language could contain snippets
-of other languages; <abbr class="acronym">HTML</abbr> + <abbr class="acronym">CSS</abbr> + JavaScript is one
-example.  In that case, text segments written in different languages
-need to be assigned different parsers.  Traditionally, this is
-achieved by using narrowing.  While tree-sitter works with narrowing
-(see <a class="pxref" href="Using-Parser.html#tree_002dsitter-narrowing">narrowing</a>), the recommended way is
-instead to specify regions of buffer text (i.e., ranges) in which a
-parser will operate.  This section describes functions for setting and
-getting ranges for a parser.
+<p>有时，某门编程语言的源码中可能会包含其他语言的代码片段；
+<abbr class="acronym">HTML</abbr> + <abbr class="acronym">CSS</abbr> + JavaScript 就是一个典型例子。
+这种情况下，使用不同语言编写的文本片段需要分配不同的解析器。
+传统上，这一需求通过 narrowing 实现。尽管 tree-sitter 可以配合 narrowing 使用
+(see <a class="pxref" href="Using-Parser.html#tree_002dsitter-narrowing">narrowing</a>)，但更推荐的方式是为解析器指定缓冲区文本的作用区域（即范围）。
+本节介绍用于为解析器设置和获取解析范围的函数。
 </p>
 <a class="index-entry-id" id="index-primary-parser"></a>
-<p>Generally when there are multiple languages at play, there is a
-&ldquo;primary&rdquo;, or &ldquo;host&rdquo; language.  The parser for this language&mdash;the
-<em class="dfn">primary parser</em>, parses the entire buffer.  Parsers for other
-languages are &ldquo;embedded&rdquo; or &ldquo;guest&rdquo; parsers, which only work on part
-of the buffer.  The parse tree of the primary parser is usually used to
-determine the ranges in which the embedded parsers operate.
+<p>通常在涉及多种语言时，会存在一门 &ldquo;主语言(primary)&rdquo; 或 &ldquo;宿主语言(host)&rdquo;。
+该语言对应的解析器——即 <em class="dfn">主解析器(primary parser)</em>，会解析整个缓冲区。
+其他语言的解析器则是 &ldquo;嵌入式(embedded)&rdquo; 或 &ldquo;客语言(guest)&rdquo; 解析器，仅作用于缓冲区的部分区域。
+主解析器生成的解析树通常用于确定嵌入式解析器的工作范围。
 </p>
 <a class="index-entry-id" id="index-treesit_002dprimary_002dparser"></a>
-<p>Major modes should set <code class="code">treesit-primary-parser</code> to the primary
-parser before calling <code class="code">treesit-major-mode-setup</code>, so that Emacs can
-configure the primary parser correctly for font-lock and other features.
+<p>主模式应在调用 <code class="code">treesit-major-mode-setup</code> 之前，将 <code class="code">treesit-primary-parser</code>
+设置为主解析器，以便 Emacs 能为主解析器正确配置字体高亮及其他功能。
 </p>
-<p>Lisp programs should call <code class="code">treesit-update-ranges</code> to make sure the
-ranges for each parser are correct before using parsers in a buffer, and
-call <code class="code">treesit-language-at</code> to figure out the language responsible
-for the text at some position.  These two functions don&rsquo;t work by
-themselves; they need major modes to set <code class="code">treesit-range-settings</code>
-and <code class="code">treesit-language-at-point-function</code>, which do the actual work.
-These functions and variables are explained in more detail towards the
-end of the section.
+<p>Lisp 程序在缓冲区中使用解析器之前，应调用 <code class="code">treesit-update-ranges</code>
+确保每个解析器的范围正确，并调用 <code class="code">treesit-language-at</code>
+判断某个位置的文本所属的语言。这两个函数无法独立工作；
+它们需要主模式设置 <code class="code">treesit-range-settings</code> 和
+<code class="code">treesit-language-at-point-function</code> 来完成实际工作。
+本节末尾会更详细地介绍这些函数与变量。
 </p>
-<p>In short, multi-language major modes should set
-<code class="code">treesit-primary-parser</code>, <code class="code">treesit-range-settings</code>, and
-<code class="code">treesit-language-at-point-function</code> before calling
-<code class="code">treesit-major-mode-setup</code>.
+<p>简而言之，支持多语言的主模式应在调用
+<code class="code">treesit-major-mode-setup</code> 之前设置
+<code class="code">treesit-primary-parser</code>、<code class="code">treesit-range-settings</code>
+以及 <code class="code">treesit-language-at-point-function</code>。
 </p>
-<h3 class="heading" id="Getting-and-setting-ranges"><span>Getting and setting ranges<a class="copiable-link" href="#Getting-and-setting-ranges"> &para;</a></span></h3>
+<h3 class="heading" id="g_t_83b7_53d6_4e0e_8bbe_7f6e_89e3_6790_8303_56f4"><span>获取与设置解析范围<a class="copiable-link" href="#g_t_83b7_53d6_4e0e_8bbe_7f6e_89e3_6790_8303_56f4"> &para;</a></span></h3>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dparser_002dset_002dincluded_002dranges"><span class="category-def">Function: </span><span><strong class="def-name">treesit-parser-set-included-ranges</strong> <var class="def-var-arguments">parser ranges</var><a class="copiable-link" href="#index-treesit_002dparser_002dset_002dincluded_002dranges"> &para;</a></span></dt>
-<dd><p>This function sets up <var class="var">parser</var> to operate on <var class="var">ranges</var>.  The
-<var class="var">parser</var> will only read the text of the specified ranges.  Each
-range in <var class="var">ranges</var> is a pair of the form <code class="code">(<var class="var">beg</var>&nbsp;.&nbsp;<var class="var">end</var>)</code><!-- /@w -->.
+<dd><p>该函数将 <var class="var">parser</var> 设置为仅在 <var class="var">ranges</var> 范围内工作。
+<var class="var">parser</var> 只会读取指定范围的文本。<var class="var">ranges</var> 中的每个范围
+均为形如 <code class="code">(<var class="var">beg</var>&nbsp;.&nbsp;<var class="var">end</var>)</code><!-- /@w --> 的 cons 单元。
 </p>
-<p>The ranges in <var class="var">ranges</var> must come in order and must not overlap.
-That is, in pseudo code:
+<p><var class="var">ranges</var> 中的范围必须按顺序排列且不能重叠。
+用伪代码表示即：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(cl-loop for idx from 1 to (1- (length ranges))
@@ -111,15 +103,14 @@ That is, in pseudo code:
 </pre></div></div>
 
 <a class="index-entry-id" id="index-treesit_002drange_002dinvalid"></a>
-<p>If <var class="var">ranges</var> violates this constraint, or something else went
-wrong, this function signals the <code class="code">treesit-range-invalid</code> error.
-The signal data contains a specific error message and the ranges we
-are trying to set.
+<p>如果 <var class="var">ranges</var> 违反该约束，或出现其他错误，
+该函数会触发 <code class="code">treesit-range-invalid</code> 错误。
+信号数据中包含具体的错误信息以及尝试设置的范围。
 </p>
-<p>This function can also be used for disabling ranges.  If <var class="var">ranges</var>
-is <code class="code">nil</code>, the parser is set to parse the whole buffer.
+<p>该函数也可用于禁用范围限制。若 <var class="var">ranges</var> 为 <code class="code">nil</code>，
+解析器将被设置为解析整个缓冲区。
 </p>
-<p>Example:
+<p>示例：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(treesit-parser-set-included-ranges
@@ -129,11 +120,10 @@ is <code class="code">nil</code>, the parser is set to parse the whole buffer.
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dparser_002dincluded_002dranges"><span class="category-def">Function: </span><span><strong class="def-name">treesit-parser-included-ranges</strong> <var class="def-var-arguments">parser</var><a class="copiable-link" href="#index-treesit_002dparser_002dincluded_002dranges"> &para;</a></span></dt>
-<dd><p>This function returns the ranges set for <var class="var">parser</var>.  The return
-value is the same as the <var class="var">ranges</var> argument of
-<code class="code">treesit-parser-included-ranges</code>: a list of cons cells of the form
-<code class="code">(<var class="var">beg</var>&nbsp;.&nbsp;<var class="var">end</var>)</code><!-- /@w -->.  If <var class="var">parser</var> doesn&rsquo;t have any
-ranges, the return value is <code class="code">nil</code>.
+<dd><p>该函数返回为 <var class="var">parser</var> 设置的解析范围。
+返回值格式与 <code class="code">treesit-parser-included-ranges</code> 的
+<var class="var">ranges</var> 参数一致：为形如 <code class="code">(<var class="var">beg</var>&nbsp;.&nbsp;<var class="var">end</var>)</code><!-- /@w -->
+的 cons 单元列表。若 <var class="var">parser</var> 未设置任何范围，返回值为 <code class="code">nil</code>。
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(treesit-parser-included-ranges parser)
@@ -143,76 +133,66 @@ ranges, the return value is <code class="code">nil</code>.
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dquery_002drange"><span class="category-def">Function: </span><span><strong class="def-name">treesit-query-range</strong> <var class="def-var-arguments">source query &amp;optional beg end</var><a class="copiable-link" href="#index-treesit_002dquery_002drange"> &para;</a></span></dt>
-<dd><p>This function matches <var class="var">source</var> with <var class="var">query</var> and returns the
-ranges of captured nodes.  The return value is a list of cons cells of
-the form <code class="code">(<var class="var">beg</var>&nbsp;.&nbsp;<var class="var">end</var>)</code><!-- /@w -->, where <var class="var">beg</var> and
-<var class="var">end</var> specify the beginning and the end of a region of text.
+<dd><p>该函数使用 <var class="var">query</var> 匹配 <var class="var">source</var>，并返回捕获节点的范围。
+返回值为形如 <code class="code">(<var class="var">beg</var>&nbsp;.&nbsp;<var class="var">end</var>)</code><!-- /@w --> 的 cons 单元列表，
+其中 <var class="var">beg</var> 与 <var class="var">end</var> 分别指定文本区域的起始与结束位置。
 </p>
-<p>For convenience, <var class="var">source</var> can be a language symbol, a parser, or a
-node.  If it&rsquo;s a language symbol, this function matches in the root
-node of the first parser using that language; if a parser, this
-function matches in the root node of that parser; if a node, this
-function matches in that node.
+<p>为方便使用，<var class="var">source</var> 可以是语言符号、解析器或节点。
+若为语言符号，函数会在使用该语言的首个解析器的根节点上进行匹配；
+若为解析器，则在该解析器的根节点上匹配；若为节点，则直接在该节点上匹配。
 </p>
-<p>The argument <var class="var">query</var> is the query used to capture nodes
-(see <a class="pxref" href="Pattern-Matching.html">Pattern Matching Tree-sitter Nodes</a>).  The capture names don&rsquo;t matter.  The
-arguments <var class="var">beg</var> and <var class="var">end</var>, if both non-<code class="code">nil</code>, limit the
-range in which this function queries.
+<p>参数 <var class="var">query</var> 是用于捕获节点的查询语句
+(see <a class="pxref" href="Pattern-Matching.html">匹配 tree-sitter 节点的模式</a>)。捕获名称无关紧要。
+若参数 <var class="var">beg</var> 与 <var class="var">end</var> 均不为 <code class="code">nil</code>，
+则会限制函数的查询范围。
 </p>
-<p>Like other query functions, this function raises the
-<code class="code">treesit-query-error</code> error if <var class="var">query</var> is malformed.
+<p>与其他查询函数类似，若 <var class="var">query</var> 格式错误，
+该函数会抛出 <code class="code">treesit-query-error</code> 错误。
 </p></dd></dl>
 
-<h3 class="heading" id="Supporting-multiple-languages-in-Lisp-programs"><span>Supporting multiple languages in Lisp programs<a class="copiable-link" href="#Supporting-multiple-languages-in-Lisp-programs"> &para;</a></span></h3>
+<h3 class="heading" id="g_t_5728-Lisp-_7a0b_5e8f_4e2d_652f_6301_591a_8bed_8a00"><span>在 Lisp 程序中支持多语言<a class="copiable-link" href="#g_t_5728-Lisp-_7a0b_5e8f_4e2d_652f_6301_591a_8bed_8a00"> &para;</a></span></h3>
 
-<p>It should suffice for general Lisp programs to call the following two
-functions in order to support program sources that mix multiple
-languages.
+<p>对于通用 Lisp 程序，只需调用以下两个函数，
+即可支持混合多种语言的程序源码。
 </p>
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dupdate_002dranges"><span class="category-def">Function: </span><span><strong class="def-name">treesit-update-ranges</strong> <var class="def-var-arguments">&amp;optional beg end</var><a class="copiable-link" href="#index-treesit_002dupdate_002dranges"> &para;</a></span></dt>
-<dd><p>This function updates ranges for parsers in the buffer.  It makes sure
-the parsers&rsquo; ranges are set correctly between <var class="var">beg</var> and <var class="var">end</var>,
-according to <code class="code">treesit-range-settings</code>.  If omitted, <var class="var">beg</var>
-defaults to the beginning of the buffer, and <var class="var">end</var> defaults to the
-end of the buffer.
+<dd><p>该函数更新缓冲区中解析器的解析范围。
+它会根据 <code class="code">treesit-range-settings</code>，
+确保 <var class="var">beg</var> 至 <var class="var">end</var> 区间内解析器的范围设置正确。
+若省略，<var class="var">beg</var> 默认为缓冲区开头，<var class="var">end</var> 默认为缓冲区结尾。
 </p>
-<p>For example, fontification functions use this function before querying
-for nodes in a region.
+<p>例如，字体高亮函数会在查询区域内的节点之前调用该函数。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dlanguage_002dat"><span class="category-def">Function: </span><span><strong class="def-name">treesit-language-at</strong> <var class="def-var-arguments">pos</var><a class="copiable-link" href="#index-treesit_002dlanguage_002dat"> &para;</a></span></dt>
-<dd><p>This function returns the language of the text at buffer position
-<var class="var">pos</var>.  Under the hood it calls
-<code class="code">treesit-language-at-point-function</code> and returns its return
-value.  If <code class="code">treesit-language-at-point-function</code> is <code class="code">nil</code>,
-this function returns the language of the first parser in the returned
-value of <code class="code">treesit-parser-list</code>.  If there is no parser in the
-buffer, it returns <code class="code">nil</code>.
+<dd><p>该函数返回缓冲区位置 <var class="var">pos</var> 处文本所属的语言。
+其底层会调用 <code class="code">treesit-language-at-point-function</code>
+并返回其执行结果。若 <code class="code">treesit-language-at-point-function</code>
+为 <code class="code">nil</code>，该函数会返回 <code class="code">treesit-parser-list</code>
+返回值中首个解析器对应的语言。若缓冲区中无解析器，则返回 <code class="code">nil</code>。
 </p></dd></dl>
 
-<h3 class="heading" id="Supporting-multiple-languages-in-major-modes"><span>Supporting multiple languages in major modes<a class="copiable-link" href="#Supporting-multiple-languages-in-major-modes"> &para;</a></span></h3>
+<h3 class="heading" id="g_t_5728_4e3b_6a21_5f0f_4e2d_652f_6301_591a_8bed_8a00"><span>在主模式中支持多语言<a class="copiable-link" href="#g_t_5728_4e3b_6a21_5f0f_4e2d_652f_6301_591a_8bed_8a00"> &para;</a></span></h3>
 
 <a class="index-entry-id" id="index-host-language_002c-tree_002dsitter"></a>
 <a class="index-entry-id" id="index-tree_002dsitter-host-and-embedded-languages"></a>
 <a class="index-entry-id" id="index-embedded-language_002c-tree_002dsitter"></a>
-<p>Normally, in a set of languages that can be mixed together, there is a
-<em class="dfn">host language</em> and one or more <em class="dfn">embedded languages</em>.  A Lisp
-program usually first parses the whole document with the host
-language&rsquo;s parser, retrieves some information, sets ranges for the
-embedded languages with that information, and then parses the embedded
-languages.
+<p>通常，在一组可混合使用的语言中，会存在一个
+<em class="dfn">宿主语言(host language)</em> 与一个或多个 <em class="dfn">嵌入式语言(embedded languages)</em>。
+Lisp 程序一般先使用宿主语言的解析器解析整个文档，
+获取相关信息，再根据这些信息为嵌入式语言设置解析范围，
+最后解析嵌入式语言。
 </p>
-<p>Take a buffer containing <abbr class="acronym">HTML</abbr>, <abbr class="acronym">CSS</abbr>, and JavaScript
-as an example.  A Lisp program will first parse the whole buffer with
-an <abbr class="acronym">HTML</abbr> parser, then query the parser for
-<code class="code">style_element</code> and <code class="code">script_element</code> nodes, which correspond
-to <abbr class="acronym">CSS</abbr> and JavaScript text, respectively.  Then it sets the
-range of the <abbr class="acronym">CSS</abbr> and JavaScript parsers to the range which
-their corresponding nodes span.
+<p>以包含 <abbr class="acronym">HTML</abbr>、<abbr class="acronym">CSS</abbr> 与 JavaScript 的缓冲区为例。
+Lisp 程序会先用 <abbr class="acronym">HTML</abbr> 解析器解析整个缓冲区，
+随后向解析器查询 <code class="code">style_element</code> 与 <code class="code">script_element</code> 节点，
+它们分别对应 <abbr class="acronym">CSS</abbr> 与 JavaScript 文本。
+之后再将 <abbr class="acronym">CSS</abbr> 与 JavaScript 解析器的范围
+设置为对应节点所覆盖的区间。
 </p>
-<p>Given a simple <abbr class="acronym">HTML</abbr> document:
+<p>给定一个简单的 <abbr class="acronym">HTML</abbr> 文档：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">&lt;html&gt;
@@ -221,17 +201,17 @@ their corresponding nodes span.
 &lt;/html&gt;
 </pre></div></div>
 
-<p>a Lisp program will first parse with a <abbr class="acronym">HTML</abbr> parser, then set
-ranges for <abbr class="acronym">CSS</abbr> and JavaScript parsers:
+<p>Lisp 程序会先用 <abbr class="acronym">HTML</abbr> 解析器解析，
+再为 <abbr class="acronym">CSS</abbr> 与 JavaScript 解析器设置范围：
 </p>
 <div class="example">
-<div class="group"><pre class="example-preformatted">;; Create parsers.
+<div class="group"><pre class="example-preformatted">;; 创建解析器
 (setq html (treesit-parser-create 'html))
 (setq css (treesit-parser-create 'css))
 (setq js (treesit-parser-create 'javascript))
 </pre></div><pre class="example-preformatted">
 
-</pre><div class="group"><pre class="example-preformatted">;; Set CSS ranges.
+</pre><div class="group"><pre class="example-preformatted">;; 设置 CSS 解析范围
 (setq css-range
       (treesit-query-range
        'html
@@ -239,7 +219,7 @@ ranges for <abbr class="acronym">CSS</abbr> and JavaScript parsers:
 (treesit-parser-set-included-ranges css css-range)
 </pre></div><pre class="example-preformatted">
 
-</pre><div class="group"><pre class="example-preformatted">;; Set JavaScript ranges.
+</pre><div class="group"><pre class="example-preformatted">;; 设置 JavaScript 解析范围
 (setq js-range
       (treesit-query-range
        'html
@@ -247,13 +227,12 @@ ranges for <abbr class="acronym">CSS</abbr> and JavaScript parsers:
 (treesit-parser-set-included-ranges js js-range)
 </pre></div></div>
 
-<p>Emacs automates this process in <code class="code">treesit-update-ranges</code>.  A
-multi-language major mode should set <code class="code">treesit-range-settings</code> so
-that <code class="code">treesit-update-ranges</code> knows how to perform this process
-automatically.  Major modes should use the helper function
-<code class="code">treesit-range-rules</code> to generate a value that can be assigned to
-<code class="code">treesit-range-settings</code>.  The settings in the following example
-directly translate into operations shown above.
+<p>Emacs 在 <code class="code">treesit-update-ranges</code> 中自动完成这一流程。
+支持多语言的主模式应设置 <code class="code">treesit-range-settings</code>，
+使 <code class="code">treesit-update-ranges</code> 能够自动执行该流程。
+主模式应使用辅助函数 <code class="code">treesit-range-rules</code>
+生成可赋值给 <code class="code">treesit-range-settings</code> 的值。
+下例中的设置与上述操作直接对应。
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(setq treesit-range-settings
@@ -266,8 +245,8 @@ directly translate into operations shown above.
        '((style_element (raw_text) @capture))))
 </pre></div><pre class="example-preformatted">
 
-</pre><div class="group"><pre class="example-preformatted">;; Major modes with multiple languages should always set
-;; `treesit-language-at-point-function' (which see).
+</pre><div class="group"><pre class="example-preformatted">;; 多语言主模式应始终设置
+;; `treesit-language-at-point-function'（详见说明）
 (setq treesit-language-at-point-function
       (lambda (pos)
         (let* ((node (treesit-node-at pos 'html))
@@ -286,92 +265,80 @@ directly translate into operations shown above.
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002drange_002drules"><span class="category-def">Function: </span><span><strong class="def-name">treesit-range-rules</strong> <var class="def-var-arguments">&amp;rest query-specs</var><a class="copiable-link" href="#index-treesit_002drange_002drules"> &para;</a></span></dt>
-<dd><p>This function is used to set <code class="code">treesit-range-settings</code>.  It takes
-care of compiling queries and other post-processing, and outputs a
-value that <code class="code">treesit-range-settings</code> can have.
+<dd><p>该函数用于设置 <code class="code">treesit-range-settings</code>。
+它负责编译查询语句及其他后续处理，并输出
+<code class="code">treesit-range-settings</code> 可接受的值。
 </p>
-<p>It takes a series of <var class="var">query-spec</var>s, where each <var class="var">query-spec</var> is
-a <var class="var">query</var> preceded by zero or more <var class="var">keyword</var>/<var class="var">value</var>
-pairs.  Each <var class="var">query</var> is a tree-sitter query in either the string,
-s-expression, or compiled form, or a function.
+<p>它接收一系列 <var class="var">query-spec</var>，每个 <var class="var">query-spec</var>
+是在 <var class="var">query</var> 前附带零个或多个 <var class="var">keyword</var>/<var class="var">value</var> 对。
+每个 <var class="var">query</var> 可以是字符串、S 表达式、编译后形式的 tree-sitter 查询，
+或是一个函数。
 </p>
-<p>If <var class="var">query</var> is a tree-sitter query, it should be preceded by two
-<var class="var">keyword</var>/<var class="var">value</var> pairs, where the <code class="code">:embed</code> keyword
-specifies the embedded language, and the <code class="code">:host</code> keyword
-specifies the host language.
+<p>若 <var class="var">query</var> 为 tree-sitter 查询，则其前面应包含两个
+<var class="var">keyword</var>/<var class="var">value</var> 对：<code class="code">:embed</code> 关键字指定嵌入式语言，
+<code class="code">:host</code> 关键字指定宿主语言。
 </p>
 <a class="index-entry-id" id="index-local-parser"></a>
-<p>If the query is given the <code class="code">:local</code> keyword whose value is
-<code class="code">t</code>, the range set by this query has a dedicated local parser;
-otherwise the range shares a parser with other ranges for the same
-language.
+<p>若为查询指定 <code class="code">:local</code> 关键字且值为 <code class="code">t</code>，
+则该查询设置的范围会使用独立的局部解析器；
+否则该范围会与同一语言的其他范围共用一个解析器。
 </p>
-<p>By default, a parser sees its ranges as a continuum, rather than
-treating them as separate independent segments.  Therefore, if the
-embedded ranges are semantically independent segments, they should be
-processed by local parsers, described below.
+<p>默认情况下，解析器会将其范围视为连续整体，
+而非多个相互独立的片段。因此，若嵌入式范围在语义上是独立片段，
+则应使用下文所述的局部解析器处理。
 </p>
-<p>Local parser set to a range can be retrieved by
-<code class="code">treesit-local-parsers-at</code> and <code class="code">treesit-local-parsers-on</code>.
+<p>设置在某一范围上的局部解析器可通过
+<code class="code">treesit-local-parsers-at</code> 与 <code class="code">treesit-local-parsers-on</code> 获取。
 </p>
-<p><code class="code">treesit-update-ranges</code> uses <var class="var">query</var> to figure out how to set
-the ranges for parsers for the embedded language.  It queries
-<var class="var">query</var> in a host language parser, computes the ranges which the
-captured nodes span, and applies these ranges to embedded language
-parsers.
+<p><code class="code">treesit-update-ranges</code> 使用 <var class="var">query</var>
+确定如何为嵌入式语言的解析器设置范围。
+它在宿主语言解析器中执行 <var class="var">query</var> 查询，
+计算捕获节点覆盖的范围，并将这些范围应用到嵌入式语言解析器上。
 </p>
-<p>If <var class="var">query</var> is a function, it doesn&rsquo;t need any <var class="var">keyword</var> and
-<var class="var">value</var> pair.  It should be a function that takes 2 arguments,
-<var class="var">start</var> and <var class="var">end</var>, and sets the ranges for parsers in the
-current buffer in the region between <var class="var">start</var> and <var class="var">end</var>.  It is
-fine for this function to set ranges in a larger region that
-encompasses the region between <var class="var">start</var> and <var class="var">end</var>.
+<p>若 <var class="var">query</var> 为函数，则无需附带任何 <var class="var">keyword</var>/<var class="var">value</var> 对。
+该函数应接收 <var class="var">start</var> 与 <var class="var">end</var> 两个参数，
+并在当前缓冲区的 <var class="var">start</var> 至 <var class="var">end</var> 区间内为解析器设置范围。
+该函数也可以设置覆盖 <var class="var">start</var> 至 <var class="var">end</var> 区间的更大范围。
 </p></dd></dl>
 
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-treesit_002drange_002dsettings"><span class="category-def">Variable: </span><span><strong class="def-name">treesit-range-settings</strong><a class="copiable-link" href="#index-treesit_002drange_002dsettings"> &para;</a></span></dt>
-<dd><p>This variable helps <code class="code">treesit-update-ranges</code> in updating the
-ranges for parsers in the buffer.  It is a list of <var class="var">setting</var>s
-where the exact format of a <var class="var">setting</var> is considered internal.  You
-should use <code class="code">treesit-range-rules</code> to generate a value that this
-variable can have.
+<dd><p>该变量协助 <code class="code">treesit-update-ranges</code>
+更新缓冲区中解析器的解析范围。它是一个由多个 <var class="var">setting</var> 组成的列表，
+单个 <var class="var">setting</var> 的具体格式视为内部实现。
+应使用 <code class="code">treesit-range-rules</code> 生成该变量可接受的值。
 </p>
 </dd></dl>
 
-
 <dl class="first-defvr first-defvar-alias-first-defvr def-block">
 <dt class="defvr defvar-alias-defvr def-line" id="index-treesit_002dlanguage_002dat_002dpoint_002dfunction"><span class="category-def">Variable: </span><span><strong class="def-name">treesit-language-at-point-function</strong><a class="copiable-link" href="#index-treesit_002dlanguage_002dat_002dpoint_002dfunction"> &para;</a></span></dt>
-<dd><p>This variable&rsquo;s value should be a function that takes a single
-argument, <var class="var">pos</var>, which is a buffer position, and returns the
-language of the buffer text at <var class="var">pos</var>.  This variable is used by
-<code class="code">treesit-language-at</code>.
+<dd><p>该变量的值应为一个单参数函数，参数 <var class="var">pos</var> 为缓冲区位置，
+返回 <var class="var">pos</var> 处缓冲区文本所属的语言。
+该变量由 <code class="code">treesit-language-at</code> 使用。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dlocal_002dparsers_002dat"><span class="category-def">Function: </span><span><strong class="def-name">treesit-local-parsers-at</strong> <var class="def-var-arguments">&amp;optional pos language</var><a class="copiable-link" href="#index-treesit_002dlocal_002dparsers_002dat"> &para;</a></span></dt>
-<dd><p>This function returns all the local parsers at <var class="var">pos</var> in the
-current buffer.  <var class="var">pos</var> defaults to point.
+<dd><p>该函数返回当前缓冲区中 <var class="var">pos</var> 位置的所有局部解析器。
+<var class="var">pos</var> 默认为光标位置。
 </p>
-<p>Local parsers are those which only parse a limited region marked by an
-overlay with a non-<code class="code">nil</code> <code class="code">treesit-parser</code> property.  If
-<var class="var">language</var> is non-<code class="code">nil</code>, only return parsers for that
-language.
+<p>局部解析器是指仅解析由叠加层标记的有限区域、
+且 <code class="code">treesit-parser</code> 属性非 <code class="code">nil</code> 的解析器。
+若 <var class="var">language</var> 不为 <code class="code">nil</code>，则仅返回该语言对应的解析器。
 </p></dd></dl>
 
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dlocal_002dparsers_002don"><span class="category-def">Function: </span><span><strong class="def-name">treesit-local-parsers-on</strong> <var class="def-var-arguments">&amp;optional beg end language</var><a class="copiable-link" href="#index-treesit_002dlocal_002dparsers_002don"> &para;</a></span></dt>
-<dd><p>This function is the same as <code class="code">treesit-local-parsers-at</code>, but it
-returns the local parsers in the range between <var class="var">beg</var> and <var class="var">end</var>
-instead of at point.
+<dd><p>该函数与 <code class="code">treesit-local-parsers-at</code> 功能相同，
+但返回 <var class="var">beg</var> 至 <var class="var">end</var> 区间内的局部解析器，而非光标位置。
 </p>
-<p><var class="var">beg</var> and <var class="var">end</var> default to the entire accessible portion of
-the buffer.
+<p><var class="var">beg</var> 与 <var class="var">end</var> 默认为缓冲区的全部可访问区域。
 </p></dd></dl>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Tree_002dsitter-Major-Modes.html">Developing major modes with tree-sitter</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="User_002ddefined-Things.html">User-defined &ldquo;Things&rdquo; and Navigation</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Program-Source.html">Parsing Program Source</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Tree_002dsitter-Major-Modes.html">使用 tree-sitter 开发主模式</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="User_002ddefined-Things.html">用户自定义 &ldquo;对象(Things)&rdquo; 与导航</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Program-Source.html">解析程序源代码</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

@@ -47,32 +47,25 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="section-level-extent" id="Parsing-Actions">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-PEG-Rules.html" accesskey="n" rel="next">Writing PEG Rules</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="PEX-Definitions.html" accesskey="p" rel="prev">PEX Definitions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html" accesskey="u" rel="up">Parsing Expression Grammars</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-PEG-Rules.html" accesskey="n" rel="next">编写 PEG 规则</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="PEX-Definitions.html" accesskey="p" rel="prev">PEX 定义</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html" accesskey="u" rel="up">解析表达式文法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Parsing-Actions-1"><span>37.2 Parsing Actions<a class="copiable-link" href="#Parsing-Actions-1"> &para;</a></span></h3>
+<h3 class="section" id="g_t_89e3_6790_52a8_4f5c"><span>37.2 解析动作<a class="copiable-link" href="#g_t_89e3_6790_52a8_4f5c"> &para;</a></span></h3>
 
 <a class="index-entry-id" id="index-parsing-actions"></a>
 <a class="index-entry-id" id="index-parsing-stack"></a>
-<p>By default the process of parsing simply moves point in the current
-buffer, ultimately returning <code class="code">t</code> if the parsing succeeds, and
-<code class="code">nil</code> if it doesn&rsquo;t.  It&rsquo;s also possible to define <em class="dfn">parsing
-actions</em> that can run arbitrary Elisp at certain points in the parsed
-text.  These actions can optionally affect something called the
-<em class="dfn">parsing stack</em>, which is a list of values returned by the parsing
-process.  These actions only run (and only return values) if the parsing
-process ultimately succeeds; if it fails the action code is not run at
-all.
+<p>默认情况下，解析过程仅会移动当前缓冲区中的点位置，
+解析成功时最终返回 <code class="code">t</code>，失败则返回 <code class="code">nil</code>。
+也可以定义 <em class="dfn">解析动作(parsing actions)</em>，在解析文本的特定位置执行任意 Elisp 代码。
+这些动作可以选择性地影响一个被称为 <em class="dfn">解析栈(parsing stack)</em> 的结构，
+它是解析过程返回值组成的列表。这些动作仅在解析过程最终成功时才会执行
+（并返回值）；如果解析失败，动作代码完全不会运行。
 </p>
-<p>Actions can be added anywhere in the definition of a rule.  They are
-distinguished from parsing expressions by an initial backquote
-(&lsquo;<samp class="samp">`</samp>&rsquo;), followed by a parenthetical form that must contain a pair
-of hyphens (&lsquo;<samp class="samp">--</samp>&rsquo;) somewhere within it.  Symbols to the left of
-the hyphens are bound to values popped from the stack (they are
-somewhat analogous to the argument list of a lambda form).  Values
-produced by code to the right of the hyphens are pushed onto the stack
-(analogous to the return value of the lambda).  For instance, the
-previous grammar can be augmented with actions to return the parsed
-number as an actual integer:
+<p>动作可以添加在规则定义的任意位置。
+它们与解析表达式的区别在于以反引号（&lsquo;<samp class="samp">`</samp>&rsquo;）开头，
+后跟一个括号形式，其中必须包含一对连字符（&lsquo;<samp class="samp">--</samp>&rsquo;）。
+连字符左侧的符号会绑定从栈中弹出的值（在某种程度上类似于 lambda 形式的参数列表）。
+连字符右侧代码产生的值会被压入栈中（类似于 lambda 的返回值）。
+例如，上文的文法可以添加动作，将解析出的数字作为实际整数返回：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(with-peg-rules ((number sign digit (* digit
@@ -85,15 +78,13 @@ number as an actual integer:
   (peg-run (peg number)))
 </pre></div></div>
 
-<p>There must be values on the stack before they can be popped and
-returned &ndash; if there aren&rsquo;t enough stack values to bind to an action&rsquo;s
-left-hand terms, they will be bound to <code class="code">nil</code>.  An action with
-only right-hand terms will push values to the stack; an action with
-only left-hand terms will consume (and discard) values from the stack.
-At the end of parsing, stack values are returned as a flat list.
+<p>栈中必须先存在值才能被弹出并返回 &ndash;
+如果栈中没有足够的值绑定到动作左侧的项，它们会被绑定为 <code class="code">nil</code>。
+仅包含右侧项的动作会向栈中压入值；仅包含左侧项的动作会从栈中消耗（并丢弃）值。
+解析结束时，栈中的值会以扁平列表形式返回。
 </p>
-<p>To return the string matched by a <abbr class="acronym">PEX</abbr> (instead of simply
-moving point over it), a grammar can use a rule like this:
+<p>要返回 <abbr class="acronym">PEX</abbr> 匹配的字符串（而非仅移动点位置），
+文法可以使用如下规则：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">(one-word
@@ -102,41 +93,37 @@ moving point over it), a grammar can use a rule like this:
   `(start -- (buffer-substring start (point))))
 </pre></div></div>
 
-<p>The first action above pushes the initial value of point to the stack.
-The intervening <abbr class="acronym">PEX</abbr> moves point over the next word.  The
-second action pops the previous value from the stack (binding it to the
-variable <code class="code">start</code>), then uses that value to extract a substring from
-the buffer and push it to the stack.  This pattern is so common that
-<abbr class="acronym">PEG</abbr> provides a shorthand function that does exactly the above,
-along with a few other shorthands for common scenarios:
+<p>上文的第一个动作将点的初始值压入栈中。
+中间的 <abbr class="acronym">PEX</abbr> 会将点移动到下一个词之后。
+第二个动作从栈中弹出先前的值（绑定到变量 <code class="code">start</code>），
+然后使用该值从缓冲区提取子串并压入栈中。
+这种模式非常常见，因此 <abbr class="acronym">PEG</abbr> 提供了一个简写函数实现上述功能，
+同时还有其他几种应对常见场景的简写：
 </p>
 <dl class="table">
 <dt><a id="index-substring-_0028a-PEG-shorthand_0029"></a><span><code class="code">(substring <var class="var">e</var>)</code><a class="copiable-link" href="#index-substring-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
-<dd><p>Match <abbr class="acronym">PEX</abbr> <var class="var">e</var> and push the matched string onto the stack.
+<dd><p>匹配 <abbr class="acronym">PEX</abbr> <var class="var">e</var> 并将匹配的字符串压入栈中。
 </p>
 </dd>
 <dt><a id="index-region-_0028a-PEG-shorthand_0029"></a><span><code class="code">(region <var class="var">e</var>)</code><a class="copiable-link" href="#index-region-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
-<dd><p>Match <var class="var">e</var> and push the start and end positions of the matched
-region onto the stack.
+<dd><p>匹配 <var class="var">e</var> 并将匹配区域的起始与结束位置压入栈中。
 </p>
 </dd>
 <dt><a id="index-replace-_0028a-PEG-shorthand_0029"></a><span><code class="code">(replace <var class="var">e</var> <var class="var">replacement</var>)</code><a class="copiable-link" href="#index-replace-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
-<dd><p>Match <var class="var">e</var> and replaced the matched region with the string
-<var class="var">replacement</var>.
+<dd><p>匹配 <var class="var">e</var> 并将匹配区域替换为字符串 <var class="var">replacement</var>。
 </p>
 </dd>
 <dt><a id="index-list-_0028a-PEG-shorthand_0029"></a><span><code class="code">(list <var class="var">e</var>)</code><a class="copiable-link" href="#index-list-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
-<dd><p>Match <var class="var">e</var>, collect all values produced by <var class="var">e</var> (and its
-sub-expressions) into a list, and push that list onto the stack.  Stack
-values are typically returned as a flat list; this is a way of
-&ldquo;grouping&rdquo; values together.
+<dd><p>匹配 <var class="var">e</var>，将 <var class="var">e</var>（及其子表达式）产生的所有值收集为列表，
+并将该列表压入栈中。栈中的值通常以扁平列表返回；
+该方式用于将值 &ldquo;分组(grouping)&rdquo;。
 </p></dd>
 </dl>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-PEG-Rules.html">Writing PEG Rules</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="PEX-Definitions.html">PEX Definitions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html">Parsing Expression Grammars</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-PEG-Rules.html">编写 PEG 规则</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="PEX-Definitions.html">PEX 定义</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html">解析表达式文法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

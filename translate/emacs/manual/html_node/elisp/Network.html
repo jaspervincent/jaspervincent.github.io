@@ -48,229 +48,136 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="section-level-extent" id="Network">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Network-Servers.html" accesskey="n" rel="next">Network Servers</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Transaction-Queues.html" accesskey="p" rel="prev">Transaction Queues</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Processes.html" accesskey="u" rel="up">Processes</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Network-Servers.html" accesskey="n" rel="next">网络服务器</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Transaction-Queues.html" accesskey="p" rel="prev">事务队列</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Processes.html" accesskey="u" rel="up">进程</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Network-Connections"><span>41.14 Network Connections<a class="copiable-link" href="#Network-Connections"> &para;</a></span></h3>
+<h3 class="section" id="g_t_7f51_7edc_8fde_63a5"><span>41.14 网络连接<a class="copiable-link" href="#g_t_7f51_7edc_8fde_63a5"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-network-connection"></a>
 <a class="index-entry-id" id="index-TCP"></a>
 <a class="index-entry-id" id="index-UDP"></a>
 
-<p>Emacs Lisp programs can open stream (TCP) and datagram (UDP) network
-connections (see <a class="pxref" href="Datagrams.html">Datagrams</a>) to other processes on the same machine
-or other machines.
-A network connection is handled by Lisp much like a subprocess, and is
-represented by a process object.  However, the process you are
-communicating with is not a child of the Emacs process, has no
-process <abbr class="acronym">ID</abbr>, and you can&rsquo;t kill it or send it signals.  All you
-can do is send and receive data.  <code class="code">delete-process</code> closes the
-connection, but does not kill the program at the other end; that
-program must decide what to do about closure of the connection.
+<p>Emacs Lisp 程序可以打开流（TCP）与数据报（UDP）网络连接（see <a class="pxref" href="Datagrams.html">数据报</a>），与本机或其他机器上的进程通信。
+Lisp 对网络连接的处理与子进程十分相似，均使用进程对象表示。但与之通信的进程并非 Emacs 的子进程，没有进程 <abbr class="acronym">ID</abbr>，你也无法终止它或向其发送信号。你只能收发数据。<code class="code">delete-process</code> 会关闭连接，但不会终止对端程序；该程序需自行决定如何处理连接关闭。
 </p>
-<p>Lisp programs can listen for connections by creating network
-servers.  A network server is also represented by a kind of process
-object, but unlike a network connection, the network server never
-transfers data itself.  When it receives a connection request, it
-creates a new network connection to represent the connection just
-made.  (The network connection inherits certain information, including
-the process plist, from the server.)  The network server then goes
-back to listening for more connection requests.
+<p>Lisp 程序可以通过创建网络服务器监听连接。网络服务器同样由一类进程对象表示，但与网络连接不同，网络服务器本身从不传输数据。当它收到连接请求时，会创建一个新的网络连接以代表刚建立的连接。（该网络连接会从服务器继承部分信息，包括进程属性表。）之后网络服务器继续监听更多连接请求。
 </p>
-<p>Network connections and servers are created by calling
-<code class="code">make-network-process</code> with an argument list consisting of
-keyword/argument pairs, for example <code class="code">:server t</code> to create a
-server process, or <code class="code">:type 'datagram</code> to create a datagram
-connection.  See <a class="xref" href="Low_002dLevel-Network.html">Low-Level Network Access</a>, for details.  You can also use
-the <code class="code">open-network-stream</code> function described below.
+<p>网络连接与服务器通过调用 <code class="code">make-network-process</code> 创建，参数为关键字/值对列表，例如使用 <code class="code">:server t</code> 创建服务器进程，或 <code class="code">:type 'datagram</code> 创建数据报连接。See <a class="xref" href="Low_002dLevel-Network.html">底层网络访问</a> 查看详情。你也可以使用下文介绍的 <code class="code">open-network-stream</code> 函数。
 </p>
-<p>To distinguish the different types of processes, the
-<code class="code">process-type</code> function returns the symbol <code class="code">network</code> for a
-network connection or server, <code class="code">serial</code> for a serial port
-connection, <code class="code">pipe</code> for a pipe connection, or <code class="code">real</code> for a
-real subprocess.
+<p>为区分不同类型的进程，<code class="code">process-type</code> 函数对网络连接或服务器返回符号 <code class="code">network</code>，对串口连接返回 <code class="code">serial</code>，对管道连接返回 <code class="code">pipe</code>，对真实子进程返回 <code class="code">real</code>。
 </p>
-<p>The <code class="code">process-status</code> function returns <code class="code">open</code>,
-<code class="code">closed</code>, <code class="code">connect</code>, <code class="code">stop</code>, or <code class="code">failed</code> for
-network connections.  For a network server, the status is always
-<code class="code">listen</code>.  Except for <code class="code">stop</code>, none of those values is
-possible for a real subprocess.  See <a class="xref" href="Process-Information.html">Process Information</a>.
+<p><code class="code">process-status</code> 函数对网络连接返回 <code class="code">open</code>、<code class="code">closed</code>、<code class="code">connect</code>、<code class="code">stop</code> 或 <code class="code">failed</code>。对网络服务器，状态始终为 <code class="code">listen</code>。除 <code class="code">stop</code> 外，这些值均不会出现在真实子进程中。See <a class="xref" href="Process-Information.html">进程信息</a>。
 </p>
-<p>You can stop and resume operation of a network process by calling
-<code class="code">stop-process</code> and <code class="code">continue-process</code>.  For a server
-process, being stopped means not accepting new connections.  (Up to 5
-connection requests will be queued for when you resume the server; you
-can increase this limit, unless it is imposed by the operating
-system&mdash;see the <code class="code">:server</code> keyword of <code class="code">make-network-process</code>,
-<a class="ref" href="Network-Processes.html"><code class="code">make-network-process</code></a>.)  For a network stream connection, being
-stopped means not processing input (any arriving input waits until you
-resume the connection).  For a datagram connection, some number of
-packets may be queued but input may be lost.  You can use the function
-<code class="code">process-command</code> to determine whether a network connection or
-server is stopped; a non-<code class="code">nil</code> value means yes.
+<p>你可以通过调用 <code class="code">stop-process</code> 与 <code class="code">continue-process</code> 暂停或恢复网络进程的运行。对服务器进程，暂停意味着不再接受新连接。（最多会缓存 5 个连接请求，待服务器恢复后处理；你可以提高该上限，除非受操作系统限制&mdash;详见 <code class="code">make-network-process</code> 的 <code class="code">:server</code> 关键字，<a class="ref" href="Network-Processes.html"><code class="code">make-network-process</code></a>。）对网络流连接，暂停意味着不处理输入（到达的输入会等待连接恢复）。对数据报连接，部分数据包可能被缓存，但输入可能丢失。你可以使用 <code class="code">process-command</code> 判断网络连接或服务器是否暂停；非 <code class="code">nil</code> 表示已暂停。
 </p>
 <a class="index-entry-id" id="index-network-connection_002c-encrypted"></a>
 <a class="index-entry-id" id="index-encrypted-network-connections"></a>
 <a class="index-entry-id" id="index-TLS-network-connections"></a>
 <a class="index-entry-id" id="index-STARTTLS-network-connections"></a>
-<p>Emacs can create encrypted network connections, using the built-in
-support for the GnuTLS Transport Layer Security Library; see
-<a class="uref" href="https://www.gnu.org/software/gnutls/">the GnuTLS project page</a>.
-If your Emacs was compiled with GnuTLS support, the function
-<code class="code">gnutls-available-p</code> is defined and returns non-<code class="code">nil</code>.  For
-more details, see <a data-manual="emacs-gnutls" href="https://www.gnu.org/software/emacs/manual/html_node/emacs-gnutls/index.html#Top">Overview</a> in <cite class="cite">The Emacs-GnuTLS manual</cite>.
-The <code class="code">open-network-stream</code> function can transparently handle the
-details of creating encrypted connections for you, using whatever
-support is available.
+<p>Emacs 可以创建加密网络连接，内置支持 GnuTLS 传输层安全库；详见 <a class="uref" href="https://www.gnu.org/software/gnutls/">GnuTLS 项目页面</a>。若你的 Emacs 编译时启用了 GnuTLS 支持，则函数 <code class="code">gnutls-available-p</code> 会被定义并返回非 <code class="code">nil</code>。更多详情参见 see <a data-manual="emacs-gnutls" href="https://www.gnu.org/software/emacs/manual/html_node/emacs-gnutls/index.html#Top">Overview</a> in <cite class="cite">The Emacs-GnuTLS manual</cite>。<code class="code">open-network-stream</code> 函数可根据可用支持透明处理加密连接的创建细节。
 </p>
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-open_002dnetwork_002dstream"><span class="category-def">Function: </span><span><strong class="def-name">open-network-stream</strong> <var class="def-var-arguments">name buffer host service &amp;rest parameters</var><a class="copiable-link" href="#index-open_002dnetwork_002dstream"> &para;</a></span></dt>
-<dd><p>This function opens a TCP connection, with optional encryption, and
-returns a process object that represents the connection.
+<dd><p>该函数打开一个 TCP 连接（支持可选加密），返回代表该连接的进程对象。
 </p>
-<p>The <var class="var">name</var> argument specifies the name for the process object.  It
-is modified as necessary to make it unique.
+<p>参数 <var class="var">name</var> 指定进程对象的名称。会根据需要自动修改以保证唯一。
 </p>
-<p>The <var class="var">buffer</var> argument is the buffer to associate with the
-connection.  Output from the connection is inserted in the buffer,
-unless you specify your own filter function to handle the output.  If
-<var class="var">buffer</var> is <code class="code">nil</code>, it means that the connection is not
-associated with any buffer.
+<p>参数 <var class="var">buffer</var> 是与该连接关联的缓冲区。连接的输出会插入该缓冲区，除非你指定了自定义过滤器函数处理输出。若 <var class="var">buffer</var> 为 <code class="code">nil</code>，表示该连接不关联任何缓冲区。
 </p>
-<p>The arguments <var class="var">host</var> and <var class="var">service</var> specify where to connect to;
-<var class="var">host</var> is the host name (a string), and <var class="var">service</var> is the name of
-a defined network service (a string) or a port number (an integer like
-<code class="code">80</code> or an integer string like <code class="code">&quot;80&quot;</code>).
+<p>参数 <var class="var">host</var> 与 <var class="var">service</var> 指定连接目标；<var class="var">host</var> 为主机名（字符串），<var class="var">service</var> 为已定义的网络服务名（字符串）或端口号（整数如 <code class="code">80</code>，或整数字符串如 <code class="code">&quot;80&quot;</code>）。
 </p>
-<p>The remaining arguments <var class="var">parameters</var> are keyword/argument pairs
-that are mainly relevant to encrypted connections:
+<p>剩余参数 <var class="var">parameters</var> 为关键字/值对，主要与加密连接相关：
 </p>
 <dl class="table">
 <dt><code class="code">:nowait <var class="var">boolean</var></code></dt>
-<dd><p>If non-<code class="code">nil</code>, try to make an asynchronous connection.
+<dd><p>若非 <code class="code">nil</code>，尝试建立异步连接。
 </p>
 </dd>
 <dt><code class="code">:noquery <var class="var">query-flag</var></code></dt>
-<dd><p>Initialize the process query flag to <var class="var">query-flag</var>.
-See <a class="xref" href="Query-Before-Exit.html">Querying Before Exit</a>.
+<dd><p>将进程查询标志初始化为 <var class="var">query-flag</var>。See <a class="xref" href="Query-Before-Exit.html">退出前询问确认</a>。
 </p>
 </dd>
 <dt><code class="code">:coding <var class="var">coding</var></code></dt>
-<dd><p>Use this to set the coding systems used by the network process, in
-preference to binding <code class="code">coding-system-for-read</code> or
-<code class="code">coding-system-for-write</code>.  See <a class="xref" href="Network-Processes.html"><code class="code">make-network-process</code></a>, for
-details.
+<dd><p>用于设置网络进程使用的编码系统，优先于绑定 <code class="code">coding-system-for-read</code> 或 <code class="code">coding-system-for-write</code>。See <a class="xref" href="Network-Processes.html"><code class="code">make-network-process</code></a> 查看详情。
 </p>
 </dd>
 <dt><code class="code">:type <var class="var">type</var></code></dt>
-<dd><p>The type of connection.  Options are:
+<dd><p>连接类型。可选值：
 </p>
 <dl class="table">
 <dt><code class="code">plain</code></dt>
-<dd><p>An ordinary, unencrypted connection.
+<dd><p>普通未加密连接。
 </p></dd>
 <dt><code class="code">tls</code></dt>
 <dt><code class="code">ssl</code></dt>
-<dd><p>A <abbr class="acronym">TLS</abbr> (Transport Layer Security) connection.
+<dd><p><abbr class="acronym">TLS</abbr>（传输层安全）连接。
 </p></dd>
 <dt><code class="code">nil</code></dt>
 <dt><code class="code">network</code></dt>
-<dd><p>Start with a plain connection, and if parameters &lsquo;<samp class="samp">:success</samp>&rsquo;
-and &lsquo;<samp class="samp">:capability-command</samp>&rsquo; are supplied, try to upgrade to an encrypted
-connection via <abbr class="acronym">STARTTLS</abbr>.  If that fails, retain the
-unencrypted connection.
+<dd><p>先建立普通连接，若提供了参数 &lsquo;<samp class="samp">:success</samp>&rsquo; 与 &lsquo;<samp class="samp">:capability-command</samp>&rsquo;，则尝试通过 <abbr class="acronym">STARTTLS</abbr> 升级为加密连接。若失败则保留未加密连接。
 </p></dd>
 <dt><code class="code">starttls</code></dt>
-<dd><p>As for <code class="code">nil</code>, but if <abbr class="acronym">STARTTLS</abbr> fails, drop the connection.
+<dd><p>与 <code class="code">nil</code> 类似，但 <abbr class="acronym">STARTTLS</abbr> 失败时断开连接。
 </p></dd>
 <dt><code class="code">shell</code></dt>
-<dd><p>A shell connection.
+<dd><p>Shell 连接。
 </p></dd>
 </dl>
 
 </dd>
 <dt><code class="code">:always-query-capabilities <var class="var">boolean</var></code></dt>
-<dd><p>If non-<code class="code">nil</code>, always ask for the server&rsquo;s capabilities, even when
-doing a &lsquo;<samp class="samp">plain</samp>&rsquo; connection.
+<dd><p>若非 <code class="code">nil</code>，即使是 &lsquo;<samp class="samp">plain</samp>&rsquo; 连接也始终查询服务器能力。
 </p>
 </dd>
 <dt><code class="code">:capability-command <var class="var">capability-command</var></code></dt>
-<dd><p>Command to query the host capabilities.  This can either be a string
-(which will then be sent verbatim to the server) or a function
-(called with a single parameter: the &ldquo;greeting&rdquo; from the server when
-connecting) that should return a string.
+<dd><p>查询主机能力的命令。可以是字符串（直接发送给服务器）或函数（接收一个参数：连接时服务器的 &ldquo;欢迎信息(greeting)&rdquo;，返回字符串）。
 </p>
 </dd>
 <dt><code class="code">:end-of-command <var class="var">regexp</var></code></dt>
 <dt><code class="code">:end-of-capability <var class="var">regexp</var></code></dt>
-<dd><p>Regular expression matching the end of a command, or the end of the
-command <var class="var">capability-command</var>.  The latter defaults to the former.
+<dd><p>匹配命令结束或能力查询命令 <var class="var">capability-command</var> 结束的正则表达式。后者默认使用前者的值。
 </p>
 </dd>
 <dt><code class="code">:starttls-function <var class="var">function</var></code></dt>
-<dd><p>Function of one argument (the response to <var class="var">capability-command</var>),
-which returns either <code class="code">nil</code> or the command to activate
-<abbr class="acronym">STARTTLS</abbr>, if supported.
+<dd><p>接收一个参数（对 <var class="var">capability-command</var> 的响应）的函数，返回 <code class="code">nil</code> 或激活 <abbr class="acronym">STARTTLS</abbr> 的命令（若支持）。
 </p>
 </dd>
 <dt><code class="code">:success <var class="var">regexp</var></code></dt>
-<dd><p>Regular expression matching a successful <abbr class="acronym">STARTTLS</abbr> negotiation.
+<dd><p>匹配 <abbr class="acronym">STARTTLS</abbr> 协商成功的正则表达式。
 </p>
 </dd>
 <dt><code class="code">:use-starttls-if-possible <var class="var">boolean</var></code></dt>
-<dd><p>If non-<code class="code">nil</code>, do opportunistic <abbr class="acronym">STARTTLS</abbr> upgrades even if Emacs
-doesn&rsquo;t have built-in <abbr class="acronym">TLS</abbr> support.
+<dd><p>若非 <code class="code">nil</code>，即使 Emacs 无内置 <abbr class="acronym">TLS</abbr> 支持也尝试 opportunistic <abbr class="acronym">STARTTLS</abbr> 升级。
 </p>
 </dd>
 <dt><code class="code">:warn-unless-encrypted <var class="var">boolean</var></code></dt>
-<dd><p>If non-<code class="code">nil</code>, warn the user if the final connection type is not
-encrypted.  This is useful for protocols like <abbr class="acronym">IMAP</abbr> and the
-like, where most users would expect the network traffic to be encrypted.
-This may be due to <abbr class="acronym">STARTTLS</abbr> upgrade failure, specifying
-<code class="code">:return-list</code> non-<code class="code">nil</code> allows you to capture any error
-encountered.
+<dd><p>若非 <code class="code">nil</code>，若最终连接类型未加密则向用户发出警告。这对 <abbr class="acronym">IMAP</abbr> 等协议很有用，多数用户期望此类网络流量加密。
+原因可能是 <abbr class="acronym">STARTTLS</abbr> 升级失败，将 <code class="code">:return-list</code> 设为非 <code class="code">nil</code> 可捕获遇到的错误。
 </p>
 </dd>
 <dt><a id="index-network_002dstream_002duse_002dclient_002dcertificates"></a><span><code class="code">:client-certificate <var class="var">list-or-t</var></code><a class="copiable-link" href="#index-network_002dstream_002duse_002dclient_002dcertificates"> &para;</a></span></dt>
-<dd><p>Either a list of the form <code class="code">(<var class="var">key-file</var> <var class="var">cert-file</var>)</code>,
-naming the certificate key file and certificate file itself, or
-<code class="code">t</code>, meaning to query <code class="code">auth-source</code> for this information
-(see <a data-manual="auth" href="https://www.gnu.org/software/emacs/manual/html_node/auth/Help-for-users.html#Help-for-users">auth-source</a> in <cite class="cite">Emacs auth-source
-Library</cite>).  Only used for <abbr class="acronym">TLS</abbr> or <abbr class="acronym">STARTTLS</abbr>.  To
-enable automatic queries of <code class="code">auth-source</code> when
-<code class="code">:client-certificate</code> is not specified customize
-<code class="code">network-stream-use-client-certificates</code> to <code class="code">t</code>.
+<dd><p>可以是格式为 <code class="code">(<var class="var">key-file</var> <var class="var">cert-file</var>)</code> 的列表，指定证书密钥文件与证书文件本身；或为 <code class="code">t</code>，表示通过 <code class="code">auth-source</code> 查询该信息（see <a data-manual="auth" href="https://www.gnu.org/software/emacs/manual/html_node/auth/Help-for-users.html#Help-for-users">auth-source</a> in <cite class="cite">Emacs auth-source Library</cite>）。仅用于 <abbr class="acronym">TLS</abbr> 或 <abbr class="acronym">STARTTLS</abbr>。若未指定 <code class="code">:client-certificate</code> 时希望自动查询 <code class="code">auth-source</code>，可将 <code class="code">network-stream-use-client-certificates</code> 自定义为 <code class="code">t</code>。
 </p>
 </dd>
 <dt><code class="code">:return-list <var class="var">cons-or-nil</var></code></dt>
-<dd><p>The return value of this function.  If omitted or <code class="code">nil</code>, return a
-process object.  Otherwise, a cons of the form
-<code class="code">(<var class="var">process-object</var>&nbsp;.&nbsp;<var class="var">plist</var>)</code><!-- /@w -->, where <var class="var">plist</var> can
-include the following keywords:
+<dd><p>该函数的返回值。若省略或为 <code class="code">nil</code>，返回进程对象。否则返回格式为 <code class="code">(<var class="var">process-object</var>&nbsp;.&nbsp;<var class="var">plist</var>)</code><!-- /@w --> 的 cons，其中 <var class="var">plist</var> 可包含以下关键字：
 </p>
 <dl class="table">
 <dt><code class="code">:greeting <var class="var">string-or-nil</var></code></dt>
-<dd><p>If non-<code class="code">nil</code>, the greeting string returned by the host.
+<dd><p>若非 <code class="code">nil</code>，为主机返回的欢迎字符串。
 </p></dd>
 <dt><code class="code">:capabilities <var class="var">string-or-nil</var></code></dt>
-<dd><p>If non-<code class="code">nil</code>, the host&rsquo;s capability string.
+<dd><p>若非 <code class="code">nil</code>，为主机的能力字符串。
 </p></dd>
 <dt><code class="code">:type <var class="var">symbol</var></code></dt>
-<dd><p>The connection type: &lsquo;<samp class="samp">plain</samp>&rsquo; or &lsquo;<samp class="samp">tls</samp>&rsquo;.
+<dd><p>连接类型：&lsquo;<samp class="samp">plain</samp>&rsquo; 或 &lsquo;<samp class="samp">tls</samp>&rsquo;。
 </p></dd>
 <dt><code class="code">:error <var class="var">symbol</var></code></dt>
-<dd><p>A string describing any error encountered when performing
-<abbr class="acronym">STARTTLS</abbr> upgrade.
+<dd><p>描述 <abbr class="acronym">STARTTLS</abbr> 升级过程中遇到错误的字符串。
 </p></dd>
 </dl>
 
 </dd>
 <dt><code class="code">:shell-command <var class="var">string-or-nil</var></code></dt>
-<dd><p>If the connection <code class="code">type</code> is <code class="code">shell</code>, this parameter will be
-interpreted as a format-spec string (see <a class="pxref" href="Custom-Format-Strings.html">自定义格式字符串</a>)
-that will be executed to make the connection.  The specs available are
-&lsquo;<samp class="samp">%s</samp>&rsquo; for the host name and &lsquo;<samp class="samp">%p</samp>&rsquo; for the port number.  For
-instance, if you want to first ssh to &lsquo;<samp class="samp">gateway</samp>&rsquo; before making a
-plain connection, then this parameter&rsquo;s value could be something like
-&lsquo;<samp class="samp">ssh gateway nc %s %p</samp>&rsquo;.
+<dd><p>若连接 <code class="code">type</code> 为 <code class="code">shell</code>，该参数会被解释为格式字符串（see <a class="pxref" href="Custom-Format-Strings.html">自定义格式字符串</a>）并执行以建立连接。可用格式符为 &lsquo;<samp class="samp">%s</samp>&rsquo;（主机名）与 &lsquo;<samp class="samp">%p</samp>&rsquo;（端口号）。例如，若想先通过 ssh 连接 &lsquo;<samp class="samp">gateway</samp>&rsquo; 再建立普通连接，该参数可设为类似 &lsquo;<samp class="samp">ssh gateway nc %s %p</samp>&rsquo;。
 </p>
 </dd>
 </dl>
@@ -281,7 +188,7 @@ plain connection, then this parameter&rsquo;s value could be something like
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Network-Servers.html">Network Servers</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Transaction-Queues.html">Transaction Queues</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Processes.html">Processes</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Network-Servers.html">网络服务器</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Transaction-Queues.html">事务队列</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Processes.html">进程</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

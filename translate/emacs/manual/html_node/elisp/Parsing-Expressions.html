@@ -47,54 +47,40 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="section-level-extent" id="Parsing-Expressions">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Syntax-Table-Internals.html" accesskey="n" rel="next">Syntax Table Internals</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Motion-and-Syntax.html" accesskey="p" rel="prev">Motion and Syntax</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Syntax-Tables.html" accesskey="u" rel="up">Syntax Tables</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Syntax-Table-Internals.html" accesskey="n" rel="next">语法表内部实现</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Motion-and-Syntax.html" accesskey="p" rel="prev">移动与语法</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Syntax-Tables.html" accesskey="u" rel="up">语法表</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Parsing-Expressions-1"><span>36.6 Parsing Expressions<a class="copiable-link" href="#Parsing-Expressions-1"> &para;</a></span></h3>
+<h3 class="section" id="g_t_8868_8fbe_5f0f_89e3_6790"><span>36.6 表达式解析<a class="copiable-link" href="#g_t_8868_8fbe_5f0f_89e3_6790"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-parsing-expressions"></a>
 <a class="index-entry-id" id="index-scanning-expressions"></a>
 
-<p>This section describes functions for parsing and scanning balanced
-expressions.  We will refer to such expressions as <em class="dfn">sexps</em>,
-following the terminology of Lisp, even though these functions can act
-on languages other than Lisp.  Basically, a sexp is either a balanced
-parenthetical grouping, a string, or a symbol (i.e., a sequence
-of characters whose syntax is either word constituent or symbol
-constituent).  However, characters in the expression prefix syntax
-class (see <a class="pxref" href="Syntax-Class-Table.html">Table of Syntax Classes</a>) are treated as part of the sexp if
-they appear next to it.
+<p>本节介绍用于解析与扫描平衡表达式的函数。
+沿用 Lisp 术语，我们将这类表达式称为<em class="dfn">sexp</em>（符号表达式），尽管这些函数也可用于 Lisp 以外的语言。
+简单来说，sexp 可以是一对平衡的括号结构、一个字符串，或一个符号（即由词构成字符或符号构成字符组成的序列）。
+不过，紧邻表达式的表达式前缀语法分类字符（see <a class="pxref" href="Syntax-Class-Table.html">语法类别表</a>）会被视为表达式的一部分。
 </p>
-<p>The syntax table controls the interpretation of characters, so these
-functions can be used for Lisp expressions when in Lisp mode and for C
-expressions when in C mode.  See <a class="xref" href="List-Motion.html">移动遍历平衡表达式</a>, for convenient
-higher-level functions for moving over balanced expressions.
+<p>语法表控制字符的解释方式，因此这些函数在 Lisp 模式下可处理 Lisp 表达式，在 C 模式下可处理 C 表达式。
+See <a class="xref" href="List-Motion.html">移动遍历平衡表达式</a>，查看用于在平衡表达式间移动的更便捷高层函数。
 </p>
-<p>A character&rsquo;s syntax controls how it changes the state of the
-parser, rather than describing the state itself.  For example, a
-string delimiter character toggles the parser state between
-in-string and in-code, but the syntax of characters does not
-directly say whether they are inside a string.  For example (note that
-15 is the syntax code for generic string delimiters),
+<p>字符的语法控制解析器状态的切换方式，而非直接描述状态本身。
+例如，字符串定界符会在“字符串内”与“代码内”状态间切换，但字符语法本身并不直接表明其是否位于字符串中。
+例如（注意 15 是通用字符串定界符的语法代码）：
 </p>
 <div class="example">
 <pre class="example-preformatted">(put-text-property 1 9 'syntax-table '(15 . nil))
 </pre></div>
 
-<p>does not tell Emacs that the first eight chars of the current buffer
-are a string, but rather that they are all string delimiters.  As a
-result, Emacs treats them as four consecutive empty string constants.
+<p>这段代码并不会告诉 Emacs 当前缓冲区前 8 个字符是一个字符串，而是将它们全部标记为字符串定界符。
+结果是 Emacs 会将其视为四个连续的空字符串常量。
 </p>
 
 <ul class="mini-toc">
-<li><a href="Motion-via-Parsing.html" accesskey="1">Motion Commands Based on Parsing</a></li>
-<li><a href="Position-Parse.html" accesskey="2">Finding the Parse State for a Position</a></li>
-<li><a href="Parser-State.html" accesskey="3">Parser State</a></li>
-<li><a href="Low_002dLevel-Parsing.html" accesskey="4">Low-Level Parsing</a></li>
-<li><a href="Control-Parsing.html" accesskey="5">Parameters to Control Parsing</a></li>
+<li><a href="Motion-via-Parsing.html" accesskey="1">基于解析的移动命令</a></li>
+<li><a href="Position-Parse.html" accesskey="2">获取位置的解析状态</a></li>
+<li><a href="Parser-State.html" accesskey="3">解析状态</a></li>
+<li><a href="Low_002dLevel-Parsing.html" accesskey="4">底层解析</a></li>
+<li><a href="Control-Parsing.html" accesskey="5">控制解析的参数</a></li>
 </ul>
 </div>
-<hr>
-<p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Syntax-Table-Internals.html">Syntax Table Internals</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Motion-and-Syntax.html">Motion and Syntax</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Syntax-Tables.html">Syntax Tables</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

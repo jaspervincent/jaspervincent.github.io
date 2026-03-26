@@ -45,135 +45,104 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="subsection-level-extent" id="JSONRPC-Overview">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Process_002dbased-JSONRPC-connections.html" accesskey="n" rel="next">Process-based JSONRPC connections</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="JSONRPC.html" accesskey="u" rel="up">JSONRPC communication</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Process_002dbased-JSONRPC-connections.html" accesskey="n" rel="next">基于进程的 JSONRPC 连接</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="JSONRPC.html" accesskey="u" rel="up">JSONRPC 通信</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Overview"><span>33.32.1 Overview<a class="copiable-link" href="#Overview"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_6982_8ff0-1"><span>33.32.1 概述<a class="copiable-link" href="#g_t_6982_8ff0-1"> &para;</a></span></h4>
 
-<p>Quoting from the <a class="uref" href="https://www.jsonrpc.org/">spec</a>, JSONRPC &quot;is
-transport agnostic in that the concepts can be used within the same
-process, over sockets, over http, or in many various message passing
-environments.&quot;
+<p>引自 <a class="uref" href="https://www.jsonrpc.org/">规范</a>，JSONRPC“与传输层无关，
+相关概念可在同一进程内、套接字、HTTP 或多种消息传递环境中使用”。
 </p>
 <a class="index-entry-id" id="index-jsonrpc_002dconnection"></a>
-<p>To model this agnosticism, the <code class="code">jsonrpc</code> library uses objects of
-a <code class="code">jsonrpc-connection</code> class, which represent a connection to a
-remote JSON endpoint (for details on Emacs&rsquo;s object system,
-see <a data-manual="eieio" href="https://www.gnu.org/software/emacs/manual/html_node/eieio/index.html#Top">EIEIO</a> in <cite class="cite">EIEIO</cite>).  In modern object-oriented parlance,
-this class is &ldquo;abstract&rdquo;, i.e. the actual class of a useful
-connection object is always a subclass of <code class="code">jsonrpc-connection</code>.
-Nevertheless, we can define two distinct APIs around the
-<code class="code">jsonrpc-connection</code> class:
+<p>为体现这种传输无关性，<code class="code">jsonrpc</code> 库使用 <code class="code">jsonrpc-connection</code> 类的对象，
+表示与远程 JSON 端点的连接（有关 Emacs 对象系统的详情，
+see <a data-manual="eieio" href="https://www.gnu.org/software/emacs/manual/html_node/eieio/index.html#Top">EIEIO</a> in <cite class="cite">EIEIO</cite>）。
+在现代面向对象术语中，该类是“抽象类”，即：一个可用的连接对象，
+其实际类始终是 <code class="code">jsonrpc-connection</code> 的子类。
+尽管如此，我们仍可以围绕 <code class="code">jsonrpc-connection</code> 类定义两套独立的 API：
 </p>
 <a class="index-entry-id" id="index-JSONRPC-application-interfaces"></a>
 <ol class="enumerate">
-<li> An API for building JSONRPC applications
+<li> 用于构建 JSONRPC 应用的 API
 
 <a class="index-entry-id" id="index-_003arequest_002ddispatcher"></a>
 <a class="index-entry-id" id="index-_003anotification_002ddispatcher"></a>
 <a class="index-entry-id" id="index-jsonrpc_002dnotify"></a>
 <a class="index-entry-id" id="index-jsonrpc_002drequest"></a>
 <a class="index-entry-id" id="index-jsonrpc_002dasync_002drequest"></a>
-<p>In this scenario, a new aspiring JSONRPC-based application selects a
-concrete subclass of <code class="code">jsonrpc-connection</code> that provides the
-transport for the JSONRPC messages to be exchanged between endpoints.
+<p>在这种场景下，一个基于 JSONRPC 的新应用会选择 <code class="code">jsonrpc-connection</code> 的一个具体子类，
+该子类为端点间交换的 JSONRPC 消息提供传输层支持。
 </p>
-<p>The application creates objects of that subclass using
-<code class="code">make-instance</code>.  To initiate a contact to a remote endpoint, the
-application passes this object to the functions such as
-<code class="code">jsonrpc-notify</code>, <code class="code">jsonrpc-request</code>, or
-<code class="code">jsonrpc-async-request</code>.
+<p>应用通过 <code class="code">make-instance</code> 创建该子类的对象。
+为发起与远程端点的通信，应用会将该对象传入
+<code class="code">jsonrpc-notify</code>、<code class="code">jsonrpc-request</code> 或
+<code class="code">jsonrpc-async-request</code> 等函数。
 </p>
-<p>For handling remotely initiated contacts, which generally come in
-asynchronously, the <code class="code">make-instance</code> instantiation should
-initialize it the <code class="code">:request-dispatcher</code> and
-<code class="code">:notification-dispatcher</code> EIEIO keyword arguments.  These are
-both functions of 3 arguments: the connection object; a symbol naming
-the JSONRPC method invoked remotely; and a JSONRPC <code class="code">params</code>
-object.
+<p>为处理通常异步到达的、由远程发起的通信，
+<code class="code">make-instance</code> 初始化时应设置
+<code class="code">:request-dispatcher</code> 与 <code class="code">:notification-dispatcher</code>
+这两个 EIEIO 关键字参数。二者均为接收三个参数的函数：
+连接对象、远程调用的 JSONRPC 方法名符号、以及 JSONRPC <code class="code">params</code> 对象。
 </p>
 <a class="index-entry-id" id="index-jsonrpc_002derror"></a>
-<p>The function passed as <code class="code">:request-dispatcher</code> is responsible for
-handling the remote endpoint&rsquo;s requests, which expect a reply from the
-local endpoint (in this case, the application you&rsquo;re building).
-Inside that function, you may either return locally (a regular return)
-or non-locally (throw an error).  Both exits from the request
-dispatcher cause a reply to the remote endpoint&rsquo;s request to be sent
-through the transport.
+<p>作为 <code class="code">:request-dispatcher</code> 传入的函数，
+负责处理远程端点的请求——这类请求期望本地端点（即你正在构建的应用）给出回复。
+在该函数内部，你可以正常返回（普通返回）或非本地返回（抛出错误）。
+两种退出方式都会通过传输层向远程端点的请求发送回复。
 </p>
-<p>A regular return determines a success response, and the return value
-must be a Lisp object that can be serialized as JSON (see <a class="pxref" href="Parsing-JSON.html">Parsing and generating JSON values</a>).  The result is forwarded to the server as the JSONRPC
-<code class="code">result</code> object.  A non-local return, achieved by calling the
-function <code class="code">jsonrpc-error</code>, causes an error response to be sent to
-the server.  The details of the accompanying JSONRPC <code class="code">error</code>
-object are filled out with whatever was passed to
-<code class="code">jsonrpc-error</code>.  A non-local return triggered by an unexpected
-error of any other type also causes an error response to be sent
-(unless you have set <code class="code">debug-on-error</code>, in which case this calls
-the Lisp debugger, see <a class="pxref" href="Error-Debugging.html">发生错误时进入调试器</a>).
+<p>普通返回表示成功响应，返回值必须是可序列化为 JSON 的 Lisp 对象（see <a class="pxref" href="Parsing-JSON.html">解析和生成 JSON 值</a>）。
+该结果会作为 JSONRPC <code class="code">result</code> 对象发送给服务端。
+通过调用 <code class="code">jsonrpc-error</code> 实现的非本地返回，
+会向服务端发送错误响应。附带的 JSONRPC <code class="code">error</code> 对象的详细信息，
+由传入 <code class="code">jsonrpc-error</code> 的参数填充。
+由其他类型意外错误触发的非本地返回，同样会发送错误响应
+（除非你已设置 <code class="code">debug-on-error</code>，此时会调用 Lisp 调试器，see <a class="pxref" href="Error-Debugging.html">发生错误时进入调试器</a>）。
 </p>
 <a class="index-entry-id" id="index-jsonrpc_002dconvert_002dto_002dendpoint"></a>
 <a class="index-entry-id" id="index-jsonrpc_002dconvert_002dfrom_002dendpoint"></a>
-<p>It&rsquo;s possible to use the <code class="code">jsonrpc</code> library to build applications
-based on transport protocols that can be described as
-&ldquo;quasi-JSONRPC&rdquo;.  These are similar, but not quite identical to
-JSONRPC, such as the <a class="uref" href="https://www.jsonrpc.org/">DAP (Debug
-Adapter Protocol)</a>.  These protocols also define request, response and
-notification messages but the format is not quite the same as JSONRPC.
-The generic functions <code class="code">jsonrpc-convert-to-endpoint</code> and
-<code class="code">jsonrpc-convert-from-endpoint</code> can be customized for converting
-between the internal representation of JSONRPC and whatever the
-endpoint accepts (see <a class="pxref" href="Generic-Functions.html">泛型函数</a>).
+<p>可以使用 <code class="code">jsonrpc</code> 库构建基于“类 JSONRPC”传输协议的应用。
+这类协议与 JSONRPC 相似但不完全相同，例如 <a class="uref" href="https://www.jsonrpc.org/">DAP（调试适配器协议）</a>。
+这类协议同样定义请求、响应与通知消息，但格式与 JSONRPC 略有差异。
+泛化函数 <code class="code">jsonrpc-convert-to-endpoint</code> 与 <code class="code">jsonrpc-convert-from-endpoint</code>
+可用于定制 JSONRPC 内部表示与端点所接受格式之间的转换（see <a class="pxref" href="Generic-Functions.html">泛型函数</a>）。
 </p>
-</li><li> An API for building JSONRPC transports
+</li><li> 用于构建 JSONRPC 传输层的 API
 
-<p>In this scenario, <code class="code">jsonrpc-connection</code> is sub-classed to implement
-a different underlying transport strategy (for details on how to
-subclass, see <a data-manual="eieio" href="https://www.gnu.org/software/emacs/manual/html_node/eieio/Inheritance.html#Inheritance">Inheritance</a>.).  Users of the
-application-building interface can then instantiate objects of this
-concrete class (using the <code class="code">make-instance</code> function) and connect
-to JSONRPC endpoints using that strategy.  See <a class="ref" href="Process_002dbased-JSONRPC-connections.html">Process-based JSONRPC connections</a> for a built-in transport implementation.
+<p>在这种场景下，<code class="code">jsonrpc-connection</code> 被继承以实现不同的底层传输策略
+（有关子类化的详情，参见 <a data-manual="eieio" href="https://www.gnu.org/software/emacs/manual/html_node/eieio/Inheritance.html#Inheritance">Inheritance</a>）。
+应用构建接口的使用者可实例化该具体类（通过 <code class="code">make-instance</code> 函数），
+并使用该策略连接到 JSONRPC 端点。
+内置的传输层实现可参见 <a class="ref" href="Process_002dbased-JSONRPC-connections.html">基于进程的 JSONRPC 连接</a>。
 </p>
-<p>This API has mandatory and optional parts.
+<p>该 API 包含必选与可选部分。
 </p>
 <a class="index-entry-id" id="index-jsonrpc_002dconnection_002dsend"></a>
-<p>To allow its users to initiate JSONRPC contacts (notifications or
-requests) or reply to endpoint requests, the new transport
-implementation must equip the <code class="code">jsonrpc-connection-send</code> generic
-function with a specialization for the new subclass
-(see <a class="pxref" href="Generic-Functions.html">泛型函数</a>).  This generic function is called
-automatically by primitives such as <code class="code">jsonrpc-request</code> and
-<code class="code">jsonrpc-notify</code>.  The specialization should ensure that the
-message described in the argument list is sent through whatever
-underlying communication mechanism (a.k.a. &ldquo;wire&rdquo;) is used by the
-new transport to talk to endpoints.  This &ldquo;wire&rdquo; may be a network
-socket, a serial interface, an HTTP connection, etc.
+<p>为允许使用者发起 JSONRPC 通信（通知或请求）或回复端点请求，
+新的传输层实现必须为新子类提供 <code class="code">jsonrpc-connection-send</code> 泛化函数的特化版本（see <a class="pxref" href="Generic-Functions.html">泛型函数</a>）。
+该泛化函数会由 <code class="code">jsonrpc-request</code>、<code class="code">jsonrpc-notify</code> 等原语自动调用。
+该特化版本应确保参数列表中描述的消息，通过新传输层用于与端点通信的底层通信机制（即 &ldquo;线路(wire)&rdquo;）发送。
+该 &ldquo;线路(wire)&rdquo; 可以是网络套接字、串行接口、HTTP 连接等。
 </p>
 <a class="index-entry-id" id="index-jsonrpc_002dconnection_002dreceive"></a>
-<p>Likewise, for handling the three types of remote contacts (requests,
-notifications, and responses to local requests), the transport
-implementation must arrange for the function
-<code class="code">jsonrpc-connection-receive</code> to be called from Elisp after
-noticing some data on the &ldquo;wire&rdquo; that can be used to craft a JSONRPC
-(or quasi-JSONRPC) message.
+<p>同样，为处理三类远程通信（请求、通知、对本地请求的响应），
+传输层实现应在 &ldquo;线路(wire)&rdquo; 上检测到可构造 JSONRPC（或类 JSONRPC）消息的数据后，
+从 Elisp 中调用 <code class="code">jsonrpc-connection-receive</code> 函数。
 </p>
 <a class="index-entry-id" id="index-jsonrpc_002dshutdown"></a>
 <a class="index-entry-id" id="index-jsonrpc_002drunning_002dp"></a>
-<p>Finally, and optionally, the <code class="code">jsonrpc-connection</code> subclass should
-add specializations to the <code class="code">jsonrpc-shutdown</code> and
-<code class="code">jsonrpc-running-p</code> generic functions if these concepts apply to
-the transport.  The specialization of <code class="code">jsonrpc-shutdown</code> should
-ensure the release of any system resources (e.g. processes, timers,
-etc.) used to listen for messages on the wire.  The specialization of
-<code class="code">jsonrpc-running-p</code> should tell if these resources are still
-active or have already been released (via <code class="code">jsonrpc-shutdown</code> or
-otherwise).
+<p>最后（可选），如果相关概念适用于该传输层，
+<code class="code">jsonrpc-connection</code> 子类应对 <code class="code">jsonrpc-shutdown</code> 与
+<code class="code">jsonrpc-running-p</code> 泛化函数添加特化实现。
+<code class="code">jsonrpc-shutdown</code> 的特化版本应确保释放用于在线路上监听消息的系统资源
+（例如进程、定时器等）。
+<code class="code">jsonrpc-running-p</code> 的特化版本应判断这些资源是否仍处于活跃状态，
+或已（通过 <code class="code">jsonrpc-shutdown</code> 或其他方式）释放。
 </p>
 </li></ol>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Process_002dbased-JSONRPC-connections.html">Process-based JSONRPC connections</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="JSONRPC.html">JSONRPC communication</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Process_002dbased-JSONRPC-connections.html">基于进程的 JSONRPC 连接</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="JSONRPC.html">JSONRPC 通信</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

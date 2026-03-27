@@ -49,130 +49,72 @@ ul.mark-minus {list-style-type: "\2212"}
 <body>
 <div class="subsection-level-extent" id="Module-Nonlocal">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Misc.html" accesskey="p" rel="prev">Miscellaneous Convenience Functions for Modules</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="u" rel="up">Writing Dynamically-Loaded Modules</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Misc.html" accesskey="p" rel="prev">模块专用的杂项便捷函数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="u" rel="up">编写可动态加载的模块</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Nonlocal-Exits-in-Modules"><span>E.8.5 Nonlocal Exits in Modules<a class="copiable-link" href="#Nonlocal-Exits-in-Modules"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_6a21_5757_4e2d_7684_975e_672c_5730_9000_51fa"><span>E.8.5 模块中的非本地退出<a class="copiable-link" href="#g_t_6a21_5757_4e2d_7684_975e_672c_5730_9000_51fa"> &para;</a></span></h4>
 <a class="index-entry-id" id="index-nonlocal-exits_002c-in-modules"></a>
 
-<p>Emacs Lisp supports nonlocal exits, whereby program control is
-transferred from one point in a program to another remote point.
-See <a class="xref" href="Nonlocal-Exits.html">非局部退出</a>.  Thus, Lisp functions called by your module
-might exit nonlocally by calling <code class="code">signal</code> or <code class="code">throw</code>, and
-your module functions must handle such nonlocal exits properly.  Such
-handling is needed because C programs will not automatically release
-resources and perform other cleanups in these cases; your module code
-must itself do it.  The module <abbr class="acronym">API</abbr> provides facilities for
-that, described in this subsection.  They are generally available
-since Emacs 25; those of them that became available in later releases
-explicitly call out the first Emacs version where they became part of
-the <abbr class="acronym">API</abbr>.
+<p>Emacs Lisp 支持非本地退出，借此可以将程序控制从程序中的某个点转移到另一个遥远的点。See <a class="xref" href="Nonlocal-Exits.html">非局部退出</a>。因此，由你的模块调用的 Lisp 函数可能会通过调用 <code class="code">signal</code> 或 <code class="code">throw</code> 进行非本地退出，你的模块函数必须正确处理此类非本地退出。需要进行此类处理的原因是，C 程序在这些情况下不会自动释放资源并执行其他清理工作；你的模块代码必须亲自完成这些工作。模块 <abbr class="acronym">API</abbr> 提供了相应的工具，如本小节所述。这些工具从 Emacs 25 版本开始普遍可用；后续版本中加入的工具会明确标注其首次成为 <abbr class="acronym">API</abbr> 一部分的 Emacs 版本。
 </p>
-<p>When some Lisp code called by a module function signals an error or
-throws, the nonlocal exit is trapped, and the pending exit and its
-associated data are stored in the environment.  Whenever a nonlocal
-exit is pending in the environment, any module <abbr class="acronym">API</abbr> function
-called with a pointer to that environment will return immediately
-without any processing (the functions <code class="code">non_local_exit_check</code>,
-<code class="code">non_local_exit_get</code>, and <code class="code">non_local_exit_clear</code> are
-exceptions from this rule).  If your module function then does nothing
-and returns to Emacs, a pending nonlocal exit will cause Emacs to act
-on it: signal an error or throw to the corresponding <code class="code">catch</code>.
+<p>当模块函数调用的某些 Lisp 代码触发错误或抛出异常时，非本地退出会被捕获，待处理的退出及其相关数据会存储在环境中。每当环境中存在待处理的非本地退出时，使用该环境指针调用的任何模块 <abbr class="acronym">API</abbr> 函数都会立即返回，不执行任何处理（<code class="code">non_local_exit_check</code>、<code class="code">non_local_exit_get</code> 和 <code class="code">non_local_exit_clear</code> 函数除外）。如果你的模块函数随后不做任何处理并返回给 Emacs，待处理的非本地退出将导致 Emacs 执行相应操作：触发错误或跳转到对应的 <code class="code">catch</code>。
 </p>
-<p>So the simplest &ldquo;handling&rdquo; of nonlocal exits in module functions is
-to do nothing special and let the rest of your code to run as if
-nothing happened.  However, this can cause two classes of problems:
+<p>因此，在模块函数中对非本地退出最简单的 &ldquo;处理(handling)&rdquo; 是不做特殊处理，让其余代码照常运行，仿佛什么都没发生。然而，这可能导致两类问题：
 </p>
 <ul class="itemize mark-minus">
-<li>Your module function might use uninitialized or undefined values,
-since <abbr class="acronym">API</abbr> functions return immediately without producing the
-expected results.
+<li>你的模块函数可能会使用未初始化或未定义的值，因为 <abbr class="acronym">API</abbr> 函数会立即返回，无法产生预期的结果。
 
-</li><li>Your module might leak resources, because it might not have the
-opportunity to release them.
+</li><li>你的模块可能会造成资源泄漏，因为它可能没有机会释放这些资源。
 </li></ul>
 
-<p>Therefore, we recommend that your module functions check for nonlocal
-exit conditions and recover from them, using the functions described
-below.
+<p>因此，我们建议你的模块函数使用下文描述的函数，检查非本地退出条件并从中恢复。
 </p>
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-non_005flocal_005fexit_005fcheck"><span class="category-def">Function: </span><span><code class="def-type">enum emacs_funcall_exit</code> <strong class="def-name">non_local_exit_check</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>)</code><a class="copiable-link" href="#index-non_005flocal_005fexit_005fcheck"> &para;</a></span></dt>
-<dd><p>This function returns the kind of nonlocal exit condition stored in
-<var class="var">env</var>.  The possible values are:
+<dd><p>该函数返回存储在 <var class="var">env</var> 中的非本地退出条件的类型。可能的值包括：
 </p>
 <a class="index-entry-id" id="index-emacs_005ffuncall_005fexit_002c-enumeration"></a>
 <dl class="vtable">
 <dt><a id="index-emacs_005ffuncall_005fexit_005freturn"></a><span><code class="code">emacs_funcall_exit_return</code><a class="copiable-link" href="#index-emacs_005ffuncall_005fexit_005freturn"> &para;</a></span></dt>
-<dd><p>The last <abbr class="acronym">API</abbr> function exited normally.
+<dd><p>最后一个 <abbr class="acronym">API</abbr> 函数正常退出。
 </p></dd>
 <dt><a id="index-emacs_005ffuncall_005fexit_005fsignal"></a><span><code class="code">emacs_funcall_exit_signal</code><a class="copiable-link" href="#index-emacs_005ffuncall_005fexit_005fsignal"> &para;</a></span></dt>
-<dd><p>The last <abbr class="acronym">API</abbr> function signaled an error.
+<dd><p>最后一个 <abbr class="acronym">API</abbr> 函数触发了错误。
 </p></dd>
 <dt><a id="index-emacs_005ffuncall_005fexit_005fthrow"></a><span><code class="code">emacs_funcall_exit_throw</code><a class="copiable-link" href="#index-emacs_005ffuncall_005fexit_005fthrow"> &para;</a></span></dt>
-<dd><p>The last <abbr class="acronym">API</abbr> function exited via <code class="code">throw</code>.
+<dd><p>最后一个 <abbr class="acronym">API</abbr> 函数通过 <code class="code">throw</code> 退出。
 </p></dd>
 </dl>
 </dd></dl>
 
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-non_005flocal_005fexit_005fget"><span class="category-def">Function: </span><span><code class="def-type">enum emacs_funcall_exit</code> <strong class="def-name">non_local_exit_get</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value *<var class="var">symbol</var>, emacs_value *<var class="var">data</var>)</code><a class="copiable-link" href="#index-non_005flocal_005fexit_005fget"> &para;</a></span></dt>
-<dd><p>This function returns the kind of nonlocal exit condition stored in
-<var class="var">env</var>, like <code class="code">non_local_exit_check</code> does, but it also returns
-the full information about the nonlocal exit, if any.  If the return
-value is <code class="code">emacs_funcall_exit_signal</code>, the function stores the
-error symbol in <code class="code">*<var class="var">symbol</var></code> and the error data in
-<code class="code">*<var class="var">data</var></code> (see <a class="pxref" href="Signaling-Errors.html">如何发出错误信号</a>).  If the return value is
-<code class="code">emacs_funcall_exit_throw</code>, the function stores the <code class="code">catch</code>
-tag symbol in <code class="code">*<var class="var">symbol</var></code> and the <code class="code">throw</code> value in
-<code class="code">*<var class="var">data</var></code>.  The function doesn&rsquo;t store anything in memory
-pointed by these arguments when the return value is
-<code class="code">emacs_funcall_exit_return</code>.
+<dd><p>该函数与 <code class="code">non_local_exit_check</code> 类似，返回存储在 <var class="var">env</var> 中的非本地退出条件的类型，但同时会返回关于非本地退出的完整信息（如果存在）。如果返回值为 <code class="code">emacs_funcall_exit_signal</code>，函数会将错误符号存入 <code class="code">*<var class="var">symbol</var></code>，将错误数据存入 <code class="code">*<var class="var">data</var></code>（see <a class="pxref" href="Signaling-Errors.html">如何发出错误信号</a>）。如果返回值为 <code class="code">emacs_funcall_exit_throw</code>，函数会将 <code class="code">catch</code> 标签符号存入 <code class="code">*<var class="var">symbol</var></code>，将 <code class="code">throw</code> 的值存入 <code class="code">*<var class="var">data</var></code>。当返回值为 <code class="code">emacs_funcall_exit_return</code> 时，函数不会向这些参数指向的内存中存入任何内容。
 </p></dd></dl>
 
-<p>You should check nonlocal exit conditions where it matters: before you
-allocated some resource or after you allocated a resource that might
-need freeing, or where a failure means further processing is
-impossible or infeasible.
+<p>你应该在关键位置检查非本地退出条件：在分配某些资源之前，或在分配可能需要释放的资源之后，或在故障意味着无法或不可行继续处理的位置。
 </p>
-<p>Once your module function detected that a nonlocal exit is pending, it
-can either return to Emacs (after performing the necessary local
-cleanup), or it can attempt to recover from the nonlocal exit.  The
-following <abbr class="acronym">API</abbr> functions will help with these tasks.
+<p>一旦你的模块函数检测到有待处理的非本地退出，它可以选择返回 Emacs（执行必要的本地清理后），或尝试从非本地退出中恢复。以下 <abbr class="acronym">API</abbr> 函数将有助于完成这些任务。
 </p>
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-non_005flocal_005fexit_005fclear"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">non_local_exit_clear</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>)</code><a class="copiable-link" href="#index-non_005flocal_005fexit_005fclear"> &para;</a></span></dt>
-<dd><p>This function clears the pending nonlocal exit conditions and data
-from <var class="var">env</var>.  After calling it, the module <abbr class="acronym">API</abbr> functions
-will work normally.  Use this function if your module function can
-recover from nonlocal exits of the Lisp functions it calls and
-continue, and also before calling any of the following two functions
-(or any other <abbr class="acronym">API</abbr> functions, if you want them to perform
-their intended processing when a nonlocal exit is pending).
+<dd><p>该函数清除 <var class="var">env</var> 中待处理的非本地退出条件和数据。调用后，模块 <abbr class="acronym">API</abbr> 函数将恢复正常工作。如果你的模块函数能够从其调用的 Lisp 函数的非本地退出中恢复并继续运行，请使用此函数；此外，在调用以下两个函数（或任何其他 <abbr class="acronym">API</abbr> 函数，如果希望它们在有待处理的非本地退出时执行预期的处理）之前，也应调用此函数。
 </p></dd></dl>
 
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-non_005flocal_005fexit_005fthrow"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">non_local_exit_throw</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">tag</var>, emacs_value <var class="var">value</var>)</code><a class="copiable-link" href="#index-non_005flocal_005fexit_005fthrow"> &para;</a></span></dt>
-<dd><p>This function throws to the Lisp <code class="code">catch</code> symbol represented by
-<var class="var">tag</var>, passing it <var class="var">value</var> as the value to return.  Your module
-function should in general return soon after calling this function.
-One use of this function is when you want to re-throw a non-local exit
-from one of the called <abbr class="acronym">API</abbr> or Lisp functions.
+<dd><p>该函数跳转到由 <var class="var">tag</var> 表示的 Lisp <code class="code">catch</code> 符号，并将 <var class="var">value</var> 作为返回值传递给它。你的模块函数通常应在调用此函数后尽快返回。此函数的一个用途是重新抛出从被调用的 <abbr class="acronym">API</abbr> 或 Lisp 函数之一产生的非本地退出。
 </p></dd></dl>
 
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-non_005flocal_005fexit_005fsignal"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">non_local_exit_signal</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">symbol</var>, emacs_value <var class="var">data</var>)</code><a class="copiable-link" href="#index-non_005flocal_005fexit_005fsignal"> &para;</a></span></dt>
-<dd><p>This function signals the error represented by the error symbol
-<var class="var">symbol</var> with the specified error data <var class="var">data</var>.  The module
-function should return soon after calling this function.  This
-function could be useful, e.g., for signaling errors from module
-functions to Emacs.
+<dd><p>该函数使用指定的错误数据 <var class="var">data</var>，触发由错误符号 <var class="var">symbol</var> 表示的错误。模块函数通常应在调用此函数后尽快返回。此函数可能很有用，例如，用于从模块函数向 Emacs 触发错误。
 </p></dd></dl>
 
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Misc.html">Miscellaneous Convenience Functions for Modules</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">Writing Dynamically-Loaded Modules</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Misc.html">模块专用的杂项便捷函数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">编写可动态加载的模块</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

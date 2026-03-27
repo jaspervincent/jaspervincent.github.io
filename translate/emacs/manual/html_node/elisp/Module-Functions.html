@@ -50,104 +50,48 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="subsection-level-extent" id="Module-Functions">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Module-Values.html" accesskey="n" rel="next">Conversion Between Lisp and Module Values</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Initialization.html" accesskey="p" rel="prev">Module Initialization Code</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="u" rel="up">Writing Dynamically-Loaded Modules</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Module-Values.html" accesskey="n" rel="next">Lisp 与模块值之间的转换</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Initialization.html" accesskey="p" rel="prev">模块初始化代码</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="u" rel="up">编写可动态加载的模块</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h4 class="subsection" id="Writing-Module-Functions"><span>E.8.2 Writing Module Functions<a class="copiable-link" href="#Writing-Module-Functions"> &para;</a></span></h4>
+<h4 class="subsection" id="g_t_7f16_5199_6a21_5757_51fd_6570"><span>E.8.2 编写模块函数<a class="copiable-link" href="#g_t_7f16_5199_6a21_5757_51fd_6570"> &para;</a></span></h4>
 <a class="index-entry-id" id="index-writing-module-functions"></a>
 <a class="index-entry-id" id="index-module-functions"></a>
 
-<p>The main reason for writing an Emacs module is to make additional
-functions available to Lisp programs that load the module.  This
-subsection describes how to write such <em class="dfn">module functions</em>.
+<p>编写 Emacs 模块的主要目的，是为加载该模块的 Lisp 程序提供额外的函数。本小节介绍如何编写此类 <em class="dfn">模块函数(module functions)</em>。
 </p>
-<p>A module function has the following general form and signature:
+<p>模块函数具有以下通用形式与签名：
 </p>
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-emacs_005ffunction"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">emacs_function</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, ptrdiff_t <var class="var">nargs</var>, emacs_value *<var class="var">args</var>, void *<var class="var">data</var>)</code><a class="copiable-link" href="#index-emacs_005ffunction"> &para;</a></span></dt>
 <dd><a class="index-entry-id" id="index-emacs_005ffunction-1"></a>
-<p>The <var class="var">env</var> argument provides a pointer to the <abbr class="acronym">API</abbr>
-environment, needed to access Emacs objects and functions.  The
-<var class="var">nargs</var> argument is the required number of arguments, which can be
-zero (see <code class="code">make_function</code> below for more flexible specification
-of the argument number), and <var class="var">args</var> is a pointer to the array of
-the function arguments.  The argument <var class="var">data</var> points to additional
-data required by the function, which was arranged when
-<code class="code">make_function</code> (see below) was called to create an Emacs
-function from <code class="code">emacs_function</code>.
+<p>参数 <var class="var">env</var> 提供指向 <abbr class="acronym">API</abbr> 环境的指针，用于访问 Emacs 对象与函数。参数 <var class="var">nargs</var> 是所需的参数个数，可以为 0（更灵活的参数个数指定方式参见下方 <code class="code">make_function</code>），<var class="var">args</var> 是指向函数参数数组的指针。参数 <var class="var">data</var> 指向函数所需的额外数据，该数据在通过 <code class="code">make_function</code>（见下文）从 <code class="code">emacs_function</code> 创建 Emacs 函数时指定。
 </p>
-<p>Module functions use the type <code class="code">emacs_value</code> to communicate Lisp
-objects between Emacs and the module (see <a class="pxref" href="Module-Values.html">Conversion Between Lisp and Module Values</a>).  The
-<abbr class="acronym">API</abbr>, described below and in the following subsections,
-provides facilities for conversion between basic C data types and the
-corresponding <code class="code">emacs_value</code> objects.
+<p>模块函数使用 <code class="code">emacs_value</code> 类型在 Emacs 与模块之间传递 Lisp 对象（see <a class="pxref" href="Module-Values.html">Lisp 与模块值之间的转换</a>）。下文及后续子小节介绍的 <abbr class="acronym">API</abbr> 提供了在基础 C 数据类型与对应 <code class="code">emacs_value</code> 对象之间转换的工具。
 </p>
-<p>In the module function&rsquo;s body, do <em class="emph">not</em> attempt to access
-elements of the <var class="var">args</var> array beyond the index
-<code class="code"><var class="var">nargs</var>-1</code>: memory for the <var class="var">args</var> array is allocated
-exactly to accommodate <var class="var">nargs</var> values, and accessing beyond that
-will most probably crash your module.  In particular, if the value of
-<var class="var">nargs</var> passed to the function at run time is zero, it must not
-access <var class="var">args</var> at all, as no memory will have been allocated for it
-in that case.
+<p>在模块函数体内，<em class="emph">切勿</em>尝试访问 <var class="var">args</var> 数组中索引超出 <code class="code"><var class="var">nargs</var>-1</code> 的元素：<var class="var">args</var> 数组的内存恰好分配为容纳 <var class="var">nargs</var> 个值，越界访问极有可能导致模块崩溃。特别地，如果运行时传递给函数的 <var class="var">nargs</var> 值为 0，则绝不能访问 <var class="var">args</var>，因为此时不会为其分配内存。
 </p>
-<p>A module function always returns a value.  If the function returns
-normally, the Lisp code which called it will see the Lisp object
-corresponding to the <code class="code">emacs_value</code> value the function returned.
-However, if the user typed <kbd class="kbd">C-g</kbd>, or if the module function or its
-callees signaled an error or exited nonlocally (see <a class="pxref" href="Module-Nonlocal.html">Nonlocal Exits in Modules</a>), Emacs will ignore the returned value and quit or throw as
-it does when Lisp code encounters the same situations.
+<p>模块函数总会返回一个值。如果函数正常返回，调用它的 Lisp 代码将看到与函数返回的 <code class="code">emacs_value</code> 对应的 Lisp 对象。但如果用户按下 <kbd class="kbd">C-g</kbd>，或模块函数及其被调用函数抛出错误或发生非局部退出（see <a class="pxref" href="Module-Nonlocal.html">模块中的非本地退出</a>），Emacs 会忽略返回值，并按照 Lisp 代码遇到相同情况时的行为执行退出或跳转。
 </p>
-<p>The header <samp class="file">emacs-module.h</samp> provides the type
-<code class="code">emacs_function</code> as an alias type for a function pointer to a
-module function.
+<p>头文件 <samp class="file">emacs-module.h</samp> 提供 <code class="code">emacs_function</code> 类型，作为指向模块函数的函数指针别名。
 </p></dd></dl>
 
-<p>After writing your C code for a module function, you should make a
-Lisp function object from it using the <code class="code">make_function</code> function,
-whose pointer is provided in the environment (recall that the pointer
-to the environment is returned by <code class="code">get_environment</code>).  This is
-normally done in the module initialization function (see <a class="pxref" href="Module-Initialization.html#module-initialization-function">module initialization function</a>), after verifying the <abbr class="acronym">API</abbr>
-compatibility.
+<p>为模块函数编写好 C 代码后，应使用环境中提供的 <code class="code">make_function</code> 函数指针（环境指针由 <code class="code">get_environment</code> 返回）将其创建为 Lisp 函数对象。这一操作通常在模块初始化函数中完成（see <a class="pxref" href="Module-Initialization.html#module-initialization-function">module initialization function</a>），且需在校验 <abbr class="acronym">API</abbr> 兼容性之后进行。
 </p>
 <dl class="first-deftypefn def-block">
 <dt class="deftypefn def-line" id="index-make_005ffunction"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_function</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, ptrdiff_t <var class="var">min_arity</var>, ptrdiff_t <var class="var">max_arity</var>, emacs_function <var class="var">func</var>, const char *<var class="var">docstring</var>, void *<var class="var">data</var>)</code><a class="copiable-link" href="#index-make_005ffunction"> &para;</a></span></dt>
 <dd><a class="index-entry-id" id="index-emacs_005fvariadic_005ffunction"></a>
-<p>This returns an Emacs function created from the C function <var class="var">func</var>,
-whose signature is as described for <code class="code">emacs_function</code> above.
-The arguments
-<var class="var">min_arity</var> and <var class="var">max_arity</var> specify the minimum and maximum
-number of arguments that <var class="var">func</var> can accept.  The <var class="var">max_arity</var>
-argument can have the special value <code class="code">emacs_variadic_function</code>,
-which makes the function accept an unlimited number of arguments, like
-the <code class="code">&amp;rest</code> keyword in Lisp (see <a class="pxref" href="Argument-List.html">参数列表的特性</a>).
+<p>该函数从 C 函数 <var class="var">func</var> 创建并返回一个 Emacs 函数，其签名与 <code class="code">emacs_function</code> 所述一致。
+参数 <var class="var">min_arity</var> 与 <var class="var">max_arity</var> 指定 <var class="var">func</var> 可接受的参数最小与最大个数。<var class="var">max_arity</var> 可以使用特殊值 <code class="code">emacs_variadic_function</code>，使函数接受任意数量的参数，类似于 Lisp 中的 <code class="code">&amp;rest</code> 关键字（see <a class="pxref" href="Argument-List.html">参数列表的特性</a>）。
 </p>
-<p>The argument <var class="var">data</var> is a way to arrange for arbitrary additional
-data to be passed to <var class="var">func</var> when it is called.  Whatever pointer
-is passed to <code class="code">make_function</code> will be passed unaltered to
-<var class="var">func</var>.
+<p>参数 <var class="var">data</var> 用于在 <var class="var">func</var> 被调用时传递任意额外数据。传递给 <code class="code">make_function</code> 的指针会原封不动地传递给 <var class="var">func</var>。
 </p>
-<p>The argument <var class="var">docstring</var> specifies the documentation string for
-the function.  It should be either an <abbr class="acronym">ASCII</abbr> string, or a
-UTF-8 encoded non-<abbr class="acronym">ASCII</abbr> string, or a <code class="code">NULL</code> pointer; in
-the latter case the function will have no documentation.  The
-documentation string can end with a line that specifies the advertised
-calling convention, see <a class="ref" href="Function-Documentation.html">函数的文档字符串</a>.
+<p>参数 <var class="var">docstring</var> 指定函数的文档字符串。它可以是 <abbr class="acronym">ASCII</abbr> 字符串、UTF-8 编码的非 <abbr class="acronym">ASCII</abbr> 字符串，或 <code class="code">NULL</code> 指针；在后一种情况下函数将没有文档。文档字符串末尾可以使用一行说明函数的调用约定，参见 <a class="ref" href="Function-Documentation.html">函数的文档字符串</a>。
 </p>
-<p>Since every module function must accept the pointer to the environment
-as its first argument, the call to <code class="code">make_function</code> could be made
-from any module function, but you will normally want to do that from
-the module initialization function, so that all the module functions
-are known to Emacs once the module is loaded.
+<p>由于所有模块函数都必须将环境指针作为第一个参数，<code class="code">make_function</code> 调用可以在任意模块函数中执行，但通常建议在模块初始化函数中完成，以便模块加载后所有函数即可被 Emacs 识别。
 </p></dd></dl>
 
-<p>Finally, you should bind the Lisp function to a symbol, so that Lisp
-code could call your function by name.  For that, use the module
-<abbr class="acronym">API</abbr> function <code class="code">intern</code> (see <a class="pxref" href="Module-Misc.html#intern">intern</a>) whose pointer is
-also provided in the environment that module functions can access.
+<p>最后，你需要将 Lisp 函数绑定到一个符号，使 Lisp 代码可以按名称调用你的函数。为此可使用模块 <abbr class="acronym">API</abbr> 中的 <code class="code">intern</code> 函数（see <a class="pxref" href="Module-Misc.html#intern">intern</a>），其指针同样存在于模块函数可访问的环境中。
 </p>
-<p>Combining the above steps, code that arranges for a C function
-<code class="code">module_func</code> to be callable as <code class="code">module-func</code> from Lisp will
-look like this, as part of the module initialization function:
+<p>结合以上步骤，在模块初始化函数中实现让 C 函数 <code class="code">module_func</code> 可从 Lisp 以 <code class="code">module-func</code> 调用的代码如下：
 </p>
 <div class="example">
 <pre class="example-preformatted"> emacs_env *env = runtime-&gt;get_environment (runtime);
@@ -158,37 +102,11 @@ look like this, as part of the module initialization function:
  env-&gt;funcall (env, env-&gt;intern (env, &quot;defalias&quot;), 2, args);
 </pre></div>
 
-<p>This makes the symbol <code class="code">module-func</code> known to Emacs by calling
-<code class="code">env-&gt;intern</code>, then invokes <code class="code">defalias</code> from Emacs to bind
-the function to that symbol.  Note that it is possible to use
-<code class="code">fset</code> instead of <code class="code">defalias</code>; the differences are described
-in <a class="ref" href="Defining-Functions.html">defalias</a>.
+<p>代码通过调用 <code class="code">env-&gt;intern</code> 让 Emacs 识别符号 <code class="code">module-func</code>，再调用 Emacs 的 <code class="code">defalias</code> 将函数绑定到该符号。注意也可以使用 <code class="code">fset</code> 代替 <code class="code">defalias</code>，二者区别参见 <a class="ref" href="Defining-Functions.html">defalias</a>。
 </p>
-<p>Module functions including the <code class="code">emacs_module_init</code> function
-(see <a class="pxref" href="Module-Initialization.html#module-initialization-function">module initialization function</a>) may only interact with Emacs
-by calling environment functions from some live <code class="code">emacs_env</code>
-pointer while being called directly or indirectly from Emacs.  In
-other words, if a module function wants to call Lisp functions or
-Emacs primitives, convert <code class="code">emacs_value</code> objects to and from C
-datatypes (see <a class="pxref" href="Module-Values.html">Conversion Between Lisp and Module Values</a>), or interact with Emacs in any other
-way, some call from Emacs to <code class="code">emacs_module_init</code> or to a module
-function must be in the call stack.  Module functions may not interact
-with Emacs while garbage collection is running; see <a class="pxref" href="Garbage-Collection.html">Garbage Collection</a>.  They may only interact with Emacs from Lisp interpreter
-threads (including the main thread) created by Emacs; see <a class="pxref" href="Threads.html">线程</a>.
-The <kbd class="kbd">--module-assertions</kbd> command-line option can detect some
-violations of the above requirements.  See <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Initial-Options.html#Initial-Options">Initial Options</a> in <cite class="cite">The GNU Emacs Manual</cite>.
+<p>包括 <code class="code">emacs_module_init</code> 函数在内的模块函数（see <a class="pxref" href="Module-Initialization.html#module-initialization-function">module initialization function</a>），仅可在被 Emacs 直接或间接调用期间，通过有效的 <code class="code">emacs_env</code> 指针调用环境函数与 Emacs 交互。换言之，如果模块函数想要调用 Lisp 函数或 Emacs 原语、在 <code class="code">emacs_value</code> 对象与 C 数据类型之间转换（see <a class="pxref" href="Module-Values.html">Lisp 与模块值之间的转换</a>），或以其他方式与 Emacs 交互，调用栈中必须存在从 Emacs 到 <code class="code">emacs_module_init</code> 或某个模块函数的调用。模块函数不得在垃圾回收运行时与 Emacs 交互；see <a class="pxref" href="Garbage-Collection.html">垃圾回收</a>。它们仅可在 Emacs 创建的 Lisp 解释器线程（包括主线程）中与 Emacs 交互；see <a class="pxref" href="Threads.html">线程</a>。命令行选项 <kbd class="kbd">--module-assertions</kbd> 可检测部分上述规则的违反情况。See <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Initial-Options.html#Initial-Options">Initial Options</a> in <cite class="cite">The GNU Emacs Manual</cite>。
 </p>
-<p>Using the module <abbr class="acronym">API</abbr>, it is possible to define more complex
-function and data types: inline functions, macros, etc.  However, the
-resulting C code will be cumbersome and hard to read.  Therefore, we
-recommend that you limit the module code which creates functions and
-data structures to the absolute minimum, and leave the rest for a Lisp
-package that will accompany your module, because doing these
-additional tasks in Lisp is much easier, and will produce a much more
-readable code.  For example, given a module function
-<code class="code">module-func</code> defined as above, one way of making a macro
-<code class="code">module-macro</code> based on it is with the following simple Lisp
-wrapper:
+<p>使用模块 <abbr class="acronym">API</abbr> 可以定义更复杂的函数与数据类型：内联函数、宏等。但生成的 C 代码会变得冗长且难以阅读。因此我们建议，将创建函数与数据结构的模块代码控制在绝对最少的程度，其余工作交由随模块一同发布的 Lisp 包完成，因为在 Lisp 中完成这些额外任务要简单得多，且代码可读性更高。例如，在上述定义好 <code class="code">module-func</code> 模块函数后，可以通过如下简单的 Lisp 包装基于它创建宏 <code class="code">module-macro</code>：
 </p>
 <div class="example lisp">
 <pre class="lisp-preformatted">(defmacro module-macro (&amp;rest args)
@@ -196,84 +114,46 @@ wrapper:
   (module-func args))
 </pre></div>
 
-<p>The Lisp package which goes with your module could then load the
-module using the <code class="code">load</code> primitive (see <a class="pxref" href="Dynamic-Modules.html">Emacs 动态模块</a>) when
-the package is loaded into Emacs.
+<p>与模块配套的 Lisp 包可在自身加载到 Emacs 时，通过 <code class="code">load</code> 原语加载该模块（see <a class="pxref" href="Dynamic-Modules.html">Emacs 动态模块</a>）。
 </p>
-<p>By default, module functions created by <code class="code">make_function</code> are not
-interactive.  To make them interactive, you can use the following
-function.
+<p>默认情况下，由 <code class="code">make_function</code> 创建的模块函数是非交互式的。若要使其支持交互，可使用以下函数。
 </p>
 <dl class="first-deftypefn first-deftypefun-alias-first-deftypefn def-block">
 <dt class="deftypefn deftypefun-alias-deftypefn def-line" id="index-make_005finteractive"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">make_interactive</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">function</var>, emacs_value <var class="var">spec</var>)</code><a class="copiable-link" href="#index-make_005finteractive"> &para;</a></span></dt>
-<dd><p>This function, which is available since Emacs 28, makes the function
-<var class="var">function</var> interactive using the interactive specification
-<var class="var">spec</var>.  Emacs interprets <var class="var">spec</var> like the argument to the
-<code class="code">interactive</code> form.  <a class="ref" href="Using-Interactive.html">使用 <code class="code">interactive</code></a>, and
-see <a class="pxref" href="Interactive-Codes.html"><code class="code">interactive</code> 的代码字符</a>.  <var class="var">function</var> must be an Emacs module
-function returned by <code class="code">make_function</code>.
+<dd><p>该函数从 Emacs 28 开始可用，它使用交互规范 <var class="var">spec</var> 将 <var class="var">function</var> 设置为交互式函数。Emacs 对 <var class="var">spec</var> 的解析与 <code class="code">interactive</code> 形式的参数一致。<a class="ref" href="Using-Interactive.html">使用 <code class="code">interactive</code></a>，以及 see <a class="pxref" href="Interactive-Codes.html"><code class="code">interactive</code> 的代码字符</a>。<var class="var">function</var> 必须是由 <code class="code">make_function</code> 返回的 Emacs 模块函数。
 </p></dd></dl>
 
-<p>Note that there is no native module support for retrieving the
-interactive specification of a module function.  Use the function
-<code class="code">interactive-form</code> for that.  <a class="ref" href="Using-Interactive.html">使用 <code class="code">interactive</code></a>.  It is not
-possible to make a module function non-interactive once you have made
-it interactive using <code class="code">make_interactive</code>.
+<p>注意，模块原生不支持获取模块函数的交互规范。可使用函数 <code class="code">interactive-form</code> 完成该操作。<a class="ref" href="Using-Interactive.html">使用 <code class="code">interactive</code></a>。一旦使用 <code class="code">make_interactive</code> 将模块函数设为交互式，便无法再将其改回非交互式。
 </p>
-<a class="anchor" id="Module-Function-Finalizers"></a><p>If you want to run some code when a module function object (i.e., an
-object returned by <code class="code">make_function</code>) is garbage-collected, you can
-install a <em class="dfn">function finalizer</em>.  Function finalizers are available
-since Emacs 28.  For example, if you have passed some heap-allocated
-structure to the <var class="var">data</var> argument of <code class="code">make_function</code>, you can
-use the finalizer to deallocate the structure.  See <a data-manual="libc" href="https://www.gnu.org/software/libc/manual/html_node/Basic-Allocation.html#Basic-Allocation">(libc)Basic
-Allocation</a>, and see <a data-manual="libc" href="https://www.gnu.org/software/libc/manual/html_node/Freeing-after-Malloc.html#Freeing-after-Malloc">(libc)Freeing after Malloc</a>.  The
-finalizer function has the following signature:
+<a class="anchor" id="Module-Function-Finalizers"></a><p>如果你希望在模块函数对象（即 <code class="code">make_function</code> 返回的对象）被垃圾回收时执行某些代码，可以安装一个 <em class="dfn">函数终结器(function finalizer)</em>。函数终结器从 Emacs 28 开始可用。例如，如果你将某个堆分配的结构传递给了 <code class="code">make_function</code> 的 <var class="var">data</var> 参数，可以使用终结器释放该结构。See <a data-manual="libc" href="https://www.gnu.org/software/libc/manual/html_node/Basic-Allocation.html#Basic-Allocation">(libc)Basic Allocation</a>，以及 see <a data-manual="libc" href="https://www.gnu.org/software/libc/manual/html_node/Freeing-after-Malloc.html#Freeing-after-Malloc">(libc)Freeing after Malloc</a>。终结器函数具有如下签名：
 </p>
 <div class="example">
 <pre class="example-preformatted">void finalizer (void *<var class="var">data</var>)
 </pre></div>
 
-<p>Here, <var class="var">data</var> receives the value passed to <var class="var">data</var> when calling
-<code class="code">make_function</code>.  Note that the finalizer can&rsquo;t interact with
-Emacs in any way.
+<p>此处 <var class="var">data</var> 接收调用 <code class="code">make_function</code> 时传递给 <var class="var">data</var> 的值。注意终结器不能以任何方式与 Emacs 交互。
 </p>
-<p>Directly after calling <code class="code">make_function</code>, the newly-created
-function doesn&rsquo;t have a finalizer.  Use <code class="code">set_function_finalizer</code>
-to add one, if desired.
+<p>刚调用 <code class="code">make_function</code> 创建的新函数没有终结器。如有需要，可使用 <code class="code">set_function_finalizer</code> 进行设置。
 </p>
 <dl class="first-deftypefn first-deftypefun-alias-first-deftypefn def-block">
 <dt class="deftypefn deftypefun-alias-deftypefn def-line" id="index-emacs_005ffinalizer"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">emacs_finalizer</strong> <code class="def-code-arguments">(void *<var class="var">ptr</var>)</code><a class="copiable-link" href="#index-emacs_005ffinalizer"> &para;</a></span></dt>
-<dd><p>The header <samp class="file">emacs-module.h</samp> provides the type
-<code class="code">emacs_finalizer</code> as a type alias for an Emacs finalizer
-function.
+<dd><p>头文件 <samp class="file">emacs-module.h</samp> 提供 <code class="code">emacs_finalizer</code> 类型，作为 Emacs 终结器函数的类型别名。
 </p></dd></dl>
 
 <dl class="first-deftypefn first-deftypefun-alias-first-deftypefn def-block">
 <dt class="deftypefn deftypefun-alias-deftypefn def-line" id="index-get_005ffunction_005ffinalizer"><span class="category-def">Function: </span><span><code class="def-type">emacs_finalizer</code> <strong class="def-name">get_function_finalizer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>)</code><a class="copiable-link" href="#index-get_005ffunction_005ffinalizer"> &para;</a></span></dt>
-<dd><p>This function, which is available since Emacs 28, returns the function
-finalizer associated with the module function represented by
-<var class="var">arg</var>.  <var class="var">arg</var> must refer to a module function, that is, an
-object returned by <code class="code">make_function</code>.  If no finalizer is
-associated with the function, <code class="code">NULL</code> is returned.
+<dd><p>该函数从 Emacs 28 开始可用，返回与 <var class="var">arg</var> 所代表的模块函数关联的函数终结器。<var class="var">arg</var> 必须指向一个模块函数，即由 <code class="code">make_function</code> 返回的对象。如果该函数未关联终结器，则返回 <code class="code">NULL</code>。
 </p></dd></dl>
 
 <dl class="first-deftypefn first-deftypefun-alias-first-deftypefn def-block">
 <dt class="deftypefn deftypefun-alias-deftypefn def-line" id="index-set_005ffunction_005ffinalizer"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">set_function_finalizer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>, emacs_finalizer <var class="var">fin</var>)</code><a class="copiable-link" href="#index-set_005ffunction_005ffinalizer"> &para;</a></span></dt>
-<dd><p>This function, which is available since Emacs 28, sets the function
-finalizer associated with the module function represented by <var class="var">arg</var>
-to <var class="var">fin</var>.  <var class="var">arg</var> must refer to a module function, that is, an
-object returned by <code class="code">make_function</code>.  <var class="var">fin</var> can either be
-<code class="code">NULL</code> to clear <var class="var">arg</var>&rsquo;s function finalizer, or a pointer to a
-function to be called when the object represented by <var class="var">arg</var> is
-garbage-collected.  At most one function finalizer can be set per
-function; if <var class="var">arg</var> already has a finalizer, it is replaced by
-<var class="var">fin</var>.
+<dd><p>该函数从 Emacs 28 开始可用，将与 <var class="var">arg</var> 所代表的模块函数关联的函数终结器设置为 <var class="var">fin</var>。<var class="var">arg</var> 必须指向一个模块函数，即由 <code class="code">make_function</code> 返回的对象。<var class="var">fin</var> 可以是 <code class="code">NULL</code> 以清除 <var class="var">arg</var> 的函数终结器，也可以是指向一个函数的指针，该函数会在 <var class="var">arg</var> 代表的对象被垃圾回收时调用。每个函数最多只能设置一个终结器；如果 <var class="var">arg</var> 已有终结器，将会被 <var class="var">fin</var> 替换。
 </p></dd></dl>
 
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Module-Values.html">Conversion Between Lisp and Module Values</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Initialization.html">Module Initialization Code</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">Writing Dynamically-Loaded Modules</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Module-Values.html">Lisp 与模块值之间的转换</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Initialization.html">模块初始化代码</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">编写可动态加载的模块</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

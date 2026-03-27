@@ -48,20 +48,15 @@ span:hover a.copiable-link {visibility: visible}
 <body>
 <div class="section-level-extent" id="Writing-Emacs-Primitives">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="n" rel="next">Writing Dynamically-Loaded Modules</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="C-Dialect.html" accesskey="p" rel="prev">C Dialect</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html" accesskey="u" rel="up">GNU Emacs Internals</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="n" rel="next">编写可动态加载的模块</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="C-Dialect.html" accesskey="p" rel="prev">C 语言方言</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html" accesskey="u" rel="up">GNU Emacs 内部结构</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Writing-Emacs-Primitives-1"><span>E.7 Writing Emacs Primitives<a class="copiable-link" href="#Writing-Emacs-Primitives-1"> &para;</a></span></h3>
+<h3 class="section" id="g_t_7f16_5199-Emacs-_539f_8bed"><span>E.7 编写 Emacs 原语<a class="copiable-link" href="#g_t_7f16_5199-Emacs-_539f_8bed"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-primitive-function-internals"></a>
 <a class="index-entry-id" id="index-writing-Emacs-primitives"></a>
 
-<p>Lisp primitives are Lisp functions implemented in C.  The details of
-interfacing the C function so that Lisp can call it are handled by a few
-C macros.  The only way to really understand how to write new C code is
-to read the source, but we can explain some things here.
+<p>Lisp 原语是用 C 实现的 Lisp 函数。通过少量 C 宏即可完成 C 函数与 Lisp 的调用接口对接。真正理解如何编写新 C 代码的唯一方法是阅读源码，但我们可以在此说明一些要点。
 </p>
-<p>An example of a special form is the definition of <code class="code">or</code>, from
-<samp class="file">eval.c</samp>.  (An ordinary function would have the same general
-appearance.)
+<p>特殊形式的一个示例是 <samp class="file">eval.c</samp> 中 <code class="code">or</code> 的定义。（普通函数的整体格式与此相同。）
 </p>
 <div class="example smallexample">
 <div class="group"><pre class="example-preformatted">DEFUN (&quot;or&quot;, For, Sor, 0, UNEVALLED, 0,
@@ -90,8 +85,7 @@ If all args return nil, return nil.
 </pre></div></div>
 
 <a class="index-entry-id" id="index-DEFUN_002c-C-macro-to-define-Lisp-primitives"></a>
-<p>Let&rsquo;s start with a precise explanation of the arguments to the
-<code class="code">DEFUN</code> macro.  Here is a template for them:
+<p>我们从精确解释 <code class="code">DEFUN</code> 宏的参数开始。以下是参数模板：
 </p>
 <div class="example">
 <pre class="example-preformatted">DEFUN (<var class="var">lname</var>, <var class="var">fname</var>, <var class="var">sname</var>, <var class="var">min</var>, <var class="var">max</var>, <var class="var">interactive</var>, <var class="var">doc</var>)
@@ -99,51 +93,28 @@ If all args return nil, return nil.
 
 <dl class="table">
 <dt><var class="var">lname</var></dt>
-<dd><p>This is the name of the Lisp symbol to define as the function name; in
-the example above, it is <code class="code">or</code>.
+<dd><p>要定义为函数名的 Lisp 符号名；在上述示例中，该值为 <code class="code">or</code>。
 </p>
 </dd>
 <dt><var class="var">fname</var></dt>
-<dd><p>This is the C function name for this function.  This is the name that
-is used in C code for calling the function.  The name is, by
-convention, &lsquo;<samp class="samp">F</samp>&rsquo; prepended to the Lisp name, with all dashes
-(&lsquo;<samp class="samp">-</samp>&rsquo;) in the Lisp name changed to underscores.  Thus, to call
-this function from C code, call <code class="code">For</code>.
+<dd><p>该函数对应的 C 函数名。这是 C 代码中调用该函数使用的名称。按照惯例，名称以 &lsquo;<samp class="samp">F</samp>&rsquo; 开头，Lisp 名称中的所有连字符（&lsquo;<samp class="samp">-</samp>&rsquo;）替换为下划线。因此，从 C 代码调用该函数时，使用 <code class="code">For</code>。
 </p>
 </dd>
 <dt><var class="var">sname</var></dt>
-<dd><p>This is a C variable name to use for a structure that holds the data for
-the subr object that represents the function in Lisp.  This structure
-conveys the Lisp symbol name to the initialization routine that will
-create the symbol and store the subr object as its definition.  By
-convention, this name is always <var class="var">fname</var> with &lsquo;<samp class="samp">F</samp>&rsquo; replaced with
-&lsquo;<samp class="samp">S</samp>&rsquo;.
+<dd><p>用于存储子例程对象数据的 C 变量名，该对象在 Lisp 中表示当前函数。该结构将 Lisp 符号名传递给初始化例程，由其创建符号并将子例程对象存储为符号的定义。按照惯例，该名称始终是将 <var class="var">fname</var> 中的 &lsquo;<samp class="samp">F</samp>&rsquo; 替换为 &lsquo;<samp class="samp">S</samp>&rsquo;。
 </p>
 </dd>
 <dt><var class="var">min</var></dt>
-<dd><p>This is the minimum number of arguments that the function requires.  The
-function <code class="code">or</code> allows a minimum of zero arguments.
+<dd><p>函数必需的最小参数数量。函数 <code class="code">or</code> 的最小参数数量为 0。
 </p>
 </dd>
 <dt><var class="var">max</var></dt>
-<dd><p>This is the maximum number of arguments that the function accepts, if
-there is a fixed maximum.  Alternatively, it can be <code class="code">UNEVALLED</code>,
-indicating a special form that receives unevaluated arguments, or
-<code class="code">MANY</code>, indicating an unlimited number of evaluated arguments (the
-equivalent of <code class="code">&amp;rest</code>).  Both <code class="code">UNEVALLED</code> and <code class="code">MANY</code> are
-macros.  If <var class="var">max</var> is a number, it must be more than <var class="var">min</var> but
-less than 8.
+<dd><p>函数接受的最大参数数量（若存在固定最大值）。或者，该值可以是 <code class="code">UNEVALLED</code>，表示接收未求值参数的特殊形式；或 <code class="code">MANY</code>，表示接受任意数量的已求值参数（等价于 <code class="code">&amp;rest</code>）。<code class="code">UNEVALLED</code> 和 <code class="code">MANY</code> 均为宏。若 <var class="var">max</var> 为数值，则必须大于 <var class="var">min</var> 且小于 8。
 </p>
 </dd>
-<dt><a id="index-interactive-specification-in-primitives"></a><span><var class="var">interactive</var><a class="copiable-link" href="#index-interactive-specification-in-primitives"> &para;</a></span></dt>
-<dd><p>This is an interactive specification, a string such as might be used
-as the argument of <code class="code">interactive</code> in a Lisp function
-(see <a class="pxref" href="Using-Interactive.html">使用 <code class="code">interactive</code></a>).  In the case
-of <code class="code">or</code>, it is <code class="code">0</code> (a null pointer), indicating that <code class="code">or</code>
-cannot be called interactively.  A value of <code class="code">&quot;&quot;</code> indicates a
-function that should receive no arguments when called interactively.
-If the value begins with a &lsquo;<samp class="samp">&quot;(</samp>&rsquo;, the string is evaluated as a
-Lisp form.  For example:
+<dt><a id="index-Yuan-Yu-Zhong-De-Jiao-Hu-Shi-Gui-Fan-"></a><span><var class="var">interactive</var><a class="copiable-link" href="#index-Yuan-Yu-Zhong-De-Jiao-Hu-Shi-Gui-Fan-"> &para;</a></span></dt>
+<dd><p>交互式规范字符串，用法与 Lisp 函数中 <code class="code">interactive</code> 的参数一致（see <a class="pxref" href="Using-Interactive.html">使用 <code class="code">interactive</code></a>）。对于 <code class="code">or</code>，该值为 <code class="code">0</code>（空指针），表示 <code class="code">or</code> 无法交互式调用。值 <code class="code">&quot;&quot;</code> 表示函数交互式调用时不接收参数。
+若值以 &lsquo;<samp class="samp">&quot;(</samp>&rsquo; 开头，字符串会作为 Lisp 表达式求值。示例：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">DEFUN (&quot;foo&quot;, Ffoo, Sfoo, 0, 3,
@@ -155,34 +126,15 @@ Lisp form.  For example:
 
 </dd>
 <dt><var class="var">doc</var></dt>
-<dd><p>This is the documentation string.  It uses C comment syntax rather
-than C string syntax because comment syntax requires nothing special
-to include multiple lines.  The &lsquo;<samp class="samp">doc:</samp>&rsquo; identifies the comment
-that follows as the documentation string.  The &lsquo;<samp class="samp">/*</samp>&rsquo; and &lsquo;<samp class="samp">*/</samp>&rsquo;
-delimiters that begin and end the comment are not part of the
-documentation string.
+<dd><p>文档字符串。它使用 C 注释语法而非 C 字符串语法，因为注释语法无需特殊处理即可包含多行。&lsquo;<samp class="samp">doc:</samp>&rsquo; 标识后续注释为文档字符串。注释的起止符 &lsquo;<samp class="samp">/*</samp>&rsquo; 和 &lsquo;<samp class="samp">*/</samp>&rsquo; 不属于文档字符串。
 </p>
-<p>If the last line of the documentation string begins with the keyword
-&lsquo;<samp class="samp">usage:</samp>&rsquo;, the rest of the line is treated as the argument list
-for documentation purposes.  This way, you can use different argument
-names in the documentation string from the ones used in the C code.
-&lsquo;<samp class="samp">usage:</samp>&rsquo; is required if the function has an unlimited number of
-arguments.
+<p>若文档字符串的最后一行以关键字 &lsquo;<samp class="samp">usage:</samp>&rsquo; 开头，该行剩余内容会作为文档用的参数列表。这样你可以在文档字符串中使用与 C 代码不同的参数名。若函数接受任意数量参数，则必须使用 &lsquo;<samp class="samp">usage:</samp>&rsquo;。
 </p>
-<p>Some primitives have multiple definitions, one per platform (e.g.,
-<code class="code">x-create-frame</code>).  In such cases, rather than writing the
-same documentation string in each definition, only one definition has
-the actual documentation.  The others have placeholders beginning with
-&lsquo;<samp class="samp">SKIP</samp>&rsquo;, which are ignored by the function that parses the
-<samp class="file">DOC</samp> file.
+<p>部分原语存在多个定义（每个平台一个），例如 <code class="code">x-create-frame</code>。这种情况下，无需在每个定义中编写相同的文档字符串，仅一个定义包含实际文档即可，其余定义使用以 &lsquo;<samp class="samp">SKIP</samp>&rsquo; 开头的占位符，解析 <samp class="file">DOC</samp> 文件的函数会忽略这些占位符。
 </p>
-<p>All the usual rules for documentation strings in Lisp code
-(see <a class="pxref" href="Documentation-Tips.html">Tips for Documentation Strings</a>) apply to C code documentation strings
-too.
+<p>Lisp 代码中文档字符串的所有通用规则（see <a class="pxref" href="Documentation-Tips.html">文档字符串编写技巧</a>）同样适用于 C 代码文档字符串。
 </p>
-<p>The documentation string can be followed by a list of C function
-attributes for the C function that implements the primitive, like
-this:
+<p>文档字符串后可跟随实现原语的 C 函数的属性列表，格式如下：
 </p>
 <div class="example">
 <div class="group"><pre class="example-preformatted">DEFUN (&quot;bar&quot;, Fbar, Sbar, 0, UNEVALLED, 0
@@ -190,141 +142,68 @@ this:
        attributes: <var class="var">attr1</var> <var class="var">attr2</var> ...)
 </pre></div></div>
 
-<p>You can specify more than a single attribute, one after the other.
-Currently, only the following attributes are recognized:
+<p>你可以依次指定多个属性。目前仅支持以下属性：
 </p>
 <dl class="table">
 <dt><code class="code">noreturn</code></dt>
-<dd><p>Declares the C function as one that never returns.  This corresponds
-to C23&rsquo;s <code class="code">[[noreturn]]</code>, to C11&rsquo;s <code class="code">_Noreturn</code>, and to GCC&rsquo;s
-<code class="code">__attribute__&nbsp;((__noreturn__))</code><!-- /@w --> (see <a data-manual="gcc" href="https://gcc.gnu.org/onlinedocs/gcc/Function-Attributes.html#Function-Attributes">Function
-Attributes</a> in <cite class="cite">Using the GNU Compiler Collection</cite>).  (Internally,
-Emacs&rsquo;s own C code uses <code class="code">_Noreturn</code> as it can be defined as a
-macro on C platforms that do not support it.)
+<dd><p>声明 C 函数永不返回。对应 C23 的 <code class="code">[[noreturn]]</code>、C11 的 <code class="code">_Noreturn</code> 以及 GCC 的 <code class="code">__attribute__&nbsp;((__noreturn__))</code><!-- /@w -->（see <a data-manual="gcc" href="https://gcc.gnu.org/onlinedocs/gcc/Function-Attributes.html#Function-Attributes">Function Attributes</a> in <cite class="cite">Using the GNU Compiler Collection</cite>）。（内部实现中，Emacs 自身的 C 代码使用 <code class="code">_Noreturn</code>，因为它可以在不支持该特性的 C 平台上定义为宏。）
 </p>
 </dd>
 <dt><code class="code">const</code></dt>
-<dd><p>Declares that the function does not examine any values except its
-arguments, and has no effects except the return value.  This
-corresponds to C23&rsquo;s <code class="code">[[unsequenced]]</code> and to GCC&rsquo;s
-<code class="code">__attribute__&nbsp;((__const__))</code><!-- /@w -->.
+<dd><p>声明函数仅检查参数，无除返回值外的其他副作用。对应 C23 的 <code class="code">[[unsequenced]]</code> 以及 GCC 的 <code class="code">__attribute__&nbsp;((__const__))</code><!-- /@w -->。
 </p>
 </dd>
 <dt><code class="code">noinline</code></dt>
-<dd><p>This corresponds to <code class="code">__attribute__&nbsp;((__noinline__))</code><!-- /@w -->
-attribute of GCC, which prevents the function from being considered
-for inlining.  This might be needed, e.g., to countermand effects of
-link-time optimizations on stack-based variables.
+<dd><p>对应 GCC 的 <code class="code">__attribute__&nbsp;((__noinline__))</code><!-- /@w --> 属性，禁止函数内联。这可能用于抵消链接时优化对栈变量的影响。
 </p></dd>
 </dl>
 
 </dd>
 </dl>
 
-<p>After the call to the <code class="code">DEFUN</code> macro, you must write the
-argument list for the C function, including the types for the
-arguments.  If the primitive accepts a fixed maximum number of Lisp
-arguments, there must be one C argument for each Lisp argument, and
-each argument must be of type <code class="code">Lisp_Object</code>.  (Various macros and
-functions for creating values of type <code class="code">Lisp_Object</code> are declared
-in the file <samp class="file">lisp.h</samp>.)  If the primitive is a special form, it
-must accept a Lisp list containing its unevaluated Lisp arguments as a
-single argument of type <code class="code">Lisp_Object</code>.  If the primitive has no
-upper limit on the number of evaluated Lisp arguments, it must have
-exactly two C arguments: the first is the number of Lisp arguments,
-and the second is the address of a block containing their values.
-These have types <code class="code">ptrdiff_t</code> and <code class="code">Lisp_Object&nbsp;*</code><!-- /@w -->,
-respectively.  Since <code class="code">Lisp_Object</code> can hold any Lisp object of
-any data type, you can determine the actual data type only at run
-time; so if you want a primitive to accept only a certain type of
-argument, you must check the type explicitly using a suitable
-predicate (see <a class="pxref" href="Type-Predicates.html">类型谓词</a>).
+<p>在 <code class="code">DEFUN</code> 宏调用之后，必须编写 C 函数的参数列表（包含参数类型）。若原语接受固定数量的 Lisp 参数，则每个 Lisp 参数对应一个 C 参数，且参数类型必须为 <code class="code">Lisp_Object</code>。（用于创建 <code class="code">Lisp_Object</code> 类型值的各类宏和函数声明在 <samp class="file">lisp.h</samp> 文件中。）若原语是特殊形式，则必须接收一个包含未求值 Lisp 参数的 Lisp 列表作为单个 <code class="code">Lisp_Object</code> 类型参数。若原语对已求值 Lisp 参数的数量无上限，则必须仅有两个 C 参数：第一个是 Lisp 参数数量，第二个是存储参数值的内存块地址，类型分别为 <code class="code">ptrdiff_t</code> 和 <code class="code">Lisp_Object&nbsp;*</code><!-- /@w -->。由于 <code class="code">Lisp_Object</code> 可以存储任意数据类型的 Lisp 对象，你只能在运行时确定实际数据类型；因此若希望原语仅接受特定类型的参数，必须使用合适的谓词显式检查类型（see <a class="pxref" href="Type-Predicates.html">类型谓词</a>）。
 <a class="index-entry-id" id="index-type-checking-internals"></a>
 </p>
 <a class="index-entry-id" id="index-garbage-collection-protection"></a>
 <a class="index-entry-id" id="index-protect-C-variables-from-garbage-collection"></a>
-<p>Within the function <code class="code">For</code> itself, the local variable
-<code class="code">args</code> refers to objects controlled by Emacs&rsquo;s stack-marking
-garbage collector.  Although the garbage collector does not reclaim
-objects reachable from C <code class="code">Lisp_Object</code> stack variables, it may
-move some of the components of an object, such as the contents of a
-string or the text of a buffer.  Therefore, functions that access
-these components must take care to refetch their addresses after
-performing Lisp evaluation.  This means that instead of keeping C
-pointers to string contents or buffer text, the code should keep the
-buffer or string position, and recompute the C pointer from the
-position after performing Lisp evaluation.  Lisp evaluation can occur
-via calls to <code class="code">eval_sub</code> or <code class="code">Feval</code>, either directly or
-indirectly.
+<p>在 <code class="code">For</code> 函数内部，局部变量 <code class="code">args</code> 引用的对象由 Emacs 的栈标记垃圾回收器管理。尽管垃圾回收器不会回收从 C <code class="code">Lisp_Object</code> 栈变量可达的对象，但它可能移动对象的部分组件（如字符串内容或缓冲区文本）。因此，访问这些组件的函数必须在执行 Lisp 求值后重新获取地址。这意味着代码不应保存指向字符串内容或缓冲区文本的 C 指针，而应保存缓冲区或字符串位置，并在执行 Lisp 求值后根据位置重新计算 C 指针。Lisp 求值可通过直接或间接调用 <code class="code">eval_sub</code> 或 <code class="code">Feval</code> 触发。
 </p>
 <a class="index-entry-id" id="index-maybe_005fquit_002c-use-in-Lisp-primitives"></a>
-<p>Note the call to <code class="code">maybe_quit</code> inside the loop: this function
-checks whether the user pressed <kbd class="kbd">C-g</kbd>, and if so, aborts the
-processing.  You should do that in any loop that can potentially
-require a large number of iterations; in this case, the list of
-arguments could be very long.  This increases Emacs responsiveness and
-improves user experience.
+<p>注意循环内的 <code class="code">maybe_quit</code> 调用：该函数检查用户是否按下 <kbd class="kbd">C-g</kbd>，若是则中止处理。任何可能执行大量迭代的循环都应调用该函数；本例中参数列表可能非常长。这能提升 Emacs 的响应速度，改善用户体验。
 </p>
-<p>You must not use C initializers for static or global variables unless
-the variables are never written once Emacs is dumped.  These variables
-with initializers are allocated in an area of memory that becomes
-read-only (on certain operating systems) as a result of dumping Emacs.
-See <a class="xref" href="Pure-Storage.html">Pure Storage</a>.
+<p>除非 Emacs 转储后变量不会被写入，否则不得对静态或全局变量使用 C 初始化器。这些带初始化器的变量分配在内存区域中，Emacs 转储后（在部分操作系统上）该区域会变为只读。See <a class="xref" href="Pure-Storage.html">纯净存储</a>。
 </p>
 <a class="index-entry-id" id="index-defsubr_002c-Lisp-symbol-for-a-primitive"></a>
-<p>Defining the C function is not enough to make a Lisp primitive
-available; you must also create the Lisp symbol for the primitive and
-store a suitable subr object in its function cell.  The code looks like
-this:
+<p>仅定义 C 函数不足以让 Lisp 原语生效；还必须为原语创建 Lisp 符号，并在其函数单元中存储合适的子例程对象。代码如下：
 </p>
 <div class="example">
 <pre class="example-preformatted">defsubr (&amp;<var class="var">sname</var>);
 </pre></div>
 
-<p>Here <var class="var">sname</var> is the name you used as the third argument to <code class="code">DEFUN</code>.
+<p>其中 <var class="var">sname</var> 是你用作 <code class="code">DEFUN</code> 第三个参数的名称。
 </p>
-<p>If you add a new primitive to a file that already has Lisp primitives
-defined in it, find the function (near the end of the file) named
-<code class="code">syms_of_<var class="var">something</var></code>, and add the call to <code class="code">defsubr</code>
-there.  If the file doesn&rsquo;t have this function, or if you create a new
-file, add to it a <code class="code">syms_of_<var class="var">filename</var></code> (e.g.,
-<code class="code">syms_of_myfile</code>).  Then find the spot in <samp class="file">emacs.c</samp> where all
-of these functions are called, and add a call to
-<code class="code">syms_of_<var class="var">filename</var></code> there.
+<p>若你向已有 Lisp 原语定义的文件中添加新原语，找到文件末尾名为 <code class="code">syms_of_<var class="var">something</var></code> 的函数，并在其中添加 <code class="code">defsubr</code> 调用。若文件没有该函数，或你创建了新文件，则添加 <code class="code">syms_of_<var class="var">filename</var></code> 函数（如 <code class="code">syms_of_myfile</code>）。然后在 <samp class="file">emacs.c</samp> 中找到所有此类函数的调用位置，并添加 <code class="code">syms_of_<var class="var">filename</var></code> 调用。
 </p>
 <a class="anchor" id="Defining-Lisp-variables-in-C"></a><a class="index-entry-id" id="index-byte_002dboolean_002dvars-1"></a>
 <a class="index-entry-id" id="index-defining-Lisp-variables-in-C"></a>
 <a class="index-entry-id" id="index-DEFVAR_005fINT_002c-DEFVAR_005fLISP_002c-DEFVAR_005fBOOL_002c-DEFSYM"></a>
-<p>The function <code class="code">syms_of_<var class="var">filename</var></code> is also the place to define
-any C variables that are to be visible as Lisp variables.
-<code class="code">DEFVAR_LISP</code> makes a C variable of type <code class="code">Lisp_Object</code> visible
-in Lisp.  <code class="code">DEFVAR_INT</code> makes a C variable of type <code class="code">int</code>
-visible in Lisp with a value that is always an integer.
-<code class="code">DEFVAR_BOOL</code> makes a C variable of type <code class="code">int</code> visible in Lisp
-with a value that is either <code class="code">t</code> or <code class="code">nil</code>.  Note that variables
-defined with <code class="code">DEFVAR_BOOL</code> are automatically added to the list
-<code class="code">byte-boolean-vars</code> used by the byte compiler.
+<p><code class="code">syms_of_<var class="var">filename</var></code> 函数也是定义需作为 Lisp 变量可见的 C 变量的位置。<code class="code">DEFVAR_LISP</code> 使 <code class="code">Lisp_Object</code> 类型的 C 变量在 Lisp 中可见。<code class="code">DEFVAR_INT</code> 使 <code class="code">int</code> 类型的 C 变量在 Lisp 中可见，且值始终为整数。<code class="code">DEFVAR_BOOL</code> 使 <code class="code">int</code> 类型的 C 变量在 Lisp 中可见，且值为 <code class="code">t</code> 或 <code class="code">nil</code>。注意，使用 <code class="code">DEFVAR_BOOL</code> 定义的变量会自动添加到字节编译器使用的 <code class="code">byte-boolean-vars</code> 列表中。
 </p>
-<p>These macros all expect three arguments:
+<p>这些宏均接收三个参数：
 </p>
 <dl class="table">
 <dt><code class="code">lname</code></dt>
-<dd><p>The name of the variable to be used by Lisp programs.
+<dd><p>Lisp 程序使用的变量名。
 </p></dd>
 <dt><code class="code">vname</code></dt>
-<dd><p>The name of the variable in the C sources.
+<dd><p>C 源码中的变量名。
 </p></dd>
 <dt><code class="code">doc</code></dt>
-<dd><p>The documentation for the variable, as a C
-comment.  See <a class="xref" href="Documentation-Basics.html">文档基础</a>, for more details.
+<dd><p>变量的文档，以 C 注释形式编写。See <a class="xref" href="Documentation-Basics.html">文档基础</a> 查看更多细节。
 </p></dd>
 </dl>
 
-<p>By convention, when defining variables of a &ldquo;native&rdquo; type
-(<code class="code">int</code> and <code class="code">bool</code>), the name of the C variable is the name
-of the Lisp variable with <code class="code">-</code> replaced by <code class="code">_</code>.  When the
-variable has type <code class="code">Lisp_Object</code>, the convention is to also prefix
-the C variable name with <code class="code">V</code>.  This is an example:
+<p>按照惯例，定义原生类型（<code class="code">int</code> 和 <code class="code">bool</code>）变量时，C 变量名是 Lisp 变量名将 <code class="code">-</code> 替换为 <code class="code">_</code>。若变量类型为 <code class="code">Lisp_Object</code>，惯例是在 C 变量名前添加前缀 <code class="code">V</code>。示例：
 </p>
 <div class="example smallexample">
 <pre class="example-preformatted">DEFVAR_INT (&quot;my-int-variable&quot;, my_int_variable,
@@ -334,35 +213,25 @@ DEFVAR_LISP (&quot;my-lisp-variable&quot;, Vmy_lisp_variable,
            doc: /* A Lisp variable.  */);
 </pre></div>
 
-<p>There are situations in Lisp where you need to refer to the symbol
-itself rather than the value of that symbol.  One such case is when
-temporarily overriding the value of a variable, which in Lisp is done
-with <code class="code">let</code>.  In C sources, this is done by defining a
-corresponding, constant symbol, and using <code class="code">specbind</code>.  By
-convention, <code class="code">Qmy_lisp_variable</code> corresponds to
-<code class="code">Vmy_lisp_variable</code>; to define it, use the <code class="code">DEFSYM</code> macro.
+<p>在 Lisp 中，有时需要引用符号本身而非符号的值。例如临时覆盖变量值时，Lisp 中使用 <code class="code">let</code>，C 源码中则通过定义对应的常量符号并使用 <code class="code">specbind</code> 实现。按照惯例，<code class="code">Qmy_lisp_variable</code> 对应 <code class="code">Vmy_lisp_variable</code>；使用 <code class="code">DEFSYM</code> 宏定义该符号。
 </p>
 <div class="example smallexample">
 <pre class="example-preformatted">DEFSYM (Qmy_lisp_variable, &quot;my-lisp-variable&quot;);
 </pre></div>
 
-<p>To perform the actual binding:
+<p>执行实际绑定：
 </p>
 <div class="example smallexample">
 <pre class="example-preformatted">specbind (Qmy_lisp_variable, Qt);
 </pre></div>
 
-<p>In Lisp, symbols sometimes need to be quoted.  To achieve the same
-effect in C, you again use the corresponding constant symbol
-<code class="code">Qmy_lisp_variable</code>.  For example, when creating a buffer-local
-variable (see <a class="pxref" href="Buffer_002dLocal-Variables.html">缓冲区局部变量</a>) in Lisp, you would write:
+<p>在 Lisp 中，符号有时需要引用。在 C 中实现相同效果时，同样使用对应的常量符号 <code class="code">Qmy_lisp_variable</code>。例如，在 Lisp 中创建缓冲区局部变量（see <a class="pxref" href="Buffer_002dLocal-Variables.html">缓冲区局部变量</a>）的写法：
 </p>
 <div class="example smallexample">
 <pre class="example-preformatted">(make-variable-buffer-local 'my-lisp-variable)
 </pre></div>
 
-<p>In C, the corresponding code uses <code class="code">Fmake_variable_buffer_local</code> in
-combination with <code class="code">DEFSYM</code>:
+<p>在 C 中，对应代码结合使用 <code class="code">Fmake_variable_buffer_local</code> 和 <code class="code">DEFSYM</code>：
 </p>
 <div class="example smallexample">
 <pre class="example-preformatted">DEFSYM (Qmy_lisp_variable, &quot;my-lisp-variable&quot;);
@@ -370,23 +239,16 @@ Fmake_variable_buffer_local (Qmy_lisp_variable);
 </pre></div>
 
 <a class="index-entry-id" id="index-defining-customization-variables-in-C"></a>
-<p>If you want to make a Lisp variable that is defined in C behave
-like one declared with <code class="code">defcustom</code>, add an appropriate entry to
-<samp class="file">cus-start.el</samp>.  See <a class="xref" href="Variable-Definitions.html">定义自定义变量</a>, for a description of
-the format to use.
+<p>若希望让 C 中定义的 Lisp 变量表现得如同 <code class="code">defcustom</code> 声明的变量，在 <samp class="file">cus-start.el</samp> 中添加合适的条目。see <a class="pxref" href="Variable-Definitions.html">定义自定义变量</a> 查看格式说明。
 </p>
 <a class="index-entry-id" id="index-staticpro_002c-protection-from-GC"></a>
-<p>If you directly define a file-scope C variable of type
-<code class="code">Lisp_Object</code>, you must protect it from garbage-collection by
-calling <code class="code">staticpro</code> in <code class="code">syms_of_<var class="var">filename</var></code>, like this:
+<p>若直接定义文件作用域的 <code class="code">Lisp_Object</code> 类型 C 变量，必须在 <code class="code">syms_of_<var class="var">filename</var></code> 中调用 <code class="code">staticpro</code> 保护其免受垃圾回收影响，示例：
 </p>
 <div class="example">
 <pre class="example-preformatted">staticpro (&amp;<var class="var">variable</var>);
 </pre></div>
 
-<p>Here is another example function, with more complicated arguments.
-This comes from the code in <samp class="file">window.c</samp>, and it demonstrates the use
-of macros and functions to manipulate Lisp objects.
+<p>以下是另一个示例函数，参数更复杂。该代码来自 <samp class="file">window.c</samp>，演示了使用宏和函数操作 Lisp 对象。
 </p>
 <div class="example smallexample">
 <div class="group"><pre class="example-preformatted">DEFUN (&quot;coordinates-in-window-p&quot;, Fcoordinates_in_window_p,
@@ -438,32 +300,18 @@ of macros and functions to manipulate Lisp objects.
 }
 </pre></div></div>
 
-<p>Note that C code cannot call functions by name unless they are defined
-in C.  The way to call a function written in Lisp is to use
-<code class="code">Ffuncall</code>, which embodies the Lisp function <code class="code">funcall</code>.  Since
-the Lisp function <code class="code">funcall</code> accepts an unlimited number of
-arguments, in C it takes two: the number of Lisp-level arguments, and a
-one-dimensional array containing their values.  The first Lisp-level
-argument is the Lisp function to call, and the rest are the arguments to
-pass to it.
+<p>注意，C 代码无法按名称调用非 C 定义的函数。调用 Lisp 编写的函数需使用 <code class="code">Ffuncall</code>，它对应 Lisp 函数 <code class="code">funcall</code>。由于 Lisp 函数 <code class="code">funcall</code> 接受任意数量参数，在 C 中它接收两个参数：Lisp 层参数数量和存储参数值的一维数组。第一个 Lisp 层参数是要调用的 Lisp 函数，其余为传递给该函数的参数。
 </p>
-<p>The C functions <code class="code">call0</code>, <code class="code">call1</code>, <code class="code">call2</code>, and so on,
-provide handy ways to call a Lisp function conveniently with a fixed
-number of arguments.  They work by calling <code class="code">Ffuncall</code>.
+<p>C 函数 <code class="code">call0</code>、<code class="code">call1</code>、<code class="code">call2</code> 等提供了便捷调用固定参数数量 Lisp 函数的方法，它们均通过调用 <code class="code">Ffuncall</code> 实现。
 </p>
-<p><samp class="file">eval.c</samp> is a very good file to look through for examples;
-<samp class="file">lisp.h</samp> contains the definitions for some important macros and
-functions.
+<p><samp class="file">eval.c</samp> 是查看示例的绝佳文件；<samp class="file">lisp.h</samp> 包含部分重要宏和函数的定义。
 </p>
-<p>If you define a function which is side-effect free or pure, give it
-a non-<code class="code">nil</code> <code class="code">side-effect-free</code> or <code class="code">pure</code> property,
-respectively (see <a class="pxref" href="Standard-Properties.html">标准符号属性</a>).  See the lists defined in
-&lsquo;<samp class="samp">byte-opt.el</samp>&rsquo;.
+<p>若你定义的函数无副作用或为纯函数，分别为其设置非 <code class="code">nil</code> 的 <code class="code">side-effect-free</code> 或 <code class="code">pure</code> 属性（see <a class="pxref" href="Standard-Properties.html">标准符号属性</a>）。参见 &lsquo;<samp class="samp">byte-opt.el</samp>&rsquo; 中定义的列表。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">Writing Dynamically-Loaded Modules</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="C-Dialect.html">C Dialect</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html">GNU Emacs Internals</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">编写可动态加载的模块</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="C-Dialect.html">C 语言方言</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html">GNU Emacs 内部结构</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

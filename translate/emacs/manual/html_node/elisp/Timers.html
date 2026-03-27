@@ -50,202 +50,107 @@ strong.def-name {font-family: monospace; font-weight: bold}
 <body>
 <div class="section-level-extent" id="Timers">
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Idle-Timers.html" accesskey="n" rel="next">Idle Timers</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Time-Calculations.html" accesskey="p" rel="prev">Time Calculations</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="System-Interface.html" accesskey="u" rel="up">操作系统接口</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Idle-Timers.html" accesskey="n" rel="next">空闲计时器</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Time-Calculations.html" accesskey="p" rel="prev">时间计算</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="System-Interface.html" accesskey="u" rel="up">操作系统接口</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 <hr>
-<h3 class="section" id="Timers-for-Delayed-Execution"><span>43.11 Timers for Delayed Execution<a class="copiable-link" href="#Timers-for-Delayed-Execution"> &para;</a></span></h3>
+<h3 class="section" id="g_t_7528_4e8e_5ef6_8fdf_6267_884c_7684_5b9a_65f6_5668"><span>43.11 用于延迟执行的定时器<a class="copiable-link" href="#g_t_7528_4e8e_5ef6_8fdf_6267_884c_7684_5b9a_65f6_5668"> &para;</a></span></h3>
 <a class="index-entry-id" id="index-timers"></a>
 
-<p>You can set up a <em class="dfn">timer</em> to call a function at a specified
-future time or after a certain length of idleness.  A timer is a
-special object that stores the information about the next invocation
-times and the function to invoke.
+<p>可以设置一个 <em class="dfn">定时器(timer)</em>，使其在指定的未来时间或经过一定空闲时长后调用某个函数。定时器是一种特殊对象，用于保存下次调用时间与待执行函数的相关信息。
 </p>
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-timerp"><span class="category-def">Function: </span><span><strong class="def-name">timerp</strong> <var class="def-var-arguments">object</var><a class="copiable-link" href="#index-timerp"> &para;</a></span></dt>
-<dd><p>This predicate function returns non-<code class="code">nil</code> if <code class="code">object</code> is a
-timer.
+<dd><p>该谓词函数在 <code class="code">object</code> 为定时器时返回非 <code class="code">nil</code>。
 </p></dd></dl>
 
-<p>Emacs cannot run timers at any arbitrary point in a Lisp program; it
-can run them only when Emacs could accept output from a subprocess:
-namely, while waiting or inside certain primitive functions such as
-<code class="code">sit-for</code> or <code class="code">read-event</code> which <em class="emph">can</em> wait.  Therefore, a
-timer&rsquo;s execution may be delayed if Emacs is busy.  However, the time of
-execution is very precise if Emacs is idle.
+<p>Emacs 无法在 Lisp 程序的任意位置运行定时器，仅能在 Emacs 可接收子进程输出时运行：即处于等待状态时，或在 <code class="code">sit-for</code>、<code class="code">read-event</code> 等可执行等待操作的特定原语函数内部。因此，若 Emacs 处于繁忙状态，定时器的执行可能被延迟。但在 Emacs 空闲时，执行时间会非常精确。
 </p>
-<p>Emacs binds <code class="code">inhibit-quit</code> to <code class="code">t</code> before calling the timer
-function, because quitting out of many timer functions can leave
-things in an inconsistent state.  This is normally unproblematical
-because most timer functions don&rsquo;t do a lot of work.  Indeed, for a
-timer to call a function that takes substantial time to run is likely
-to be annoying.  If a timer function needs to allow quitting, it
-should use <code class="code">with-local-quit</code> (see <a class="pxref" href="Quitting.html">退出</a>).  For example, if
-a timer function calls <code class="code">accept-process-output</code> to receive output
-from an external process, that call should be wrapped inside
-<code class="code">with-local-quit</code>, to ensure that <kbd class="kbd">C-g</kbd> works if the external
-process hangs.
+<p>Emacs 在调用定时器函数前会将 <code class="code">inhibit-quit</code> 绑定为 <code class="code">t</code>，因为从多数定时器函数中退出可能导致程序状态不一致。这通常不会带来问题，因为大多数定时器函数不会执行大量操作。实际上，若定时器调用耗时较长的函数，往往会造成不良体验。若定时器函数需要允许退出，应使用 <code class="code">with-local-quit</code>（see <a class="pxref" href="Quitting.html">退出</a>）。例如，当定时器函数调用 <code class="code">accept-process-output</code> 接收外部进程输出时，该调用应包裹在 <code class="code">with-local-quit</code> 内，以确保外部进程挂起时 <kbd class="kbd">C-g</kbd> 可以正常工作。
 </p>
-<p>It is usually a bad idea for timer functions to alter buffer
-contents.  When they do, they usually should call <code class="code">undo-boundary</code>
-both before and after changing the buffer, to separate the timer&rsquo;s
-changes from user commands&rsquo; changes and prevent a single undo entry
-from growing to be quite large.
+<p>定时器函数修改缓冲区内容通常是不合适的。若确有必要，一般应在修改缓冲区前后均调用 <code class="code">undo-boundary</code>，将定时器的修改与用户命令的修改分隔开，避免单个撤销记录变得过大。
 </p>
-<p>Timer functions should also avoid calling functions that cause Emacs
-to wait, such as <code class="code">sit-for</code> (see <a class="pxref" href="Waiting.html">等待时间流逝或输入</a>).  This can lead to
-unpredictable effects, since other timers (or even the same timer) can
-run while waiting.  If a timer function needs to perform an action
-after a certain time has elapsed, it can do this by scheduling a new
-timer.
+<p>定时器函数还应避免调用会使 Emacs 进入等待的函数，例如 <code class="code">sit-for</code>（see <a class="pxref" href="Waiting.html">等待时间流逝或输入</a>）。这可能导致不可预料的后果，因为等待期间其他定时器（甚至同一定时器）可能被触发。若定时器函数需要在一段时间后执行操作，可通过设置新定时器实现。
 </p>
-<p>If a timer function performs a remote file operation, it can be in
-conflict with an already running remote file operation of the same
-connection.  Such conflicts are detected, and they result in a
-<code class="code">remote-file-error</code> error (see <a class="pxref" href="Standard-Errors.html">Standard Errors</a>).  This should
-be protected by wrapping the timer function body with
+<p>若定时器函数执行远程文件操作，可能与同一连接上正在执行的远程文件操作冲突。此类冲突会被检测并抛出 <code class="code">remote-file-error</code> 错误（see <a class="pxref" href="Standard-Errors.html">标准错误</a>）。可通过将定时器函数体包裹在以下代码中进行防护：
 </p>
 <div class="example lisp">
 <div class="group"><pre class="lisp-preformatted">(ignore-error 'remote-file-error
   ...)
 </pre></div></div>
 
-<p>If a timer function calls functions that can change the match data,
-it should save and restore the match data.  See <a class="xref" href="Saving-Match-Data.html">保存与恢复匹配数据</a>.
+<p>若定时器函数调用的函数可能修改匹配数据，应保存并恢复匹配数据。See <a class="xref" href="Saving-Match-Data.html">保存与恢复匹配数据</a>。
 </p>
 <dl class="first-deffn def-block">
 <dt class="deffn def-line" id="index-run_002dat_002dtime"><span class="category-def">Command: </span><span><strong class="def-name">run-at-time</strong> <var class="def-var-arguments">time repeat function &amp;rest args</var><a class="copiable-link" href="#index-run_002dat_002dtime"> &para;</a></span></dt>
-<dd><p>This sets up a timer that calls the function <var class="var">function</var> with
-arguments <var class="var">args</var> at time <var class="var">time</var>.  If <var class="var">repeat</var> is a number
-(integer or floating point), the timer is scheduled to run again every
-<var class="var">repeat</var> seconds after <var class="var">time</var>.  If <var class="var">repeat</var> is <code class="code">nil</code>,
-the timer runs only once.
+<dd><p>该函数设置一个定时器，在时间 <var class="var">time</var> 以参数 <var class="var">args</var> 调用函数 <var class="var">function</var>。若 <var class="var">repeat</var> 为数值（整数或浮点数），定时器将在 <var class="var">time</var> 之后每隔 <var class="var">repeat</var> 秒重复执行。若 <var class="var">repeat</var> 为 <code class="code">nil</code>，定时器仅执行一次。
 </p>
-<p><var class="var">time</var> may specify an absolute or a relative time.
+<p><var class="var">time</var> 可指定绝对时间或相对时间。
 </p>
-<p>Absolute times may be specified using a string with a limited variety
-of formats, and are taken to be times <em class="emph">today</em>, even if already in
-the past.  The recognized forms are &lsquo;<samp class="samp"><var class="var">xxxx</var></samp>&rsquo;,
-&lsquo;<samp class="samp"><var class="var">x</var>:<var class="var">xx</var></samp>&rsquo;, or &lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var></samp>&rsquo; (military time),
-and &lsquo;<samp class="samp"><var class="var">xx</var>am</samp>&rsquo;, &lsquo;<samp class="samp"><var class="var">xx</var>AM</samp>&rsquo;, &lsquo;<samp class="samp"><var class="var">xx</var>pm</samp>&rsquo;,
-&lsquo;<samp class="samp"><var class="var">xx</var>PM</samp>&rsquo;, &lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>am</samp>&rsquo;,
-&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>AM</samp>&rsquo;, &lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>pm</samp>&rsquo;, or
-&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>PM</samp>&rsquo;.  A period can be used instead of a colon
-to separate the hour and minute parts.
+<p>绝对时间可使用有限格式的字符串指定，均视为当日时间，即使该时间已过去。支持的格式包括 &lsquo;<samp class="samp"><var class="var">xxxx</var></samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">x</var>:<var class="var">xx</var></samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var></samp>&rsquo;（24 小时制），以及 &lsquo;<samp class="samp"><var class="var">xx</var>am</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>AM</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>pm</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>PM</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>am</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>AM</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>pm</samp>&rsquo;、&lsquo;<samp class="samp"><var class="var">xx</var>:<var class="var">xx</var>PM</samp>&rsquo;。小时与分钟之间可使用点号代替冒号。
 </p>
-<p>To specify a relative time as a string, use numbers followed by units.
-For example:
+<p>以字符串指定相对时间时，可在数字后跟随单位。例如：
 </p>
 <dl class="table">
 <dt>&lsquo;<samp class="samp">1 min</samp>&rsquo;</dt>
-<dd><p>denotes 1 minute from now.
+<dd><p>表示从现在起 1 分钟后。
 </p></dd>
 <dt>&lsquo;<samp class="samp">1 min 5 sec</samp>&rsquo;</dt>
-<dd><p>denotes 65 seconds from now.
+<dd><p>表示从现在起 65 秒后。
 </p></dd>
 <dt>&lsquo;<samp class="samp">1 min 2 sec 3 hour 4 day 5 week 6 fortnight 7 month 8 year</samp>&rsquo;</dt>
-<dd><p>denotes exactly 103 months, 123 days, and 10862 seconds from now.
+<dd><p>表示从现在起恰好 103 个月、123 天与 10862 秒后。
 </p></dd>
 </dl>
 
-<p>For relative time values, Emacs considers a month to be exactly thirty
-days, and a year to be exactly 365.25 days.
+<p>对于相对时间值，Emacs 将 1 个月视为严格 30 天，1 年视为严格 365.25 天。
 </p>
-<p>Not all convenient formats are strings.  If <var class="var">time</var> is a number
-(integer or floating point), that specifies a relative time measured in
-seconds.  The result of <code class="code">encode-time</code> can also be used to specify
-an absolute value for <var class="var">time</var>.
+<p>并非所有便捷格式均为字符串。若 <var class="var">time</var> 为数值（整数或浮点数），则表示以秒为单位的相对时间。<code class="code">encode-time</code> 的返回值也可用于指定 <var class="var">time</var> 的绝对时间。
 </p>
-<p>In most cases, <var class="var">repeat</var> has no effect on when <em class="emph">first</em> call
-takes place&mdash;<var class="var">time</var> alone specifies that.  There is one exception:
-if <var class="var">time</var> is <code class="code">t</code>, then the timer runs whenever the time is a
-multiple of <var class="var">repeat</var> seconds after the epoch.  This is useful for
-functions like <code class="code">display-time</code>.  For instance, the following will
-make <var class="var">function</var> run at every &ldquo;whole&rdquo; minute (e.g.,
-&lsquo;<samp class="samp">11:03:00</samp>&rsquo;, &lsquo;<samp class="samp">11:04:00</samp>&rsquo;, etc):
+<p>多数情况下，<var class="var">repeat</var> 不影响首次调用的时间，仅由 <var class="var">time</var> 决定。唯一例外是当 <var class="var">time</var> 为 <code class="code">t</code> 时，定时器将在从纪元开始每经过 <var class="var">repeat</var> 秒的整数倍时执行。这对 <code class="code">display-time</code> 等函数十分有用。例如，以下代码可使 <var class="var">function</var> 在每个整分钟（如 &lsquo;<samp class="samp">11:03:00</samp>&rsquo;、&lsquo;<samp class="samp">11:04:00</samp>&rsquo; 等）执行：
 </p>
 <div class="example">
 <pre class="example-preformatted">(run-at-time t 60 <var class="var">function</var>)
 </pre></div>
 
-<p>If Emacs didn&rsquo;t get any CPU time when the timer would have run (for
-example if the system was busy running another process or if the
-computer was sleeping or in a suspended state), the timer will run as
-soon as Emacs resumes and is idle.
+<p>若定时器本应执行时 Emacs 未获得 CPU 时间（例如系统忙于运行其他进程，或计算机处于睡眠、挂起状态），定时器将在 Emacs 恢复并空闲后立即执行。
 </p>
-<p>The function <code class="code">run-at-time</code> returns a timer value that identifies
-the particular scheduled future action.  You can use this value to call
-<code class="code">cancel-timer</code> (see below).
+<p>函数 <code class="code">run-at-time</code> 返回一个定时器值，用于标识该次预定的后续操作。可使用该值调用 <code class="code">cancel-timer</code>（见下文）。
 </p></dd></dl>
 
 <dl class="first-deffn def-block">
 <dt class="deffn def-line" id="index-run_002dwith_002dtimer"><span class="category-def">Command: </span><span><strong class="def-name">run-with-timer</strong> <var class="def-var-arguments">secs repeat function &amp;rest args</var><a class="copiable-link" href="#index-run_002dwith_002dtimer"> &para;</a></span></dt>
-<dd><p>This is exactly the same as <code class="code">run-at-time</code> (so see that definition
-for an explanation of the parameters; <var class="var">secs</var> is passed as
-<var class="var">time</var> to that function), but is meant to be used when the delay
-is specified in seconds.
+<dd><p>该函数与 <code class="code">run-at-time</code> 完全相同（参数说明参见该函数定义，<var class="var">secs</var> 会作为 <var class="var">time</var> 传递给对应函数），专用于以秒为单位指定延迟时间。
 </p></dd></dl>
 
-<p>A repeating timer nominally ought to run every <var class="var">repeat</var> seconds,
-but remember that any invocation of a timer can be late.  Lateness of
-one repetition has no effect on the scheduled time of the next
-repetition.  For instance, if Emacs is busy computing for long enough
-to cover three scheduled repetitions of the timer, and then starts to
-wait, it will immediately call the timer function three times in
-immediate succession (presuming no other timers trigger before or
-between them).  If you want a timer to run again no less than <var class="var">n</var>
-seconds after the last invocation, don&rsquo;t use the <var class="var">repeat</var> argument.
-Instead, the timer function should explicitly reschedule the timer.
+<p>重复定时器理论上应每隔 <var class="var">repeat</var> 秒执行一次，但需注意任意一次定时器调用都可能延迟。某次执行的延迟不会影响下一次预定执行时间。例如，若 Emacs 长时间繁忙计算，错过定时器三次预定执行，随后开始等待时，会连续立即调用三次定时器函数（假定其间无其他定时器触发）。若希望定时器在上次执行后至少间隔 <var class="var">n</var> 秒再执行，不要使用 <var class="var">repeat</var> 参数，而应在定时器函数中显式重新设置定时器。
 </p>
 <dl class="first-defvr first-defopt-alias-first-defvr def-block">
 <dt class="defvr defopt-alias-defvr def-line" id="index-timer_002dmax_002drepeats"><span class="category-def">User Option: </span><span><strong class="def-name">timer-max-repeats</strong><a class="copiable-link" href="#index-timer_002dmax_002drepeats"> &para;</a></span></dt>
-<dd><p>This variable&rsquo;s value specifies the maximum number of times to repeat
-calling a timer function in a row, when many previously scheduled
-calls were unavoidably delayed.
+<dd><p>该变量用于指定当大量先前预定调用被不可避免地延迟时，连续重复调用定时器函数的最大次数。
 </p></dd></dl>
 
 <dl class="first-deffn first-defmac-alias-first-deffn def-block">
 <dt class="deffn defmac-alias-deffn def-line" id="index-with_002dtimeout"><span class="category-def">Macro: </span><span><strong class="def-name">with-timeout</strong> <var class="def-var-arguments">(seconds timeout-forms&hellip;) body&hellip;</var><a class="copiable-link" href="#index-with_002dtimeout"> &para;</a></span></dt>
-<dd><p>Execute <var class="var">body</var>, but give up after <var class="var">seconds</var> seconds.  If
-<var class="var">body</var> finishes before the time is up, <code class="code">with-timeout</code> returns
-the value of the last form in <var class="var">body</var>.  If, however, the execution of
-<var class="var">body</var> is cut short by the timeout, then <code class="code">with-timeout</code>
-executes all the <var class="var">timeout-forms</var> and returns the value of the last
-of them.
+<dd><p>执行 <var class="var">body</var>，并在 <var class="var">seconds</var> 秒后超时终止。若 <var class="var">body</var> 在超时前执行完毕，<code class="code">with-timeout</code> 返回 <var class="var">body</var> 中最后一个表达式的值。若 <var class="var">body</var> 的执行因超时而中断，<code class="code">with-timeout</code> 将执行所有 <var class="var">timeout-forms</var> 并返回其中最后一个表达式的值。
 </p>
-<p>This macro works by setting a timer to run after <var class="var">seconds</var> seconds.  If
-<var class="var">body</var> finishes before that time, it cancels the timer.  If the
-timer actually runs, it terminates execution of <var class="var">body</var>, then
-executes <var class="var">timeout-forms</var>.
+<p>该宏通过设置一个在 <var class="var">seconds</var> 秒后执行的定时器实现。若 <var class="var">body</var> 在此之前执行完毕，则取消该定时器。若定时器实际触发，将终止 <var class="var">body</var> 的执行并运行 <var class="var">timeout-forms</var>。
 </p>
-<p>Since timers can run within a Lisp program only when the program calls a
-primitive that can wait, <code class="code">with-timeout</code> cannot stop executing
-<var class="var">body</var> while it is in the midst of a computation&mdash;only when it
-calls one of those primitives.  So use <code class="code">with-timeout</code> only with a
-<var class="var">body</var> that waits for input, not one that does a long computation.
+<p>由于定时器仅能在 Lisp 程序调用可等待的原语时运行，<code class="code">with-timeout</code> 无法在 <var class="var">body</var> 处于计算过程中终止其执行，仅能在调用上述原语时生效。因此 <code class="code">with-timeout</code> 仅适用于包含输入等待的 <var class="var">body</var>，不适用于长时间计算。
 </p></dd></dl>
 
-<p>The function <code class="code">y-or-n-p-with-timeout</code> provides a simple way to use
-a timer to avoid waiting too long for an answer.  See <a class="xref" href="Yes_002dor_002dNo-Queries.html">Yes-or-No 查询</a>.
+<p>函数 <code class="code">y-or-n-p-with-timeout</code> 提供了一种简单方式，使用定时器避免过长时间等待用户应答。See <a class="xref" href="Yes_002dor_002dNo-Queries.html">Yes-or-No 查询</a>。
 </p>
 <dl class="first-deffn first-defun-alias-first-deffn def-block">
 <dt class="deffn defun-alias-deffn def-line" id="index-cancel_002dtimer"><span class="category-def">Function: </span><span><strong class="def-name">cancel-timer</strong> <var class="def-var-arguments">timer</var><a class="copiable-link" href="#index-cancel_002dtimer"> &para;</a></span></dt>
-<dd><p>This cancels the requested action for <var class="var">timer</var>, which should be a
-timer&mdash;usually, one previously returned by <code class="code">run-at-time</code> or
-<code class="code">run-with-idle-timer</code>.  This cancels the effect of that call to
-one of these functions; the arrival of the specified time will not
-cause anything special to happen.
+<dd><p>取消 <var class="var">timer</var> 对应的预定操作，<var class="var">timer</var> 应为一个定时器对象&mdash;通常是此前由 <code class="code">run-at-time</code> 或 <code class="code">run-with-idle-timer</code> 返回的对象。这会取消对应函数调用的效果；当指定时间到达时不会触发任何特殊操作。
 </p></dd></dl>
 
 <a class="index-entry-id" id="index-list_002dtimers"></a>
-<p>The <code class="code">list-timers</code> command lists all the currently active timers.
-The command <kbd class="kbd">c</kbd> (<code class="code">timer-list-cancel</code>) will cancel the timer
-on the line under point.  You can sort the list by column using the
-command <kbd class="kbd">S</kbd> (<code class="code">tabulated-list-sort</code>).
+<p><code class="code">list-timers</code> 命令用于列出当前所有活动定时器。命令 <kbd class="kbd">c</kbd>（<code class="code">timer-list-cancel</code>）可取消光标所在行的定时器。可使用命令 <kbd class="kbd">S</kbd>（<code class="code">tabulated-list-sort</code>）按列对列表排序。
 </p>
 </div>
 <hr>
 <p class="nav-panel">
-<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Idle-Timers.html">Idle Timers</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Time-Calculations.html">Time Calculations</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="System-Interface.html">操作系统接口</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Idle-Timers.html">空闲计时器</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Time-Calculations.html">时间计算</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="System-Interface.html">操作系统接口</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
 
 
 

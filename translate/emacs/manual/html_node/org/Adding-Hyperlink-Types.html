@@ -58,15 +58,13 @@ span:hover a.copiable-link {visibility: visible}
 
 <a class="index-entry-id" id="index-hyperlinks_002c-adding-new-types"></a>
 
-<p>Org has many built-in hyperlink types (see <a class="ref" href="Hyperlinks.html">Hyperlinks</a>), and an
-interface for adding new link types.  The following example shows the
-process of adding Org links to Unix man pages, which look like this
+<p>Org 内置多种超链接类型（见 <a class="ref" href="Hyperlinks.html">Hyperlinks</a>），并提供用于添加新链接类型的接口。下面示例展示为 Unix 手册页添加 Org 链接的过程，形式如下：
 </p>
 <div class="example">
 <pre class="example-preformatted">[[man:printf][The printf manual]]
 </pre></div>
 
-<p>The following &lsquo;<samp class="samp">ol-man.el</samp>&rsquo; file implements it
+<p>下面的 &lsquo;<samp class="samp">ol-man.el</samp>&rsquo; 文件实现了该功能：
 </p>
 <div class="example lisp">
 <pre class="lisp-preformatted">;;; ol-man.el - Support for links to man pages in Org mode
@@ -78,19 +76,19 @@ process of adding Org links to Unix man pages, which look like this
                          :store #'org-man-store-link)
 
 (defcustom org-man-command 'man
-  &quot;The Emacs command to be used to display a man page.&quot;
+  &quot;用于显示手册页的 Emacs 命令。&quot;
   :group 'org-link
   :type '(choice (const man) (const woman)))
 
 (defun org-man-open (path _)
-  &quot;Visit the manpage on PATH.
-PATH should be a topic that can be thrown at the man command.&quot;
+  &quot;打开 PATH 对应的手册页。
+PATH 应为可被 man 命令处理的主题。&quot;
   (funcall org-man-command path))
 
 (defun org-man-store-link (&amp;optional _interactive?)
-  &quot;Store a link to a man page.&quot;
+  &quot;存储指向手册页的链接。&quot;
   (when (memq major-mode '(Man-mode woman-mode))
-    ;; This is a man page, we do make this link.
+    ;; 当前为手册页缓冲区，创建该链接
     (let* ((page (org-man-get-page-name))
            (link (concat &quot;man:&quot; page))
            (description (format &quot;Man page for %s&quot; page)))
@@ -100,14 +98,14 @@ PATH should be a topic that can be thrown at the man command.&quot;
        :description description))))
 
 (defun org-man-get-page-name ()
-  &quot;Extract the page name from the buffer name.&quot;
-  ;; This works for both `Man-mode' and `woman-mode'.
+  &quot;从缓冲区名称中提取手册页名称。&quot;
+  ;; 同时适用于 `Man-mode' 和 `woman-mode'
   (if (string-match &quot; \\(\\S-+\\)\\*&quot; (buffer-name))
       (match-string 1 (buffer-name))
     (error &quot;Cannot create link to this man page&quot;)))
 
 (defun org-man-export (link description format _)
-  &quot;Export a man page link from Org files.&quot;
+  &quot;从 Org 文件导出手册页链接。&quot;
   (let ((path (format &quot;http://man.he.net/?topic=%s&amp;section=all&quot; link))
         (desc (or description link)))
     (pcase format
@@ -121,38 +119,24 @@ PATH should be a topic that can be thrown at the man command.&quot;
 ;;; ol-man.el ends here
 </pre></div>
 
-<p>To activate links to man pages in Org, enter this in the Emacs init
-file:
+<p>要在 Org 中启用手册页链接，在 Emacs 初始化文件中添加：
 </p>
 <div class="example lisp">
 <pre class="lisp-preformatted">(require 'ol-man)
 </pre></div>
 
-<p>A review of &lsquo;<samp class="samp">ol-man.el</samp>&rsquo;:
+<p>对 &lsquo;<samp class="samp">ol-man.el</samp>&rsquo; 的说明
 </p>
 <ol class="enumerate">
-<li> First, &lsquo;<samp class="samp">(require 'ol)</samp>&rsquo; ensures that &lsquo;<samp class="samp">ol.el</samp>&rsquo; is loaded.
+<li> 首先， &lsquo;<samp class="samp">(require 'ol)</samp>&rsquo; 确保加载 &lsquo;<samp class="samp">ol.el</samp>&rsquo; 。
 
 </li><li> <a class="index-entry-id" id="index-org_002dlink_002dset_002dparameters"></a>
 <a class="index-entry-id" id="index-org_002dlink_002dparameters"></a>
-Then <code class="code">org-link-set-parameters</code> defines a new link type with &lsquo;<samp class="samp">man</samp>&rsquo;
-prefix and associates functions for following, exporting and
-storing such links.  See the variable <code class="code">org-link-parameters</code> for
-a complete list of possible associations.
+随后 <code class="code">org-link-set-parameters</code> 定义以 &lsquo;<samp class="samp">man</samp>&rsquo; 为前缀的新链接类型，并关联用于打开、导出和存储该类链接的函数。完整的可关联项列表可查看变量 <code class="code">org-link-parameters</code> 。
 
-</li><li> The rest of the file implements necessary variables and functions.
+</li><li> 文件其余部分实现所需变量与函数。
 
-<p>For example, <code class="code">org-man-store-link</code> is responsible for storing a link
-when <code class="code">org-store-link</code> (see <a class="ref" href="Handling-Links.html">Handling Links</a>) is called from a buffer
-displaying a man page.  It is passed an argument <code class="code">interactive?</code>
-which this function does not use, but other store functions used to
-behave differently when a link is stored interactively by the user.
-It first checks if the major mode is appropriate.  If check fails,
-the function returns <code class="code">nil</code>, which means it isn&rsquo;t responsible for
-creating a link to the current buffer.  Otherwise, the function
-makes a link string by combining the &lsquo;<samp class="samp">man:</samp>&rsquo; prefix with the man
-topic.  It also provides a default description.  The function
-<code class="code">org-insert-link</code> can insert it back into an Org buffer later on.
+<p>例如，在显示手册页的缓冲区中调用 <code class="code">org-store-link</code> （见 <a class="ref" href="Handling-Links.html">Handling Links</a>）时， <code class="code">org-man-store-link</code> 负责存储链接。该函数接收参数 <code class="code">interactive?</code> 但并未使用，不过其他存储函数在用户交互式存储链接时会有不同行为。函数首先检查主模式是否匹配，若不匹配则返回 <code class="code">nil</code> ，表示不负责为当前缓冲区创建链接；否则将 &lsquo;<samp class="samp">man:</samp>&rsquo; 前缀与手册主题拼接生成链接字符串，并提供默认描述。后续可通过函数 <code class="code">org-insert-link</code> 将其插入回 Org 缓冲区。
 </p></li></ol>
 
 </div>

@@ -7,8 +7,9 @@ document.addEventListener("DOMContentLoaded", function(event) {
     if (window.location.pathname == "/"
         || window.location.pathname == "/index.html"
         || window.location.pathname == "/archives.html"
-        || window.location.pathname == "/jcodelog.html"
-        || window.location.pathname == "/reading/index.html"
+        || window.location.pathname == "/skills.html"
+        || window.location.pathname == "/others/english/index.html"
+        || window.location.pathname == "/translate/index.html"
         || window.location.pathname == "/link/index.html") {
         // 这些页面不启用 Disqus
         enableDisqus = false;
@@ -77,8 +78,9 @@ function addNavbar() {
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item"><a class="nav-link" href="/">JasperHsu</a></li>
-        <li class="nav-item"><a class="nav-link" href="/jcodelog.html">技术</a></li>
-        <li class="nav-item"><a class="nav-link" href="/reading/index.html">阅读</a></li>
+        <li class="nav-item"><a class="nav-link" href="/skills.html">技能</a></li>
+        <li class="nav-item"><a class="nav-link" href="/others/english/index.html">英语</a></li>
+        <li class="nav-item"><a class="nav-link" href="/translate/index.html">翻译</a></li>
         <li class="nav-item"><a class="nav-link" href="/archives.html">归档</a></li>
         <li class="nav-item"><a class="nav-link" href="/link/index.html">友链</a></li>
         <li class="nav-item"><a class="nav-link" href="/about.html">关于</a></li>

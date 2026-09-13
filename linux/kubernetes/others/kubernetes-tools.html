@@ -41,25 +41,30 @@
 <h2>&#30446;&#24405;</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#h:C52B4165-B204-495F-84A2-39978BAC04C1">k3s</a></li>
 <li><a href="#h:e7748fbc-5a90-4cfe-be05-235082201bf1">MetaLB</a></li>
-<li><a href="#h:6a953f2e-09a4-463b-9905-da547bec2cdb">Kurl</a></li>
 <li><a href="#h:21367e73-c218-4241-a16b-9fc1e2ddeaab">虚拟节点</a></li>
+<li><a href="#h:6a953f2e-09a4-463b-9905-da547bec2cdb">Kurl</a></li>
 <li><a href="#h:E9095474-9FA5-4AF7-8EC0-D97C4E7F5BB6">镜像</a></li>
+<li><a href="#h:6FB860B1-E8EA-43ED-A025-866C9E958D83">集群管理</a>
+<ul>
+<li><a href="#h:721F993C-E207-48E3-89B4-80F8B7475C5D">快速部署</a>
+<ul>
+<li><a href="#h:DC6843B5-2395-4EA0-83B2-0AFD2C9A5882">kubekey</a></li>
+</ul>
+</li>
+<li><a href="#h:0946E55C-5438-4429-AA67-0229A3DCC8F9">k9s</a>
+<ul>
+<li><a href="#h:159EEED7-2B04-4555-A894-5AD08EC36403">多集群切换</a></li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 </div>
 </nav>
 <ul class="org-ul">
 <li>TAGS: <a href="../index.html">Kubernetes</a></li>
 </ul>
-<section id="outline-container-h:C52B4165-B204-495F-84A2-39978BAC04C1" class="outline-2">
-<h2 id="h:C52B4165-B204-495F-84A2-39978BAC04C1"><a href="#h:C52B4165-B204-495F-84A2-39978BAC04C1">k3s</a></h2>
-<div class="outline-text-2" id="text-h:C52B4165-B204-495F-84A2-39978BAC04C1">
-<p>
-单点测试使用
-</p>
-</div>
-</section>
 <section id="outline-container-h:e7748fbc-5a90-4cfe-be05-235082201bf1" class="outline-2">
 <h2 id="h:e7748fbc-5a90-4cfe-be05-235082201bf1"><a href="#h:e7748fbc-5a90-4cfe-be05-235082201bf1">MetaLB</a></h2>
 <div class="outline-text-2" id="text-h:e7748fbc-5a90-4cfe-be05-235082201bf1">
@@ -71,54 +76,152 @@
 <a href="https://metallb.universe.tf/">https://metallb.universe.tf/</a>
 </p>
 
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#38598;&#32676;&#29256;&#26412; 1.37
+</span>root@master01:~# kubectl  get node
+NAME                  STATUS   ROLES           AGE   VERSION
+node01.jasper.org     Ready    worker          45h   v1.37.0
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597;&#38598;&#32676;&#30340;&#20195;&#29702;&#27169;&#24335;&#12290; nftables
+</span>root@master01:~# curl 127.0.0.1:10249/proxyMode
+nftables
+</pre>
+</div>
+
 <p>
 安装
 </p>
 <div class="org-src-container">
-<pre class="src src-sh">kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">2026.8 &#19981;&#20877;&#25903;&#25345; ipvs &#65292;&#25152;&#20197;&#19981;&#38656;&#35201;&#29305;&#27530;&#22788;&#29702;
+</span>curl -L -o metallb-native.yaml <span class="org-sh-escaped-newline">\</span>
+     https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-native.yaml
 
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#25110;&#25346;&#38236;&#20687;&#19979;&#36733;
+</span>curl -L -o metallb-native.yaml <span class="org-sh-escaped-newline">\</span>
+     https://ghfast.top/https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-native.yaml
 
-<span class="org-comment-delimiter">#</span><span class="org-comment">&#23450;&#20041;&#20998;&#37197;&#32473;&#36127;&#36733;&#22343;&#34913;&#22120;&#26381;&#21153;&#30340; IP
-</span>kubectl apply -f &lt;&lt;-EOF<span class="org-sh-heredoc">
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#38236;&#20687;&#29256;&#26412;
+</span>grep -E <span class="org-string">'^\s+image:'</span> metallb-native.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24212;&#29992;
+</span>kubectl apply -f metallb-native.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">speaker &#26159; DaemonSet + hostNetwork: true
+</span>kubectl -n metallb-system get pod -o wid
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#32593;&#32476;&#20449;&#24687;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">node
+</span>root@master01:~# kubectl get nodes -o wide
+NAME                  STATUS   ROLES           AGE   VERSION   INTERNAL-IP      EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION             CONTAINER-RUNTIME
+master01.jasper.org   Ready    control-plane   21h   v1.37.0   10.103.236.201   &lt;none&gt;        Ubuntu 26.04.1 LTS   7.0.0-31-generic (arm64)   containerd://2.3.5
+master02.jasper.org   Ready    control-plane   20h   v1.37.0   10.103.236.202   &lt;none&gt;        Ubuntu 26.04.1 LTS   7.0.0-31-generic (arm64)   containerd://2.3.5
+master03.jasper.org   Ready    control-plane   20h   v1.37.0   10.103.236.203   &lt;none&gt;        Ubuntu 26.04.1 LTS   7.0.0-31-generic (arm64)   containerd://2.3.5
+node01.jasper.org     Ready    worker          46h   v1.37.0   10.103.236.204   &lt;none&gt;        Ubuntu 26.04.1 LTS   7.0.0-31-generic (arm64)   containerd://2.3.5
+node02.jasper.org     Ready    worker          46h   v1.37.0   10.103.236.205   &lt;none&gt;        Ubuntu 26.04.1 LTS   7.0.0-31-generic (arm64)   containerd://2.3.5
+node03.jasper.org     Ready    worker          22h   v1.37.0   10.103.236.206   &lt;none&gt;        Ubuntu 26.04.1 LTS   7.0.0-31-generic (arm64)   containerd://2.3.5
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">service cidr
+</span>root@master01:~# grep -oE <span class="org-string">'\-\-service-cluster-ip-range=[^ ]*'</span> /lib/systemd/system/kube-apiserver.service
+--service-cluster-ip-range=192.168.0.0/16
+<span class="org-comment-delimiter">## </span><span class="org-comment">pod cidr
+</span>root@master01:~# kubectl get ippool -o custom-columns=NAME:.metadata.name,CIDR:.spec.cidr
+NAME                  CIDR
+default-ipv4-ippool   172.16.0.0/12
+root@master01:~# kubectl get ippools.crd.projectcalico.org -o yaml | grep cidr
+    cidr: 172.16.0.0/12
+</pre>
+</div>
+
+<p>
+配置
+</p>
+<ul class="org-ul">
+<li><a href="https://metallb.io/configuration/#layer-2-configuration">Layer 2 configuration</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">manifest &#19981;&#21547;&#20219;&#20309;&#37197;&#32622;&#65292;&#35013;&#23436;&#20004;&#20010;&#32452;&#20214;&#20250;&#31354;&#36716;&#12290;&#20808;&#30830;&#35748;&#33410;&#28857;&#32593;&#27573;&#65306;
+</span>kubectl get nodes -o wide
+ip -4 addr show | grep 10.103.236 <span class="org-comment-delimiter"># </span><span class="org-comment">&#25513;&#30721;&#30830;&#35748;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25214;&#31354;&#38386;&#22320;&#22336;
+</span><span class="org-variable-name">interface</span>=enp2s0
+<span class="org-keyword">for</span> i<span class="org-keyword"> in</span> $(seq 240 250); <span class="org-keyword">do</span>
+  arping -c 2 -w 1 -I $<span class="org-variable-name">interface</span> 10.103.236.$<span class="org-variable-name">i</span> &gt;/dev/null 2&gt;&amp;1 <span class="org-sh-escaped-newline">\</span>
+    &amp;&amp; <span class="org-builtin">echo</span> <span class="org-string">"10.103.236.$i &#24050;&#34987;&#21344;&#29992;"</span>
+<span class="org-keyword">done</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23450;&#20041;&#20998;&#37197;&#32473;&#36127;&#36733;&#22343;&#34913;&#22120;&#26381;&#21153;&#30340; IP
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#25361;&#19968;&#27573;&#21516;&#32593;&#27573;&#12289;&#19981;&#22312; DHCP &#27744;&#37324;&#30340;&#31354;&#38386; IP
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#33410;&#28857;&#22312; 10.103.236.0/24 &#27573;&#65292;&#23601;&#20174;&#36825;&#37324;&#21010;&#20986;&#38386;&#32622; ip
+</span>cat &gt;ippool.yaml &lt;&lt; EOF<span class="org-sh-heredoc">
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: first-pool
+  name: default-pool
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.10.0/24
-EOF
-</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">&#20108;&#23618;&#37197;&#32622;
-</span>kubectl apply -f &lt;&lt;-EOF<span class="org-sh-heredoc">
+  - 10.103.236.240-10.103.236.250
+---
+#&#20108;&#23618;&#36716;&#21457;&#21151;&#33021;
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
-  name: example
+  name: default-l2
   namespace: metallb-system
 spec:
   ipAddressPools:
-  - first-pool
-EOF</span>
+  - default-pool
+EOF
+</span>
+kubectl apply -f ippool.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;
+</span>root@master01:~# kubectl  -n metallb-system  get ipaddresspool
+NAME           AUTO ASSIGN   AVOID BUGGY IPS   ADDRESSES
+default-pool   true          false             [<span class="org-string">"10.103.236.240-10.103.236.250"</span>]
+
+root@master01:~# kubectl  -n metallb-system  get ippools
+NAME                  AGE
+default-ipv4-ippool   41h
+root@master01:~# kubectl  -n metallb-system  get l2advertisements
+NAME         IPADDRESSPOOLS     IPADDRESSPOOL SELECTORS   INTERFACES
+default-l2   [<span class="org-string">"default-pool"</span>]
 </pre>
 </div>
-</div>
-</section>
-<section id="outline-container-h:6a953f2e-09a4-463b-9905-da547bec2cdb" class="outline-2">
-<h2 id="h:6a953f2e-09a4-463b-9905-da547bec2cdb"><a href="#h:6a953f2e-09a4-463b-9905-da547bec2cdb">Kurl</a></h2>
-<div class="outline-text-2" id="text-h:6a953f2e-09a4-463b-9905-da547bec2cdb">
-<p>
-kURL 是一个定制的 Kubernetes 发行版创建工具。自定义选择安装哪些组件。
-</p>
 
 <p>
-<a href="https://kurl.sh/">https://kurl.sh/</a>
+使用
 </p>
-
 <div class="org-src-container">
-<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#36873;&#25321;&#22909;&#65292;&#23433;&#35013;
-</span>curl https://kurl.sh/latest | sudo bash
+<pre class="src src-shell">cat &gt; n.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+  namespace: default
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+EOF
+</span>  
+kubectl  apply -f n.yaml
+
+
+root@master01:~# kubectl  get svc
+NAME         TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
+kubernetes   ClusterIP      192.168.0.1      &lt;none&gt;           443/TCP        2d2h
+nginx        LoadBalancer   192.168.21.226   10.103.236.240   80:30963/TCP   4s
 </pre>
 </div>
 </div>
@@ -142,12 +245,756 @@ kURL 是一个定制的 Kubernetes 发行版创建工具。自定义选择安装
 </ul>
 </div>
 </section>
+<section id="outline-container-h:6a953f2e-09a4-463b-9905-da547bec2cdb" class="outline-2">
+<h2 id="h:6a953f2e-09a4-463b-9905-da547bec2cdb"><a href="#h:6a953f2e-09a4-463b-9905-da547bec2cdb">Kurl</a></h2>
+<div class="outline-text-2" id="text-h:6a953f2e-09a4-463b-9905-da547bec2cdb">
+<p>
+kURL 是一个定制的 Kubernetes 发行版创建工具。自定义选择安装哪些组件。
+</p>
+
+<p>
+<a href="https://kurl.sh/">https://kurl.sh/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#36873;&#25321;&#22909;&#65292;&#23433;&#35013;
+</span>curl https://kurl.sh/latest | sudo bash
+</pre>
+</div>
+</div>
+</section>
 <section id="outline-container-h:E9095474-9FA5-4AF7-8EC0-D97C4E7F5BB6" class="outline-2">
 <h2 id="h:E9095474-9FA5-4AF7-8EC0-D97C4E7F5BB6"><a href="#h:E9095474-9FA5-4AF7-8EC0-D97C4E7F5BB6">镜像</a></h2>
 <div class="outline-text-2" id="text-h:E9095474-9FA5-4AF7-8EC0-D97C4E7F5BB6">
 <ul class="org-ul">
 <li><a href="https://github.com/jimmidyson/configmap-reload/pkgs/container/configmap-reload">configmap-reload</a>  监听目录变化 <code>docker pull ghcr.io/jimmidyson/configmap-reload:dev</code></li>
 </ul>
+</div>
+</section>
+<section id="outline-container-h:6FB860B1-E8EA-43ED-A025-866C9E958D83" class="outline-2">
+<h2 id="h:6FB860B1-E8EA-43ED-A025-866C9E958D83"><a href="#h:6FB860B1-E8EA-43ED-A025-866C9E958D83">集群管理</a></h2>
+<div class="outline-text-2" id="text-h:6FB860B1-E8EA-43ED-A025-866C9E958D83">
+</div>
+<div id="outline-container-h:721F993C-E207-48E3-89B4-80F8B7475C5D" class="outline-3">
+<h3 id="h:721F993C-E207-48E3-89B4-80F8B7475C5D"><a href="#h:721F993C-E207-48E3-89B4-80F8B7475C5D">快速部署</a></h3>
+<div class="outline-text-3" id="text-h:721F993C-E207-48E3-89B4-80F8B7475C5D">
+<p>
+部署工具
+</p>
+<ul class="org-ul">
+<li>kubeadm 原生
+<ul class="org-ul">
+<li>kubekey</li>
+<li>sealos</li>
+<li>kubeaz</li>
+<li>minikube</li>
+<li>kind</li>
+<li>kubespray</li>
+</ul></li>
+<li>K0S
+<ul class="org-ul">
+<li>近原生 k8s</li>
+</ul></li>
+<li>Rancher
+<ul class="org-ul">
+<li>k3s</li>
+<li>RKE2</li>
+</ul></li>
+</ul>
+</div>
+<div id="outline-container-h:DC6843B5-2395-4EA0-83B2-0AFD2C9A5882" class="outline-4">
+<h4 id="h:DC6843B5-2395-4EA0-83B2-0AFD2C9A5882"><a href="#h:DC6843B5-2395-4EA0-83B2-0AFD2C9A5882">kubekey</a></h4>
+<div class="outline-text-4" id="text-h:DC6843B5-2395-4EA0-83B2-0AFD2C9A5882">
+<p>
+集群创建工具
+</p>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">linux
+</span><span class="org-variable-name">KUBEKEY_VERSION</span>=4.0.6
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/kubesphere/kubekey/releases/download/v${<span class="org-variable-name">KUBEKEY_VERSION</span>}/kubekey-v${<span class="org-variable-name">KUBEKEY_VERSION</span>}-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+
+tar xf kubekey-v${<span class="org-variable-name">KUBEKEY_VERSION</span>}-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz kk
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1. &#29983;&#25104; inventory.yaml
+</span>./kk create inventory -o .
+cat &gt; inventory.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: kubekey.kubesphere.io/v1
+kind: Inventory
+metadata:
+  name: default
+spec:
+  hosts:
+    localhost:
+      connector:
+        password: 123456      # &#26412;&#22320;&#36830;&#25509;&#26102;&#36825;&#26159; sudo &#23494;&#30721;
+  groups:
+    k8s_cluster:
+      groups:
+        - kube_control_plane
+        - kube_worker
+    kube_control_plane:
+      hosts:
+        - localhost
+    kube_worker:
+      hosts:
+        - localhost
+    etcd:
+      hosts:
+        - localhost
+EOF
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#26524;&#20320;&#26159; root &#30452;&#25509;&#36305;&#65292;connector &#37027;&#27573;&#21487;&#20197;&#25972;&#20010;&#21024;&#25481;&#8212;&#8212;type &#20250;&#26681;&#25454;&#33410;&#28857;&#21517;&#33258;&#21160;&#35782;&#21035;&#25104; local&#12290;
+</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#21019;&#24314;&#38598;&#32676;&#37197;&#32622;&#25991;&#20214;
+</span>./kk create config --with-kubernetes v1.37.0 -o .
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25353;&#38656;&#20462;&#25913;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">kubernetes.kube_proxy.mode &#21482;&#33021;&#36873; ipvs &#25110; iptables&#65292;&#27809;&#26377; nftables&#12290;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">KubeKey &#40664;&#35748; Pod 10.233.64.0/18&#12289;Service 10.233.0.0/18
+</span>vim config-v1.37.0.yaml
+zone: <span class="org-string">"cn"</span>                      <span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38190;&#65292;&#19981;&#28982;&#38236;&#20687;&#36824;&#26159;&#36208;&#22659;&#22806;&#28304;
+</span>
+kubernetes:
+  cluster_name: my-cluster
+  control_plane_endpoint:
+    host: lb.kubesphere.local
+    <span class="org-builtin">type</span>: local                 <span class="org-comment-delimiter"># </span><span class="org-comment">&#21333;&#33410;&#28857;&#20445;&#25345; local&#65292;&#20250;&#24448; /etc/hosts &#20889; 127.0.0.1
+</span>
+cni:
+  <span class="org-builtin">type</span>: calico
+  pod_cidr: 10.233.64.0/18      <span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748;&#20540;
+</span>  service_cidr: 10.233.0.0/18   <span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748;&#20540;
+</span>
+cri:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">containerd &#25110; docker&#65292;&#40664;&#35748; containerd
+</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3 &#23433;&#35013;
+</span>./kk create cluster -i inventory.yaml -c config-v1.34.0.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;
+</span>kubectl get nodes
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">4. &#21024;&#38500;&#38598;&#32676;
+</span>./kk delete cluster --all --with-data
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0946E55C-5438-4429-AA67-0229A3DCC8F9" class="outline-3">
+<h3 id="h:0946E55C-5438-4429-AA67-0229A3DCC8F9"><a href="#h:0946E55C-5438-4429-AA67-0229A3DCC8F9">k9s</a></h3>
+<div class="outline-text-3" id="text-h:0946E55C-5438-4429-AA67-0229A3DCC8F9">
+<p>
+命令行终端集群管理工具
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/derailed/k9s">https://github.com/derailed/k9s</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">linux
+</span><span class="org-variable-name">K9S_VERSION</span>=0.51.0
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/derailed/k9s/releases/download/v${<span class="org-variable-name">K9S_VERSION</span>}/k9s_Linux_${<span class="org-variable-name">ARCH</span>}.tar.gz
+
+tar xf k9s_Linux_${<span class="org-variable-name">ARCH</span>}.tar.gz  -C /usr/local/bin k9s
+</pre>
+</div>
+
+
+<p>
+<b>使用</b>
+</p>
+
+<p>
+k9s 的完整键位可以在程序内按 <code>?</code> 查看帮助，按 <code>ctrl-a</code> 查看所有资源别名。
+</p>
+<ul class="org-ul">
+<li>vim 类 jk 上下选择， <code>:</code> 选择 crd 的类型， <code>q</code> 退出。</li>
+<li>键位以 <a href="https://github.com/derailed/k9s#key-bindings">k9s 官方 README Key Bindings</a> 为准。</li>
+</ul>
+
+
+<p>
+启动
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">k9s                          <span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748;&#21551;&#21160;
+</span>k9s -n kube-system           <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#21629;&#21517;&#31354;&#38388;
+</span>k9s --context jasper-org     <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#38598;&#32676; context
+</span>k9s --readonly               <span class="org-comment-delimiter"># </span><span class="org-comment">&#21482;&#35835;&#27169;&#24335;&#65292;&#31105;&#29992; delete/kill/edit
+</span>k9s info                     <span class="org-comment-delimiter"># </span><span class="org-comment">&#25171;&#21360;&#37197;&#32622;&#12289;&#26085;&#24535;&#12289;&#25554;&#20214;&#12289;&#21035;&#21517;&#25991;&#20214;&#30340;&#23454;&#38469;&#36335;&#24452;
+</span>k9s help                     <span class="org-comment-delimiter"># </span><span class="org-comment">&#25152;&#26377; CLI &#36873;&#39033;</span>
+</pre>
+</div>
+
+<p>
+导航
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">操作</th>
+<th scope="col" class="org-left">键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">打开资源视图</td>
+<td class="org-left"><code>:pod⏎</code> （单数/复数/简称/别名都认）</td>
+</tr>
+
+<tr>
+<td class="org-left">指定命名空间</td>
+<td class="org-left"><code>:pod kube-system⏎</code></td>
+</tr>
+
+<tr>
+<td class="org-left">直接带过滤</td>
+<td class="org-left"><code>:pod /nginx⏎</code></td>
+</tr>
+
+<tr>
+<td class="org-left">直接带标签</td>
+<td class="org-left"><code>:pod app=headlamp,env=prod⏎</code></td>
+</tr>
+
+<tr>
+<td class="org-left">切换集群 context</td>
+<td class="org-left"><code>:ctx⏎</code> 或 <code>:ctx 集群名⏎</code></td>
+</tr>
+
+<tr>
+<td class="org-left">切换命名空间</td>
+<td class="org-left"><code>:ns⏎</code> ，在列表里按 <code>u</code> 使用</td>
+</tr>
+
+<tr>
+<td class="org-left">返回上一层</td>
+<td class="org-left"><code>esc</code></td>
+</tr>
+
+<tr>
+<td class="org-left">回到上一个命令（类似 cd -）</td>
+<td class="org-left"><code>-</code></td>
+</tr>
+
+<tr>
+<td class="org-left">命令历史前后翻</td>
+<td class="org-left"><code>[</code> / <code>]</code></td>
+</tr>
+
+<tr>
+<td class="org-left">所有资源别名速查</td>
+<td class="org-left"><code>ctrl-a</code></td>
+</tr>
+
+<tr>
+<td class="org-left">显示帮助</td>
+<td class="org-left"><code>?</code></td>
+</tr>
+
+<tr>
+<td class="org-left">退出</td>
+<td class="org-left"><code>:q⏎</code> 或 <code>ctrl-c</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>
+过滤和排序-这是找问题的核心区。
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">操作</th>
+<th scope="col" class="org-left">键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">正则过滤</td>
+<td class="org-left"><code>/nginx⏎</code> ，支持 <code>fred\vert{}blee</code></td>
+</tr>
+
+<tr>
+<td class="org-left">反向过滤</td>
+<td class="org-left"><code>/! nginx⏎</code> 留下*不*匹配的</td>
+</tr>
+
+<tr>
+<td class="org-left">按标签过滤</td>
+<td class="org-left"><code>/-l app=nginx⏎</code></td>
+</tr>
+
+<tr>
+<td class="org-left">模糊查找</td>
+<td class="org-left"><code>/-f nginx⏎</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><b>只看故障/错误</b></td>
+<td class="org-left"><code>ctrl-z</code></td>
+</tr>
+
+<tr>
+<td class="org-left">按状态排序</td>
+<td class="org-left"><code>shift-s</code></td>
+</tr>
+
+<tr>
+<td class="org-left">按时间排序</td>
+<td class="org-left"><code>shift-a</code></td>
+</tr>
+
+<tr>
+<td class="org-left">按名称排序</td>
+<td class="org-left"><code>shift-n</code></td>
+</tr>
+
+<tr>
+<td class="org-left">按命名空间排序</td>
+<td class="org-left"><code>shift-p</code> （仅全命名空间视图下可用）</td>
+</tr>
+
+<tr>
+<td class="org-left">按当前列排序</td>
+<td class="org-left"><code>shift-o</code></td>
+</tr>
+
+<tr>
+<td class="org-left">宽列（IP、节点等）</td>
+<td class="org-left"><code>ctrl-w</code></td>
+</tr>
+
+<tr>
+<td class="org-left">列左移 / 右移</td>
+<td class="org-left"><code>shift-←</code> / <code>shift-→</code></td>
+</tr>
+</tbody>
+</table>
+
+<blockquote>
+<p>
+<code>ctrl-z</code> 是运维最该记住的一个键。集群几百个 Pod，一键只留异常的，
+比 <code>kubectl get pod -A | grep -v Running</code> 好用得多。
+</p>
+</blockquote>
+
+<p>
+排查单个资源
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">操作</th>
+<th scope="col" class="org-left">键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">describe</td>
+<td class="org-left"><code>d</code></td>
+</tr>
+
+<tr>
+<td class="org-left">查看 YAML</td>
+<td class="org-left"><code>y</code></td>
+</tr>
+
+<tr>
+<td class="org-left">查看日志</td>
+<td class="org-left"><code>l</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><b>上一次容器的日志</b></td>
+<td class="org-left"><code>p</code></td>
+</tr>
+
+<tr>
+<td class="org-left">进容器 shell</td>
+<td class="org-left"><code>s</code></td>
+</tr>
+
+<tr>
+<td class="org-left">attach</td>
+<td class="org-left"><code>a</code></td>
+</tr>
+
+<tr>
+<td class="org-left">编辑</td>
+<td class="org-left"><code>e</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><b>跳到 owner</b></td>
+<td class="org-left"><code>shift-j</code></td>
+</tr>
+
+<tr>
+<td class="org-left">刷新视图</td>
+<td class="org-left"><code>ctrl-r</code></td>
+</tr>
+
+<tr>
+<td class="org-left">复制资源名</td>
+<td class="org-left"><code>c</code></td>
+</tr>
+
+<tr>
+<td class="org-left">复制命名空间</td>
+<td class="org-left"><code>n</code></td>
+</tr>
+</tbody>
+</table>
+
+<ul class="org-ul">
+<li><code>p</code> 看崩溃前的日志，等价于 <code>kubectl logs --previous</code> 。
+CrashLoopBackOff 全靠它。</li>
+<li><code>shift-j</code> 从 Pod 一路跳到 ReplicaSet 再到 Deployment，
+省掉翻 ownerReferences 的功夫。</li>
+</ul>
+
+
+<p>
+日志视图内的键
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">操作</th>
+<th scope="col" class="org-left">键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">切换自动换行</td>
+<td class="org-left"><code>w</code></td>
+</tr>
+
+<tr>
+<td class="org-left">切换时间戳</td>
+<td class="org-left"><code>t</code></td>
+</tr>
+
+<tr>
+<td class="org-left">全屏</td>
+<td class="org-left"><code>f</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<code>f</code> 全屏同样适用于 YAML 和 Details 视图
+</p>
+
+
+<p>
+找依赖关系
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">操作</th>
+<th scope="col" class="org-left">键</th>
+<th scope="col" class="org-left">适用对象</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><b>UsedBy</b> — 谁在用这个</td>
+<td class="org-left"><code>u</code></td>
+<td class="org-left">ServiceAccount / PVC / Secret / ConfigMap</td>
+</tr>
+
+<tr>
+<td class="org-left">查看 ReplicaSets</td>
+<td class="org-left"><code>z</code></td>
+<td class="org-left">Deployment 视图</td>
+</tr>
+
+<tr>
+<td class="org-left">Warp to namespace</td>
+<td class="org-left"><code>w</code></td>
+<td class="org-left">有命名空间列时</td>
+</tr>
+</tbody>
+</table>
+
+<blockquote>
+<p>
+<code>u</code> 这个很多人不知道。"这个 Secret 能不能删"、"这个 PVC 挂在哪"，
+选中按 <code>u</code> 直接列出引用方。
+</p>
+</blockquote>
+
+<p>
+日常操作
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">操作</th>
+<th scope="col" class="org-left">键</th>
+<th scope="col" class="org-left">适用对象</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><b>滚动重启</b></td>
+<td class="org-left"><code>r</code></td>
+<td class="org-left">Deployment / DaemonSet / StatefulSet</td>
+</tr>
+
+<tr>
+<td class="org-left">回滚</td>
+<td class="org-left"><code>ctrl-l</code></td>
+<td class="org-left">ReplicaSet 视图</td>
+</tr>
+
+<tr>
+<td class="org-left">手动触发</td>
+<td class="org-left"><code>t</code></td>
+<td class="org-left">CronJob</td>
+</tr>
+
+<tr>
+<td class="org-left"><b>cordon / uncordon</b></td>
+<td class="org-left"><code>u</code></td>
+<td class="org-left">Node 视图</td>
+</tr>
+
+<tr>
+<td class="org-left"><b>drain</b></td>
+<td class="org-left"><code>r</code></td>
+<td class="org-left">Node 视图</td>
+</tr>
+
+<tr>
+<td class="org-left">端口转发</td>
+<td class="org-left"><code>shift-f</code></td>
+<td class="org-left">Pod / Service / Container</td>
+</tr>
+
+<tr>
+<td class="org-left">查看已有转发</td>
+<td class="org-left"><code>f</code></td>
+<td class="org-left">同上</td>
+</tr>
+
+<tr>
+<td class="org-left">压测（启动/停止）</td>
+<td class="org-left"><code>b</code></td>
+<td class="org-left">Service / Port-forward</td>
+</tr>
+</tbody>
+</table>
+
+<blockquote>
+<p>
+*警告*：=r= 在不同视图含义不同。工作负载视图是滚动重启，
+*Node 视图是 drain*。手滑代价差很远。
+</p>
+</blockquote>
+
+
+<p>
+生产环境建议-默认开只读
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">k9s --readonly
+</pre>
+</div>
+
+<p>
+或写进配置文件：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">k9s:
+  readOnly: true
+</pre>
+</div>
+</div>
+<div id="outline-container-h:159EEED7-2B04-4555-A894-5AD08EC36403" class="outline-4">
+<h4 id="h:159EEED7-2B04-4555-A894-5AD08EC36403"><a href="#h:159EEED7-2B04-4555-A894-5AD08EC36403">多集群切换</a></h4>
+<div class="outline-text-4" id="text-h:159EEED7-2B04-4555-A894-5AD08EC36403">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1.&#22312;&#23545;&#26041;&#38598;&#32676;&#19978;&#25191;&#34892;&#65292;&#24314;&#19968;&#20010;&#19987;&#29992; ServiceAccount
+</span>kubectl create sa k9s-ops -n kube-system
+  kubectl create clusterrolebinding k9s-ops <span class="org-sh-escaped-newline">\</span>
+    --clusterrole=cluster-admin <span class="org-sh-escaped-newline">\</span>
+    --serviceaccount=kube-system:k9s-ops
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">k8s 1.24 &#20043;&#21518; SA &#19981;&#20877;&#33258;&#21160;&#29983;&#25104;&#27704;&#20037; Secret&#65292;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">kubectl create token &#31614;&#20986;&#26469;&#30340;&#26377;&#26399;&#38480;&#65292;&#20250;&#36807;&#26399;&#12290;&#38271;&#26399;&#29992;&#35201;&#25163;&#21160;&#24314;&#65306;
+</span>  
+kubectl apply -f - &lt;&lt;<span class="org-string">'EOF'</span><span class="org-sh-heredoc">
+apiVersion: v1
+kind: Secret
+metadata:
+  name: k9s-ops-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: k9s-ops
+type: kubernetes.io/service-account-token
+EOF
+</span>
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#28982;&#21518;&#32452;&#35013; kubeconfig
+</span><span class="org-variable-name">SERVER</span>=https://10.103.236.236:6443
+<span class="org-variable-name">CTX</span>=prod-cluster
+<span class="org-variable-name">CA</span>=$(kubectl -n kube-system get secret k9s-ops-token -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">'{.data.ca\.crt}'</span>)
+<span class="org-variable-name">TOKEN</span>=$(kubectl -n kube-system get secret k9s-ops-token -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">'{.data.token}'</span> | base64 -d)
+
+cat &gt; ./$<span class="org-variable-name">CTX</span>.kubeconfig &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Config
+clusters:
+- name: $CTX
+  cluster:
+    server: $SERVER
+    certificate-authority-data: $CA
+users:
+- name: $CTX
+  user:
+    token: $TOKEN
+contexts:
+- name: $CTX
+  context:
+    cluster: $CTX
+    user: $CTX
+current-context: $CTX
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#26412;&#22320;&#21512;&#24182; kubeconfig
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">&#22312;&#21512;&#24182;&#21069;&#65292;&#20808;&#32473;&#23545;&#26041;&#30340;&#25991;&#20214;&#25913;&#21517;&#65292;&#36991;&#20813;&#20914;&#31361;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">&#30830;&#35748; context &#26159;&#19981;&#26159;&#21483; kubernetes-admin@kubernete
+</span><span class="org-variable-name">KUBECONFIG</span>=./prod-cluster.kubeconfig kubectl config view --minify --raw
+
+<span class="org-variable-name">KUBECONFIG</span>=./prod-cluster.kubeconfig kubectl config rename-context <span class="org-sh-escaped-newline">\</span>
+            kubernetes-admin@kubernetes prod-cluster
+
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#21512;&#24182;
+</span>cp ~/.kube/config ~/.kube/config.bak
+<span class="org-variable-name">KUBECONFIG</span>=~/.kube/config:./prod-cluster.kubeconfig <span class="org-sh-escaped-newline">\</span>
+    kubectl config view --flatten &gt; /tmp/merged
+
+mv /tmp/merged ~/.kube/config
+chmod 600 ~/.kube/config
+<span class="org-comment-delimiter"># </span><span class="org-comment">--flatten &#26159;&#20851;&#38190;&#8212;&#8212;&#23427;&#25226;&#35777;&#20070;&#25991;&#20214;&#30340;&#20869;&#23481;&#20869;&#23884;&#36827;&#21435;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#19981;&#21152;&#30340;&#35805;&#21512;&#24182;&#32467;&#26524;&#37324;&#21482;&#26159; certificate-authority: /path/to/ca.crt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#36825;&#31181;&#36335;&#24452;&#24341;&#29992;&#65292;&#25442;&#21488;&#26426;&#22120;&#23601;&#22833;&#25928;&#20102;&#12290;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;
+</span>kubectl config get-contexts
+</pre>
+</div>
+
+<p>
+k9s 里切换
+</p>
+<ul class="org-ul">
+<li>列出并切换     ：ctx⏎</li>
+<li>直接切到指定集群：ctx prod-cluster⏎</li>
+<li>启动时指定：k9s &#x2013;context prod-cluster</li>
+<li>用别的 kubeconfig 文件：k9s &#x2013;kubeconfig /path/to/config</li>
+<li>跨集群看资源          ：pod @prod-cluster⏎</li>
+</ul>
+
+
+<p>
+k9s 每集群独立配置
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$<span class="org-variable-name">XDG_DATA_HOME</span>/k9s/clusters/&lt;&#38598;&#32676;&#21517;&gt;/&lt;context&#21517;&gt;/config.yaml
+
+k9s:
+  cluster: prod-cluster
+  readOnly: true          <span class="org-comment-delimiter"># </span><span class="org-comment">&#36825;&#20010;&#38598;&#32676;&#24378;&#21046;&#21482;&#35835;
+</span>  namespace:
+    active: default
+    lockFavorites: false
+    favorites:
+      - kube-system
+      - headlamp
+      - metallb-system
+  view:
+    active: po            <span class="org-comment-delimiter"># </span><span class="org-comment">&#36827;&#26469;&#40664;&#35748;&#33853;&#22312; Pod &#35270;&#22270;
+</span>  featureGates:
+    nodeShell: true       <span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768;&#22312; Node &#35270;&#22270;&#25353; s &#36827;&#23487;&#20027;&#26426;</span>
+</pre>
+</div>
+</div>
+</div>
 </div>
 </section>
 </div>

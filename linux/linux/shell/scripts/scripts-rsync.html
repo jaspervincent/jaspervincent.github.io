@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-rsync</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-rsync</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:202ccd6c-43e1-4dfb-a904-cbd386b1381c">同步_上线push-mod.sh</a></li>
+<li><a href="#h:07e86182-7adc-4505-9b3f-e542825295d3">同步_内网</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li><p>
+TAGS: <a href="../index.html">Script</a>
+</p>
+
+<p>
+很早以前上线是靠脚本同步数据的
+</p></li>
+</ul>
+<section id="outline-container-h:202ccd6c-43e1-4dfb-a904-cbd386b1381c" class="outline-2">
+<h2 id="h:202ccd6c-43e1-4dfb-a904-cbd386b1381c"><a href="#h:202ccd6c-43e1-4dfb-a904-cbd386b1381c">同步_上线push-mod.sh</a></h2>
+<div class="outline-text-2" id="text-h:202ccd6c-43e1-4dfb-a904-cbd386b1381c">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">sh</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">create_date:2015.7.3
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">version:1.0
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#39044;&#19978;&#32447;&#29615;&#22659;&#20195;&#30721;&#21516;&#27493;&#20197;&#21450;&#25209;&#37327;&#21551;&#21160;&#26381;&#21153;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#21464;&#37327;
+</span><span class="org-variable-name">DATE</span>=$(date <span class="org-string">'+%F %T'</span>)
+<span class="org-comment-delimiter">#################################################################</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">nginx server:nginx3 nginx4                                     #
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">app_server:app3 app4                        #
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">userplat_form:userplatform1 userplatform2            #
+</span><span class="org-variable-name">NGINX_SERVER</span>=(10.161.159.96 10.161.145.115)            <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">APP_SERVER</span>=(10.160.3.242 10.160.7.122)                <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">USER_PLAT_FORM</span>=(10.241.132.237 10.241.132.238)            <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">NGINX_PATH</span>=/home/emacle/services/webstatic            <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">APP_PATH</span>=/home/emacle/libexec/backend/current                    <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">APP_TRUE_PATH</span>=<span class="org-sh-quoted-exec">`cd $APP_PATH &amp;&amp; pwd -P`</span>                        <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">USER_FORM_PATH</span>=/home/emacle/services/user_platform/tongbupan    <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">PYTHON_PORT</span>=<span class="org-string">"9005 9006 9007"</span>                    <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#################################################################</span><span class="org-comment">
+</span><span class="org-variable-name">RETVAL</span>=0
+<span class="org-variable-name">CurUser</span>=<span class="org-sh-quoted-exec">`/usr/bin/whoami`</span>
+<span class="org-variable-name">LOG_FILE</span>=<span class="org-string">'/home/emacle/script/push-mod.log'</span>
+. /etc/init.d/functions
+
+<span class="org-builtin">echo</span> <span class="org-string">"### $DATE  $0 script begin now ..."</span> | tee -a $<span class="org-variable-name">LOG_FILE</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">emacle&#29992;&#25143;&#25191;&#34892;&#33050;&#26412;
+</span><span class="org-function-name">check_user</span> (){
+  <span class="org-keyword">if</span> [ <span class="org-string">"$CurUser"</span> != <span class="org-string">"emacle"</span> ];<span class="org-keyword">then</span>
+      <span class="org-builtin">echo</span> <span class="org-string">"Please su - emacle!Exit The Program!"</span>
+      <span class="org-builtin">echo</span> <span class="org-string">"[`date '+%F %H:%M:%S'`] Please su - emacle!Exit The Program!"</span> &gt;&gt; $<span class="org-variable-name">LogFile</span>
+      <span class="org-keyword">exit</span> 1
+  <span class="org-keyword">fi</span>
+}
+<span class="org-function-name">Information</span> (){
+cat &lt;&lt;EOF<span class="org-sh-heredoc">
+    &#21516;&#27493;&#35828;&#26126;&#65306;
+    &#26412;&#27425;&#38024;&#23545;134&#39044;&#19978;&#32447;&#26381;&#21153;&#22120;&#65292;&#30001;&#33050;&#26412;&#23454;&#29616;&#20195;&#30721;&#21516;&#27493;&#21040;webstatic&#12289;user_platform&#12289;appserver&#26381;&#21153;&#22120;&#20043;&#19978;&#12290;
+    &#26412;&#33050;&#26412;&#20027;&#35201;&#20998;&#20026;&#20004;&#27493;&#65306;&#20195;&#30721;&#21516;&#27493;&#12289;&#26381;&#21153;&#22120;&#37325;&#21551;&#12290;
+    &#38656;&#35201;&#27880;&#24847;&#30340;&#26159;&#65306;
+    &#26412;&#33050;&#26412;&#36824;&#19981;&#23436;&#21892;&#65292;&#21516;&#27493;&#26102;&#38656;&#35201;&#26681;&#25454;&#23454;&#38469;&#29615;&#22659;&#36827;&#34892;&#21516;&#27493;&#12290;&#19979;&#38754;&#25552;&#20379;&#19968;&#20123;&#31616;&#35201;&#21629;&#20196;&#21442;&#25968;&#65306;
+    rsync:
+    -a, --archive &#24402;&#26723;&#27169;&#24335;&#65292;&#34920;&#31034;&#20197;&#36882;&#24402;&#26041;&#24335;&#20256;&#36755;&#25991;&#20214;&#65292;&#24182;&#20445;&#25345;&#25152;&#26377;&#25991;&#20214;&#23646;&#24615;&#65292;&#31561;&#20110;-rlptgoD
+    -u, --update &#20165;&#20165;&#36827;&#34892;&#26356;&#26032;&#65292;&#20063;&#23601;&#26159;&#36339;&#36807;&#25152;&#26377;&#24050;&#32463;&#23384;&#22312;&#20110;DST&#65292;&#24182;&#19988;&#25991;&#20214;&#26102;&#38388;&#26202;&#20110;&#35201;&#22791;&#20221;&#30340;&#25991;&#20214;&#12290;(&#19981;&#35206;&#30422;&#26356;&#26032;&#30340;&#25991;&#20214;)
+    -r, --recursive &#23545;&#23376;&#30446;&#24405;&#20197;&#36882;&#24402;&#27169;&#24335;&#22788;&#29702;
+    --delete &#21024;&#38500;&#37027;&#20123;DST&#20013;SRC&#27809;&#26377;&#30340;&#25991;&#20214;
+    --timeout=TIME IP&#36229;&#26102;&#26102;&#38388;&#65292;&#21333;&#20301;&#20026;&#31186;
+    --exclude=PATTERN &#25351;&#23450;&#25490;&#38500;&#19981;&#38656;&#35201;&#20256;&#36755;&#30340;&#25991;&#20214;&#27169;&#24335;
+    --exclude-from=FILE &#25490;&#38500;FILE&#20013;&#25351;&#23450;&#27169;&#24335;&#30340;&#25991;&#20214;
+    -z, --compress &#23545;&#22791;&#20221;&#30340;&#25991;&#20214;&#22312;&#20256;&#36755;&#26102;&#36827;&#34892;&#21387;&#32553;&#22788;&#29702;
+    -e &#25351;&#23450;&#36890;&#36947;&#21327;&#35758;&#65292;-e ssh&#29992;ssh&#21327;&#35758;&#36830;&#25509;&#36828;&#31243;&#30340;&#26426;&#22120;
+    &#20363;1&#65306;&#25512;&#36865; &#32477;&#23545;&#36335;&#24452;
+    &#23558;&#26412;&#22320;abc&#25991;&#20214;&#22841;&#30340;&#25152;&#26377;&#25991;&#20214;&#25512;&#36865;&#21040;&#30446;&#26631;&#26381;&#21153;&#22120;&#23478;&#30446;&#24405;&#19979;33&#25991;&#20214;&#22841;&#20013;&#12290;
+    rsync -zav --delete /root/abc/ 10.0.0.6:~/33
+    ps:&#22914;&#26524;&#26159;&#29992;&#30456;&#23545;&#36335;&#24452;&#21152;-R&#65292;&#20294;&#19978;&#38754;&#21629;&#20196;&#20250;&#26377;&#36923;&#36753;&#38382;&#39064;&#12290;
+    cd /root
+    rsync -zav --delete -R ./abc/ 10.0.0.6:~/33
+    &#24847;&#24605;&#26159;&#25226;abc &#25991;&#20214;&#22841;&#65292;&#21516;&#27493;&#21040;&#30446;&#26631;&#26381;&#21153;&#22120;33&#30446;&#24405;&#19979;&#24182;&#29983;&#25104;abc&#25991;&#20214;&#22841;
+    &#20363;2&#65306;&#25490;&#38500;
+    * --exclude=a.txt
+    * --exclude={a.txt,b.txt}
+    * --exclude={a..g}
+    * --exclude-from=paichu.txt
+    &#20351;&#29992;rsync -av --exclude=upload &#21482;&#33021;&#25490;&#38500;upload&#25991;&#20214;/&#30446;&#24405;&#12290;&#20294;&#22914;&#35201;&#25490;&#38500;&#22810;&#20010;&#25991;&#20214;/&#30446;&#24405;&#65292;\
+    &#23601;&#38656;&#26032;&#24314;exclude.list&#65292;&#28982;&#21518;rsync -av --exclude-from="exclude.list"&#25351;&#23450;&#19981;&#38656;&#35201;&#21516;&#27493;&#30340;&#25991;&#20214;/&#30446;&#24405;
+    rsync -av --exclude-from=/a/exclude.list /a/backup /a/mysql/backup2/
+    &#23558;/a/backup&#30446;&#24405;&#25335;&#36125;&#21040;/a/backup2&#30446;&#24405;&#19979;&#65292;/a/exclude.list&#20013;&#25351;&#23450;&#25991;&#20214;&#19981;&#25335;&#36125;&#12290;
+    &#27880;&#24847;exclude.list&#37324;&#38754;&#22635;&#20889;&#35201;&#25490;&#38500;&#30340;&#25991;&#20214;/&#30446;&#24405;&#65292;&#19968;&#34892;&#19968;&#20010;&#65292;&#30452;&#25509;&#20889;&#25991;&#20214;&#21517;&#21363;&#21487;&#12290;
+    a
+    b.*
+    tmp/g
+    *rsync&#21629;&#20196;&#20165;&#22797;&#21046;&#30446;&#24405;&#32467;&#26500;&#32780;&#24573;&#30053;&#25481;&#30446;&#24405;&#20013;&#30340;&#25991;&#20214;&#12290;
+    rsync -av &#8211;include &#8216;*/&#8217; &#8211;exclude &#8216;*&#8217; backup@192.168.0.101:/www/ /backup/www-tree/
+    &#20363;3&#65306;&#25351;&#23450;&#31471;&#21475;
+    rsync -avz  -e 'ssh -p 52113' /etc/hosts abc@10.0.0.8:~
+    =======================
+    Appserver
+    &#36873;&#25321;&#36828;&#31243;&#21551;&#21160;&#30340;&#35805;&#65292;&#35831;&#25226;&#26032;&#29256;&#26412;&#20013;&#21551;&#21160;&#33050;&#26412;java&#21629;&#20196;&#26368;&#22909;&#21152;&#19978;&#32477;&#23545;&#36335;&#24452;&#65306;daemon.sh:&#65292;&#21542;&#21017;&#21487;&#33021;&#31243;&#24207;&#25253;&#38169;
+            &#35299;&#20915;:ssh user@IP &#26159;&#38750;&#30331;&#24405;&#38750;&#20132;&#20114;&#27169;&#24335;&#65292;&#21482;&#20250;&#21152;&#36733;.bashrc&#65292;&#36825;&#37324;&#38656;&#35201;&#22686;&#21152;&#29615;&#22659;&#21464;&#37327;:source /etc/profile
+            ssh $n "source /etc/profile;cd /home/emacle/libexec/backend/current &amp;&amp; /bin/sh ./stop.sh &amp;&amp; sleep 1 &amp;&amp;/bin/sh ./start.sh" &gt;/dev/null 2&gt;&amp;1
+EOF
+</span>    <span class="org-keyword">for</span> a<span class="org-keyword"> in</span> <span class="org-sh-quoted-exec">`seq -f 0%g 5 -1 0`</span>;<span class="org-keyword">do </span><span class="org-builtin">echo</span> -ne <span class="org-string">"\b\b$a"</span>;sleep 1;<span class="org-keyword">done</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"
+        "</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"next to push-mod menu"</span>
+}
+
+
+<span class="org-function-name">webstatic</span> (){
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#20195;&#30721;&#21516;&#27493;
+</span>    <span class="org-builtin">echo</span> -e <span class="org-string">"\033[1m
+    Webstaic : GO!!\033[0m"</span>
+    <span class="org-keyword">for</span> i<span class="org-keyword"> in</span> ${<span class="org-variable-name">NGINX_SERVER</span>[@]}
+       <span class="org-keyword">do</span>
+         <span class="org-builtin">local</span> <span class="org-variable-name">push</span>=<span class="org-string">"##rsync -avz --delete --timeout=100 ${NGINX_PATH}/ $i:${NGINX_PATH}"</span>
+         <span class="org-builtin">echo</span> <span class="org-string">"push:$push"</span>
+         rsync -azv --delete --timeout=100 --exclude=<span class="org-string">".svn"</span>  ${<span class="org-variable-name">NGINX_PATH</span>}/ $<span class="org-variable-name">i</span>:${<span class="org-variable-name">NGINX_PATH</span>} <span class="org-sh-escaped-newline">\</span>
+                     | tee -a $<span class="org-variable-name">LOG_FILE</span> <span class="org-comment-delimiter">#</span><span class="org-comment">&#25490;&#26597;.svn&#26159;&#22240;&#20026;&#65292;&#21516;&#27493;&#26102;&#30446;&#26631;&#26381;&#21153;&#22120;&#26159;root&#26435;&#38480;&#30446;&#24405;&#65292;&#25152;&#20197;&#36807;&#28388;&#12290;&#26377;&#38656;&#35201;&#30340;&#35805;&#65292;&#33258;&#24049;&#20462;&#25913;&#21543;&#12290;
+</span>         <span class="org-keyword">if</span> [ $<span class="org-variable-name">?</span> -eq 0 ] ; <span class="org-keyword">then</span>
+                 action <span class="org-string">"Webstatic push is ok"</span>  /bin/true
+                 <span class="org-builtin">echo</span> <span class="org-string">"Info:Webstatic push $answer on $i is ok"</span> &gt;&gt; $<span class="org-variable-name">LOG_FILE</span>
+         <span class="org-keyword">else</span>
+                 action <span class="org-string">"try again"</span>  /bin/flase
+                 <span class="org-builtin">echo</span> <span class="org-string">"Error:Webstatic push $answer on $i  is flase "</span> <span class="org-sh-escaped-newline">\</span>
+                                   | tee -a $<span class="org-variable-name">LOG_FILE</span>
+                 <span class="org-keyword">exit</span> 1
+         <span class="org-keyword">fi</span>
+       <span class="org-keyword">done</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"
+    "</span>
+}
+
+<span class="org-function-name">user_platform</span> (){
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#20195;&#30721;&#21516;&#27493;
+</span>    <span class="org-builtin">echo</span> -e <span class="org-string">"\033[1m
+    User_platform : GO!!\033[0m"</span>
+    <span class="org-keyword">for</span> i<span class="org-keyword"> in</span> ${<span class="org-variable-name">USER_PLAT_FORM</span>[@]}
+      <span class="org-keyword">do</span>
+          <span class="org-builtin">local</span> <span class="org-variable-name">push</span>=<span class="org-string">"##rsync -azv --delete --timeout=100 --exclude={wordpress,static/avatars}   ${USER_FORM_PATH}/ $i:${USER_FORM_PATH}"</span>
+          <span class="org-builtin">echo</span> <span class="org-string">"push:$push"</span>
+          rsync -azv --delete --timeout=100  --exclude={wordpress,static/avatars}  ${<span class="org-variable-name">USER_FORM_PATH</span>}/ $<span class="org-variable-name">i</span>:${<span class="org-variable-name">USER_FORM_PATH</span>} <span class="org-comment-delimiter">#</span><span class="org-comment">&#36807;&#28388;&#25481;&#30446;&#30340;&#26381;&#21153;&#22120;&#30340;&#20004;&#20010;&#25991;&#20214;&#22841;&#65292;&#22240;&#20026;134&#19978;&#27809;&#30475;&#21040;&#65292;&#32780;&#19988;&#26435;&#38480;&#29992;&#25143;&#19981;&#26159;emacle
+</span>         <span class="org-comment-delimiter"># </span><span class="org-comment">if [ $? -eq 0 ] ; then
+</span>         <span class="org-comment-delimiter">#   </span><span class="org-comment">action "Userplatform push is ok"  /bin/true
+</span>         <span class="org-comment-delimiter">#   </span><span class="org-comment">echo "Info:Userplatform push $answer on $i is ok" &gt;&gt; $LOG_FILE
+</span>         <span class="org-comment-delimiter"># </span><span class="org-comment">else
+</span>         <span class="org-comment-delimiter">#   </span><span class="org-comment">action "try again"  /bin/flase
+</span>         <span class="org-comment-delimiter">#   </span><span class="org-comment">echo "Error:Userplatform push $answer on $i  is flase " | tee -a $LOG_FILE
+</span>         <span class="org-comment-delimiter">#   </span><span class="org-comment">exit 1
+</span>         <span class="org-comment-delimiter">#</span><span class="org-comment">fi
+</span>      <span class="org-keyword">done</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551;&#26381;&#21153;
+</span>    <span class="org-builtin">echo</span> <span class="org-string">"==================SERVER-UP========================="</span>
+    sleep 1
+    <span class="org-builtin">echo</span> <span class="org-string">"Userplatform:${USER_PLAT_FORM[@]} restart"</span>
+    <span class="org-keyword">for</span> n<span class="org-keyword"> in</span> ${<span class="org-variable-name">USER_PLAT_FORM</span>[@]}
+       <span class="org-keyword">do</span>
+           <span class="org-keyword">for</span> PORT<span class="org-keyword"> in</span> $<span class="org-variable-name">PYTHON_PORT</span>
+              <span class="org-keyword">do</span>
+                 <span class="org-builtin">echo</span>  ${<span class="org-variable-name">n</span>}:$<span class="org-variable-name">PORT</span> will restart
+                 <span class="org-comment-delimiter"># </span><span class="org-comment">Check python Port process  :bug:&#26377;python&#36827;&#31243;&#25165;&#20250;&#37325;&#21551;
+</span>                 <span class="org-keyword">if</span> ssh $<span class="org-variable-name">n</span> <span class="org-string">"ps aux | grep '/home/emacle/services/user_platform/tongbupan/tongbupan.fcgi' | grep -q $PORT"</span> ;<span class="org-keyword">then</span>
+                      action <span class="org-string">"Found python port ${n}:$PORT, and will restart"</span>  /bin/true
+                      <span class="org-builtin">echo</span> <span class="org-string">"Info:Found python port ${n}:$PORT, and will restart"</span> &gt;&gt;  $<span class="org-variable-name">LOG_FILE</span>
+                      ssh $<span class="org-variable-name">n</span> <span class="org-string">"python /home/emacle/services/user_platform/tongbupan/tongbupan.fcgi -t 50 -p $PORT restart"</span>
+                 <span class="org-keyword">else</span>
+                      <span class="org-builtin">echo</span> <span class="org-string">"Error:Python port process is not exist"</span> &gt;&gt; $<span class="org-variable-name">LOG_FILE</span>
+                 <span class="org-keyword">fi</span>
+             <span class="org-keyword">done</span>
+       <span class="org-keyword">done</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"
+    &#26412;&#22320;python&#26381;&#21153;&#35831;&#25163;&#21160;&#37325;&#21551;"</span>
+}
+
+<span class="org-function-name">appserver</span> (){
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#20195;&#30721;&#21516;&#27493;
+</span>    <span class="org-builtin">echo</span> -e <span class="org-string">"\033[1m
+    Appserver : GO!!\033[0m"</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#26816;&#26597;&#36719;&#36830;&#25509;,&#23427;&#23558;&#20250;&#22312;&#30446;&#26631;&#26381;&#21153;&#22120;&#24314;&#31435;&#23545;&#24212;current&#25991;&#20214;&#22841;&#65292;&#22914;&#26524;&#23384;&#22312;&#21017;&#25191;&#34892;&#21516;&#27493;&#21629;&#20196;
+</span>    <span class="org-builtin">read</span> -n1 -t20 -p  <span class="org-string">"warning:&#35831;&#26816;&#26597;&#26412;&#22320;&#26381;&#21153;&#22120;current&#23545;&#24212;&#29256;&#26412;&#21495;&#65292;&#24182;&#30830;&#35748;&#24314;&#31435;&#20102;&#26032;&#30340;&#36719;&#36830;&#25509;. &#26159;&#21542;&#25191;&#34892;&#21516;&#27493;&#65306;y/n"</span> ln
+    <span class="org-keyword">case</span> $<span class="org-variable-name">ln</span><span class="org-keyword"> in</span>
+    y)
+    :
+    ;;
+    n)
+    <span class="org-keyword">exit</span> 0
+    ;;
+    *)
+    <span class="org-builtin">echo</span> <span class="org-string">"Error: :$ln: input y/n"</span>
+    <span class="org-keyword">exit</span> 0
+    ;;
+    <span class="org-keyword">esac</span>
+
+    <span class="org-keyword">for</span> i<span class="org-keyword"> in</span> ${<span class="org-variable-name">APP_SERVER</span>[@]}
+       <span class="org-keyword">do</span>
+          <span class="org-builtin">local</span> <span class="org-variable-name">push</span>=<span class="org-string">"##rsync -azv --delete --timeout=100  ${APP_TRUE_PATH}/ $i:${APP_PATH}"</span>
+          <span class="org-builtin">echo</span> <span class="org-string">"
+              push:$push"</span>
+          rsync -azv --delete --timeout=100  ${<span class="org-variable-name">APP_TRUE_PATH</span>}/ $<span class="org-variable-name">i</span>:${<span class="org-variable-name">APP_PATH</span>}
+              <span class="org-keyword">if</span> [ $<span class="org-variable-name">?</span> -eq 0 ] ; <span class="org-keyword">then</span>
+                    action <span class="org-string">"Appserver push is ok"</span>  /bin/true
+                    <span class="org-builtin">echo</span> <span class="org-string">"Info:Appserver push  $answer on $i is ok"</span> &gt;&gt; $<span class="org-variable-name">LOG_FILE</span>
+              <span class="org-keyword">else</span>
+                    action <span class="org-string">"try again"</span>  /bin/flase
+                    <span class="org-builtin">echo</span> <span class="org-string">"Error:Appserver push $answer on $i  is flase "</span> | tee -a $<span class="org-variable-name">LOG_FILE</span>
+              <span class="org-keyword">exit</span> 1
+              <span class="org-keyword">fi</span>
+      <span class="org-keyword">done</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551;&#26381;&#21153;
+</span>      <span class="org-builtin">echo</span> <span class="org-string">"==================SERVER-UP========================="</span>
+    sleep 1
+    <span class="org-builtin">echo</span> <span class="org-string">'&#36873;&#25321;&#36828;&#31243;&#21551;&#21160;&#35805;&#65292;&#35831;&#25226;&#26032;&#29256;&#26412;&#20013;&#21551;&#21160;&#33050;&#26412;java&#21629;&#20196;&#21152;&#19978;&#32477;&#23545;&#36335;&#24452;(daemon.sh)&#65292;&#21542;&#21017;&#21551;&#21160;&#22833;&#36133;'</span>
+    <span class="org-builtin">echo</span>  -n <span class="org-string">"[31m &#26159; &#21542;  &#21551; &#21160; &#30446; &#26631; &#26381; &#21153; &#22120; Appserver&#65306;y/n[ ] [3D[0m"</span>
+    <span class="org-builtin">read</span>  appstart
+    <span class="org-keyword">case</span> $<span class="org-variable-name">appstart</span><span class="org-keyword"> in</span>
+    y)
+    <span class="org-builtin">echo</span> <span class="org-string">"Appserver:${APP_SERVER[@]} restart"</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">cd /home/emacle/libexec/backend/current &amp;&amp; ./stop.sh &amp;&amp; sleep 1 &amp;&amp; ./start.sh &amp;&amp; cd -
+</span>    <span class="org-keyword">for</span> n<span class="org-keyword"> in</span> ${<span class="org-variable-name">APP_SERVER</span>[@]}
+        <span class="org-keyword">do</span>
+           <span class="org-builtin">echo</span>  ${<span class="org-variable-name">n</span>}:tongbupan_app  will restart
+           ssh $<span class="org-variable-name">n</span> <span class="org-string">"source /etc/profile;cd /home/emacle/libexec/backend/current &amp;&amp; /bin/sh ./stop.sh &amp;&amp; sleep 1 &amp;&amp;/bin/sh ./start.sh"</span> &gt;/dev/null 2&gt;&amp;1 
+           <span class="org-keyword">if</span> [ <span class="org-sh-quoted-exec">`ssh $n "ps -ef|grep tongbupan_apps|grep -v grep|wc -l"`</span> -eq 1 ] ;<span class="org-keyword">then</span>
+               action <span class="org-string">"Found appserver  ${n}  restart is ok"</span>  /bin/true
+               <span class="org-builtin">echo</span> <span class="org-string">"Info:Found appserver  ${n}  restart"</span> &gt;&gt; $<span class="org-variable-name">LOG_FILE</span>
+           <span class="org-keyword">else</span>
+               action <span class="org-string">"Found appserver  ${n}  false"</span>  /bin/false
+               <span class="org-builtin">echo</span> <span class="org-string">"Info:Found appserver  ${n}  false"</span> &gt;&gt; $<span class="org-variable-name">LOG_FILE</span>
+           <span class="org-keyword">fi</span>
+       <span class="org-keyword">done</span>
+    ;;
+    n)
+    :
+    <span class="org-keyword">exit</span> 0
+    ;;
+    *)
+    <span class="org-builtin">echo</span> <span class="org-string">"Error: :$appstart: bye!"</span>
+    <span class="org-keyword">exit</span> 0
+    ;;
+    <span class="org-keyword">esac</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"
+    "</span>
+}
+
+<span class="org-function-name">choose</span> (){
+    <span class="org-builtin">read</span> -n1 -t 10 -p <span class="org-string">"Do you want to continue [y/n]?"</span> answer
+    <span class="org-keyword">case</span> $<span class="org-variable-name">answer</span><span class="org-keyword"> in</span>
+    Y|y)
+    $<span class="org-variable-name">@</span>
+    ;;
+    N|n)
+     <span class="org-builtin">echo</span> <span class="org-string">"Good bye"</span>
+    ;;
+    *)
+    <span class="org-builtin">echo</span> <span class="org-string">"Input y/n"</span>
+    ;;
+    <span class="org-keyword">esac</span>
+}
+
+<span class="org-function-name">menu</span> (){
+    <span class="org-builtin">echo</span> -en <span class="org-string">"\033[44;35;1m
+     &#21516;&#27493;&#20195;&#30721;&#21015;&#34920;:                      \033[0m"</span>
+    <span class="org-builtin">echo</span> -e <span class="org-string">"\033[44;37;1m
+    1.all            &#21516;&#27493;&#21450;&#37325;&#21551;&#26381;&#21153;     
+    2.webstatic&#65306;    &#21516;&#27493;&#37325;&#21551;&#26381;&#21153;       
+    3.user_platform&#65306;&#21516;&#27493;&#37325;&#21551;&#26381;&#21153;       
+    4.appserver&#65306;    &#21516;&#27493;&#37325;&#21551;&#26381;&#21153;       
+    5.help           &#24110;&#21161;               
+    \033[0m"</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"Please choose:"</span>
+    <span class="org-builtin">read</span> -t 10 -p <span class="org-string">"10s to choose"</span> number
+    <span class="org-keyword">case</span> $<span class="org-variable-name">number</span><span class="org-keyword"> in</span>
+    1)
+    choose <span class="org-string">'webstatic'</span>
+    user_platform
+    appserver
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'#               [1m ==DONE==[0m                      #'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    sleep 1
+    ;;
+    2)
+    choose <span class="org-string">'webstatic'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'#               [1m ==DONE==[0m                      #'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    sleep 2
+    <span class="org-keyword">exit</span> 0
+    ;;
+    3)
+    choose <span class="org-string">'user_platform'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'#               [1m ==DONE==[0m                      #'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    sleep 1
+    ;;
+    4)
+    <span class="org-comment-delimiter">#</span><span class="org-comment">choose appserver
+</span>    choose <span class="org-string">'appserver'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'#               [1m ==DONE==[0m                      #'</span>
+    <span class="org-builtin">echo</span> <span class="org-string">'################################################'</span>
+    sleep 1
+    ;;
+    5)
+    Information
+    menu
+    ;;
+    *)
+    <span class="org-builtin">echo</span> <span class="org-string">"please Input number 1-4"</span>
+    <span class="org-keyword">esac</span>
+}
+
+[ $<span class="org-variable-name">#</span> -gt 0 ] &amp;&amp; {
+<span class="org-builtin">echo</span> -e <span class="org-string">"Error:usage $0 $@  \033[31;4;1m please exec: ./push-mod.sh \033[0m"</span>
+<span class="org-builtin">echo</span> <span class="org-string">"Error: $0 $@"</span> &gt;&gt; $<span class="org-variable-name">LOG_FILE</span>
+<span class="org-keyword">exit</span> 1
+}
+
+<span class="org-function-name">main</span> (){
+check_user
+menu
+}
+main
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:07e86182-7adc-4505-9b3f-e542825295d3" class="outline-2">
+<h2 id="h:07e86182-7adc-4505-9b3f-e542825295d3"><a href="#h:07e86182-7adc-4505-9b3f-e542825295d3">同步_内网</a></h2>
+<div class="outline-text-2" id="text-h:07e86182-7adc-4505-9b3f-e542825295d3">
+<ol class="org-ol">
+<li>增WEB代码推送脚本；shell脚本负责hdcms到WEB的代码同步。脚本位置:/root/scripts/push_hdcms.sh</li>
+</ol>
+
+<p>
+web上线流程：
+</p>
+<ol class="org-ol">
+<li>cd 到脚本目录 cd <i>root/scripts</i></li>
+<li>执行上级命令: 内容功能代码更新 ./push_hdcms.sh &#x2013;type hdcms</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">VERSION</span>=v4.2.1
+<span class="org-variable-name">BUILD_NUMBER</span>=<span class="org-sh-quoted-exec">`date +%s`</span>
+
+. /etc/init.d/functions
+
+<span class="org-keyword">function</span> <span class="org-function-name">usage</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"$0: Options: "</span>
+    <span class="org-builtin">echo</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"--type    the type of deploy [test,hdcms]"</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"--help    print the help message"</span>
+    <span class="org-builtin">echo</span>
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">accquirelock</span>()
+{
+    <span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -f <span class="org-string">"$1"</span> ]; <span class="org-keyword">then</span>
+        touch <span class="org-string">"$1"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"accquired $1"</span>
+    <span class="org-keyword">else</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"someone else is deploying or the $1 did not successfully removed last time."</span>
+        <span class="org-keyword">exit</span> 1;
+    <span class="org-keyword">fi</span>
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">releaselock</span>()
+{
+    <span class="org-keyword">if</span> [ -f <span class="org-string">"$1"</span> ]; <span class="org-keyword">then</span>
+        rm -rf <span class="org-string">"$1"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"released $1"</span>
+    <span class="org-keyword">fi</span>
+}
+
+
+<span class="org-keyword">function</span> <span class="org-function-name">tar_package</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"tar -Jcf /root/hdcms.tar.xz --exclude=\".svn\" --exclude=\"Application/Runtime/*\"  hdcms/ "</span>
+    <span class="org-builtin">cd</span> $<span class="org-variable-name">hdcms_path</span>
+    tar -Jcf /root/hdcms.tar.xz --exclude=<span class="org-string">".svn"</span> --exclude=<span class="org-string">"Application/Runtime/*"</span>  hdcms/
+    <span class="org-builtin">cd</span> -
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">remote_copy</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"scp -P $REMOTE_PORT /root/hdcms.tar.xz ${REMOTE_USER}@$REMOTE_ADDR:~"</span>
+    scp -P $<span class="org-variable-name">REMOTE_PORT</span> /root/hdcms.tar.xz ${<span class="org-variable-name">REMOTE_USER</span>}@$<span class="org-variable-name">REMOTE_ADDR</span>:~
+    <span class="org-comment-delimiter">#</span><span class="org-comment">echo $?
+</span>    <span class="org-variable-name">RC</span>=$<span class="org-variable-name">?</span>   
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">hdcms_env</span>()
+{
+<span class="org-variable-name">WEB</span>=(120.26.75.240 121.40.194.140)
+<span class="org-variable-name">WEB01</span>=${<span class="org-variable-name">web</span>[0]}
+<span class="org-variable-name">WEB02</span>=${<span class="org-variable-name">web</span>[1]}
+<span class="org-variable-name">hdcms_path</span>=/usr/local/nginx/html
+<span class="org-comment-delimiter">#</span><span class="org-comment">scp -P 10022 hdcms.tar.gz operator1@120.26.75.240:~
+</span><span class="org-builtin">echo</span> -e <span class="org-string">"$web01   \n$web02"</span>
+<span class="org-variable-name">REMOTE_PORT</span>=10022
+<span class="org-variable-name">REMOTE_USER</span>=root
+<span class="org-variable-name">REMOTE_BASE</span>=/root
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">hdcms_deploy</span>()
+{
+    hdcms_env
+    tar_package
+    <span class="org-builtin">echo</span> -e <span class="org-string">"\033[1mWaiting .....\033[0m"</span>
+    <span class="org-keyword">for</span> REMOTE_ADDR<span class="org-keyword"> in</span> ${<span class="org-variable-name">WEB</span>[@]};<span class="org-keyword">do</span>
+        <span class="org-builtin">echo</span> -e <span class="org-string">"======================================"</span>
+        <span class="org-builtin">echo</span> -e <span class="org-string">"|-------\033[37;44;5m $REMOTE_ADDR \033[0m --------|"</span>
+        <span class="org-builtin">echo</span> -e <span class="org-string">"======================================"</span>
+        remote_copy
+        [ <span class="org-string">"$RC"</span> == <span class="org-string">"0"</span> ] &amp;&amp; action <span class="org-string">"copy file to remote is ok"</span> /bin/true
+     <span class="org-builtin">echo</span> <span class="org-string">"ssh -p $REMOTE_PORT ${REMOTE_USER}@$REMOTE_ADDR \"tar xf /root/hdcms.tar.xz -C /root/ &amp;&amp; rm -f /root/hdcms.tar.xz\" "</span>
+        ssh -p $<span class="org-variable-name">REMOTE_PORT</span> ${<span class="org-variable-name">REMOTE_USER</span>}@$<span class="org-variable-name">REMOTE_ADDR</span> <span class="org-string">"tar xf /root/hdcms.tar.xz -C /root/ &amp;&amp; rm -f /root/hdcms.tar.xz"</span>
+        <span class="org-comment-delimiter"># </span><span class="org-comment">change permission of file
+</span>    <span class="org-builtin">echo</span> <span class="org-string">"ssh -p $REMOTE_PORT ${REMOTE_USER}@$REMOTE_ADDR \"chown -R www.www /root/hdcms ; chmod -R 755 /root/hdcms ; find /root/hdcms -type f | xargs chmod 644\""</span>
+        ssh -p $<span class="org-variable-name">REMOTE_PORT</span> ${<span class="org-variable-name">REMOTE_USER</span>}@$<span class="org-variable-name">REMOTE_ADDR</span> <span class="org-string">"chown -R www.www /root/hdcms ; chmod -R 755 /root/hdcms ; \
+            find /root/hdcms -type f | xargs chmod 644"</span>
+        <span class="org-comment-delimiter">#</span><span class="org-comment">ssh -p $REMOTE_PORT ${REMOTE_USER}@$REMOTE_ADDR "find /root/hdcms -type f | xargs chmod 644"
+</span>
+        <span class="org-comment-delimiter"># </span><span class="org-comment">up production
+</span>    <span class="org-builtin">echo</span> <span class="org-string">"ssh -p $REMOTE_PORT ${REMOTE_USER}@$REMOTE_ADDR \"\\cp /root/hdcms/admin.php.pro /root/hdcms/admin.php ; \\cp /root/hdcms/index.php.pro /root/hdcms/index.php\""</span>
+        ssh -p $<span class="org-variable-name">REMOTE_PORT</span> ${<span class="org-variable-name">REMOTE_USER</span>}@$<span class="org-variable-name">REMOTE_ADDR</span> <span class="org-string">"\\cp /root/hdcms/admin.php.pro /root/hdcms/admin.php ; \\cp /root/hdcms/index.php.pro /root/hdcms/index.php"</span>
+
+        <span class="org-comment-delimiter">#</span><span class="org-comment">rsync file
+</span>    <span class="org-builtin">echo</span> <span class="org-string">"ssh -p $REMOTE_PORT ${REMOTE_USER}@$REMOTE_ADDR 'rsync -azv --delete --timeout=100 --exclude=\".svn\" /root/hdcms/ /var/www/hdzuoye/hdcms/' "</span>
+        ssh -p $<span class="org-variable-name">REMOTE_PORT</span> ${<span class="org-variable-name">REMOTE_USER</span>}@$<span class="org-variable-name">REMOTE_ADDR</span> <span class="org-string">'rsync -azv --delete --timeout=100 --exclude=".svn" /root/hdcms/ /var/www/hdzuoye/hdcms/ '</span>
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">del directory /root/hdcms
+</span>    <span class="org-builtin">echo</span> <span class="org-string">"ssh -p $REMOTE_PORT ${REMOTE_USER}@$REMOTE_ADDR 'rm -fr  /root/hdcms/'"</span>
+    ssh -p $<span class="org-variable-name">REMOTE_PORT</span> ${<span class="org-variable-name">REMOTE_USER</span>}@$<span class="org-variable-name">REMOTE_ADDR</span> <span class="org-string">'rm -fr  /root/hdcms/'</span>
+    <span class="org-keyword">done</span>
+    action <span class="org-string">"Deployment Complete"</span> /bin/true
+}
+
+[ $<span class="org-variable-name">#</span> -lt 1 ] &amp;&amp; {
+<span class="org-builtin">echo</span> -e <span class="org-string">"Error:usage $0 $@  \033[31;4;1m please exec: $0 --help \033[0m"</span>
+<span class="org-keyword">exit</span> 1
+}
+
+<span class="org-keyword">while</span> [ $<span class="org-variable-name">#</span> -gt 0 ]
+<span class="org-keyword">do</span>
+    <span class="org-keyword">case</span> $<span class="org-variable-name">1</span><span class="org-keyword"> in</span>
+        --type)
+            <span class="org-builtin">shift</span>
+            <span class="org-variable-name">BUILD_TYPE</span>=$<span class="org-variable-name">1</span>
+        ;;
+        --help)
+            usage
+            <span class="org-keyword">exit</span> 1
+        ;;
+        *)
+            <span class="org-builtin">echo</span> <span class="org-string">"Unknown option $1"</span>
+            usage
+            <span class="org-keyword">exit</span>
+        ;;
+    <span class="org-keyword">esac</span>
+    <span class="org-builtin">shift</span>
+<span class="org-keyword">done</span>
+
+<span class="org-keyword">function</span> <span class="org-function-name">deploy</span>()
+{
+    accquirelock deploy.lock
+    <span class="org-keyword">if</span> [ <span class="org-string">"$BUILD_TYPE"</span> == <span class="org-string">"hdcms"</span> ];<span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> start deploy for hdcms env
+        hdcms_deploy
+    <span class="org-keyword">elif</span> [ <span class="org-string">"$BUILD_TYPE"</span> == <span class="org-string">"test"</span> ];<span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> start deploy for test env
+    <span class="org-keyword">fi</span>
+   <span class="org-comment-delimiter"># </span><span class="org-comment">echo ok
+</span>    releaselock deploy.lock
+}
+
+deploy
+</pre>
+</div>
+
+<p>
+本地同步
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/sh
+</span>
+<span class="org-variable-name">VERSION</span>=v4.2.1
+<span class="org-variable-name">BUILD_NUMBER</span>=<span class="org-sh-quoted-exec">`date +%s`</span>
+
+
+<span class="org-keyword">function</span> <span class="org-function-name">usage</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"$0: Options: "</span>
+    <span class="org-builtin">echo</span> 
+    <span class="org-builtin">echo</span> <span class="org-string">"--type    the type of deploy [test,staging,prod]"</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"--help    print the help message"</span>
+    <span class="org-builtin">echo</span> 
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">accquirelock</span>()
+{
+    <span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -f <span class="org-string">"$1"</span> ]; <span class="org-keyword">then</span>
+        touch <span class="org-string">"$1"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"accquired $1"</span>
+    <span class="org-keyword">else</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"someone else is deploying or the $1 did not successfully removed last time."</span>
+        <span class="org-keyword">exit</span> 1;
+    <span class="org-keyword">fi</span>
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">releaselock</span>()
+{
+    <span class="org-keyword">if</span> [ -f <span class="org-string">"$1"</span> ]; <span class="org-keyword">then</span>
+        rm -rf <span class="org-string">"$1"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"released $1"</span>
+    <span class="org-keyword">fi</span>
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">rebuild</span>()
+{
+    mvn clean;
+    <span class="org-builtin">echo</span>;
+    <span class="org-builtin">echo</span>;
+    <span class="org-builtin">echo</span> <span class="org-string">"mvn package -P $1"</span>;
+    mvn package -P $<span class="org-variable-name">1</span> -Dtongbupan.version=$<span class="org-variable-name">VERSION</span>-$<span class="org-variable-name">BUILD_NUMBER</span> 
+    chmod +x target/*.sh
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">remote_copy</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"rsync -e "</span>ssh -p $<span class="org-variable-name">REMOTE_PORT</span><span class="org-string">" -avz --delete target/ $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE;"</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">rsync -e "ssh -p $REMOTE_PORT" -avz --delete target/ $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE;
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">rsync -e "ssh -p $REMOTE_PORT" -avz target/ $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE;
+</span>    rsync -e <span class="org-string">"ssh -p $REMOTE_PORT"</span> -avz --exclude <span class="org-string">"conf/updater-default.xml"</span> --delete target/ $<span class="org-variable-name">REMOTE_USER</span>@$<span class="org-variable-name">REMOTE_ADDR</span>:$<span class="org-variable-name">REMOTE_BASE</span>;
+    <span class="org-builtin">echo</span> <span class="org-string">"finished rsync to $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE"</span>
+}
+
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">test env 
+</span><span class="org-keyword">function</span> <span class="org-function-name">test_env</span>()
+{
+     <span class="org-variable-name">TARGET_PATH</span>=/home/emacle/backend/$<span class="org-variable-name">VERSION</span>
+}
+
+
+<span class="org-keyword">function</span> <span class="org-function-name">test_deploy</span>()
+{
+    test_env
+    rm -rf $<span class="org-variable-name">TARGET_PATH</span>/*
+    <span class="org-builtin">echo</span> <span class="org-string">"finished clean $TARGET_PATH"</span>
+    rebuild test98
+    cp -rf target/* $<span class="org-variable-name">TARGET_PATH</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"finished copy to  $TARGET_PATH"</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"restart appserver"</span>
+    <span class="org-builtin">cd</span> $<span class="org-variable-name">TARGET_PATH</span>
+    ./stop.sh
+    ./start.sh
+    <span class="org-builtin">cd</span> - &gt; /dev/null 2&gt;&amp;1
+}
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">staging env
+</span><span class="org-keyword">function</span> <span class="org-function-name">staging_env</span>()
+{   
+    <span class="org-variable-name">REMOTE_PORT</span>=22
+    <span class="org-variable-name">REMOTE_USER</span>=emacle
+    <span class="org-variable-name">REMOTE_ADDR</span>=--------
+    <span class="org-variable-name">REMOTE_BASE</span>=/home/emacle/libexec/backend/target
+
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">staging_deploy</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"start deploy staging env"</span>
+    staging_env
+    rebuild <span class="org-string">'staging7777,!test98'</span>
+    cp -f ./conf/qqwry.dat ./target/conf/
+    remote_copy
+    <span class="org-builtin">echo</span> <span class="org-string">"restart remote appserver"</span>
+    ssh -p ${<span class="org-variable-name">REMOTE_PORT</span>} ${<span class="org-variable-name">REMOTE_USER</span>}@${<span class="org-variable-name">REMOTE_ADDR</span>} <span class="org-string">"cd ${REMOTE_BASE} &amp;&amp; ./stop.sh &amp;&amp; ./start.sh"</span>  &gt;/dev/null 2&gt;&amp;1
+
+
+}
+<span class="org-comment-delimiter"># </span><span class="org-comment">prod env
+</span><span class="org-keyword">function</span> <span class="org-function-name">prod_env</span>()
+{
+    <span class="org-variable-name">REMOTE_PORT</span>=22
+    <span class="org-variable-name">REMOTE_USER</span>=emacle
+    <span class="org-variable-name">REMOTE_ADDR</span>=134
+    <span class="org-variable-name">REMOTE_BASE</span>=/home/emacle/libexec/backend/target
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">prod_deploy</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"start deploy production env"</span>
+    prod_env
+    rebuild <span class="org-string">'production,!staging7777,!test98'</span>
+    cp -f ./conf/qqwry.dat ./target/conf/
+    remote_copy
+}
+<span class="org-comment-delimiter"># </span><span class="org-comment">master env
+</span><span class="org-keyword">function</span> <span class="org-function-name">master_env</span>()
+{
+        <span class="org-variable-name">REMOTE_PORT</span>=22
+        <span class="org-variable-name">REMOTE_USER</span>=emacle
+        <span class="org-variable-name">REMOTE_ADDR</span>=42.120.49.136
+        <span class="org-variable-name">REMOTE_BASE</span>=/home/emacle/libexec/backend/target
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">master_deploy</span>()
+{
+        <span class="org-builtin">echo</span> <span class="org-string">"start deploy production env"</span>
+        master_env
+        rebuild <span class="org-string">'production,!staging7777,!test98'</span>
+        remote_copy
+}
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">master env
+</span><span class="org-keyword">function</span> <span class="org-function-name">privacy_env</span>()
+{
+        <span class="org-variable-name">REMOTE_PORT</span>=22
+        <span class="org-variable-name">REMOTE_USER</span>=emacle
+        <span class="org-variable-name">REMOTE_ADDR</span>=192.168.64.201
+        <span class="org-variable-name">REMOTE_BASE</span>=/home/emacle/appserver
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">privacy_deploy</span>()
+{
+        <span class="org-builtin">echo</span> <span class="org-string">"start deploy privacy env"</span>
+        privacy_env
+        rebuild <span class="org-string">'production,!staging7777,!test98'</span>
+        remote_copy_privacy
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">remote_copy_privacy</span>()
+{
+    <span class="org-builtin">echo</span> <span class="org-string">"rsync -e "</span>ssh -p $<span class="org-variable-name">REMOTE_PORT</span><span class="org-string">" -avz --delete target/ $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE;"</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">rsync -e "ssh -p $REMOTE_PORT" -avz --delete target/ $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE;
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">rsync -e "ssh -p $REMOTE_PORT" -avz target/ $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE;
+</span>    rsync -e <span class="org-string">"ssh -p $REMOTE_PORT"</span> -avz --exclude <span class="org-string">"tongbupan_apps-v4.2.1*"</span> --delete target/ $<span class="org-variable-name">REMOTE_USER</span>@$<span class="org-variable-name">REMOTE_ADDR</span>:$<span class="org-variable-name">REMOTE_BASE</span>;
+    <span class="org-builtin">echo</span> <span class="org-string">"finished rsync to $REMOTE_USER@$REMOTE_ADDR:$REMOTE_BASE"</span>
+}
+
+
+<span class="org-keyword">while</span> [ $<span class="org-variable-name">#</span> -gt 0 ]
+<span class="org-keyword">do</span>
+      <span class="org-keyword">case</span> $<span class="org-variable-name">1</span><span class="org-keyword"> in</span> 
+        --type)
+            <span class="org-builtin">shift</span>
+            <span class="org-variable-name">BUILD_TYPE</span>=$<span class="org-variable-name">1</span> 
+            ;;
+        --help)
+              usage
+              <span class="org-keyword">exit</span> 0
+            ;;
+        *)
+        <span class="org-builtin">echo</span> <span class="org-string">"Unknown option $1"</span>
+            usage
+            <span class="org-keyword">exit</span> 1
+            ;;
+        <span class="org-keyword">esac</span>
+        <span class="org-builtin">shift</span>
+<span class="org-keyword">done</span>
+
+
+<span class="org-keyword">function</span> <span class="org-function-name">deploy</span>()
+{
+    accquirelock deploy.lock
+    <span class="org-keyword">if</span> [ <span class="org-string">"${BUILD_TYPE}"</span> = <span class="org-string">"test"</span> ]
+    <span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> start deploy for test env
+        test_deploy
+    <span class="org-keyword">elif</span> [ <span class="org-string">"${BUILD_TYPE}"</span> = <span class="org-string">"staging"</span> ]
+    <span class="org-keyword">then</span>
+         <span class="org-builtin">echo</span> start deploy for staging env
+         staging_deploy
+    <span class="org-keyword">elif</span> [ <span class="org-string">"${BUILD_TYPE}"</span> = <span class="org-string">"prod"</span> ]
+    <span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> start deploy for production env;
+        prod_deploy
+    <span class="org-keyword">elif</span> [ <span class="org-string">"${BUILD_TYPE}"</span> = <span class="org-string">"master"</span> ]
+    <span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> start deploy for production env;
+        master_deploy
+    <span class="org-keyword">elif</span> [ <span class="org-string">"${BUILD_TYPE}"</span> = <span class="org-string">"privacy"</span> ]
+    <span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> start deploy for privacy env;
+        privacy_deploy
+    <span class="org-keyword">fi</span>
+    releaselock deploy.lock
+}
+
+deploy
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

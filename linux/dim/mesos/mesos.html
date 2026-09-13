@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 容器编排Mesos</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 容器编排Mesos</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:2fb36f9f-9c72-4216-882f-b6062f6d8942">架构简介</a>
+<ul>
+<li><a href="#h:3ae3dd3c-bf24-4136-bde1-b2086b877ca0">mesos架构</a></li>
+<li><a href="#h:2cabb245-87bf-461e-abdd-4dbaa0b0c6a3">marathon 简介</a></li>
+</ul>
+</li>
+<li><a href="#h:f1e495e6-11a6-43d6-87fb-326933a30906">集群部署</a>
+<ul>
+<li><a href="#h:9af31aba-297e-405f-928e-eb0d6e5dcd91">系统要求：</a></li>
+<li><a href="#h:370ca6b3-a33a-4da2-adee-f16843a0b563">编译mesos (略)</a></li>
+<li><a href="#h:68d6a8b5-584a-46ba-a700-7b9bc7f059c6">所有节点yum源</a></li>
+<li><a href="#h:7ab367ed-884e-4ff6-abe0-3f913b44ea84">zookeeper节点</a></li>
+<li><a href="#h:22497e5e-82e5-4d0b-ba7d-f9a6af4f5747">mesos-master服务</a></li>
+<li><a href="#h:9b1ee027-5ae5-4fa7-92b0-cd8dcebaecf9">marathon节点</a></li>
+<li><a href="#h:2af555c0-5252-4769-8914-cc8d33cfbe99">mesos-slave服务</a>
+<ul>
+<li><a href="#h:1ab254a8-41b8-4e1a-a3d8-0c9aef57f12e">docker安装</a></li>
+</ul>
+</li>
+<li><a href="#h:b1dd4850-11c8-46f3-9c4f-61c883447b68">mesos-slave安装</a></li>
+</ul>
+</li>
+<li><a href="#h:8f42db72-15ac-4e71-a119-d6462828970e">Docker仓库</a></li>
+<li><a href="#h:3ba1b3e2-364b-43df-8ebc-c40aa1e6c0e2">添加节点脚本-add-mesos.sh</a></li>
+<li><a href="#h:eb707312-ba2e-45cb-ba73-cc872db0d68b">nginx with consul-template</a></li>
+</ul>
+</div>
+</nav>
+<p>
+TAGS: <a href="../index.html">Dim</a>
+</p>
+
+<p>
+<code>弃用</code>
+</p>
+<section id="outline-container-h:2fb36f9f-9c72-4216-882f-b6062f6d8942" class="outline-2">
+<h2 id="h:2fb36f9f-9c72-4216-882f-b6062f6d8942"><a href="#h:2fb36f9f-9c72-4216-882f-b6062f6d8942">架构简介</a></h2>
+<div class="outline-text-2" id="text-h:2fb36f9f-9c72-4216-882f-b6062f6d8942">
+<p>
+官网地址：<a href="http://mesos.apache.org/">http://mesos.apache.org/</a>
+</p>
+</div>
+<div id="outline-container-h:3ae3dd3c-bf24-4136-bde1-b2086b877ca0" class="outline-3">
+<h3 id="h:3ae3dd3c-bf24-4136-bde1-b2086b877ca0"><a href="#h:3ae3dd3c-bf24-4136-bde1-b2086b877ca0">mesos架构</a></h3>
+<div class="outline-text-3" id="text-h:3ae3dd3c-bf24-4136-bde1-b2086b877ca0">
+
+<figure id="org3eac294">
+<img style="aspect-ratio:487/254" decoding="async" loading="lazy" src="./images/img_20241023_011947.webp" alt="img_20241023_011947.webp" width="80%">
+
+<figcaption><span class="figure-number">&#22270;1&nbsp; </span>CDF of job and task durations in Facebook's Haddop data warehouse(data from[38])</figcaption>
+</figure>
+
+
+<p>
+<b>Mesos框架图</b>
+</p>
+
+
+
+<figure id="org33eac32">
+<img style="aspect-ratio:488/329" decoding="async" loading="lazy" src="./images/img_20241023_012114.webp" alt="img_20241023_012114.webp" width="80%">
+
+<figcaption><span class="figure-number">&#22270;2&nbsp; </span>Mesos architecture diagram, showing tow running frameworks(Hadoop and MPI)</figcaption>
+</figure>
+
+
+
+<p>
+从上图可知，Mesos由一个管理在每个集群节点上运行的slave进程的master守护进程和在这些slave上运行任务的Mesos框架(framworks)组成。
+</p>
+
+<p>
+通过提供资源，master可以通过frameworks实现细粒度的资源共享（CPU，RAM，&#x2026;）。
+</p>
+
+<p>
+在Mesos的框架中存在如下基本概念：
+</p>
+
+<ol class="org-ol">
+<li>Mesos-matser: 协调全部的slave，并确定每个节点的可用资源，聚合计算跨节点的所有可用资源的报告，然后向注册到Master的Framework发出资源邀约。</li>
+<li>Mesos-slave：向Master汇报自己的空闲资源和任务的状态，负责管理本节点上的各个mesos-task，在framework成功向Master申请资源后，收到消息的slave会启动相应framework的executor。</li>
+<li>Framework：Hadoop，Spark等，通过MesosSchedulerDriver接入Mesos。Framework由两部分组成，调度器（Scheduler）和执行器（Executor）。Scheduler在master上注册，获取提供的资源，Executor进程在slave节点上启动，运行framework的任务。</li>
+</ol>
+
+<p>
+Executor：执行器，用于启动计算框架中的task。
+</p>
+
+<p>
+在框架图中framework有两种，一种是Hadoop；一种是MPI。从框架图中可以看出，
+Mesos是一个master/slave结构，其中master根据调度策略(比如公平调度和优先
+级方式)，来决定将slave节点上的空闲资源(比如：CPU、内存或磁盘等)的提供
+给framwork使用。另外Mater会保存framework和mesos slave的一些状态，这些
+状态可用通过framework和slave重新注册来进行重构，因此可用使用zookeeper
+来解决mesos matser单点故障的问题。slave主要功能是向Mater汇报任务状态和
+启动framwork的executor。
+</p>
+
+<p>
+<b>Mesos业务逻辑流程</b>
+</p>
+
+
+
+<figure id="org7021685">
+<img style="aspect-ratio:406/297" decoding="async" loading="lazy" src="./images/img_20241023_012314.webp" alt="img_20241023_012314.webp" width="80%">
+
+<figcaption><span class="figure-number">&#22270;3&nbsp; </span>Resource offer example</figcaption>
+</figure>
+
+
+
+<p>
+Mesos的框架图的逻辑流程分为如下四步：
+</p>
+<ul class="org-ul">
+<li>第一步，Slave1节点向master报告它有空闲资源4个CPU和4GB内存。</li>
+<li>第二步，Master发送一个Resource Offer给Framework1来描述Slave1有多少可用资源。</li>
+<li>第三步，FrameWork1中的FW Sheduler会答复Master，有两个task需要运行在Slave1，一个Task需要&lt; 2个cpu，1gb内存&gt;，另一个Task需要&lt; 1个cpu，2gb内存&gt;</li>
+<li>第四步，Master将任务需求资源发送给Slave1，Slave1分配适当的资源给Framework1的Executor，然后executor开始执行这两个任务，因为Slave1还剩&lt; 1CPU，1gb内存&gt;的资源未分配，分配模块还可用将这些资源提供给Framwork2来使用。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2cabb245-87bf-461e-abdd-4dbaa0b0c6a3" class="outline-3">
+<h3 id="h:2cabb245-87bf-461e-abdd-4dbaa0b0c6a3"><a href="#h:2cabb245-87bf-461e-abdd-4dbaa0b0c6a3">marathon 简介</a></h3>
+<div class="outline-text-3" id="text-h:2cabb245-87bf-461e-abdd-4dbaa0b0c6a3">
+<p>
+Marathon是基于MesosFramework的开源框架，框架图可参考如下。Marathon可以指定每个应用程序需要的资源以及要运行此程序需要多少实例。它可以使用的集群资源对失败的任务自动做出响应。
+</p>
+
+<p>
+如果某个Mesos Slave宕机或应用的某个实例退出、失败，Marathon将会自动启动一个新的实例，来替换掉失败的实例。Marathon也允许用户在部署时指定应用程序彼此间的依赖关系，这样就可以保证某个应用程序实例不会在它依赖的数据库实例启动前启动。
+</p>
+
+
+<figure id="org5a4e06f">
+<img style="aspect-ratio:599/343" decoding="async" loading="lazy" src="./images/img_20241023_012448.webp" alt="img_20241023_012448.webp" width="80%">
+
+</figure>
+
+
+<p>
+Marathon提供对外的API接口函数，比如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">1.&#38656;&#35201;&#36890;&#36807;Marathon&#21551;&#21160;&#23481;&#22120;
+</span>curl -X POST -H <span class="org-string">"Accept: application/json"</span> -H <span class="org-string">"Content-Type: application/json"</span> <span class="org-sh-escaped-newline">\</span>
+localhost:8080/v2/apps -d <span class="org-string">'{
+"container": {"image": "docker:///libmesos/ubuntu", "options": ["--privileged"]},
+"cpus": 0.5,
+"cmd": "sleep 500",
+"id": "docker-tester",
+"instances": 1,
+"mem": 300
+}'</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">2.&#36890;&#36807;Marathon Rest API&#26816;&#26597;&#21551;&#21160;&#20219;&#21153;&#30340;&#29366;&#24577;
+</span>curl -X GET -H <span class="org-string">"Content-Type: application/json"</span> localhost:8080/v2/apps
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f1e495e6-11a6-43d6-87fb-326933a30906" class="outline-2">
+<h2 id="h:f1e495e6-11a6-43d6-87fb-326933a30906"><a href="#h:f1e495e6-11a6-43d6-87fb-326933a30906">集群部署</a></h2>
+<div class="outline-text-2" id="text-h:f1e495e6-11a6-43d6-87fb-326933a30906">
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li>部署：<a href="https://www.jianshu.com/p/6fd7941b86ae">https://www.jianshu.com/p/6fd7941b86ae</a></li>
+<li>mesos: <a href="http://mesos.apache.org/">http://mesos.apache.org/</a></li>
+<li>marathon: <a href="https://mesosphere.github.io/marathon/docs/">https://mesosphere.github.io/marathon/docs/</a></li>
+</ul>
+</div>
+<div id="outline-container-h:9af31aba-297e-405f-928e-eb0d6e5dcd91" class="outline-3">
+<h3 id="h:9af31aba-297e-405f-928e-eb0d6e5dcd91"><a href="#h:9af31aba-297e-405f-928e-eb0d6e5dcd91">系统要求：</a></h3>
+<div class="outline-text-3" id="text-h:9af31aba-297e-405f-928e-eb0d6e5dcd91">
+<pre class="example" id="orgf896312">
+64位Linux操作系统
+kernel&gt;=3.10
+jdk必须是1.8+版本
+</pre>
+
+<p>
+关闭虚拟机防火墙
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">setenforce 0
+systemctl stop firewalld.service
+</pre>
+</div>
+
+<p>
+虚拟机的hostname及hosts文件都需做修改
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">hostnamectl set-hostname master01     <span class="org-comment-delimiter">#</span><span class="org-comment">&#20998;&#21035;&#20462;&#25913;&#34394;&#25311;&#26426;&#30340;&#20027;&#26426;&#21517;&#65292;&#19968;&#19968;&#23545;&#24212;&#65292;&#37325;&#21551;&#29983;&#25928;
+</span>
+cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+10.200.46.198 master01 zookeeper01 slave01 xu-1 my.registry.cici.me
+10.200.46.199 master02 zookeeper02 slave02 xu-2
+10.200.46.200 master03 zookeeper03 xu-3
+</pre>
+</div>
+
+<p>
+注意：主机名一定要在hosts文件中
+</p>
+
+<p>
+marathon在这里部署在所有mesos master节点上
+</p>
+</div>
+</div>
+<div id="outline-container-h:370ca6b3-a33a-4da2-adee-f16843a0b563" class="outline-3">
+<h3 id="h:370ca6b3-a33a-4da2-adee-f16843a0b563"><a href="#h:370ca6b3-a33a-4da2-adee-f16843a0b563">编译mesos (略)</a></h3>
+<div class="outline-text-3" id="text-h:370ca6b3-a33a-4da2-adee-f16843a0b563">
+<p>
+看官网，需要注意的是如果网络不通，编译的时候需要设置maven的代理
+</p>
+
+<p>
+下面以yum 方式安装
+</p>
+</div>
+</div>
+<div id="outline-container-h:68d6a8b5-584a-46ba-a700-7b9bc7f059c6" class="outline-3">
+<h3 id="h:68d6a8b5-584a-46ba-a700-7b9bc7f059c6"><a href="#h:68d6a8b5-584a-46ba-a700-7b9bc7f059c6">所有节点yum源</a></h3>
+<div class="outline-text-3" id="text-h:68d6a8b5-584a-46ba-a700-7b9bc7f059c6">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#28155;&#21152;&#38463;&#37324;&#20113;yum
+</span>wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+sed -i <span class="org-string">'/mirrors.aliyuncs.com/d'</span> /etc/yum.repos.d/CentOS-Base.repo
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;mesos&#30340;yum&#28304;
+</span>rpm -Uvh http://repos.mesosphere.io/el/7/noarch/RPMS/mesosphere-el-repo-7-1.noarch.rpm
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-mesosphere
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7ab367ed-884e-4ff6-abe0-3f913b44ea84" class="outline-3">
+<h3 id="h:7ab367ed-884e-4ff6-abe0-3f913b44ea84"><a href="#h:7ab367ed-884e-4ff6-abe0-3f913b44ea84">zookeeper节点</a></h3>
+<div class="outline-text-3" id="text-h:7ab367ed-884e-4ff6-abe0-3f913b44ea84">
+<p>
+安装ZooKeeper
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">$yum -y install mesosphere-zookeeper
+</span>
+yum install java-1.8.0-openjdk -y
+wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/zookeeper-3.4.11/zookeeper-3.4.11.tar.gz
+tar xf zookeeper-3.4.11.tar.gz -C /usr/local/
+ln -sv /usr/local/zookeeper-3.4.11 /usr/local/zookeeper
+<span class="org-builtin">cd</span> /usr/local/zookeeper
+
+mkdir -p /var/lib/zookeeper
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#32534;&#36753;zookeeper&#37197;&#32622;&#25991;&#20214;
+</span>cat &gt; /usr/local/zookeeper/conf/zoo.cfg &lt;&lt; EOF<span class="org-sh-heredoc">
+maxClientCnxns=100
+tickTime=2000
+dataDir=/var/lib/zookeeper
+clientPort=2181
+initLimit=10
+syncLimit=5
+#&#31532;&#19968;&#20010;&#31471;&#21475;2888 &#29992;&#26469;&#38598;&#32676;&#25104;&#21592;&#30340;&#20449;&#24687;&#20132;&#25442;&#65292;&#21482;&#26377;&#19968;&#20010;master&#20250;&#30417;&#21548;&#36825;&#20010;&#31471;&#21475;
+#&#31532;&#20108;&#20010;&#31471;&#21475;3888 &#26159;&#22312;leader&#25346;&#25481;&#26102;&#19987;&#38376;&#29992;&#26469;&#36827;&#34892;&#36873;&#20030;leader&#25152;&#29992;
+server.1=zookeeper01:2888:3888
+server.2=zookeeper02:2888:3888
+server.3=zookeeper03:2888:3888
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;zookeeper&#30340;id,&#20889;&#20837;&#19968;&#20010;1-255&#30340;&#20540;&#65292;&#27599;&#20010;zookeeper&#33410;&#28857;&#30340;id&#19981;&#35201;&#37325;&#22797;
+</span>master01
+<span class="org-builtin">echo</span> 1 &gt;/var/lib/zookeeper/myid
+master02
+<span class="org-builtin">echo</span> 2 &gt;/var/lib/zookeeper/myid
+master03
+<span class="org-builtin">echo</span> 3 &gt;/var/lib/zookeeper/myid
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29615;&#22659;&#21464;&#37327;
+</span>cat &gt;/etc/profile.d/zookeeper.sh &lt;&lt;\EOF<span class="org-sh-heredoc">
+ZOOKEEPER=/usr/local/zookeeper
+PATH=$PATH:$ZOOKEEPER/bin
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#21160;&#33050;&#26412;
+</span>cat &gt;/usr/lib/systemd/system/zookeeper.service&lt;&lt;\EOF<span class="org-sh-heredoc">
+[Unit]
+Description=Apache ZooKeeper
+After=network.target
+
+[Service]
+Environment="ZOOCFGDIR=/usr/local/zookeeper/conf"
+SyslogIdentifier=zookeeper
+WorkingDirectory=/usr/local/zookeeper
+ExecStart=/usr/local/zookeeper/bin/zkServer.sh start-foreground
+Restart=on-failure
+RestartSec=20
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#21160;zk
+</span>systemctl start zookeeper
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:22497e5e-82e5-4d0b-ba7d-f9a6af4f5747" class="outline-3">
+<h3 id="h:22497e5e-82e5-4d0b-ba7d-f9a6af4f5747"><a href="#h:22497e5e-82e5-4d0b-ba7d-f9a6af4f5747">mesos-master服务</a></h3>
+<div class="outline-text-3" id="text-h:22497e5e-82e5-4d0b-ba7d-f9a6af4f5747">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013;mesos marathon
+</span>yum install mesos -y
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;mesos-master&#30340;--zk&#21442;&#25968;
+</span><span class="org-builtin">echo</span> <span class="org-string">"zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"</span> &gt;/etc/mesos/zk  
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;mesos-master&#30340;--hostname&#21442;&#25968;
+</span><span class="org-variable-name">host_ip</span>=$(/usr/sbin/ifconfig eth0 | sed -n <span class="org-string">'/inet /p'</span>| awk <span class="org-string">'{print $2}'</span>)
+<span class="org-variable-name">host_name</span>=$(sed -rn <span class="org-string">"/$(/usr/sbin/ifconfig eth0 | sed -n '/inet /p'| awk '{print $2}')/s@[[:digit:]\.]+[[:space:]]+([[:alnum:]_-]+).*@\1@gp"</span> /etc/hosts)
+<span class="org-builtin">echo</span> $<span class="org-variable-name">host_ip</span> &gt;/etc/mesos-master/hostname
+<span class="org-builtin">echo</span> $<span class="org-variable-name">host_ip</span> &gt;/etc/mesos-master/ip
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;mesos-master&#30340;--quorum&#20540;&#65292;&#36825;&#20010;&#20540;&#35201;&#22823;&#20110;master&#25968;&#37327;/2&#65292;&#36825;&#37324;&#26159;3&#20010;master&#25152;&#20197;&#35813;&#20540;&#35774;&#32622;&#20026;2
+</span><span class="org-variable-name">mesos_num</span>=$(($(grep -c $(<span class="org-builtin">echo</span>  $<span class="org-variable-name">host_name</span> |sed  -r <span class="org-string">'s@([[:alpha:]]+).*@\1@g'</span>) /etc/hosts)/2+1))
+<span class="org-builtin">echo</span> $<span class="org-variable-name">mesos_num</span> &gt; /etc/mesos-master/quorum
+<span class="org-comment-delimiter">#</span><span class="org-comment">=========mesos ACL
+</span><span class="org-builtin">echo</span> <span class="org-string">'/etc/mesospasswd'</span> &gt; /etc/mesos-master/credentials
+<span class="org-builtin">echo</span> <span class="org-string">'/etc/acls.json'</span> &gt; /etc/mesos-master/acls
+cat &lt;&lt; EOF &gt; /etc/mesospasswd<span class="org-sh-heredoc">
+marathon marathon
+EOF
+</span>
+cat &lt;&lt; EOF &gt; /etc/acls.json<span class="org-sh-heredoc">
+{
+  "register_frameworks": [
+    {
+      "principals": { "values": ["marathon"] },
+      "roles": { "values": ["marathon"] }
+            }
+         ]
+     }
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">=========
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#31105;&#29992;&#25481; mesos-slave, &#22240;&#20026;master&#21644;slave&#19981;&#33021;&#36816;&#34892;&#22312;&#21516;&#19968;&#21488;&#26381;&#21153;&#22120;
+</span>systemctl stop mesos-slave.service
+systemctl disable mesos-slave.service
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21551;&#21160;mesos-master
+</span>systemctl start mesos-master
+</pre>
+</div>
+
+<p>
+因为master和slave不能同时运行于同一台物理主机上，所以为了节省主机资源，可以考虑在docker中运行mesos-master
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">docker run -itd -v /etc/mesos:/etc/mesos -v /etc/mesos-master:/etc/mesos-master <span class="org-sh-escaped-newline">\</span>
+--name mesosmaster --network host  --restart=always <span class="org-sh-escaped-newline">\</span>
+10.0.209.130:5000/mymesos-master:1.4.1 /root/run.sh
+</pre>
+</div>
+
+<p>
+/root/run.sh 的内容是
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">/usr/bin/mesos-init-wrapper master
+</pre>
+</div>
+
+
+<p>
+如果mesos-master的日志中一直出现  Replica in VOTING status received &#x2026;  
+</p>
+<pre class="example" id="org46657a3">
+这表示出了一些问题，
+这表示你之前使用过相同的 work_dir 运行过这个 master，这个文件夹内有一些持久化状态,
+然后master会因为 quorum 达不到要求( 因为没有足够 quorum数量 的 master 有相同的持久化状态) 而拒绝启动以避免风险。
+清空所有的work_dir即可。 echo "rm -rf $(cat /etc/mesos-master/work_dir)/*"
+</pre>
+</div>
+</div>
+<div id="outline-container-h:9b1ee027-5ae5-4fa7-92b0-cd8dcebaecf9" class="outline-3">
+<h3 id="h:9b1ee027-5ae5-4fa7-92b0-cd8dcebaecf9"><a href="#h:9b1ee027-5ae5-4fa7-92b0-cd8dcebaecf9">marathon节点</a></h3>
+<div class="outline-text-3" id="text-h:9b1ee027-5ae5-4fa7-92b0-cd8dcebaecf9">
+<p>
+1)安装marathon
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">yum install  marathon -y
+</pre>
+</div>
+
+<p>
+2)配置marathon
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">======1.7&#29256;&#26412;=============
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#24744;&#19981;&#33021;&#21516;&#26102;&#25351;&#23450;&#29615;&#22659;&#21464;&#37327;&#21644;&#23454;&#38469;&#21629;&#20196;&#34892;&#21442;&#25968;&#30456;&#21516;&#30340;&#21629;&#20196;&#34892;&#21442;&#25968;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#29615;&#22659;&#21464;&#37327;&#26684;&#24335;&#65306;MARATHON_+&#22823;&#20889;&#30340;&#21629;&#20196;&#34892;&#21442;&#25968;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">The core functionality flags can be also set by environment variable MARATHON_ + the option name in all caps. For example, MARATHON_MASTER for the --master option.
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">For boolean values, set the environment variable with empty value. For example, use MARATHON_HA= to enable --ha or MARATHON_DISABLE_HA= for --disable_ha.
+</span>mkdir -p /etc/default
+mkdir -p /etc/marathon/
+<span class="org-variable-name">host_ip</span>=$(/usr/sbin/ifconfig eth0 | sed -n <span class="org-string">'/inet /p'</span>| awk <span class="org-string">'{print $2}'</span>)
+cat &gt;&gt; /etc/default/marathon &lt;&lt; EOF<span class="org-sh-heredoc">
+#------------------------------------
+# &#37197;&#32622;marathon&#30340;--master&#21442;&#25968;
+MARATHON_MASTER="zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"
+# &#37197;&#32622;marathon&#30340;--hostname&#21442;&#25968;
+MARATHON_HOSTNAME="$host_ip"
+# &#37197;&#32622;marathon&#30340;&#21551;&#21160;&#21442;&#25968;&#65292;&#36825;&#20010;&#20540;&#34920;&#31034;&#31561;&#24453;10&#20998;&#38047;&#21518;&#65292;task&#22914;&#26524;&#36824;&#27809;&#26377;&#36827;&#20837;&#21040;TASK_RUNNING&#29366;&#24577;&#23601;&#34987;KILL&#25481;&#65292;&#21333;&#20301;&#27627;&#31186;&#65292;&#40664;&#35748;&#20540;300000(5&#20998;&#38047;)&#12290;
+MARATHON_TASK_LAUNCH_TIMEOUT="600000"
+# &#37197;&#32622;marathon&#30340;--http_port&#21442;&#25968;(&#21487;&#36873;)&#65292;&#40664;&#35748;8080
+MARATHON_HTTP_PORT="8080"
+# &#39640;&#21487;&#29992;
+MARATHON_ZK="zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"
+# HTTP &#30331;&#38470;&#39564;&#35777;
+MARATHON_HTTP_CREDENTIALS="wowotuan:wowotuan"
+# SSL &#30331;&#38470;
+MARATHON_HTTPS_PORT="8443"
+MARATHON_SSL_KEYSTORE_PASSWORD="marathonwowopass" 
+MARATHON_SSL_KEYSTORE_PATH="/etc/marathon/marathon.jks"
+#=================marathon Framework &#35748;&#35777;
+MARATHON_MESOS_AUTHENTICATION_PRINCIPAL="marathon"
+MARATHON_MESOS_AUTHENTICATION_SECRET_FILE="/etc/marathonpasswd"
+MARATHON_MESOS_ROLE="marathon"
+
+#=================&#20854;&#23427;&#21442;&#25968;
+# --task_lost_expunge_initial_delay &#40664;&#35748;5&#20998;&#38047;&#65292;&#21333;&#20301;&#27627;&#31186;&#12290;&#22312;Marathon&#24320;&#22987;&#23450;&#26399;&#25191;&#34892;&#20219;&#21153;&#28165;&#38500;gc&#25805;&#20316;&#20043;&#21069;
+MARATHON_TASK_LOST_EXPUNGE_INITIAL_DELAY="120000"
+# --task_lost_expunge_interval &#40664;&#35748;30&#31186;&#65292;&#21333;&#20301;&#27627;&#31186;&#12290;&#23545;&#20110;&#20002;&#22833;&#30340;&#20219;&#21153;gc&#25805;&#20316;
+MARATHON_TASK_LOST_EXPUNGE_INTERVAL="300000"
+
+#=================
+EOF
+</span>
+cat &lt;&lt; EOF &gt; /etc/mesospasswd<span class="org-sh-heredoc">
+marathon marathon
+EOF
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">=======1.7&#29256;&#26412;==============
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">=======&#37197;&#32622;&#25991;&#20214;&#26041;&#24335;1.4&#29256;&#26412;==============
+</span>mkdir -p /etc/marathon/conf
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#29992;marathon&#35746;&#38405;&#21151;&#33021;&#65292;1.4&#29256;&#26412;&#29305;&#24615;
+</span><span class="org-builtin">echo</span> <span class="org-string">"http_callback"</span> &gt; /etc/marathon/conf/event_subscriber
+<span class="org-variable-name">host_ip</span>=$(/usr/sbin/ifconfig eth0 | sed -n <span class="org-string">'/inet /p'</span>| awk <span class="org-string">'{print $2}'</span>)
+<span class="org-builtin">echo</span> <span class="org-string">"$host_ip"</span> &gt; /etc/marathon/conf/hostname
+<span class="org-comment-delimiter">#</span><span class="org-comment">echo "http://172.16.49.21:8000/api/services" &gt; /etc/marathon/conf/http_endpoints # &#24320;&#21457;&#27979;&#35797;&#29992;1.4&#29256;&#26412;&#29305;&#24615;
+</span><span class="org-builtin">echo</span> <span class="org-string">"zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"</span> &gt; /etc/marathon/conf/master
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39640;&#21487;&#29992;
+</span><span class="org-builtin">echo</span> <span class="org-string">"zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"</span> &gt; /etc/marathon/conf/zk
+<span class="org-comment-delimiter"># </span><span class="org-comment">HTTP &#30331;&#38470;&#39564;&#35777;
+</span><span class="org-builtin">echo</span> <span class="org-string">"wowotuan:wowotuan"</span> &gt;/etc/marathon/conf/http_credentials
+<span class="org-comment-delimiter"># </span><span class="org-comment">SSL &#30331;&#38470;
+</span><span class="org-builtin">echo</span> <span class="org-string">"8443"</span> &gt;/etc/marathon/conf/https_port
+<span class="org-builtin">echo</span> <span class="org-string">"marathonwowopass"</span> &gt; /etc/marathon/conf/ssl_keystore_password
+<span class="org-builtin">echo</span> <span class="org-string">"/etc/marathon/marathon.jks"</span> &gt;/etc/marathon/conf/ssl_keystore_path
+<span class="org-comment-delimiter">#</span><span class="org-comment">=================marathon Framework &#35748;&#35777;
+</span><span class="org-builtin">echo</span> <span class="org-string">'marathon'</span> &gt; /etc/marathon/conf/mesos_authentication_principal
+<span class="org-builtin">echo</span> <span class="org-string">'/etc/marathonpasswd'</span> &gt; /etc/marathon/conf/mesos_authentication_secret_file
+<span class="org-builtin">echo</span> <span class="org-string">'marathon'</span> &gt; /etc/marathon/conf/mesos_role
+
+cat &lt;&lt; EOF &gt; /etc/mesospasswd<span class="org-sh-heredoc">
+marathon marathon
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">=================&#20854;&#23427;&#21442;&#25968;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">--task_lost_expunge_gc &#40664;&#35748;75&#31186;&#65292;&#21333;&#20301;&#27627;&#31186;&#12290;&#30452;&#21040;&#20002;&#22833;&#30340;&#20219;&#21153;&#34987;&#22403;&#22334;&#25910;&#38598;&#24182;&#20174;&#20219;&#21153;&#36319;&#36394;&#22120;&#21644;&#20219;&#21153;&#23384;&#20648;&#24211;&#20013;&#28165;&#38500;&#12290;1.4&#29256;&#26412;&#21518;&#24323;&#29992;
+</span><span class="org-builtin">echo</span> <span class="org-string">'180000'</span> &gt; /etc/marathon/conf/task_lost_expunge_gc
+<span class="org-comment-delimiter"># </span><span class="org-comment">--task_lost_expunge_initial_delay &#40664;&#35748;5&#20998;&#38047;&#65292;&#21333;&#20301;&#27627;&#31186;&#12290;&#22312;Marathon&#24320;&#22987;&#23450;&#26399;&#25191;&#34892;&#20219;&#21153;&#28165;&#38500;gc&#25805;&#20316;&#20043;&#21069;
+</span><span class="org-builtin">echo</span> <span class="org-string">'120000'</span> &gt; /etc/marathon/conf/task_lost_expunge_initial_delay
+<span class="org-comment-delimiter"># </span><span class="org-comment">--task_lost_expunge_interval &#40664;&#35748;30&#31186;&#65292;&#21333;&#20301;&#27627;&#31186;&#12290;&#23545;&#20110;&#20002;&#22833;&#30340;&#20219;&#21153;gc&#25805;&#20316;
+</span><span class="org-builtin">echo</span> <span class="org-string">'300000'</span> &gt; /etc/marathon/conf/task_lost_expunge_interval
+<span class="org-comment-delimiter">#</span><span class="org-comment">=======&#37197;&#32622;&#25991;&#20214;&#26041;&#24335;1.4&#29256;&#26412;==============</span>
+</pre>
+</div>
+
+
+<p>
+3)marathon 证书配置
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">export</span> <span class="org-variable-name">MARATHON_KEY_PASSWORD</span>=marathonwowopass
+<span class="org-builtin">export</span> <span class="org-variable-name">MARATHON_PKCS_PASSWORD</span>=marathonwowopass
+<span class="org-builtin">export</span> <span class="org-variable-name">MARATHON_JKS_PASSWORD</span>=marathonwowopass
+
+<span class="org-variable-name">COUNTRY</span>=CN
+<span class="org-variable-name">PROVINCE</span>=BEIJING
+<span class="org-variable-name">CITY</span>=BEIJING
+<span class="org-variable-name">ORGANIZATION</span>=55tuan
+<span class="org-variable-name">GROUP</span>=55tuan
+<span class="org-variable-name">HOST</span>=MARATHON-CA
+<span class="org-variable-name">SUBJ</span>=<span class="org-string">"/C=$COUNTRY/ST=$PROVINCE/L=$CITY/O=$ORGANIZATION/OU=$GROUP/CN=$HOST"</span>
+
+mkdir -p /etc/marathon/conf
+<span class="org-builtin">cd</span> /etc/marathon/
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;ca&#31169;&#38053;&#21644;ca&#33258;&#31614;&#35777;&#20070;
+</span>touch  /etc/pki/CA/{serial,index.txt}  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#35777;&#20070;&#24207;&#21015;&#21495;&#25991;&#20214;&#12289;&#35777;&#20070;&#32034;&#24341;&#25991;&#20214;
+</span><span class="org-builtin">echo</span>  01 &gt; /etc/pki/CA/serial <span class="org-comment-delimiter"># </span><span class="org-comment">&#31532;&#19968;&#27425;&#21019;&#24314;&#30340;&#26102;&#20505;&#38656;&#35201;&#32473;&#20104;&#35777;&#20070;&#24207;&#21015;&#21495;
+</span>openssl genrsa -out /tmp/ca.key 2048
+openssl req -new -x509 -key /tmp/ca.key -out /tmp/ca.pem -days 36500 -subj $<span class="org-variable-name">SUBJ</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#23458;&#25143;&#31471;&#31169;&#38053;&#21644;&#35777;&#20070;&#35831;&#27714;&#65292;&#24403;&#21069;key&#30340;&#21475;&#20197;&#38450;&#27490;&#26412;&#23494;&#38053;&#27844;&#28431;&#21518;&#34987;&#20154;&#30423;&#29992;
+</span><span class="org-builtin">export</span> <span class="org-variable-name">MARATHON_KEY_PASSWORD</span>=marathonwowopass
+openssl genrsa -des3 -out marathon.key -passout <span class="org-string">"env:MARATHON_KEY_PASSWORD"</span>
+
+openssl req <span class="org-sh-escaped-newline">\</span>
+  -reqexts SAN <span class="org-sh-escaped-newline">\</span>
+  -config &lt;(cat /etc/pki/tls/openssl.cnf <span class="org-sh-escaped-newline">\</span>
+  &lt;(printf <span class="org-string">"[SAN]\nsubjectAltName=DNS:marathon,DNS:*.cicinet.com"</span>)) <span class="org-sh-escaped-newline">\</span>
+  -new  -sha256  <span class="org-sh-escaped-newline">\</span>
+  -key marathon.key -passin <span class="org-string">"env:MARATHON_KEY_PASSWORD"</span>  -out marathon.csr  <span class="org-sh-escaped-newline">\</span>
+  -subj <span class="org-string">"/C=CN/ST=BEIJING/L=BEIJING/O=55tuan/OU=55tuan/CN=marathon"</span> <span class="org-sh-escaped-newline">\</span>
+  -days 36500
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23458;&#25143;&#31471;key&#31614;&#21517;
+</span>openssl ca -batch <span class="org-sh-escaped-newline">\</span>
+    -extensions SAN <span class="org-sh-escaped-newline">\</span>
+    -config &lt;(cat /etc/pki/tls/openssl.cnf <span class="org-sh-escaped-newline">\</span>
+    &lt;(printf <span class="org-string">"[SAN]\nsubjectAltName=DNS:marathon,DNS:*.cicinet.com"</span>)) <span class="org-sh-escaped-newline">\</span>
+    -days 36500     -notext <span class="org-sh-escaped-newline">\</span>
+    -md sha256     -in marathon.csr  -out marathon.crt <span class="org-sh-escaped-newline">\</span>
+    -cert /tmp/ca.pem -key file /tmp/ca.key
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#35777;&#20070;&#36716;&#25442;&#20026;&#22823;&#22810;&#25968;&#27983;&#35272;&#22120;&#37117;&#33021;&#35782;&#21035;&#30340;PKCS12&#25991;&#20214;
+</span><span class="org-builtin">export</span> <span class="org-variable-name">MARATHON_PKCS_PASSWORD</span>=marathonwowopass
+openssl pkcs12 -name marathon  -inkey marathon.key -passin <span class="org-string">"env:MARATHON_KEY_PASSWORD"</span> -in marathon.crt  -password <span class="org-string">"env:MARATHON_PKCS_PASSWORD"</span> -export -out marathon.pkcs12
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">PKCS12&#25991;&#20214;&#36716;JKS
+</span><span class="org-builtin">export</span> <span class="org-variable-name">MARATHON_JKS_PASSWORD</span>=marathonwowopass
+keytool -importkeystore -srckeystore marathon.pkcs12 -srcalias marathon -srcstorepass $<span class="org-variable-name">MARATHON_PKCS_PASSWORD</span> -srcstoretype PKCS12 -destkeystore marathon.jks -deststorepass $<span class="org-variable-name">MARATHON_JKS_PASSWORD</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>启动marathon</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25163;&#21160;&#21551;&#21160;&#27979;&#35797;
+</span>/usr/share/marathon/bin/marathon  --master <span class="org-string">"zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"</span> --zk <span class="org-string">"zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/marathon"</span> --hostname <span class="org-string">"10.200.46.198"</span> --http_credentials <span class="org-string">"wowotuan:wowotuan"</span> --https_port <span class="org-string">"8443"</span> --ssl_keystore_password <span class="org-string">"marathonwowopass"</span> --ssl_keystore_path <span class="org-string">"/etc/marathon/marathon.jks"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">unit service&#21551;&#21160;
+</span>systemctl start marathon
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2af555c0-5252-4769-8914-cc8d33cfbe99" class="outline-3">
+<h3 id="h:2af555c0-5252-4769-8914-cc8d33cfbe99"><a href="#h:2af555c0-5252-4769-8914-cc8d33cfbe99">mesos-slave服务</a></h3>
+<div class="outline-text-3" id="text-h:2af555c0-5252-4769-8914-cc8d33cfbe99">
+</div>
+<div id="outline-container-h:1ab254a8-41b8-4e1a-a3d8-0c9aef57f12e" class="outline-4">
+<h4 id="h:1ab254a8-41b8-4e1a-a3d8-0c9aef57f12e"><a href="#h:1ab254a8-41b8-4e1a-a3d8-0c9aef57f12e">docker安装</a></h4>
+<div class="outline-text-4" id="text-h:1ab254a8-41b8-4e1a-a3d8-0c9aef57f12e">
+<p>
+<b>1挂载磁盘</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">parted -s /dev/vdb mklabel gpt
+parted -s /dev/vdb mkpart primary 0 100%
+mkfs.xfs /dev/vdb1
+
+parted -s /dev/vdc mklabel gpt
+parted -s /dev/vdc mkpart primary 0 100%
+mkfs.xfs /dev/vdc1
+
+mkdir /data
+<span class="org-builtin">echo</span> <span class="org-string">"/dev/vdc1                /data                   xfs     defaults        0 0"</span> &gt;&gt;/etc/fstab
+mount -a
+</pre>
+</div>
+
+<p>
+安装docker
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">yum remove docker <span class="org-sh-escaped-newline">\</span>
+                  docker-client <span class="org-sh-escaped-newline">\</span>
+                  docker-client-latest <span class="org-sh-escaped-newline">\</span>
+                  docker-common <span class="org-sh-escaped-newline">\</span>
+                  docker-latest <span class="org-sh-escaped-newline">\</span>
+                  docker-latest-logrotate <span class="org-sh-escaped-newline">\</span>
+                  docker-logrotate <span class="org-sh-escaped-newline">\</span>
+                  docker-engine
+yum install -y yum-utils device-mapper-persistent-data lvm2
+yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+yum makecache fast
+yum -y install docker-ce
+</pre>
+</div>
+
+<p>
+<b>2 准备docker devicemapper存储模式</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">2. &#23433;&#35013;&#20381;&#36182;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">centos device-mapper-persistent-data, lvm2
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">yum install -y yum-utils device-mapper-persistent-data  xfsprogs  lvm2 gcc*  install zlib-devel curl-devel openssl-devel httpd-devel apr-devel apr-util-devel mysql-devel libffi-devel
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">4. &#21019;&#24314;pv
+</span>pvcreate /dev/vdb1&lt;&lt;EOF<span class="org-sh-heredoc">
+y
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">5. &#21019;&#24314;vg
+</span>vgcreate docker /dev/vdb1
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">6. &#25351;&#23450;2&#20010;&#36923;&#36753;&#21367;&#21517;&#31216;thinpool and thinpoolmeta&#12290;&#26368;&#21518;&#19968;&#20010;&#21442;&#25968;&#25351;&#23450;&#20801;&#35768;&#22312;&#31354;&#38388;&#19981;&#36275;&#26102;&#33258;&#21160;&#25193;&#23637;&#25968;&#25454;&#25110;&#20803;&#25968;&#25454;&#30340;&#21487;&#29992;&#31354;&#38388;&#37327;&#65292;&#20316;&#20026;&#20020;&#26102;&#38388;&#38553;
+</span>lvcreate --wipesignatures y -n thinpool docker -l 95%VG&lt;&lt;EOF<span class="org-sh-heredoc">
+y
+EOF
+</span>lvcreate --wipesignatures y -n thinpoolmeta docker -l 1%VG&lt;&lt;EOF<span class="org-sh-heredoc">
+y
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">7. &#20351;&#29992;lvconvert&#21629;&#20196;&#23558;&#21367;&#36716;&#25442;&#20026;&#31934;&#31616;&#27744;&#21644;&#31934;&#31616;&#27744;&#30340;&#20803;&#25968;&#25454;&#23384;&#20648;&#20301;&#32622;
+</span>lvconvert -y --zero n -c 512K --thinpool docker/thinpool --poolmetadata docker/thinpoolmeta
+<span class="org-comment-delimiter">#</span><span class="org-comment">8. &#36890;&#36807;&#37197;&#32622;&#25991;&#20214;&#33258;&#21160;&#25193;&#23481;
+</span>cat &gt;&gt; /etc/lvm/profile/docker-thinpool.profile &lt;&lt; EOF<span class="org-sh-heredoc">
+activation {
+    thin_pool_autoextend_threshold=80
+    thin_pool_autoextend_percent=20
+}
+EOF
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;&#35828;&#26126;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">thin_pool_autoextend_threshold &#35813;&#20540;&#26159;lvm&#23581;&#35797;&#25193;&#23481;&#21040;&#21487;&#29992;&#31354;&#38388;&#26102;&#65292;&#24403;&#21069;&#24050;&#31354;&#38388;&#20351;&#29992;&#37327;&#30340;&#30334;&#20998;&#27604;&#65288;100=&#31105;&#27490;&#65289;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">thin_pool_autoextend_percent &#35813;&#20540;&#26159;thin&#27744;&#35201;&#25193;&#23481;&#30340;&#30334;&#20998;&#27604;&#65288;100=&#31105;&#27490;&#65289;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">9. &#24212;&#29992;&#26032;lvm profile &#25991;&#20214;
+</span>lvchange --metadataprofile docker-thinpool docker/thinpool
+systemctl daemon-reload
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">10. &#37197;&#32622;docker unit
+</span>vim /usr/lib/systemd/system/docker.service
+[Unit]
+<span class="org-variable-name">Description</span>=Docker Application Container Engine
+<span class="org-variable-name">Documentation</span>=https://docs.docker.com
+<span class="org-variable-name">After</span>=network.target docker.socket
+<span class="org-variable-name">Requires</span>=docker.socket
+
+[Service]
+<span class="org-variable-name">Type</span>=notify
+<span class="org-variable-name">ExecStart</span>=/usr/bin/docker daemon <span class="org-sh-escaped-newline">\</span>
+          --exec-opt native.cgroupdriver=systemd <span class="org-sh-escaped-newline">\</span>
+        --tlsverify -H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock <span class="org-sh-escaped-newline">\</span>
+        --tlscacert=/etc/docker/ca.pem --tlscert=/etc/docker/cert.pem <span class="org-sh-escaped-newline">\</span>
+        --tlskey=/etc/docker/key.pem --storage-driver=devicemapper <span class="org-sh-escaped-newline">\</span>
+        --storage-opt=dm.thinpooldev=/dev/mapper/docker-thinpool --storage-opt dm.use_deferred_removal=true
+<span class="org-variable-name">MountFlags</span>=slave
+<span class="org-variable-name">LimitNOFILE</span>=1048576
+<span class="org-variable-name">LimitNPROC</span>=1048576
+<span class="org-variable-name">LimitCORE</span>=infinity
+<span class="org-variable-name">TimeoutStartSec</span>=0
+
+[Install]
+<span class="org-variable-name">WantedBy</span>=multi-user.target
+systemctl start docke
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">11. &#21551;&#21160;docker
+</span>systemctl start docker &amp;&amp; systemctl enable docker
+docker  login -u wowotuanops -p registrywowotuan -e baijunhua@cicinet.com  tc-yz-hd1.registry.me:443
+</pre>
+</div>
+
+<p>
+<b>3 18.06的包已经用了overlay2存储模式</b>
+</p>
+
+<p>
+<b>4 docker daemon ssl 认证安装</b>
+</p>
+
+<ol class="org-ol">
+<li>方式1</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;gem
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">yum install -y gem
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992;taobao ruby gem&#38236;&#20687;
+</span>$ gem sources --remove https://rubygems.org/
+$ gem sources -a https://ruby.taobao.org/
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;certificate_authority
+</span>$ gem install certificate_authority
+&#23548;&#20837;&#33050;&#26412;&#65288;&#25214;&#25105;&#35201;&#65292;&#25110;&#32773;&#22312;gitlab&#19978;&#38754;&#25214;&#25105;&#20889;&#24471;ansible&#33050;&#26412;&#65289;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;&#35777;&#20070;&#65288;&#27880;&#24847;example.com&#26159;&#38024;&#23545;&#35775;&#38382;&#30340;&#24212;&#29992;&#30340;&#22495;&#21517;&#65292;&#22914;&#26524;&#26159;IP&#35775;&#38382;&#65292;&#36825;&#37324;&#23601;&#22635;&#20889;ip eg:ruby certgen.rb 10.9.120.20&#65289;
+</span>$ ruby certgen.rb example.com
+CA certificates are<span class="org-keyword"> in</span> /root/.docker/ca
+Client certificates are<span class="org-keyword"> in</span> /root/.docker
+Server certificates are<span class="org-keyword"> in</span> /root/.docker/example.com
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26381;&#21153;&#22120;&#31471;&#65306;
+</span>&#25335;&#36125; /root/.docker/example.com&#19979;&#30340;&#19977;&#20010;&#25991;&#20214; ca.pem cert.pem key.pem&#21040; /etc/docker/&#30446;&#24405;&#19979;
+&#37197;&#32622;docker&#21551;&#21160;&#20351;&#29992;ssl
+<span class="org-comment-delimiter"># </span><span class="org-comment">cat /etc/sysconfig/docker
+</span><span class="org-variable-name">OPTIONS</span>=<span class="org-string">'--tlsverify -H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock --tlscacert=/etc/docker/ca.pem --tlscert=/etc/docker/cert.pem --tlskey=/etc/docker/key.pem'</span>
+&#37325;&#21551;docker daemon&#36827;&#31243;
+systemctl restart docker
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23458;&#25143;&#31471;&#65306;
+</span>&#25335;&#36125;/root/.docker &#19979;&#30340;&#19977;&#20010;&#25991;&#20214; ca.pem cert.pem key.pem&#65292;&#21040;&#23458;&#25143;&#31471;&#30340;&#35748;&#35777;&#65292;&#22914;&#65306;java&#35775;&#38382;&#30340;&#35748;&#35777;&#12290;
+</pre>
+</div>
+
+
+<ol class="org-ol">
+<li>方式2</li>
+</ol>
+
+<p>
+创建TLS证书(根证书、服务端证书、客户端证书)
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">cd</span> /usr/anyesu/docker
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20869;&#23481;&#27604;&#36739;&#22810;, &#23601;&#20889;&#25104;&#19968;&#20010;shell&#33050;&#26412;, &#23558;&#38656;&#35201;&#32465;&#23450;&#30340;&#26381;&#21153;&#31471;ip&#25110;&#22495;&#21517;&#20570;&#21442;&#25968;&#20256;&#20837;&#21363;&#21487;
+</span>vi tlscert.sh
+</pre>
+</div>
+
+<p>
+脚本内容如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">/bin/bash
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-keyword">if</span> [ $<span class="org-variable-name">#</span> != 1 ] ; <span class="org-keyword">then</span>
+<span class="org-builtin">echo</span> <span class="org-string">"USAGE: $0 [HOST_IP]"</span>
+<span class="org-keyword">exit</span> 1;
+<span class="org-keyword">fi</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter">#   </span><span class="org-comment">&#19979;&#38754;&#20026;&#35777;&#20070;&#23494;&#38053;&#21450;&#30456;&#20851;&#20449;&#24687;&#37197;&#32622;&#65292;&#27880;&#24847;&#20462;&#25913;   #
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-variable-name">PASSWORD</span>=<span class="org-string">"8#QBD2$!EmED&amp;QxK"</span>
+<span class="org-variable-name">COUNTRY</span>=CN
+<span class="org-variable-name">PROVINCE</span>=yourprovince
+<span class="org-variable-name">CITY</span>=yourcity
+<span class="org-variable-name">ORGANIZATION</span>=yourorganization
+<span class="org-variable-name">GROUP</span>=yourgroup
+<span class="org-variable-name">NAME</span>=yourname
+<span class="org-variable-name">HOST</span>=$<span class="org-variable-name">1</span>
+<span class="org-variable-name">SUBJ</span>=<span class="org-string">"/C=$COUNTRY/ST=$PROVINCE/L=$CITY/O=$ORGANIZATION/OU=$GROUP/CN=$HOST"</span>
+<span class="org-builtin">echo</span> <span class="org-string">"your host is: $1"</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">1.&#29983;&#25104;&#26681;&#35777;&#20070;RSA&#31169;&#38053;&#65292;PASSWORD&#20316;&#20026;&#31169;&#38053;&#25991;&#20214;&#30340;&#23494;&#30721;
+</span>openssl genrsa -passout pass:$<span class="org-variable-name">PASSWORD</span> -aes256 -out ca-key.pem 4096
+<span class="org-comment-delimiter"># </span><span class="org-comment">2.&#29992;&#26681;&#35777;&#20070;RSA&#31169;&#38053;&#29983;&#25104;&#33258;&#31614;&#21517;&#30340;&#26681;&#35777;&#20070;
+</span>openssl req -passin pass:$<span class="org-variable-name">PASSWORD</span> -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -subj $<span class="org-variable-name">SUBJ</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter">#          </span><span class="org-comment">&#29992;&#26681;&#35777;&#20070;&#31614;&#21457;server&#31471;&#35777;&#20070;          #
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">3.&#29983;&#25104;&#26381;&#21153;&#31471;&#31169;&#38053;
+</span>openssl genrsa -out server-key.pem 4096
+<span class="org-comment-delimiter"># </span><span class="org-comment">4.&#29983;&#25104;&#26381;&#21153;&#31471;&#35777;&#20070;&#35831;&#27714;&#25991;&#20214;
+</span>openssl req -new -sha256 -key server-key.pem -out server.csr -subj <span class="org-string">"/CN=$HOST"</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">5.&#20351;tls&#36830;&#25509;&#33021;&#36890;&#36807;ip&#22320;&#22336;&#26041;&#24335;&#65292;&#32465;&#23450;IP
+</span><span class="org-builtin">echo</span> <span class="org-variable-name">subjectAltName</span> = IP:127.0.0.1,IP:$<span class="org-variable-name">HOST</span> &gt; extfile.cnf
+<span class="org-comment-delimiter"># </span><span class="org-comment">6.&#20351;&#29992;&#26681;&#35777;&#20070;&#31614;&#21457;&#26381;&#21153;&#31471;&#35777;&#20070;
+</span>openssl x509 -passin pass:$<span class="org-variable-name">PASSWORD</span> -req -days 365 -sha256 -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -extfile extfile.cnf
+
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter">#          </span><span class="org-comment">&#29992;&#26681;&#35777;&#20070;&#31614;&#21457;client&#31471;&#35777;&#20070;          #
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">7.&#29983;&#25104;&#23458;&#25143;&#31471;&#31169;&#38053;
+</span>openssl genrsa -out key.pem 4096
+<span class="org-comment-delimiter"># </span><span class="org-comment">8.&#29983;&#25104;&#23458;&#25143;&#31471;&#35777;&#20070;&#35831;&#27714;&#25991;&#20214;
+</span>openssl req -subj <span class="org-string">'/CN=client'</span> -new -key key.pem -out client.csr
+<span class="org-comment-delimiter"># </span><span class="org-comment">9.&#23458;&#25143;&#31471;&#35777;&#20070;&#37197;&#32622;&#25991;&#20214;
+</span><span class="org-builtin">echo</span> <span class="org-variable-name">extendedKeyUsage</span> = clientAuth &gt; extfile.cnf
+<span class="org-comment-delimiter"># </span><span class="org-comment">10.&#20351;&#29992;&#26681;&#35777;&#20070;&#31614;&#21457;&#23458;&#25143;&#31471;&#35777;&#20070;
+</span>openssl x509 -passin pass:$<span class="org-variable-name">PASSWORD</span> -req -days 365 -sha256 -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out cert.pem -extfile extfile.cnf
+<span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter">#                    </span><span class="org-comment">&#28165;&#29702;                    #
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">============================================#
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;&#20013;&#38388;&#25991;&#20214;
+</span>rm -f client.csr server.csr ca.srl extfile.cnf
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36716;&#31227;&#30446;&#24405;
+</span>mkdir client server
+cp {ca,cert,key}.pem client
+cp {ca,server-cert,server-key}.pem server
+rm {cert,key,server-cert,server-key}.pem
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35774;&#32622;&#31169;&#38053;&#26435;&#38480;&#20026;&#21482;&#35835;
+</span>chmod -f 0400 ca-key.pem server/server-key.pem client/key.pem
+</pre>
+</div>
+
+
+<p>
+执行服务端配置
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#32473;&#33050;&#26412;&#28155;&#21152;&#36816;&#34892;&#26435;&#38480;
+</span>chmod +x tlscert.sh
+<span class="org-variable-name">HOST_IP</span>=127.0.0.1
+./tlscert.sh $<span class="org-variable-name">HOST_IP</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23458;&#25143;&#31471;&#38656;&#35201;&#30340;&#35777;&#20070;&#20445;&#23384;&#22312;client&#30446;&#24405;&#19979;, &#26381;&#21153;&#31471;&#38656;&#35201;&#30340;&#35777;&#20070;&#20445;&#23384;&#22312;server&#30446;&#24405;&#19979;
+</span>sudo cp server/* /etc/docker
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#37197;&#32622;
+</span>sudo vi /etc/default/docker
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25913;&#20026; DOCKER_OPTS="--selinux-enabled --tlsverify --tlscacert=/etc/docker/ca.pem --tlscert=/etc/docker/server-cert.pem --tlskey=/etc/docker/server-key.pem -H=unix:///var/run/docker.sock -H=0.0.0.0:2375"
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#21551;docker
+</span>sudo service docker restart
+</pre>
+</div>
+
+<p>
+正确的访问方式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#23458;&#25143;&#31471;&#21152;tls&#21442;&#25968;&#35775;&#38382;
+</span>docker --tlsverify --tlscacert=client/ca.pem --tlscert=client/cert.pem --tlskey=client/key.pem -H tcp://127.0.0.1:2375 version
+<span class="org-comment-delimiter"># </span><span class="org-comment">Docker API&#26041;&#24335;&#35775;&#38382;
+</span>curl https://127.0.0.1:2375/images/json --cert client/cert.pem --key client/key.pem --cacert client/ca.pem
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#31616;&#21270;&#23458;&#25143;&#31471;&#35843;&#29992;&#21442;&#25968;&#37197;&#32622;
+</span>sudo cp client/* ~/.docker
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36861;&#21152;&#29615;&#22659;&#21464;&#37327;
+</span><span class="org-builtin">echo</span> -e <span class="org-string">"export DOCKER_HOST=tcp://$HOST_IP:2375 DOCKER_TLS_VERIFY=1"</span> &gt;&gt; ~/.bashrc
+sudo docker version
+</pre>
+</div>
+<p>
+切记, 要保护好客户端证书, 这是连接服务端的凭证。另外根证书私钥也要保存好, 泄漏之后就能签发客户端证书了。
+</p>
+
+<p>
+认证模式
+</p>
+<pre class="example" id="org395ef9d">
+1. 服务端认证模式
+选项  说明
+tlsverify, tlscacert, tlscert, tlskey
+向客户端发送服务端证书, 校验客户端证书是否由指定的CA(自签名根证书)签发
+
+tls, tlscert, tlskey
+向客户端发送服务端证书, 不校验客户端证书是否由指定的CA(自签名根证书)签发
+
+2. 客户端认证模式
+选项  说明
+tls
+校验服务端证书是否由 公共的CA机构签发
+
+tlsverify, tlscacert
+校验服务端证书是否由指定的CA(自签名根证书)签发
+
+tls, tlscert, tlskey
+使用客户端证书进行身份验证,  但不校验服务端证书是否由指定的CA(自签名根证书)签发
+
+tlsverify, tlscacert, tlscert, tlskey
+使用客户端证书进行身份验证且校验服务端证书是否由指定的CA(自签名根证书)签发
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b1dd4850-11c8-46f3-9c4f-61c883447b68" class="outline-3">
+<h3 id="h:b1dd4850-11c8-46f3-9c4f-61c883447b68"><a href="#h:b1dd4850-11c8-46f3-9c4f-61c883447b68">mesos-slave安装</a></h3>
+<div class="outline-text-3" id="text-h:b1dd4850-11c8-46f3-9c4f-61c883447b68">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">host_ip</span>=$(/usr/sbin/ifconfig eth0 | sed -n <span class="org-string">'/inet /p'</span>| awk <span class="org-string">'{print $2}'</span>)
+<span class="org-variable-name">host_name</span>=$(sed -rn <span class="org-string">"/$(/usr/sbin/ifconfig eth0 | sed -n '/inet /p'| awk '{print $2}')/s@[[:digit:]\.]+[[:space:]]+([[:alnum:]_-]+).*@\1@gp"</span> /etc/hosts)
+
+sudo rpm -Uvh http://repos.mesosphere.com/el/7/noarch/RPMS/mesosphere-el-repo-7-1.noarch.rpm
+sudo yum -y install mesos
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;mesos-slave&#30340;--master&#21442;&#25968;
+</span><span class="org-builtin">echo</span> <span class="org-string">"zk://10.200.46.198:2181,10.200.46.199:2181,10.200.46.200:2181/mesos"</span> &gt;/etc/mesos/zk  
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;mesos-slave&#30340;--hostname&#21442;&#25968;
+</span><span class="org-builtin">echo</span> <span class="org-string">"$host_ip"</span> &gt; /etc/mesos-slave/ip
+<span class="org-builtin">echo</span> <span class="org-string">"$host_ip"</span> &gt; /etc/mesos-slave/hostname
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#26524;&#24819;&#22312;marathon&#19978;&#36816;&#34892;docker&#65292;&#38656;&#35201;&#22312;slave&#19978;&#39069;&#22806;&#30340;&#37197;&#32622;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#20351;&#29992;docker&#23481;&#22120;&#21270;&#65292;&#37197;&#32622;slave&#30340; --containerizers&#21442;&#25968;
+</span><span class="org-builtin">echo</span> <span class="org-string">'docker,mesos'</span> &gt; /etc/mesos-slave/containerizers
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35774;&#32622;&#26426;&#22120;&#23646;&#24615;
+</span>mkdir /etc/mesos-slave/attributes
+<span class="org-builtin">echo</span> <span class="org-string">"$host_ip"</span> &gt;/etc/mesos-slave/attributes/host
+<span class="org-builtin">echo</span> <span class="org-string">'main'</span> &gt; /etc/mesos-slave/attributes/hostgroup
+systemctl enable mesos-slave &amp;&amp; systemctl stop  mesos-master &amp;&amp; systemctl disable mesos-master
+systemctl start mesos-slave
+
+
+[root@nginx001 ~]# curl -s -u wowotuan:wowotuan 172.16.0.22:8080/v2/apps?<span class="org-variable-name">embed</span>=apps.count|jq  <span class="org-string">'.apps[]|.id ,.instances'</span> |sed -n <span class="org-string">'{N;s/\n/  /p}'</span> |sort -nr -k2
+<span class="org-string">"/yuncapital-yzprod"</span>  2
+... ...
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:8f42db72-15ac-4e71-a119-d6462828970e" class="outline-2">
+<h2 id="h:8f42db72-15ac-4e71-a119-d6462828970e"><a href="#h:8f42db72-15ac-4e71-a119-d6462828970e">Docker仓库</a></h2>
+<div class="outline-text-2" id="text-h:8f42db72-15ac-4e71-a119-d6462828970e">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">1. &#25289;&#21462;docker registry
+</span>docker pull registry:2.5.0
+<span class="org-comment-delimiter">#</span><span class="org-comment">2. &#23433;&#35013;docker-compose
+</span>curl -L <span class="org-string">"https://github.com/docker/compose/releases/download/1.23.2/docker-compose-$(uname -s)-$(uname -m)"</span> -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+<span class="org-comment-delimiter">#</span><span class="org-comment">3. &#36890;&#36807;distribution &#26469;&#23433;&#35013;registry
+</span>git clone https://github.com/docker/distribution.git
+<span class="org-builtin">cd</span> distribution/
+git checkout release/2.0
+<span class="org-builtin">cd</span> contrib/compose/nginx/
+
+<span class="org-variable-name">NAME</span>=my.registry.cici.me
+<span class="org-variable-name">COUNTRY</span>=CN
+<span class="org-variable-name">PROVINCE</span>=BEIJING
+<span class="org-variable-name">CITY</span>=BEIJING
+<span class="org-variable-name">ORGANIZATION</span>=$<span class="org-variable-name">NAME</span>
+<span class="org-variable-name">GROUP</span>=$<span class="org-variable-name">NAME</span>
+<span class="org-variable-name">HOST</span>=$<span class="org-variable-name">NAME</span>
+<span class="org-variable-name">EMAIL</span>=baijunhua@cicinet.com
+<span class="org-variable-name">SUBJ</span>=<span class="org-string">"/C=$COUNTRY/ST=$PROVINCE/L=$CITY/O=$ORGANIZATION/OU=$GROUP/CN=$HOST/emailAddress=$EMAIL"</span>
+
+openssl genrsa -out $<span class="org-variable-name">NAME</span>.pem 2048
+openssl req -new -sha256 -key $<span class="org-variable-name">NAME</span>.pem -out $<span class="org-variable-name">NAME</span>.csr -subj <span class="org-string">"$SUBJ"</span>
+openssl x509 -req -days 3650 -in $<span class="org-variable-name">NAME</span>.csr -signkey $<span class="org-variable-name">NAME</span>.pem -out $<span class="org-variable-name">NAME</span>.crt
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">4. &#23433;&#35013;httpd-tools &#29983;&#25104;&#23494;&#30721;
+</span>yum install httpd-tools -y
+htpasswd -c .htpasswd wowotuanops
+registrywowotuan
+<span class="org-comment-delimiter">#</span><span class="org-comment">5. &#20462;&#25913;dockerfile
+</span>&#21024;&#38500;COPY docker-registry.conf /etc/nginx/docker-registry.conf
+<span class="org-builtin">echo</span> <span class="org-string">"COPY .htpasswd /etc/nginx/.htpasswd"</span> &gt;&gt;Dockerfile
+<span class="org-builtin">echo</span> <span class="org-string">"COPY $NAME.pem /etc/nginx/$NAME.pem"</span> &gt;&gt;Dockerfile
+<span class="org-builtin">echo</span> <span class="org-string">"COPY $NAME.crt /etc/nginx/$NAME.crt"</span> &gt;&gt;Dockerfile
+<span class="org-comment-delimiter">#</span><span class="org-comment">6. &#32534;&#36753;registry.conf&#25991;&#20214;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#24847;&#65306;mesos&#38598;&#32676;&#21152;hosts&#35299;&#26512;
+</span>cat &gt;registry.conf&lt;&lt;EOF<span class="org-sh-heredoc">
+# Docker registry proxy for api versions 1 and 2
+
+upstream docker-registry-v2 {
+  ip_hash;
+  server registryv2:5000;
+}
+
+upstream docker-registry-api {
+  ip_hash;
+  server registryapi:5000;
+}
+
+# No client auth or TLS
+server {
+  listen 5000;
+  server_name $NAME.me;
+
+  # disable any limits to avoid HTTP 413 for large image uploads
+  client_max_body_size 0;
+
+  # required to avoid HTTP 411: see Issue #1486 (https://github.com/docker/docker/issues/1486)
+  chunked_transfer_encoding on;
+
+  # for ssl
+  ssl on;
+  ssl_certificate /etc/nginx/$NAME.crt;
+  ssl_certificate_key /etc/nginx/$NAME.pem;
+
+  location /v2/ {
+    # Do not allow connections from docker 1.5 and earlier
+    # docker pre-1.6.0 did not properly set the user agent on ping, catch "Go *" user agents
+    auth_basic "registry v2 realm";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    add_header 'Docker-Distribution-Api-Version' 'registry/2.0' always;
+
+    include               docker-registry-v2.conf;
+    }
+}
+server {
+  listen 5001;
+  server_name $NAME.me;
+
+  # disable any limits to avoid HTTP 413 for large image uploads
+  client_max_body_size 0;
+
+  # required to avoid HTTP 411: see Issue #1486 (https://github.com/docker/docker/issues/1486)
+  chunked_transfer_encoding on;
+
+  location /search/imagesinfo {
+proxy_set_header  Host              $http_host;   # required for docker client's sake
+proxy_set_header  X-Real-IP         $remote_addr; # pass on real client's IP
+proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header  X-Forwarded-Proto $scheme;
+proxy_read_timeout                  900;
+    proxy_pass  http://docker-registry-api;
+  }
+
+  location /repositories {
+proxy_set_header  Host              $http_host;   # required for docker client's sake
+proxy_set_header  X-Real-IP         $remote_addr; # pass on real client's IP
+proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header  X-Forwarded-Proto $scheme;
+proxy_read_timeout                  900;
+    proxy_pass http://docker-registry-api;
+  }
+}
+EOF
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">7. &#20462;&#25913;docker-compose.yml
+</span><span class="org-builtin">cd</span> ..
+cat &gt;docker-compose.yml &lt;&lt;\EOF<span class="org-sh-heredoc">
+nginx:
+  build: "nginx"
+  ports:
+    - "5000:5000"
+    - "443:5000"
+    - "80:5001"
+  links:
+    - registryv2:registryv2
+    - registryapi:registryapi
+registryv2:
+  image: myegistry.55tuan.me:443/registry:2.5.0
+  ports:
+    - "5000"
+  volumes:
+    - /data/registryv2/registry:/etc/docker/registry
+    - /data/registryv2/data:/var/lib/registry
+registryapi:
+  image: myregistry.55tuan.me:443/regisitryweb:v1
+  ports:
+    - "5001:5000"
+  volumes:
+    - /data/registryv2/data:/data/registryv2/data
+EOF
+</span>
+mkdir /data/registryv2/{registry,data} -pv
+cat &gt;/data/registryv2/registry/config.yml&lt;&lt;\EOF<span class="org-sh-heredoc">
+version: 0.1
+log:
+  level: info
+  fields:
+    service: registry
+#notifications:
+##  endpoints:
+##    - name: local-python-8000
+##      url: http://10.9.120.24:8000/
+##      timeout: 1s
+##      threshold: 10
+##      backoff: 1s
+##      disabled: false
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+http:
+  addr: :5000
+EOF
+</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:3ba1b3e2-364b-43df-8ebc-c40aa1e6c0e2" class="outline-2">
+<h2 id="h:3ba1b3e2-364b-43df-8ebc-c40aa1e6c0e2"><a href="#h:3ba1b3e2-364b-43df-8ebc-c40aa1e6c0e2">添加节点脚本-add-mesos.sh</a></h2>
+<div class="outline-text-2" id="text-h:3ba1b3e2-364b-43df-8ebc-c40aa1e6c0e2">
+<div class="org-src-container">
+<pre class="src src-sh">cat add-mesos.sh 
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-comment-delimiter">###</span><span class="org-comment">time:2018-9-19
+</span>
+<span class="org-variable-name">ip</span>=<span class="org-sh-quoted-exec">`ifconfig  eth0|grep 'inet '|awk '{print $2}'`</span>
+<span class="org-builtin">echo</span> <span class="org-string">"""
+192.168.100.247  mesos-master1
+192.168.101.150 mesos-master2
+192.168.101.151 mesos-master3
+192.168.100.249 mesos-slave1
+192.168.100.251 mesos-slave2
+192.168.100.250 mesos-slave3
+192.168.101.152 mesos-slave4
+192.168.101.153 mesos-slave5
+192.168.101.166 mesos-slave6
+192.168.101.167 mesos-slave7
+192.168.101.181 mesos-slave8
+192.168.101.182 mesos-slave9
+192.168.101.183 mesos-slave10
+192.168.101.184 mesos-slave11
+192.168.101.192 mesos-slave12
+192.168.101.193 mesos-slave13
+192.168.101.194 mesos-slave14
+192.168.101.195 mesos-slave15
+
+116.213.103.33 msg.cici
+192.168.100.44 ldapserver-44.zke.cici
+192.168.101.106 ldapserver-106.zke.cici
+192.168.101.184 mesos-slave-11
+"""</span> &gt;&gt; /etc/hosts
+<span class="org-builtin">echo</span> <span class="org-string">"""
+nameserver 192.168.100.44
+nameserver 192.168.101.106
+"""</span> &gt;  /etc/resolv.conf 
+
+rpm -Uhv http://repos.mesosphere.com/el/7/noarch/RPMS/mesosphere-el-repo-7-2.noarch.rpm
+rpm -ivh https://mirrors.aliyun.com/epel/epel-release-latest-7.noarch.rpm
+yum install -y yum-utils device-mapper-persistent-data  xfsprogs  lvm2 gcc*  install zlib-devel curl-devel openssl-devel httpd-devel apr-devel apr-util-devel mysql-devel libffi-devel 
+
+<span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -b <span class="org-string">"/dev/vdb1"</span> ];<span class="org-keyword">then</span>
+parted -s /dev/vdb mklabel gpt
+parted -s /dev/vdb mkpart primary 0 100%
+mkfs.xfs /dev/vdb1
+<span class="org-keyword">else</span>
+<span class="org-builtin">echo</span> <span class="org-string">"/dev/vdb1 exist"</span>
+<span class="org-keyword">fi</span>
+
+<span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -b <span class="org-string">"/dev/vdc1"</span> ];<span class="org-keyword">then</span>
+parted -s /dev/vdc mklabel gpt
+parted -s /dev/vdc mkpart primary 0 100%
+mkfs.xfs /dev/vdc1
+<span class="org-keyword">else</span>
+<span class="org-builtin">echo</span> <span class="org-string">"/dev/vdc1 exist"</span>
+<span class="org-keyword">fi</span>
+
+<span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -d <span class="org-string">"/data"</span> ];<span class="org-keyword">then</span>
+    mkdir /data
+<span class="org-keyword">fi</span>
+cat /etc/fstab |grep -E <span class="org-string">"/data|/dev/vdc1"</span>
+<span class="org-keyword">if</span> [ $<span class="org-variable-name">?</span> ];<span class="org-keyword">then</span>
+<span class="org-builtin">echo</span> <span class="org-string">"/dev/vdc1                /data                   xfs     defaults        0 0"</span> &gt;&gt;/etc/fstab
+mount -a
+<span class="org-keyword">fi</span>
+
+
+
+<span class="org-comment-delimiter">###</span><span class="org-comment">devicemapper
+</span>pvcreate /dev/vdb1&lt;&lt;EOF<span class="org-sh-heredoc">
+y
+ 
+EOF
+</span>vgcreate docker /dev/vdb1
+lvcreate --wipesignatures y -n thinpool docker -l 95%VG&lt;&lt;EOF<span class="org-sh-heredoc">
+y
+
+EOF
+</span>lvcreate --wipesignatures y -n thinpoolmeta docker -l 1%VG&lt;&lt;EOF<span class="org-sh-heredoc">
+y
+
+EOF
+</span>lvconvert -y --zero n -c 512K --thinpool docker/thinpool --poolmetadata docker/thinpoolmeta
+cat &gt;&gt; /etc/lvm/profile/docker-thinpool.profile &lt;&lt; EOF<span class="org-sh-heredoc">
+activation {
+    thin_pool_autoextend_threshold=80
+    thin_pool_autoextend_percent=20
+}
+EOF
+</span>lvchange --metadataprofile docker-thinpool docker/thinpool
+
+<span class="org-builtin">cd</span>
+wget http://192.168.101.104/mesos/ruby-2.2.7.tar.gz
+tar -zxf ruby-2.2.7.tar.gz
+<span class="org-builtin">cd</span> ruby-2.2.7
+./configure 
+make -j 3
+make install
+<span class="org-builtin">cd</span> /root/ruby-2.2.7/ext/zlib
+ruby ./extconf.rb
+make
+make install
+<span class="org-builtin">cd</span> /root/ruby-2.2.7/ext/openssl
+ln -s /root/ruby-2.2.7/include/ /
+ruby extconf.rb
+make  -j 3
+make install
+<span class="org-builtin">cd</span> /usr/local/bin/ 
+./gem sources --remove https://rubygems.org/
+gem sources -a https://gems.ruby-china.com/
+./gem install certificate_authority
+<span class="org-builtin">cd</span> 
+wget http://192.168.101.104/mesos/certgen1.rb
+ruby certgen1.rb  $<span class="org-variable-name">ip</span>
+<span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -d <span class="org-string">"/root/.docker/$ip/"</span> ];<span class="org-keyword">then</span>
+<span class="org-builtin">cd</span>
+ruby certgen1.rb  $<span class="org-variable-name">ip</span>
+<span class="org-keyword">fi</span>
+mkdir  /etc/docker
+cp /root/.docker/$<span class="org-variable-name">ip</span>/* /etc/docker
+<span class="org-builtin">cd</span>
+wget http://192.168.101.104/mesos/docker-engine-1.10.3-1.el7.centos.x86_64.rpm
+wget http://192.168.101.104/mesos/docker-engine-selinux-1.10.3-1.el7.centos.noarch.rpm
+wget -O /etc/pki/ca-trust/source/anchors/hb2.registry.cici.crt http://192.168.101.104/mesos/hb2.registry.cici.crt
+update-ca-trust extract 
+
+yum localinstall -y docker-engine*
+wget -O /usr/lib/systemd/system/docker.service  http://192.168.101.104/mesos/docker.service
+systemctl daemon-reload
+systemctl start docker &amp;&amp; systemctl enable docker
+
+docker login -u wowotuanops -p registrywowotuan -e baijunhua@cicinet.com hb2.registry.cici:443
+<span class="org-keyword">if</span> [ $<span class="org-variable-name">?</span> -eq 0 ];<span class="org-keyword">then</span>
+<span class="org-builtin">cd</span> /root &amp;&amp; tar -czvf /etc/docker.tar.gz .docker/
+<span class="org-builtin">cd</span>
+<span class="org-keyword">else</span>
+<span class="org-builtin">echo</span> <span class="org-string">"docker login err"</span>
+<span class="org-keyword">fi</span>
+
+yum install mesos -y
+mkdir -p /etc/mesos-slave/attributes
+<span class="org-builtin">echo</span> $<span class="org-variable-name">ip</span> &gt; /etc/mesos-slave/attributes/host
+<span class="org-builtin">echo</span> <span class="org-string">'main'</span> &gt; /etc/mesos-slave/attributes/hostgroup
+<span class="org-builtin">echo</span> <span class="org-string">'zk://192.168.100.247:2181,192.168.101.150:2181,192.168.101.151:2181/mesos'</span> &gt; /etc/mesos/zk
+<span class="org-builtin">echo</span> $<span class="org-variable-name">ip</span> &gt; /etc/mesos-slave/hostname
+<span class="org-builtin">echo</span> $<span class="org-variable-name">ip</span> &gt; /etc/mesos-slave/ip
+<span class="org-builtin">echo</span> <span class="org-string">'docker,mesos'</span> &gt; /etc/mesos-slave/containerizers
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">systemctl enable mesos-slave &amp;&amp; systemctl start  mesos-slave &amp;&amp; systemctl disable mesos-master
+</span>
+wget -O /usr/bin/consul  http://192.168.101.104/mesos/consul
+wget -O /etc/systemd/system/consul.service http://192.168.101.104/mesos/consul.service
+chmod +x /usr/bin/consul 
+sed -i <span class="org-string">"s/IP/$ip/g"</span> /etc/systemd/system/consul.service
+systemctl daemon-reload
+<span class="org-comment-delimiter">#</span><span class="org-comment">systemctl start consul  &amp;&amp; systemctl enable consul 
+</span>
+ docker run --restart=<span class="org-string">'always'</span> -d --name=registrator --hostname=${<span class="org-variable-name">ip</span>} --volume=/var/run/docker.sock:/tmp/docker.sock   hb2.registry.cici:443/registrator:v7 -ip ${<span class="org-variable-name">ip</span>} consul://${<span class="org-variable-name">ip</span>}:8500
+
+pip install prometheus_client
+
+<span class="org-builtin">cd</span> /home 
+wget http://192.168.101.104/mesos/sh.tar.gz
+tar zxf sh.tar.gz
+<span class="org-builtin">cd</span> /data
+wget http://192.168.101.104/mesos/check_jvm.tar.gz
+tar -zxf check_jvm.tar.gz
+<span class="org-builtin">echo</span> <span class="org-string">"""
+*/1 * * * *  /usr/bin/python /home/sh/altersms.py
+0 */6 * * *  cd /data/check_jvm/ &amp;&amp; /bin/sh /data/check_jvm/check_jvm_Running.sh
+"""</span>&gt;&gt;/var/spool/cron/root
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:eb707312-ba2e-45cb-ba73-cc872db0d68b" class="outline-2">
+<h2 id="h:eb707312-ba2e-45cb-ba73-cc872db0d68b"><a href="#h:eb707312-ba2e-45cb-ba73-cc872db0d68b">nginx with consul-template</a></h2>
+<div class="outline-text-2" id="text-h:eb707312-ba2e-45cb-ba73-cc872db0d68b">
+<p>
+<a href="https://book-consul-guide.vnzmi.com/11_consul_template.html">https://book-consul-guide.vnzmi.com/11_consul_template.html</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">
+<span class="org-comment-delimiter"># </span><span class="org-comment">nginx with consul-template
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">1. &#26597;&#30475;marathon&#65292;&#24182;&#25214;&#20986;&#23545;&#24212;&#30340;&#24212;&#29992;
+</span>&#35775;&#38382;http://IP:8080/ &#25214;&#21040;&#23545;&#24212;&#24212;&#29992;&#30340;configuration&#65292;<span class="org-variable-name">&#22914;container_uuid</span>=cross-bmserver-yzprod-10580
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#32534;&#20889;consul-template&#27169;&#26495;
+</span>&#22914;
+[root@tc-xy-nginx001 vhosts]# head xr-cicinet.ctmpl
+upstream yzbizcenter-api-yzprod-11045 {
+    {{range service <span class="org-string">"yzbizcenter-api-yzprod-11045"</span>}}server {{.Address}}:{{.Port}};{{<span class="org-keyword">else</span>}}server 1.1.1.1:8000;{{end}}
+}
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. &#21033;&#29992;&#33050;&#26412;&#29983;&#25104;consul-template&#26381;&#21153;
+</span>[root@tc-xy-nginx001 ~]# cd /home/sh/add-template/
+[root@tc-xy-nginx001 add-template]# ll
+total 112
+-rwxr-xr-x 1 root root  579 Dec 14 14:07 add-nginx-consul-template.sh
+-rw-r--r-- 1 root root  213 Jan 14 17:30 consul.cfg
+-rw-r--r-- 1 root root  453 Dec 14 14:00 consul-template.service
+[root@tc-xy-nginx001 add-template]# cat add-nginx-consul-template.sh
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-variable-name">path</span>=../add-template
+<span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -n <span class="org-string">"$1"</span> ] ;<span class="org-keyword">then</span>
+  <span class="org-builtin">echo</span> $<span class="org-string">"usage: $0 nginx-templates-name"</span>
+<span class="org-keyword">else</span>
+  <span class="org-keyword">if</span> [ -f /etc/$<span class="org-variable-name">1</span>.cfg -a -f /etc/systemd/system/consul-template-$<span class="org-variable-name">1</span>.service ];<span class="org-keyword">then</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"$1 already exists!!!"</span>
+    <span class="org-keyword">exit</span> 1
+  <span class="org-keyword">else</span>
+    cp -f consul.cfg $<span class="org-variable-name">1</span>.cfg
+    sed -i s/TEMPLATE/$<span class="org-variable-name">1</span>/g $<span class="org-variable-name">1</span>.cfg
+    cp -f $<span class="org-variable-name">1</span>.cfg /etc/
+    cp -f consul-template.service consul-template-$<span class="org-variable-name">1</span>.service
+    sed -i s/TEMPLATE/$<span class="org-variable-name">1</span>/g consul-template-$<span class="org-variable-name">1</span>.service
+    cp -f consul-template-$<span class="org-variable-name">1</span>.service  /etc/systemd/system/
+    <span class="org-comment-delimiter">#</span><span class="org-comment">systemctl daemon-reload
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">systemctl enable consul-template-$1.service
+</span>  <span class="org-keyword">fi</span>
+<span class="org-keyword">fi</span>
+
+[root@tc-xy-nginx001 add-template]# cat consul.cfg
+<span class="org-variable-name">consul</span> = <span class="org-string">"192.168.100.9:8500"</span>
+template {
+  <span class="org-variable-name">source</span> = <span class="org-string">"/usr/local/nginx/conf/vhosts/TEMPLATE.ctmpl"</span>
+  <span class="org-variable-name">destination</span> = <span class="org-string">"/usr/local/nginx/conf/vhosts/TEMPLATE.conf"</span>
+  <span class="org-variable-name">command</span> = <span class="org-string">"/usr/local/nginx/sbin/nginx -s reload"</span>
+}
+
+</pre>
+</div>
+
+<p>
+注意：template会实时发现consul集群中容器变化，如果有变化，则重载nginx。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@tc-xy-nginx001 add-template]# cat consul-template.service
+<span class="org-comment-delimiter"># </span><span class="org-comment">this is consul-template systemd script
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Version: 1.0
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Descripthin: consul
+</span>[Unit]
+<span class="org-variable-name">Description</span>=Consul-template
+<span class="org-variable-name">After</span>=network.target
+[Service]
+<span class="org-variable-name">ExecStart</span>=/usr/bin/consul-template --config /etc/TEMPLATE.cfg
+<span class="org-comment-delimiter">#</span><span class="org-comment">ExecStop=/usr/bin/killall -9 /usr/bin/consul-template
+</span><span class="org-variable-name">ExecStop</span>=/usr/bin/ps aux | /usr/bin/grep <span class="org-string">"consul-template"</span>| /usr/bin/grep TEMPLATE | /usr/bin/grep -v grep | /usr/bin/awk <span class="org-string">'{print $2}'</span> | /usr/bin/xargs kill
+
+[Install]
+<span class="org-variable-name">WantedBy</span>=default.target
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

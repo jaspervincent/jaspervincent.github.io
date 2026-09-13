@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Asynchronous Processes (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Asynchronous Processes (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Asynchronous Processes (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Processes.html" rel="up" title="Processes">
+<link href="Deleting-Processes.html" rel="next" title="Deleting Processes">
+<link href="Synchronous-Processes.html" rel="prev" title="Synchronous Processes">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+kbd.kbd {font-style: oblique}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Asynchronous-Processes">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Deleting-Processes.html" accesskey="n" rel="next">删除进程</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Synchronous-Processes.html" accesskey="p" rel="prev">创建同步进程</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Processes.html" accesskey="u" rel="up">进程</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_521b_5efa_5f02_6b65_8fdb_7a0b"><span>41.4 创建异步进程<a class="copiable-link" href="#g_t_521b_5efa_5f02_6b65_8fdb_7a0b"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-asynchronous-subprocess"></a>
+
+<p>在本节中，我们将介绍如何创建一个 <em class="dfn">异步进程(asynchronous process)</em>。异步进程创建后会与 Emacs 并行运行，Emacs 可以通过后续小节介绍的函数与其通信（see <a class="pxref" href="Input-to-Processes.html">向进程发送输入</a> 和 see <a class="pxref" href="Output-from-Processes.html">接收进程输出</a>）。注意进程通信只是部分异步：Emacs 仅在调用这些函数时才会与进程收发数据。
+</p>
+<a class="index-entry-id" id="index-pty_002c-when-to-use-for-subprocess-communications"></a>
+<a class="index-entry-id" id="index-pipe_002c-when-to-use-for-subprocess-communications"></a>
+<p>异步进程通过 <em class="dfn">pty</em>（伪终端）或 <em class="dfn">管道(pipe)</em> 进行控制。在创建进程时会选择 pty 或管道，默认基于变量 <code class="code">process-connection-type</code> 的值（见下文）。如果可用，pty 通常更适合用户可见的进程（例如 Shell 模式），因为它们支持进程与子进程之间的任务控制（<kbd class="kbd">C-c</kbd>、<kbd class="kbd">C-z</kbd> 等），并且交互式程序会将 pty 视为终端设备，而管道不支持这些功能。但对于 Lisp 程序内部使用的子进程（即无需用户与子进程交互），如果需要在子进程与 Lisp 程序间交换大量数据，通常更适合使用管道，因为管道效率更高。此外，许多系统上 pty 的总数有限，避免不必要地浪费它们是更好的做法。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-make_002dprocess"><span class="category-def">Function: </span><span><strong class="def-name">make-process</strong> <var class="def-var-arguments">&amp;rest args</var><a class="copiable-link" href="#index-make_002dprocess"> &para;</a></span></dt>
+<dd><p>该函数是启动异步子进程的基础底层原语，返回表示该子进程的进程对象。与下文介绍的更高级别的 <code class="code">start-process</code> 相比，它使用关键字参数，更灵活，可在单次调用中指定进程过滤器和哨兵函数。
+</p>
+<p>参数 <var class="var">args</var> 是一组关键字/参数对。省略某个关键字等价于将其值设为 <code class="code">nil</code>。有效关键字如下：
+</p>
+<dl class="table">
+<dt><code class="code">:name <var class="var">name</var></code></dt>
+<dd><p>使用字符串 <var class="var">name</var> 作为进程名；若同名进程已存在，会修改 <var class="var">name</var>（追加 &lsquo;<samp class="samp">&lt;1&gt;</samp>&rsquo; 等）以保证唯一。
+</p>
+</dd>
+<dt><code class="code">:buffer <var class="var">buffer</var></code></dt>
+<dd><p>使用 <var class="var">buffer</var> 作为进程缓冲区。若值为 <code class="code">nil</code>，子进程不与任何缓冲区关联。
+</p>
+</dd>
+<dt><code class="code">:command <var class="var">command</var></code></dt>
+<dd><p>使用 <var class="var">command</var> 作为进程命令行。该值应为一个列表，首元素为程序可执行文件名，后续字符串为程序参数。若列表首元素为 <code class="code">nil</code>，Emacs 会打开一个新的伪终端（pty）并将其输入输出关联到 <var class="var">buffer</var>，不实际运行任何程序；此时列表其余元素会被忽略。
+</p>
+</dd>
+<dt><code class="code">:coding <var class="var">coding</var></code></dt>
+<dd><p>若 <var class="var">coding</var> 为符号，指定用于连接数据读写的编码系统。若 <var class="var">coding</var> 为 cons 单元格 <code class="code">(<var class="var">decoding</var>&nbsp;.&nbsp;<var class="var">encoding</var>)</code><!-- /@w -->，则 <var class="var">decoding</var> 用于读取，<var class="var">encoding</var> 用于写入。用于编码写入程序数据的编码系统也会用于编码命令行参数（程序本身除外，其文件名编码与其他文件名一致；see <a class="pxref" href="Encoding-and-I_002fO.html">file-name-coding-system</a>）。
+</p>
+<p>若 <var class="var">coding</var> 为 <code class="code">nil</code>，则使用编码系统的默认查找规则。See <a class="xref" href="Default-Coding-Systems.html">默认编码系统</a>。
+</p>
+</dd>
+<dt><code class="code">:connection-type <var class="var">type</var></code></dt>
+<dd><p>初始化与子进程通信的设备类型。可选值：<code class="code">pty</code> 使用伪终端，<code class="code">pipe</code> 使用管道，<code class="code">nil</code> 使用由变量 <code class="code">process-connection-type</code> 决定的默认值。若 <var class="var">type</var> 为 cons 单元格 <code class="code">(<var class="var">input</var>&nbsp;.&nbsp;<var class="var">output</var>)</code><!-- /@w -->，则 <var class="var">input</var> 用于标准输入，<var class="var">output</var> 用于标准输出（若 <code class="code">:stderr</code> 为 <code class="code">nil</code>，也用于标准错误）。
+</p>
+<p>在不支持 pty 的系统（MS-Windows）上，该参数会被忽略，无条件使用管道。
+</p>
+</dd>
+<dt><code class="code">:noquery <var class="var">query-flag</var></code></dt>
+<dd><p>初始化进程退出询问标志为 <var class="var">query-flag</var>。See <a class="xref" href="Query-Before-Exit.html">退出前询问确认</a>。
+</p>
+</dd>
+<dt><code class="code">:stop <var class="var">stopped</var></code></dt>
+<dd><p>若提供该参数，<var class="var">stopped</var> 必须为 <code class="code">nil</code>，使用非空值会报错。<code class="code">:stop</code> 关键字仅为兼容管道进程等其他进程类型而保留，会被忽略。异步子进程不会以停止状态启动。
+</p>
+</dd>
+<dt><code class="code">:filter <var class="var">filter</var></code></dt>
+<dd><p>初始化进程过滤器为 <var class="var">filter</var>。未指定时会使用默认过滤器，后续可覆盖。See <a class="xref" href="Filter-Functions.html">进程过滤器函数</a>。
+</p>
+</dd>
+<dt><code class="code">:sentinel <var class="var">sentinel</var></code></dt>
+<dd><p>初始化进程哨兵函数为 <var class="var">sentinel</var>。未指定时会使用默认哨兵函数，后续可覆盖。See <a class="xref" href="Sentinels.html">哨兵函数：检测进程状态变化</a>。
+</p>
+</dd>
+<dt><code class="code">:stderr <var class="var">stderr</var></code></dt>
+<dd><p>将 <var class="var">stderr</var> 与进程标准错误关联。非空值应为缓冲区或下文介绍的 <code class="code">make-pipe-process</code> 创建的管道进程。若 <var class="var">stderr</var> 为 <code class="code">nil</code>，标准错误与标准输出合并，一同发送至 <var class="var">buffer</var> 或过滤器。
+</p>
+<a class="index-entry-id" id="index-standard-error-process"></a>
+<p>若 <var class="var">stderr</var> 为缓冲区，Emacs 会创建一个管道进程，即 <em class="dfn">标准错误进程(standard error process)</em>。该进程使用默认过滤器（see <a class="pxref" href="Filter-Functions.html">进程过滤器函数</a>）、哨兵函数（see <a class="pxref" href="Sentinels.html">哨兵函数：检测进程状态变化</a>）和编码系统（see <a class="pxref" href="Default-Coding-Systems.html">默认编码系统</a>），但使用 <var class="var">query-flag</var> 作为退出询问标志（see <a class="pxref" href="Query-Before-Exit.html">退出前询问确认</a>）。它会与 <var class="var">stderr</var> 缓冲区关联（see <a class="pxref" href="Process-Buffers.html">进程缓冲区</a>）并将输出（主进程的标准错误）写入其中。可将 <var class="var">stderr</var> 缓冲区传入 <code class="code">get-buffer-process</code> 获取标准错误进程的进程对象。
+</p>
+<p>若 <var class="var">stderr</var> 为管道进程，Emacs 会将其作为新进程的标准错误进程。
+</p>
+</dd>
+<dt><code class="code">:file-handler <var class="var">file-handler</var></code></dt>
+<dd><p>若 <var class="var">file-handler</var> 非空，查找当前缓冲区 <code class="code">default-directory</code> 对应的文件名处理器，并调用该处理器创建进程。若无对应处理器，则按 <code class="code">file-handler</code> 为 <code class="code">nil</code> 处理。
+</p></dd>
+</dl>
+
+<p>可通过 <code class="code">process-contact</code> 函数获取包含实际连接信息的原始参数列表。
+</p>
+<p>子进程的当前工作目录设为当前缓冲区的 <code class="code">default-directory</code> 值（本地目录时，由 <code class="code">unhandled-file-name-directory</code> 判断），否则为 <samp class="file">~</samp>。若需要在远程目录运行进程，向 <code class="code">make-process</code> 传入 <code class="code">:file-handler t</code>。此时当前工作目录为 <code class="code">default-directory</code> 的本地名称部分（由 <code class="code">file-local-name</code> 决定）。
+</p>
+<p>根据文件名处理器的实现，可能无法对生成的进程对象应用 <var class="var">filter</var> 或 <var class="var">sentinel</var>。<code class="code">:stderr</code> 参数不能是管道进程，文件名处理器不支持此用法。<code class="code">:stderr</code> 可使用缓冲区，其内容无需管道进程即可显示。See <a class="xref" href="Filter-Functions.html">进程过滤器函数</a>、<a class="ref" href="Sentinels.html">哨兵函数：检测进程状态变化</a> 和 <a class="ref" href="Accepting-Output.html">接收进程输出</a>。
+</p>
+<p>部分文件名处理器可能不支持 <code class="code">make-process</code>，此时该函数无操作并返回 <code class="code">nil</code>。
+</p></dd></dl>
+
+<a class="anchor" id="Pipe-Processes"></a><dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-make_002dpipe_002dprocess"><span class="category-def">Function: </span><span><strong class="def-name">make-pipe-process</strong> <var class="def-var-arguments">&amp;rest args</var><a class="copiable-link" href="#index-make_002dpipe_002dprocess"> &para;</a></span></dt>
+<dd><p>该函数创建可关联到子进程的双向管道，常用于配合 <code class="code">make-process</code> 的 <code class="code">:stderr</code> 关键字使用，返回进程对象。
+</p>
+<p>参数 <var class="var">args</var> 是一组关键字/参数对。省略某个关键字等价于将其值设为 <code class="code">nil</code>。
+</p>
+<p>有效关键字如下：
+</p>
+<dl class="table">
+<dt><code class="code">:name <var class="var">name</var></code></dt>
+<dd><p>使用字符串 <var class="var">name</var> 作为进程名，与 <code class="code">make-process</code> 相同，必要时会修改以保证唯一。
+</p>
+</dd>
+<dt><code class="code">:buffer <var class="var">buffer</var></code></dt>
+<dd><p>使用 <var class="var">buffer</var> 作为进程缓冲区。
+</p>
+</dd>
+<dt><code class="code">:coding <var class="var">coding</var></code></dt>
+<dd><p>若 <var class="var">coding</var> 为符号，指定用于连接数据读写的编码系统。若 <var class="var">coding</var> 为 cons 单元格 <code class="code">(<var class="var">decoding</var>&nbsp;.&nbsp;<var class="var">encoding</var>)</code><!-- /@w -->，则 <var class="var">decoding</var> 用于读取，<var class="var">encoding</var> 用于写入。
+</p>
+<p>若 <var class="var">coding</var> 为 <code class="code">nil</code>，则使用编码系统的默认查找规则。See <a class="xref" href="Default-Coding-Systems.html">默认编码系统</a>。
+</p>
+</dd>
+<dt><code class="code">:noquery <var class="var">query-flag</var></code></dt>
+<dd><p>初始化进程退出询问标志为 <var class="var">query-flag</var>。See <a class="xref" href="Query-Before-Exit.html">退出前询问确认</a>。
+</p>
+</dd>
+<dt><code class="code">:stop <var class="var">stopped</var></code></dt>
+<dd><p>若 <var class="var">stopped</var> 非空，以停止状态启动进程。停止状态下管道进程不接收传入数据，但可发送传出数据。停止状态由 <code class="code">stop-process</code> 设置，<code class="code">continue-process</code> 清除（see <a class="pxref" href="Signals-to-Processes.html">向进程发送信号</a>）。
+</p>
+</dd>
+<dt><code class="code">:filter <var class="var">filter</var></code></dt>
+<dd><p>初始化进程过滤器为 <var class="var">filter</var>。未指定时会使用默认过滤器，后续可修改。See <a class="xref" href="Filter-Functions.html">进程过滤器函数</a>。
+</p>
+</dd>
+<dt><code class="code">:sentinel <var class="var">sentinel</var></code></dt>
+<dd><p>初始化进程哨兵函数为 <var class="var">sentinel</var>。未指定时会使用默认哨兵函数，后续可修改。See <a class="xref" href="Sentinels.html">哨兵函数：检测进程状态变化</a>。
+</p></dd>
+</dl>
+
+<p>可通过 <code class="code">process-contact</code> 函数获取包含实际连接信息的原始参数列表。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-start_002dprocess"><span class="category-def">Function: </span><span><strong class="def-name">start-process</strong> <var class="def-var-arguments">name buffer-or-name program &amp;rest args</var><a class="copiable-link" href="#index-start_002dprocess"> &para;</a></span></dt>
+<dd><p>该函数是 <code class="code">make-process</code> 的高级封装，接口与 <code class="code">call-process</code> 类似。它创建新的异步子进程并运行指定的 <var class="var">program</var>，返回 Lisp 中代表该子进程的进程对象。参数 <var class="var">name</var> 指定进程对象名称；与 <code class="code">make-process</code> 相同，必要时会修改以保证唯一。<var class="var">buffer-or-name</var> 为与进程关联的缓冲区。
+</p>
+<p>若 <var class="var">program</var> 为 <code class="code">nil</code>，Emacs 打开新伪终端（pty）并将其输入输出关联到 <var class="var">buffer-or-name</var>，不创建子进程，此时剩余参数 <var class="var">args</var> 被忽略。
+</p>
+<p>其余 <var class="var">args</var> 为字符串，指定子进程的命令行参数。
+</p>
+<p>在下例中，第一个进程启动并运行（实际为休眠）100 秒（输出缓冲区 &lsquo;<samp class="samp">foo</samp>&rsquo; 会立即创建）。与此同时第二个进程启动，为保证唯一性命名为 &lsquo;<samp class="samp">my-process&lt;1&gt;</samp>&rsquo;。它在第一个进程结束前将目录列表插入缓冲区 &lsquo;<samp class="samp">foo</samp>&rsquo; 末尾，随后结束并在缓冲区插入相应提示。很久之后第一个进程结束，同样在缓冲区插入提示信息。
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(start-process &quot;my-process&quot; &quot;foo&quot; &quot;sleep&quot; &quot;100&quot;)
+     &rArr; #&lt;process my-process&gt;
+</pre></div><pre class="example-preformatted">
+
+</pre><div class="group"><pre class="example-preformatted">(start-process &quot;my-process&quot; &quot;foo&quot; &quot;ls&quot; &quot;-l&quot; &quot;/bin&quot;)
+     &rArr; #&lt;process my-process&lt;1&gt;&gt;
+
+---------- Buffer: foo ----------
+total 8336
+-rwxr-xr-x 1 root root 971384 Mar 30 10:14 bash
+-rwxr-xr-x 1 root root 146920 Jul  5  2011 bsd-csh
+...
+-rwxr-xr-x 1 root root 696880 Feb 28 15:55 zsh4
+
+Process my-process&lt;1&gt; finished
+
+Process my-process finished
+---------- Buffer: foo ----------
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-start_002dfile_002dprocess"><span class="category-def">Function: </span><span><strong class="def-name">start-file-process</strong> <var class="def-var-arguments">name buffer-or-name program &amp;rest args</var><a class="copiable-link" href="#index-start_002dfile_002dprocess"> &para;</a></span></dt>
+<dd><p>与 <code class="code">start-process</code> 类似，该函数启动新异步子进程运行 <var class="var">program</var> 并返回其进程对象。
+</p>
+<p>与 <code class="code">start-process</code> 的区别在于，该函数会根据 <code class="code">default-directory</code> 的值调用文件名处理器。该处理器会运行 <var class="var">program</var>，可能在本地主机，也可能在与 <code class="code">default-directory</code> 对应的远程主机。后一种情况下，<code class="code">default-directory</code> 的本地部分成为进程工作目录。
+</p>
+<p>该函数不会为 <var class="var">program</var> 或其余 <var class="var">args</var> 调用文件名处理器。因此，若 <var class="var">program</var> 或任意 <var class="var">args</var> 使用远程文件语法（see <a class="pxref" href="Magic-File-Names.html">实现&ldquo;魔法&rdquo;文件名机制</a>），必须通过 <code class="code">file-local-name</code> 将其转换为相对于 <code class="code">default-directory</code> 的文件名，或远程主机本地可识别的文件名。
+</p>
+<p>根据文件名处理器的实现，可能无法对生成的进程对象应用 <code class="code">process-filter</code> 或 <code class="code">process-sentinel</code>。See <a class="xref" href="Filter-Functions.html">进程过滤器函数</a> 和 <a class="ref" href="Sentinels.html">哨兵函数：检测进程状态变化</a>。
+</p>
+<p>部分文件名处理器可能不支持 <code class="code">start-file-process</code>（例如函数 <code class="code">ange-ftp-hook-function</code>），此时该函数无操作并返回 <code class="code">nil</code>。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-shell_002dfile_002dname"></a>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-start_002dprocess_002dshell_002dcommand"><span class="category-def">Function: </span><span><strong class="def-name">start-process-shell-command</strong> <var class="def-var-arguments">name buffer-or-name command</var><a class="copiable-link" href="#index-start_002dprocess_002dshell_002dcommand"> &para;</a></span></dt>
+<dd><p>该函数与 <code class="code">start-process</code> 类似，区别在于使用 Shell 执行指定的 <var class="var">command</var>。参数 <var class="var">command</var> 为 Shell 命令字符串。变量 <code class="code">shell-file-name</code> 指定所用 Shell。
+</p>
+<p>通过 Shell 而非直接使用 <code class="code">make-process</code> 或 <code class="code">start-process</code> 运行程序，目的是可以在参数中使用通配符等 Shell 特性。因此，如果命令中包含任意用户指定参数，应先使用 <code class="code">shell-quote-argument</code> 转义，避免特殊字符被 Shell 解析。See <a class="xref" href="Shell-Arguments.html">Shell 参数</a>。当然，执行基于用户输入的命令时还应考虑安全问题。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-start_002dfile_002dprocess_002dshell_002dcommand"><span class="category-def">Function: </span><span><strong class="def-name">start-file-process-shell-command</strong> <var class="def-var-arguments">name buffer-or-name command</var><a class="copiable-link" href="#index-start_002dfile_002dprocess_002dshell_002dcommand"> &para;</a></span></dt>
+<dd><p>该函数与 <code class="code">start-process-shell-command</code> 类似，但内部使用 <code class="code">start-file-process</code>。因此根据 <code class="code">default-directory</code>，<var class="var">command</var> 也可在远程主机执行。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-process_002dconnection_002dtype"><span class="category-def">Variable: </span><span><strong class="def-name">process-connection-type</strong><a class="copiable-link" href="#index-process_002dconnection_002dtype"> &para;</a></span></dt>
+<dd><p>该变量控制与异步子进程通信的设备类型。若非空，在可用时使用 pty，否则使用管道。
+</p>
+<p><code class="code">process-connection-type</code> 的值在调用 <code class="code">make-process</code> 或 <code class="code">start-process</code> 时生效。因此可在调用这些函数时绑定该变量，指定与单个子进程的通信方式。
+</p>
+<p>注意，若调用 <code class="code">make-process</code> 时 <code class="code">:stderr</code> 参数非空，该变量的值会被忽略；此时 Emacs 会使用管道与进程通信。在 pty 不可用的系统（MS-Windows）上同样会被忽略。
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(let ((process-connection-type nil))  ; <span class="r">使用管道</span>
+  (start-process ...))
+</pre></div></div>
+
+<p>可使用 <code class="code">process-tty-name</code> 函数判断指定子进程实际使用管道还是 pty（see <a class="pxref" href="Process-Information.html">进程信息</a>）。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-process_002derror_002dpause_002dtime"><span class="category-def">Variable: </span><span><strong class="def-name">process-error-pause-time</strong><a class="copiable-link" href="#index-process_002derror_002dpause_002dtime"> &para;</a></span></dt>
+<dd><p>若进程哨兵/过滤器函数发生错误，Emacs 默认会在显示错误后暂停 <code class="code">process-error-pause-time</code> 秒，以便用户看到该错误。但这可能导致 Emacs 无响应（若大量此类错误发生），因此可将 <code class="code">process-error-pause-time</code> 设为 0 禁用该行为。
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Deleting-Processes.html">删除进程</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Synchronous-Processes.html">创建同步进程</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Processes.html">进程</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

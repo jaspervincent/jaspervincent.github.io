@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-mysql</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-mysql</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:FFD281F7-52E0-486A-B3A6-B82B58CD8A6B">mysql_后台运行命令</a></li>
+<li><a href="#h:5D4CB706-06D8-48C5-BEF9-BF8C3BFC598E">mysql_导出csv文件</a></li>
+<li><a href="#h:21E94494-C265-45BD-864C-E00BD324E9D2">mysql_批量导入</a></li>
+<li><a href="#h:DA28F288-185D-4744-92FC-387618BA6159">mysql_更改数据库库名</a></li>
+<li><a href="#h:8D5F2AB8-E1EF-48BE-90FE-B1CD9B66CAE7">备份</a>
+<ul>
+<li><a href="#h:2262C038-80CE-47C0-851A-D4B423BD27FC">备份1</a></li>
+<li><a href="#h:F16BE0F5-49AA-449A-A3D9-9865AED62DA3">mysql_分库分表备份</a></li>
+<li><a href="#h:0D1C649C-8B8A-4C49-90E1-E88C64F74AC1">分库与binlog备份</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-h:FFD281F7-52E0-486A-B3A6-B82B58CD8A6B" class="outline-2">
+<h2 id="h:FFD281F7-52E0-486A-B3A6-B82B58CD8A6B"><a href="#h:FFD281F7-52E0-486A-B3A6-B82B58CD8A6B">mysql_后台运行命令</a></h2>
+<div class="outline-text-2" id="text-h:FFD281F7-52E0-486A-B3A6-B82B58CD8A6B">
+<div class="org-src-container">
+<pre class="src src-sh">[root@pc-mysql01 scripts]# cat upmysql.sh
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">MYUSER</span>=vzysql
+<span class="org-variable-name">MYPASS</span>=<span class="org-string">'hd@sWxH*fA(G+$Tgjr_ASE'</span>
+<span class="org-variable-name">MYHOST</span>=<span class="org-string">'rds.rds.aliyuncs.com'</span>
+<span class="org-variable-name">MYCMD</span>=<span class="org-string">"mysql -h$MYHOST -u$MYUSER -p$MYPASS -D vzy2014"</span>
+<span class="org-variable-name">MYDUMP</span>=<span class="org-string">"mysqldump -R -h$MYHOST -u$MYUSER -p$MYPASS"</span>
+<span class="org-variable-name">DATE</span>=$(date +%F)
+<span class="org-variable-name">MY_PATH</span>=/ops
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">$MYCMD &lt; ${MY_PATH}/exam_paper_area_code_relation.sql
+</span>cat | $<span class="org-variable-name">MYCMD</span> &lt;&lt;EOF<span class="org-sh-heredoc">
+update user set union_id = 'UID_EA95D204063589FCCB3F976BD5F22918testtest'  where id = '2352946' and union_id = 'UID_EA95D204063589FCCB3F976BD5F22918';
+EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:5D4CB706-06D8-48C5-BEF9-BF8C3BFC598E" class="outline-2">
+<h2 id="h:5D4CB706-06D8-48C5-BEF9-BF8C3BFC598E"><a href="#h:5D4CB706-06D8-48C5-BEF9-BF8C3BFC598E">mysql_导出csv文件</a></h2>
+<div class="outline-text-2" id="text-h:5D4CB706-06D8-48C5-BEF9-BF8C3BFC598E">
+<div class="org-src-container">
+<pre class="src src-sh">[root@pc-mysql01 scripts]# cat mycsv.sh
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">MYUSER</span>=sql_read
+<span class="org-variable-name">MYPASS</span>=<span class="org-string">'hd^SM+$h)*Q#I=z@l'</span>
+<span class="org-variable-name">MYHOST</span>=<span class="org-string">"r.mysql.rds.aliyuncs.com"</span>
+<span class="org-variable-name">MYCMD</span>=<span class="org-string">"mysql -h$MYHOST -u$MYUSER -p$MYPASS"</span>
+<span class="org-variable-name">MYDUMP</span>=<span class="org-string">"mysqldump -R -h$MYHOST -u$MYUSER -p$MYPASS"</span>
+<span class="org-variable-name">DATE</span>=$(date +%F)
+<span class="org-variable-name">BAK_PATH</span>=/ops/backup/db/${<span class="org-variable-name">database</span>}/$<span class="org-variable-name">DATE</span>
+
+    <span class="org-variable-name">BAK_PATH</span>=/ops/backup/db/$<span class="org-variable-name">DATE</span>
+    mkdir ${<span class="org-variable-name">BAK_PATH</span>} -p
+$<span class="org-variable-name">MYCMD</span>  -D vzy2014 -e <span class="org-string">"SELECT a.reserveBookCode  from reserve_book a LEFT JOIN book b on a.reserveBookCode  = b.bar_code where b.bar_code is null GROUP BY a.reserveBookCode;"</span> | sed <span class="org-string">'s/\t/,/g;s/^//;s/$//;s/\n//g'</span> &gt; ${<span class="org-variable-name">BAK_PATH</span>}/reserve_book.csv
+<span class="org-comment-delimiter">#</span><span class="org-comment">$MYCMD -e "select user_id,object_id as book_id from vzy2014.zone_self_reprint where type=2;" | sed 's/\t/,/g;s/^//;s/$//;s/\n//g' &gt; ${BAK_PATH}/zone_self_reprint.csv
+</span>sleep 2
+<span class="org-comment-delimiter">#</span><span class="org-comment">$MYCMD -e "select id as user_id,grade_id,school_id,city_id from vzy2014.user;" | sed 's/\t/,/g;s/^//;s/$//;s/\n//g' &gt;${BAK_PATH}/user.csv
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">$MYDUMP   --single-transaction --set-gtid-purged=OFF --opt --default-character-set=utf8  vzy2014 activites    &gt; /ops/backup/db/$DATE/advice.sql</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:21E94494-C265-45BD-864C-E00BD324E9D2" class="outline-2">
+<h2 id="h:21E94494-C265-45BD-864C-E00BD324E9D2"><a href="#h:21E94494-C265-45BD-864C-E00BD324E9D2">mysql_批量导入</a></h2>
+<div class="outline-text-2" id="text-h:21E94494-C265-45BD-864C-E00BD324E9D2">
+<div class="org-src-container">
+<pre class="src src-sh">[root@app-test01 scripts]# cat returnmysql.sh
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">mysql  -h10.161.171.134 -uroot -p41a6af476b
+</span><span class="org-variable-name">MYUSER</span>=root
+<span class="org-variable-name">MYPASS</span>=<span class="org-string">'41a6af476b'</span>
+<span class="org-variable-name">MYHOST</span>=10.161.171.134
+<span class="org-variable-name">MYCMD</span>=<span class="org-string">"mysql -h$MYHOST -u$MYUSER -p$MYPASS"</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">MYDUMP="mysqldump -R -h$MYHOST -u$MYUSER -p$MYPASS"
+</span>
+<span class="org-builtin">cd</span> /alidata/backup/mysql_bak/bigtables
+<span class="org-keyword">for</span> table<span class="org-keyword"> in</span>  $(ls -l | awk <span class="org-string">'/sql/{print $NF}'</span>); <span class="org-keyword">do</span>
+    <span class="org-builtin">echo</span> <span class="org-string">"-----------------"</span>
+    <span class="org-builtin">echo</span> $<span class="org-variable-name">table</span>
+    $<span class="org-variable-name">MYCMD</span> vzy2014 &lt; $<span class="org-variable-name">table</span>
+<span class="org-keyword">done</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:DA28F288-185D-4744-92FC-387618BA6159" class="outline-2">
+<h2 id="h:DA28F288-185D-4744-92FC-387618BA6159"><a href="#h:DA28F288-185D-4744-92FC-387618BA6159">mysql_更改数据库库名</a></h2>
+<div class="outline-text-2" id="text-h:DA28F288-185D-4744-92FC-387618BA6159">
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt;  renamemysql.sh<span class="org-sh-heredoc">
+#!/bin/bash
+
+mysqlconn="mysql -u root -p3flreaem37 -S /var/www/server/mysql/mysql.sock -h localhost"
+olddb="vzy2014_n"
+newdb="vzy2014"
+$mysqlconn -e "CREATE DATABASE $newdb character set utf8;"
+params=$($mysqlconn -N -e "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE table_schema='$olddb';")
+
+for name in $params; do
+    $mysqlconn -e "RENAME TABLE $olddb.$name to $newdb.$name;"
+done
+
+#$mysqlconn -e &#8220;DROP DATABASE $olddb&#8221;
+EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:8D5F2AB8-E1EF-48BE-90FE-B1CD9B66CAE7" class="outline-2">
+<h2 id="h:8D5F2AB8-E1EF-48BE-90FE-B1CD9B66CAE7"><a href="#h:8D5F2AB8-E1EF-48BE-90FE-B1CD9B66CAE7">备份</a></h2>
+<div class="outline-text-2" id="text-h:8D5F2AB8-E1EF-48BE-90FE-B1CD9B66CAE7">
+<div class="org-src-container">
+<pre class="src src-shell">root@pt-sit-cli:~/.jasper# cat a.sh 
+<span class="org-variable-name">db</span>=<span class="org-string">"nacos"</span>
+
+<span class="org-keyword">for</span> d<span class="org-keyword"> in</span> $<span class="org-variable-name">db</span>; <span class="org-keyword">do</span>
+docker run --rm  --name tmp mysql:8  mysqldump --set-gtid-purged=OFF -h  st-1.rds.amazonaws.com -P 3306 -u admin -pvD --no-tablespaces -B $<span class="org-variable-name">d</span> &gt;$<span class="org-variable-name">d</span>.sql
+
+<span class="org-keyword">done</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">mysql -h at-1.rds.amazonaws.com -P 3306 -u admin -pxxxAk &lt;/tmp/nacos.sql
+</pre>
+</div>
+</div>
+<div id="outline-container-h:2262C038-80CE-47C0-851A-D4B423BD27FC" class="outline-3">
+<h3 id="h:2262C038-80CE-47C0-851A-D4B423BD27FC"><a href="#h:2262C038-80CE-47C0-851A-D4B423BD27FC">备份1</a></h3>
+<div class="outline-text-3" id="text-h:2262C038-80CE-47C0-851A-D4B423BD27FC">
+<p>
+磁盘容量超过90%删除mysql备份文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">auth=hsu
+</span><span class="org-variable-name">date_30ago</span>=<span class="org-sh-quoted-exec">`date +%F -d -2month`</span>
+<span class="org-variable-name">DATE</span>=<span class="org-sh-quoted-exec">`date +%F,%r`</span>
+<span class="org-variable-name">user_home</span>=/root
+<span class="org-variable-name">script_log_path</span>=${<span class="org-variable-name">user_home</span>}/script/cron/logs
+<span class="org-variable-name">script_log</span>=${<span class="org-variable-name">script_log_path</span>}/mysqlbak-for-del.log
+<span class="org-variable-name">path</span>=/mnt/mysqlbak
+<span class="org-variable-name">disk_mnt_num</span>=<span class="org-sh-quoted-exec">`df -P|awk '/mnt/{print $5}'|sed 's/%//g'|head -1`</span>
+
+[ -d $<span class="org-variable-name">script_log_path</span> ]||mkdir   $<span class="org-variable-name">script_log_path</span> -p
+[ -f $<span class="org-variable-name">script_log</span> ]||touch  $<span class="org-variable-name">script_log</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">echo $DATE &gt;&gt; ${script_log}
+</span>
+<span class="org-keyword">if</span> [ ${<span class="org-variable-name">disk_mnt_num</span>} -ge 90 ];<span class="org-keyword">then</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"# $DATE"</span> &gt;&gt; ${<span class="org-variable-name">script_log</span>}
+    <span class="org-keyword">for</span> f<span class="org-keyword"> in</span> <span class="org-sh-quoted-exec">`find $path -type d -name "201[5-7]*" -mtime +60`</span>;<span class="org-keyword">do</span>
+    rm -fr $<span class="org-variable-name">f</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"$f for del ok"</span> &gt;&gt;$<span class="org-variable-name">script_log</span>
+    <span class="org-keyword">done</span>
+<span class="org-keyword">fi</span>
+</pre>
+</div>
+
+
+<p>
+mysql备份脚本dumpmysql.sh
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">set -x
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">set -u
+</span><span class="org-variable-name">DATE</span>=$(date +%F)
+
+mkdir /mnt/mysqlbak/$<span class="org-variable-name">DATE</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">/usr/local/mysql/bin/mysqldump -uemacle_backend  -R  --single-transaction  -p3zha2pzbcz72gdxe -h tongbupan.mysql.rds.aliyuncs.com  storage_service &gt; /mnt/mysqlbak/$DATE/service.sql
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">gzip /mnt/mysqlbak/$DATE/service.sql
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">/usr/local/mysql/bin/mysqldump -uemacle_backend  -R  --single-transaction  -p3zha2pzbcz72gdxe -h tongbupan.mysql.rds.aliyuncs.com  storage_service | xz &gt; /mnt/mysqlbak/$DATE/service.sql.xz
+</span>/usr/local/src/mysqldump -uemacle_backend  -R  --single-transaction  -p3zha2pzbcz72gdxe -h tongbupan.mysql.rds.aliyuncs.com  storage_service | xz &gt; /mnt/mysqlbak/$<span class="org-variable-name">DATE</span>/service.sql.xz
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:F16BE0F5-49AA-449A-A3D9-9865AED62DA3" class="outline-3">
+<h3 id="h:F16BE0F5-49AA-449A-A3D9-9865AED62DA3"><a href="#h:F16BE0F5-49AA-449A-A3D9-9865AED62DA3">mysql_分库分表备份</a></h3>
+<div class="outline-text-3" id="text-h:F16BE0F5-49AA-449A-A3D9-9865AED62DA3">
+<p>
+备份前看下数据库和表再决定备份时是否指定字符集
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@pc-mysql01 scripts]# cat fenkubiao.sh
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-variable-name">MYUSER</span>=sql_read1
+<span class="org-variable-name">MYPASS</span>=<span class="org-string">'hd^R+O%ZU(5@oy#E'</span>
+<span class="org-variable-name">MYHOST</span>=100.99.77.99
+<span class="org-variable-name">MYCMD</span>=<span class="org-string">"mysql -h$MYHOST -u$MYUSER -p$MYPASS"</span>
+<span class="org-variable-name">MYDUMP</span>=<span class="org-string">"mysqldump -R -h$MYHOST -u$MYUSER -p$MYPASS"</span>
+
+<span class="org-keyword">for</span> database<span class="org-keyword"> in</span> $($<span class="org-variable-name">MYCMD</span> -e <span class="org-string">"show databases;"</span>|sed <span class="org-string">'1,2d'</span>|egrep -v <span class="org-string">"mysql|schema|blog|activity"</span>); <span class="org-keyword">do</span>
+    mkdir /ops/backup/db/${<span class="org-variable-name">database</span>} -p
+    <span class="org-keyword">for</span> table<span class="org-keyword"> in</span>  $($<span class="org-variable-name">MYCMD</span> -e <span class="org-string">"show tables from $database;"</span>|sed <span class="org-string">'1d'</span>|egrep -v <span class="org-string">"apply_book_answer|apply_book_check"</span>); <span class="org-keyword">do</span>
+        $<span class="org-variable-name">MYDUMP</span>  --single-transaction --set-gtid-purged=OFF --opt --default-character-set=utf8 $<span class="org-variable-name">database</span> $<span class="org-variable-name">table</span> &gt;/ops/backup/db/${<span class="org-variable-name">database</span>}/$<span class="org-variable-name">table</span>.sql
+    <span class="org-keyword">done</span>
+<span class="org-keyword">done</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0D1C649C-8B8A-4C49-90E1-E88C64F74AC1" class="outline-3">
+<h3 id="h:0D1C649C-8B8A-4C49-90E1-E88C64F74AC1"><a href="#h:0D1C649C-8B8A-4C49-90E1-E88C64F74AC1">分库与binlog备份</a></h3>
+<div class="outline-text-3" id="text-h:0D1C649C-8B8A-4C49-90E1-E88C64F74AC1">
+<div class="org-src-container">
+<pre class="src src-sh">[root@backup01 ~]# crontab -l
+0 3 * * * /bin/sh /root/scripts/mysql_backup_logic_from_master.sh &amp;&gt; /tmp/mysql_backup.log
+*/30 * * * * /bin/sh /root/scripts/backup_binlog_from_rds_master.sh &amp;&gt; /tmp/binlog_backup.log
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /root/scripts/backup_binlog_from_rds_master.sh<span class="org-sh-heredoc">
+#!/bin/sh
+
+###&#23450;&#20041;&#29992;&#25143; &#23494;&#30721; &#22791;&#20221;&#30446;&#24405;&#31561;&#20449;&#24687;
+host='rdsjmlwvi81yzyaypa1gb964.mysql.rds.aliyuncs.com'
+user='mysqldump'
+psd='my-sql-dump'
+backup_base=/alidata/binlog_backup
+
+cd $backup_base
+already_done=`ls -t .`
+i=0
+for binlog in `mysql -h$host -u$user -p$psd -s -N -e "show binary logs"`;do
+    let i++
+    if [ $(($i%2)) -eq 1 ];then
+        if [[ $binlog == `echo $already_done|awk '{print $1}'` ]] || [[ -z `echo $already_done|grep $binlog` ]];then
+            #&#22914;&#26524;&#26159;&#19978;&#19968;&#27425;&#25289;&#21462;&#30340;&#26368;&#21518;&#19968;&#20010;,&#21017;&#20877;&#25289;&#21462;&#19968;&#27425;; &#22914;&#26524;&#20174;mysql&#37324;&#30475;&#21040;&#30340;binlog&#22312;&#22791;&#20221;&#30446;&#24405;&#19981;&#23384;&#22312;,&#21017;&#25289;&#21462;
+            mysqlbinlog -u$user -p$psd -h$host --read-from-remote-server --raw $binlog
+        fi
+    else
+        continue
+    fi
+done
+
+find $backup_base -mtime +4 | xargs rm -f
+EOF
+</span>
+
+cat &lt;&lt;\EOF&gt; /root/scripts/mysql_backup_logic_from_master.sh<span class="org-sh-heredoc">
+#!/bin/sh
+###&#27599;&#22825;&#36816;&#34892;&#19968;&#27425;
+
+###&#23450;&#20041;&#29992;&#25143; &#23494;&#30721; &#22791;&#20221;&#30446;&#24405;&#31561;&#20449;&#24687;
+host='rdsjmlwvi81yzyaypa1gb964.mysql.rds.aliyuncs.com'
+user='hd_rds_admin'
+psd='0jQ071XY$!+1UMC(BB&amp;a'
+backup_base=/alidata/mysql_backup
+date=`date +%Y%m%d`
+old_date=`date +%Y%m%d -d -15days`    ###&#20445;&#23384;&#30340;&#22825;&#25968;
+
+###&#33719;&#21462;&#24211;&#21517;&#65292;&#25490;&#38500;&#19981;&#38656;&#35201;&#22791;&#20221;&#30340;&#24211;
+for db in `mysql -h$host -u$user -p$psd -s -N -e "show databases"|grep -v -E "(test|percona|information_schema|performance_schema)"`;do
+  ###&#21019;&#24314;&#22791;&#20221;&#30446;&#24405;
+  if [ ! -d $backup_base/$db ];then
+    mkdir $backup_base/$db
+  fi
+  cd $backup_base/$db
+  pwd
+  chattr -i *
+
+  rm -f $old_date.sql* &amp;&gt;/dev/null     #&#21024;&#38500;30&#22825;&#20197;&#21069;&#30340;
+
+  #mysqldump -h$host -u$user -p$psd --events --routines  $db |gzip &gt; $date.sql.gz    ###&#22791;&#20221;&amp;&#21387;&#32553;
+  mysqldump -h$host -u$user -p"$psd" --routines --single-transaction --master-data=2 --set-gtid-purged=OFF $db |gzip -4 &gt; $date.sql.gz    ###&#22791;&#20221;&amp;&#21387;&#32553;
+
+  chattr +i *    ###&#36825;&#37324;&#21152;&#20102;&#20010;&#38450;&#35823;&#21024;&#30340;&#23646;&#24615;
+done
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

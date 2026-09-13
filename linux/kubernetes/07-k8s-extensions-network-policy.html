@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: 07-k8s-拓展-网络策略</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: 07-k8s-拓展-网络策略</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:b8f2fa4b-16d1-4515-921f-2f1389ea0f98">k8s-拓展-网络策略Network Policy</a>
+<ul>
+<li><a href="#h:8ecc92d7-0edc-4dfa-aea3-2a469eec43d4">什么是NetworkPolicy？</a></li>
+<li><a href="#h:68f86f07-9000-42c4-84e6-9c39a940fc2f">NetworkPolicy配置详解</a>
+<ul>
+<li><a href="#h:ae05ebc8-fb2c-45d0-a535-06eddb21de45">NetworkPolicy注意事项</a></li>
+</ul>
+</li>
+<li><a href="#h:375f18ec-1cea-4890-954b-fad1c42ad910">NetworkPolicy示例</a>
+<ul>
+<li><a href="#h:f45ea7fd-95ff-43f0-8419-3928e1470369">NetworkPolicy示例1：隔离中间件服务</a></li>
+<li><a href="#h:ccb88c8d-1576-4021-a2f1-8e89f62d46a4">NetworkPolicy示例2：服务发布限制</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:b8f2fa4b-16d1-4515-921f-2f1389ea0f98" class="outline-2">
+<h2 id="h:b8f2fa4b-16d1-4515-921f-2f1389ea0f98"><a href="#h:b8f2fa4b-16d1-4515-921f-2f1389ea0f98">k8s-拓展-网络策略Network Policy</a></h2>
+<div class="outline-text-2" id="text-h:b8f2fa4b-16d1-4515-921f-2f1389ea0f98">
+</div>
+<div id="outline-container-h:8ecc92d7-0edc-4dfa-aea3-2a469eec43d4" class="outline-3">
+<h3 id="h:8ecc92d7-0edc-4dfa-aea3-2a469eec43d4"><a href="#h:8ecc92d7-0edc-4dfa-aea3-2a469eec43d4">什么是NetworkPolicy？</a></h3>
+<div class="outline-text-3" id="text-h:8ecc92d7-0edc-4dfa-aea3-2a469eec43d4">
+<p>
+<b>K8s命名空间隔离性</b>
+</p>
+
+
+<figure id="org1e6f96a">
+<img style="aspect-ratio:1216/584" decoding="async" loading="lazy" src="./images/Snipaste_2023-01-04_22-21-40.webp" alt="Snipaste_2023-01-04_22-21-40.webp" width="50%">
+
+</figure>
+
+<p>
+不同名称空间下的资源类型名称是可以相同的。只要在资源名称后面加上 namesapce 名称就可以跨名称空间访问，所以这是一种软隔离。
+</p>
+
+<p>
+<b>K8s Pod之间无隔离性</b>
+</p>
+
+
+<figure id="org9d6a45d">
+<img style="aspect-ratio:1192/572" decoding="async" loading="lazy" src="./images/Snipaste_2023-01-04_22-22-32.webp" alt="Snipaste_2023-01-04_22-22-32.webp" width="50%">
+
+</figure>
+
+<p>
+如果知道 pod 的 ip 地址，不同名称空间下的任一 pod 都能访问。
+</p>
+
+<p>
+K8s 网络策略
+</p>
+
+
+<figure id="org97295db">
+<img style="aspect-ratio:1186/572" decoding="async" loading="lazy" src="./images/Snipaste_2023-01-04_22-23-14.webp" alt="Snipaste_2023-01-04_22-23-14.webp" width="50%">
+
+</figure>
+
+<p>
+可以对名称空间做隔离、服务限制访问
+</p>
+</div>
+</div>
+<div id="outline-container-h:68f86f07-9000-42c4-84e6-9c39a940fc2f" class="outline-3">
+<h3 id="h:68f86f07-9000-42c4-84e6-9c39a940fc2f"><a href="#h:68f86f07-9000-42c4-84e6-9c39a940fc2f">NetworkPolicy配置详解</a></h3>
+<div class="outline-text-3" id="text-h:68f86f07-9000-42c4-84e6-9c39a940fc2f">
+<p>
+参考：<a href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">https://kubernetes.io/docs/concepts/services-networking/network-policies/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default
+spec:
+  podSelector:  # 对哪些 pod 生效
+    matchLabels:
+      role: db
+  policyTypes: # 限制入口还是出口，Ingress 入口，Egress 出口。未指定 policyTypes 则默认情况下始终设置 Ingress； 如果 NetworkPolicy 有任何出口规则的话则设置 Egress
+    - Ingress
+    - Egress
+  ingress:
+    - from: # 限制容器或者 ip 地址访问。ipBlock、namespaceSelector、podSelector 各自有一个横杠表示或者的关系，包含在一个横杠中表示且的关系
+        - ipBlock:           # ip 限制。是网段内的 pod 可以访问。 是 172.17.0.0/16 网，但排除 172.17.1.0/24 网段。
+            cidr: 172.17.0.0/16
+            except:
+              - 172.17.1.0/24
+        - namespaceSelector: # namespace 限制。
+            matchLabels:
+              project: myproject
+        - podSelector:       # pod 限制。
+            matchLabels:
+              role: frontend
+      ports:
+        - protocol: TCP
+          port: 6379
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/24
+      ports:
+        - protocol: TCP
+          port: 5978
+</pre>
+</div>
+
+<p>
+说明：
+</p>
+<ul class="org-ul">
+<li>必需字段：与所有其他的 Kubernetes 配置一样，NetworkPolicy 需要 apiVersion、 kind 和 metadata 字段。</li>
+<li>spec：NetworkPolicy 规约 中包含了在一个名字空间中定义特定网络策略所需的所有信息。</li>
+
+<li>podSelector：每个 NetworkPolicy 都包括一个 podSelector， 它对该策略所适用的一组 Pod 进行选择。示例中的策略选择带有 "role=db" 标签的 Pod。 空的 podSelector 选择名字空间下的所有 Pod。</li>
+
+<li>policyTypes：每个 NetworkPolicy 都包含一个 policyTypes 列表，其中包含 Ingress 或 Egress 或两者兼具。policyTypes 字段表示给定的策略是应用于进入所选 Pod 的入站流量还是来自所选 Pod 的出站流量，或两者兼有。 如果 NetworkPolicy 未指定 policyTypes 则默认情况下始终设置 Ingress； 如果 NetworkPolicy 有任何出口规则的话则设置 Egress。</li>
+
+<li>ingress：每个 NetworkPolicy 可包含一个 ingress 规则的白名单列表。 每个规则都允许同时匹配 from 和 ports 部分的流量。示例策略中包含一条简单的规则： 它匹配某个特定端口，来自三个来源中的一个，第一个通过 ipBlock 指定，第二个通过 namespaceSelector 指定，第三个通过 podSelector 指定。</li>
+
+<li>egress：每个 NetworkPolicy 可包含一个 egress 规则的白名单列表。 每个规则都允许匹配 to 和 port 部分的流量。该示例策略包含一条规则， 该规则将指定端口上的流量匹配到 10.0.0.0/24 中的任何目的地。</li>
+</ul>
+
+<p>
+所以，该网络策略示例:
+</p>
+<ul class="org-ul">
+<li>隔离 default 名字空间下 role=db 的 Pod （如果它们不是已经被隔离的话）。</li>
+<li>（Ingress 规则）允许以下 Pod 连接到 default 名字空间下的带有 role=db 标签的所有 Pod 的 6379 TCP 端口：
+<ul class="org-ul">
+<li>default 名字空间下带有 role=frontend 标签的所有 Pod</li>
+<li>带有 project=myproject 标签的所有名字空间中的 Pod</li>
+<li>IP 地址范围为 172.17.0.0–172.17.0.255 和 172.17.2.0–172.17.255.255 （即，除了 172.17.1.0/24 之外的所有 172.17.0.0/16）</li>
+</ul></li>
+<li>（Egress 规则）允许 default 名字空间中任何带有标签 role=db 的 Pod 到 CIDR 10.0.0.0/24 下 5978 TCP 端口的连接。</li>
+</ul>
+
+<p>
+参阅声明网络策略演练了解更多示例。
+</p>
+</div>
+<div id="outline-container-h:ae05ebc8-fb2c-45d0-a535-06eddb21de45" class="outline-4">
+<h4 id="h:ae05ebc8-fb2c-45d0-a535-06eddb21de45"><a href="#h:ae05ebc8-fb2c-45d0-a535-06eddb21de45">NetworkPolicy注意事项</a></h4>
+<div class="outline-text-4" id="text-h:ae05ebc8-fb2c-45d0-a535-06eddb21de45">
+<p>
+ipBlock、namespaceSelector、podSelector 各自有一个横杠表示或者的关系，包含在一个横杠中表示且的关系
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21516;&#32423;&#21035;&#25110;&#32773;&#30340;&#20851;&#31995;
+</span> - from:
+    - ipBlock:
+        cidr: 172.17.0.0/16
+        except:
+        - 172.17.1.0/24
+    - namespaceSelector:
+        matchLabels:
+          project: myproject
+    - podSelector:
+        matchLabels:
+          role: frontend
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">namespaceSelector &#21644; podSelector &#26159;&#19988;&#30340;&#20851;&#31995;&#65292;&#25972;&#20307;&#19982; ipBlock &#26159;&#25110;&#32773;&#30340;&#20851;&#31995;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768; project=myproject &#26631;&#31614;&#30340;&#21517;&#31216;&#31354;&#38388;&#19979; role=frontend &#30340;pod &#35775;&#38382;&#65292;&#25110;&#32773; ip &#38500;&#20102; 172.17.1.0/24 &#20043;&#22806;&#30340;&#25152;&#26377;  172.17.0.0/16 &#30340; pod &#35775;&#38382;&#12290;
+</span> - from:
+    - ipBlock:
+        cidr: 172.17.0.0/16
+        except:
+        - 172.17.1.0/24
+    - namespaceSelector:
+        matchLabels:
+          project: myproject
+      podSelector:
+        matchLabels:
+          role: frontend
+</pre>
+</div>
+
+<p>
+ip 不建议使用，因为 pod ip 会改变。另外有目标地址转换的也不建议使用。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:375f18ec-1cea-4890-954b-fad1c42ad910" class="outline-3">
+<h3 id="h:375f18ec-1cea-4890-954b-fad1c42ad910"><a href="#h:375f18ec-1cea-4890-954b-fad1c42ad910">NetworkPolicy示例</a></h3>
+<div class="outline-text-3" id="text-h:375f18ec-1cea-4890-954b-fad1c42ad910">
+</div>
+<div id="outline-container-h:f45ea7fd-95ff-43f0-8419-3928e1470369" class="outline-4">
+<h4 id="h:f45ea7fd-95ff-43f0-8419-3928e1470369"><a href="#h:f45ea7fd-95ff-43f0-8419-3928e1470369">NetworkPolicy示例1：隔离中间件服务</a></h4>
+<div class="outline-text-4" id="text-h:f45ea7fd-95ff-43f0-8419-3928e1470369">
+</div>
+</div>
+<div id="outline-container-h:ccb88c8d-1576-4021-a2f1-8e89f62d46a4" class="outline-4">
+<h4 id="h:ccb88c8d-1576-4021-a2f1-8e89f62d46a4"><a href="#h:ccb88c8d-1576-4021-a2f1-8e89f62d46a4">NetworkPolicy示例2：服务发布限制</a></h4>
+<div class="outline-text-4" id="text-h:ccb88c8d-1576-4021-a2f1-8e89f62d46a4">
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

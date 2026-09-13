@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Extending Rx (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Extending Rx (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Extending Rx (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Rx-Notation.html" rel="up" title="Rx Notation">
+<link href="Rx-Functions.html" rel="prev" title="Rx Functions">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsubsection-level-extent" id="Extending-Rx">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Rx-Functions.html" accesskey="p" rel="prev">使用 <code class="code">rx</code> 正则表达式的函数和宏</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Rx-Notation.html" accesskey="u" rel="up"><code class="code">rx</code> 结构化正则表达式表示法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsubsection" id="g_t_5b9a_4e49_65b0_7684-rx-_5f62_5f0f"><span>35.3.3.3 定义新的 <code class="code">rx</code> 形式<a class="copiable-link" href="#g_t_5b9a_4e49_65b0_7684-rx-_5f62_5f0f"> &para;</a></span></h4>
+
+<p>可通过基于其他 <code class="code">rx</code> 表达式定义新符号和参数化形式
+来扩展 <code class="code">rx</code> 表示法。
+这便于在多个正则表达式之间共享部分内容，
+并通过将复杂正则表达式由较小部分组合而成，
+使其更易于构建和理解。
+</p>
+<p>例如，可将 <code class="code">name</code> 定义为
+<code class="code">(one-or-more letter)</code>，
+将 <code class="code">(quoted <var class="var">x</var>)</code> 定义为
+<code class="code">(seq ?' <var class="var">x</var> ?')</code>（适用于任意 <var class="var">x</var>）。
+这些形式可像其他形式一样在 <code class="code">rx</code> 表达式中使用：
+<code class="code">(rx (quoted name))</code>
+将匹配单引号内的非空字母序列。
+</p>
+<p>以下 Lisp 宏提供了将名称绑定到定义的不同方式。
+所有宏均遵循以下规则：
+</p>
+<ul class="itemize mark-bullet">
+<li>内置 <code class="code">rx</code> 形式（如 <code class="code">digit</code> 和 <code class="code">group</code>）
+不可重定义。
+
+</li><li>定义拥有独立的命名空间，与 Lisp 变量的命名空间分离。
+因此无需在名称后附加 <code class="code">-regexp</code> 之类的后缀；
+它们不会与其他内容冲突。
+
+</li><li>定义不可直接或间接递归引用自身。
+若确实需要此类引用，应使用解析器，而非正则表达式。
+
+</li><li>定义仅在调用 <code class="code">rx</code> 或 <code class="code">rx-to-string</code> 时展开，
+而非仅因存在于定义宏中就展开。
+这意味着定义的顺序无关紧要，
+即使它们相互引用也是如此；
+语法错误仅在使用定义时出现，而非定义时。
+
+</li><li>在需要任意 <code class="code">rx</code> 表达式的位置均允许使用用户定义形式；
+例如，在 <code class="code">zero-or-one</code> 形式的主体中，
+但不在 <code class="code">any</code> 或 <code class="code">category</code> 形式内部。
+它们也可在 <code class="code">not</code> 和 <code class="code">intersection</code> 形式内部使用。
+</li></ul>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-rx_002ddefine"><span class="category-def">Macro: </span><span><strong class="def-name">rx-define</strong> <var class="def-var-arguments">name [arglist] rx-form</var><a class="copiable-link" href="#index-rx_002ddefine"> &para;</a></span></dt>
+<dd><p>在后续所有对 <code class="code">rx</code> 和 <code class="code">rx-to-string</code> 的调用中
+全局定义 <var class="var">name</var>。
+若缺失 <var class="var">arglist</var>，
+则将 <var class="var">name</var> 定义为普通符号，替换为 <var class="var">rx-form</var>。
+示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(rx-define haskell-comment (seq &quot;--&quot; (zero-or-more nonl)))
+(rx haskell-comment)
+     &rArr; &quot;--.*&quot;
+</pre></div></div>
+
+<p>若存在 <var class="var">arglist</var>，
+则它必须是包含零个或多个参数名的列表，
+此时将 <var class="var">name</var> 定义为参数化形式。
+在 <code class="code">rx</code> 表达式中以 <code class="code">(<var class="var">name</var> <var class="var">arg</var>&hellip;)</code> 形式使用时，
+每个 <var class="var">arg</var> 将替换 <var class="var">rx-form</var> 内对应的参数名。
+</p>
+<p><var class="var">arglist</var> 可以 <code class="code">&amp;rest</code> 和一个最终参数名结尾，
+表示剩余参数。
+剩余参数将展开为 <var class="var">arglist</var> 中其他参数未匹配到的所有额外实际参数值，
+并在 <var class="var">rx-form</var> 中出现的位置插入。
+示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(rx-define moan (x y &amp;rest r) (seq x (one-or-more y) r &quot;!&quot;))
+(rx (moan &quot;MOO&quot; &quot;A&quot; &quot;MEE&quot; &quot;OW&quot;))
+     &rArr; &quot;MOOA+MEEOW!&quot;
+</pre></div></div>
+
+<p>由于定义是全局的，
+建议像命名非局部变量和函数时通常那样，
+为 <var class="var">name</var> 添加包前缀以避免与其他位置的定义冲突。
+</p>
+<p>以此方式定义的形式仅执行简单模板替换。
+若要进行任意计算，
+可将其与 <code class="code">rx</code> 形式 <code class="code">eval</code>、<code class="code">regexp</code> 或 <code class="code">literal</code> 一起使用。
+示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(defun n-tuple-rx (n element)
+  `(seq &quot;&lt;&quot;
+        (group-n 1 ,element)
+        ,@(mapcar (lambda (i) `(seq ?, (group-n ,i ,element)))
+                  (number-sequence 2 n))
+        &quot;&gt;&quot;))
+(rx-define n-tuple (n element) (eval (n-tuple-rx n 'element)))
+(rx (n-tuple 3 (+ (in &quot;0-9&quot;))))
+  &rArr; &quot;&lt;\\(?1:[0-9]+\\),\\(?2:[0-9]+\\),\\(?3:[0-9]+\\)&gt;&quot;
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-rx_002dlet"><span class="category-def">Macro: </span><span><strong class="def-name">rx-let</strong> <var class="def-var-arguments">(bindings&hellip;) body&hellip;</var><a class="copiable-link" href="#index-rx_002dlet"> &para;</a></span></dt>
+<dd><p>使 <var class="var">bindings</var> 中的 <code class="code">rx</code> 定义
+在 <var class="var">body</var> 内的 <code class="code">rx</code> 宏调用中局部可用，
+随后对 <var class="var">body</var> 进行求值。
+</p>
+<p><var class="var">bindings</var> 的每个元素格式为
+<code class="code">(<var class="var">name</var>&nbsp;[<var class="var">arglist</var>]&nbsp;<var class="var">rx-form</var>)</code><!-- /@w -->，
+各部分含义与上述 <code class="code">rx-define</code> 相同。
+示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(rx-let ((comma-separated (item) (seq item (0+ &quot;,&quot; item)))
+         (number (1+ digit))
+         (numbers (comma-separated number)))
+  (re-search-forward (rx &quot;(&quot; numbers &quot;)&quot;)))
+</pre></div></div>
+
+<p>定义仅在 <var class="var">body</var> 的宏展开期间可用，
+因此在编译代码的执行期间不存在。
+</p>
+<p><code class="code">rx-let</code> 不仅可在函数内部使用，
+也可在顶层用于需要共享一组公共 <code class="code">rx</code> 形式的
+全局变量和函数定义。
+由于名称在 <var class="var">body</var> 内部是局部的，
+无需任何包前缀。
+示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(rx-let ((phone-number (seq (opt ?+) (1+ (any digit ?-)))))
+  (defun find-next-phone-number ()
+    (re-search-forward (rx phone-number)))
+  (defun phone-number-p (string)
+    (string-match-p (rx bos phone-number eos) string)))
+</pre></div></div>
+
+<p><code class="code">rx-let</code> 绑定的作用域是词法的，
+这意味着它们在 <var class="var">body</var> 外部不可见，
+即使在从 <var class="var">body</var> 调用的函数中也是如此。
+</p></dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-rx_002dlet_002deval"><span class="category-def">Macro: </span><span><strong class="def-name">rx-let-eval</strong> <var class="def-var-arguments">bindings body&hellip;</var><a class="copiable-link" href="#index-rx_002dlet_002deval"> &para;</a></span></dt>
+<dd><p>像 <code class="code">rx-let</code> 一样对 <var class="var">bindings</var> 求值以获取绑定列表，
+并在这些绑定生效的情况下对 <var class="var">body</var> 求值，
+用于对 <code class="code">rx-to-string</code> 的调用。
+</p>
+<p>此宏与 <code class="code">rx-let</code> 类似，
+区别在于 <var class="var">bindings</var> 参数会被求值（因此若为列表字面量则需要引用），
+且定义在运行时替换，
+这是 <code class="code">rx-to-string</code> 正常工作所必需的。
+示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(rx-let-eval
+    '((ponder (x) (seq &quot;Where have all the &quot; x &quot; gone?&quot;)))
+  (looking-at (rx-to-string
+               '(ponder (or &quot;flowers&quot; &quot;young girls&quot;
+                            &quot;left socks&quot;)))))
+</pre></div></div>
+
+<p>与 <code class="code">rx-let</code> 的另一个区别是，
+<var class="var">bindings</var> 是动态作用域的，
+因此在从 <var class="var">body</var> 调用的函数中也可用。
+但它们在 <var class="var">body</var> 中定义的函数内部不可见。
+</p></dd></dl>
+
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Rx-Functions.html">使用 <code class="code">rx</code> 正则表达式的函数和宏</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Rx-Notation.html"><code class="code">rx</code> 结构化正则表达式表示法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

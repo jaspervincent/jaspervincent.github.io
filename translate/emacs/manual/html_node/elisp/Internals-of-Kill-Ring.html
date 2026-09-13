@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Internals of Kill Ring (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Internals of Kill Ring (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Internals of Kill Ring (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="The-Kill-Ring.html" rel="up" title="The Kill Ring">
+<link href="Low_002dLevel-Kill-Ring.html" rel="prev" title="Low-Level Kill Ring">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+kbd.kbd {font-style: oblique}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Internals-of-Kill-Ring">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Low_002dLevel-Kill-Ring.html" accesskey="p" rel="prev">底层剪切环接口</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="The-Kill-Ring.html" accesskey="u" rel="up">删除环</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_526a_5207_73af_5185_90e8_5b9e_73b0"><span>33.8.6 剪切环内部实现<a class="copiable-link" href="#g_t_526a_5207_73af_5185_90e8_5b9e_73b0"> &para;</a></span></h4>
+
+<p>变量 <code class="code">kill-ring</code> 保存剪切环内容，形式为字符串列表。
+最新剪切的内容始终位于列表首部。
+</p>
+<p>变量 <code class="code">kill-ring-yank-pointer</code> 指向剪切环列表中的一个链，其 <small class="sc">CAR</small>
+即为下一次要粘贴的文本。我们称其标识了环的首部。将 <code class="code">kill-ring-yank-pointer</code>
+移动到其他链称为<em class="dfn">旋转剪切环(rotating the kill ring)</em>。将剪切环称为 &ldquo;环(ring)&rdquo;，是因为移动粘贴指针的函数
+会在列表首尾之间循环。剪切环的旋转是虚拟的，不会改变 <code class="code">kill-ring</code> 的值。
+</p>
+<p><code class="code">kill-ring</code> 与 <code class="code">kill-ring-yank-pointer</code> 均为 Lisp 变量，
+其值通常为列表。<code class="code">kill-ring-yank-pointer</code> 名称中的 &ldquo;指针(pointer)&rdquo; 一词表明，
+该变量的作用是标识列表中供下一次粘贴命令使用的元素。
+</p>
+<p><code class="code">kill-ring-yank-pointer</code> 的值始终与剪切环列表中的某条链 <code class="code">eq</code> 等价。
+它所指向的元素即为该链的 <small class="sc">CAR</small>。修改剪切环的剪切命令同时会将该变量
+设为 <code class="code">kill-ring</code> 的值，效果是旋转环使新剪切的文本位于首部。
+</p>
+<p>下图展示了变量 <code class="code">kill-ring-yank-pointer</code> 指向剪切环
+<code class="code">(&quot;some text&quot; &quot;a different piece of text&quot; &quot;yet older text&quot;)</code>
+中第二个条目的状态。
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">kill-ring                  ---- kill-ring-yank-pointer
+  |                       |
+  |                       v
+  |     --- ---          --- ---      --- ---
+   --&gt; |   |   |------&gt; |   |   |--&gt; |   |   |--&gt; nil
+        --- ---          --- ---      --- ---
+         |                |            |
+         |                |            |
+         |                |             --&gt;&quot;yet older text&quot;
+         |                |
+         |                 --&gt; &quot;a different piece of text&quot;
+         |
+          --&gt; &quot;some text&quot;
+</pre></div></div>
+
+<p>这种状态通常出现在执行 <kbd class="kbd">C-y</kbd>（<code class="code">yank</code>）后紧接着执行 <kbd class="kbd">M-y</kbd>（<code class="code">yank-pop</code>）时。
+</p>
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-kill_002dring"><span class="category-def">Variable: </span><span><strong class="def-name">kill-ring</strong><a class="copiable-link" href="#index-kill_002dring"> &para;</a></span></dt>
+<dd><p>该变量保存剪切文本序列列表，最新剪切内容在前。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-kill_002dring_002dyank_002dpointer"><span class="category-def">Variable: </span><span><strong class="def-name">kill-ring-yank-pointer</strong><a class="copiable-link" href="#index-kill_002dring_002dyank_002dpointer"> &para;</a></span></dt>
+<dd><p>该变量的值指明剪切环中哪一个元素作为粘贴操作的首部。更精确地说，
+其值是 <code class="code">kill-ring</code> 值的一个尾部，其 <small class="sc">CAR</small> 即为 <kbd class="kbd">C-y</kbd>
+应当粘贴的剪切字符串。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-kill_002dring_002dmax"><span class="category-def">User Option: </span><span><strong class="def-name">kill-ring-max</strong><a class="copiable-link" href="#index-kill_002dring_002dmax"> &para;</a></span></dt>
+<dd><p>该变量的值为剪切环可增长的最大长度，超出后会从末尾丢弃元素。
+<code class="code">kill-ring-max</code> 的默认值为 120。
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Low_002dLevel-Kill-Ring.html">底层剪切环接口</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="The-Kill-Ring.html">删除环</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

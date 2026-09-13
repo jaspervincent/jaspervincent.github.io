@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 时间同步</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 时间同步</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:d7552cad-1604-44b8-a3a1-b772c69ac077">时间同步</a>
+<ul>
+<li><a href="#h:03e96976-998f-46dd-a93e-48ab0f0f4ebd">计时方式</a>
+<ul>
+<li><a href="#h:0ce168c2-31de-423b-a640-f0307e34639e">古代计时方式</a></li>
+<li><a href="#h:014b0009-705f-4112-bc33-b0f5fbd5a09c">现代计时方式</a></li>
+</ul>
+</li>
+<li><a href="#h:696efe75-df2d-41b0-bca9-a9e5f7ddc87e">时间同步服务</a></li>
+<li><a href="#h:1e48d0b0-d4e8-47aa-a111-10d63474db26">NTP</a>
+<ul>
+<li><a href="#h:0b6c70a7-cd4f-4386-9bd4-97f571bc6a0e">NTP简介</a></li>
+<li><a href="#h:9af21b86-1f21-4a17-8dd1-24f82c23ac1c">NTP服务器安装</a></li>
+<li><a href="#h:ac174d22-e830-4a76-9c96-ba6f1f7cee4d">配置NTP服务</a></li>
+<li><a href="#h:c2023251-279d-490d-a747-3a09df9713fc">启动NTP服务器</a></li>
+<li><a href="#h:52fe2dd0-59b1-4db9-89fd-434db037c03c">客户机时间同步</a></li>
+</ul>
+</li>
+<li><a href="#h:db2aaf16-f0fd-449f-bac8-3177e77e928e">Chrony</a>
+<ul>
+<li><a href="#h:2c08c084-9794-4b9c-9922-a07e021e4bb7">Chrony介绍</a></li>
+<li><a href="#h:68595b80-7637-449a-8d5c-be25c18c4ff2">Chrony 文件组成</a></li>
+<li><a href="#h:f7747200-0b88-483b-8b4a-8a8d73fc0eef">配置文件chrony.conf</a></li>
+<li><a href="#h:9cb41dab-6721-4df9-996d-84439649ddc5">Chronyc 命令</a></li>
+<li><a href="#h:a4fb5076-6704-47ec-b0af-8ed2355f86fc">公共NTP服务</a></li>
+<li><a href="#h:f7300e0a-b7a4-4f0b-b1c9-7a1e84494e82">时间工具</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-h:d7552cad-1604-44b8-a3a1-b772c69ac077" class="outline-2">
+<h2 id="h:d7552cad-1604-44b8-a3a1-b772c69ac077"><a href="#h:d7552cad-1604-44b8-a3a1-b772c69ac077">时间同步</a></h2>
+<div class="outline-text-2" id="text-h:d7552cad-1604-44b8-a3a1-b772c69ac077">
+<p>
+<a href="https://chrony.tuxfamily.org/">https://chrony.tuxfamily.org/</a>
+</p>
+</div>
+<div id="outline-container-h:03e96976-998f-46dd-a93e-48ab0f0f4ebd" class="outline-3">
+<h3 id="h:03e96976-998f-46dd-a93e-48ab0f0f4ebd"><a href="#h:03e96976-998f-46dd-a93e-48ab0f0f4ebd">计时方式</a></h3>
+<div class="outline-text-3" id="text-h:03e96976-998f-46dd-a93e-48ab0f0f4ebd">
+</div>
+<div id="outline-container-h:0ce168c2-31de-423b-a640-f0307e34639e" class="outline-4">
+<h4 id="h:0ce168c2-31de-423b-a640-f0307e34639e"><a href="#h:0ce168c2-31de-423b-a640-f0307e34639e">古代计时方式</a></h4>
+<div class="outline-text-4" id="text-h:0ce168c2-31de-423b-a640-f0307e34639e">
+<p>
+在远古时期，人类用来确定时间的方式是一些自然界“相对”亘古不变的周期。
+如地球的公转是为一年，月球的公转是为一月，地球的自转是为一天等，最早的
+计时可以追溯到公元前大约2000年，古埃及人利用光线留下的影子用作计时的工
+具。影子拉得越长，计时越精确。古埃及人修建高耸入云的大型方尖碑，来追踪
+太阳的移动，随后人们又利用了沙漏、日晷、钟摆等工具，巧妙地利用一些相对
+固定而准确的周期来计时
+</p>
+
+<p>
+商朝人开发并使用了一种泄水型水钟-&#x2013;&#x2014;漏壶。后来又有用蜡烛和线香计时的
+北宋元祐元年（1086年），天文学家苏颂将浑仪、浑象和报时装置结合，建造一
+个划时代的计时工具-&#x2013;&#x2014;"水运仪象台"
+</p>
+
+<p>
+14世纪时，西方国家广泛使用机械钟。在十六世纪，奥斯曼帝国的科学家达兹·
+艾-丁（Taqi al-Din）发明出了机械闹钟1583年，伽利略提出了著名的等时性理
+论，即不论摆动幅度的大小，完成一次摆动的时间是相同的。1656年，荷兰科学
+家克里斯蒂安·惠更斯（Christiaan Huygens）应用他的理论，设计出了世界第
+一只钟摆 1868年，百达翡丽（Patek Philippe）发明了手表
+</p>
+</div>
+</div>
+<div id="outline-container-h:014b0009-705f-4112-bc33-b0f5fbd5a09c" class="outline-4">
+<h4 id="h:014b0009-705f-4112-bc33-b0f5fbd5a09c"><a href="#h:014b0009-705f-4112-bc33-b0f5fbd5a09c">现代计时方式</a></h4>
+<div class="outline-text-4" id="text-h:014b0009-705f-4112-bc33-b0f5fbd5a09c">
+<p>
+石英晶体受到电池的电力影响时，会产生规律的振动。每秒的振动次数是32768
+次，可以设计电路来计算振动次数，当计数到32768次时，即计时1秒。1967年，
+瑞士人发布了世界上首款石英表
+</p>
+
+<p>
+当原子从一个相对高的“能量态”迁至低的“能量态”时，会释放出电磁波，产
+生共振频率。依据此原理，拉比构想出了一种全新的计时仪器-&#x2013;&#x2014;原子钟
+（Atomic clock）
+</p>
+
+<p>
+因为原子的共振频率是固定的。如：铯原子（Caesium133）的固有频率是
+9192631770赫兹，约合92亿赫兹，对铯原子钟计数9192631770次，即可测量出一
+秒钟。很多国家（包括我国和美国NIST）的标准局，就是用铯原子钟来作为时间
+精度标准的。GPS系统也是用铯原子钟来计时
+</p>
+
+<p>
+2008年诞生的锶（Strontium87）原子钟，固有频率为429228004229873，约合
+430万亿赫兹，将精度提高到了10的17次方
+</p>
+
+<p>
+2013年镱元素（ytterbium）制成的原子钟问世，镱原子钟的固有频率约合518万
+亿赫兹，精度高达10的18次方。宇宙的年龄为138亿年。如果这台镱原子钟从宇
+宙诞生之初就开始计时，直到今天也不会发生1秒的误差
+</p>
+
+<p>
+范例：一次性的同步
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@Centos7 ~]#date -s <span class="org-string">'-1 year'</span>
+Sun May 26 11:08:30 CST 2019
+[root@Centos7 ~]#date
+Sun May 26 11:08:32 CST 2019
+[root@Centos7 ~]#ping ntp.aliyun.com
+PING ntp.aliyun.com (203.107.6.88) 56(84) bytes of data.
+64 bytes from 203.107.6.88 (203.107.6.88): <span class="org-variable-name">icmp_seq</span>=1 <span class="org-variable-name">ttl</span>=128 <span class="org-variable-name">time</span>=29.4 ms
+64 bytes from 203.107.6.88 (203.107.6.88): <span class="org-variable-name">icmp_seq</span>=2 <span class="org-variable-name">ttl</span>=128 <span class="org-variable-name">time</span>=42.3 ms
+[root@Centos7 ~]#ntpdate ntp.aliyun.com
+26 May 11:09:12 ntpdate[2236]: step time server 203.107.6.88 offset 31622401.067788 sec
+[root@Centos7 ~]#date
+Tue May 26 11:09:18 CST 2020
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:696efe75-df2d-41b0-bca9-a9e5f7ddc87e" class="outline-3">
+<h3 id="h:696efe75-df2d-41b0-bca9-a9e5f7ddc87e"><a href="#h:696efe75-df2d-41b0-bca9-a9e5f7ddc87e">时间同步服务</a></h3>
+<div class="outline-text-3" id="text-h:696efe75-df2d-41b0-bca9-a9e5f7ddc87e">
+<p>
+加密和安全当前都离不开时间的同步，否则各种网络服务可能不能正常运行
+</p>
+
+<p>
+时间同步服务
+</p>
+
+<p>
+多主机协作工作时，各个主机的时间同步很重要，时间不一致会造成很多重要应
+用的故障，如：加密协议，日志，集群等，利用NTP（Network Time Protocol）
+协议使网络中的各个计算机时间达到同步。目前NTP协议属于运维基础架构中必
+备的基本服务之一
+</p>
+
+<p>
+虽然主机的cpu频率是固定的，时间计算准确，但随着服务占用cpu时间片越来越
+多时间也就不准确了，需要定期同步时间。利用互联网公用的原子钟时间服务做
+同步。
+</p>
+
+<p>
+时间同步软件实现：
+</p>
+
+<ul class="org-ul">
+<li>ntp</li>
+<li>chrony （centos7+推荐使用）</li>
+</ul>
+
+<p>
+<b>ntp</b> ：
+</p>
+
+<p>
+将系统时钟和世界协调时UTC同步，精度在局域网内可达0.1ms，在互联网上绝大
+多数的地方精度可以达到1-50ms
+</p>
+
+<p>
+项目官网：<a href="http://www.ntp.org">http://www.ntp.org</a>
+</p>
+
+<p>
+<b>chrony</b> ：
+</p>
+
+<p>
+实现NTP协议的的自由软件。可使系统时钟与NTP服务器，参考时钟（例如GPS接
+收器）以及使用手表和键盘的手动输入进行同步。还可以作为NTPv4（RFC 5905）
+服务器和对等体运行，为网络中的计算机提供时间服务。设计用于在各种条件下
+良好运行，包括间歇性和高度拥挤的网络连接，温度变化（计算机时钟对温度敏
+感），以及不能连续运行或在虚拟机上运行的系统。
+</p>
+
+<p>
+通过Internet同步的两台机器之间的典型精度在几毫秒之内，在LAN上，精度通
+常为几十微秒。利用硬件时间戳或硬件参考时钟，可实现亚微秒的精度
+</p>
+</div>
+</div>
+<div id="outline-container-h:1e48d0b0-d4e8-47aa-a111-10d63474db26" class="outline-3">
+<h3 id="h:1e48d0b0-d4e8-47aa-a111-10d63474db26"><a href="#h:1e48d0b0-d4e8-47aa-a111-10d63474db26">NTP</a></h3>
+<div class="outline-text-3" id="text-h:1e48d0b0-d4e8-47aa-a111-10d63474db26">
+</div>
+<div id="outline-container-h:0b6c70a7-cd4f-4386-9bd4-97f571bc6a0e" class="outline-4">
+<h4 id="h:0b6c70a7-cd4f-4386-9bd4-97f571bc6a0e"><a href="#h:0b6c70a7-cd4f-4386-9bd4-97f571bc6a0e">NTP简介</a></h4>
+<div class="outline-text-4" id="text-h:0b6c70a7-cd4f-4386-9bd4-97f571bc6a0e">
+<p>
+NTP（Network Time Protocol，网络时间协议）是用来使网络中的各个计算机时
+间同步的一种协议。它的用途是把计算机的时钟同步到世界协调时UTC，其精度
+在局域网内可达0.1ms，在互联网上绝大多数的地方其精度可以达到1-50ms。
+</p>
+
+<p>
+NTP服务器就是利用NTP协议提供时间同步服务
+</p>
+
+<p>
+相关的命令和配置文件
+</p>
+
+<ul class="org-ul">
+<li>/etc/ntp.conf: linux各版本虽然目录不同，但文件名相同。可以用which
+ntp.conf 或者locate ntp.conf来查找。这是NTP唯一的一个设置文件。</li>
+
+<li><code>/usr/share/zoneinfo/</code> : 这个里面规定了这个主要时区的时间设置文件。</li>
+
+<li><p>
+/etc/sysconfig/clock:这个文件是linux的主要时区设置文件，每次开机后
+linux会自动读取这个文件来设置系统所默认的显示时间，可以看看它里面到
+底设置了什么：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat /etc/sysconfig/clock
+<span class="org-comment-delimiter"># </span><span class="org-comment">The ZONE parameter is only evaluated by system-config-date.
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">The timezone of the system is defined by the contents of /etc/localtime.
+</span><span class="org-variable-name">ZONE</span>=<span class="org-string">"Asia/Shanghai"</span>
+<span class="org-variable-name">UTC</span>=true
+<span class="org-variable-name">ARC</span>=false
+</pre>
+</div></li>
+
+<li>/etc/localtime: 本地端时间配置文件。</li>
+
+<li>/bin/date: 这个是时间的修改命令，除了输出时间，还可以修改时间。</li>
+
+<li>/sbin/hwclock:因为linux系统上面BIOS时间与linux系统时间是分开的，所以
+使用date这个指令调整了时间之后，还需要使用hwclock才能将修改过的时间
+写入BIOS中。</li>
+
+<li>/usr/sbin/ntpd:这是NTP的daemon文件，需要启动它才能提供NTP服务，这个
+命令会读取/etc/ntp.conf里面的设置。</li>
+
+<li>/usr/sbin/ntpdate: 这是client用来连接NTP Server的主要执行文件，如果
+您不想启用NTP，只想启用NTP Client功能的话，可以只应用此命令。</li>
+
+<li>/usr/sbin/ntptrace: 可以用来追踪某台时间服务器的时间对应关系。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:9af21b86-1f21-4a17-8dd1-24f82c23ac1c" class="outline-4">
+<h4 id="h:9af21b86-1f21-4a17-8dd1-24f82c23ac1c"><a href="#h:9af21b86-1f21-4a17-8dd1-24f82c23ac1c">NTP服务器安装</a></h4>
+<div class="outline-text-4" id="text-h:9af21b86-1f21-4a17-8dd1-24f82c23ac1c">
+<p>
+系统自带ntp
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">rpm -qa ntp
+ntp-4.2.6p5-5.el6.centos.x86_64
+&#22914;&#26524;&#27809;&#26377;&#23601;&#23433;&#35013;
+yum -y install ntp
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ac174d22-e830-4a76-9c96-ba6f1f7cee4d" class="outline-4">
+<h4 id="h:ac174d22-e830-4a76-9c96-ba6f1f7cee4d"><a href="#h:ac174d22-e830-4a76-9c96-ba6f1f7cee4d">配置NTP服务</a></h4>
+<div class="outline-text-4" id="text-h:ac174d22-e830-4a76-9c96-ba6f1f7cee4d">
+<div class="org-src-container">
+<pre class="src src-sh">[root@o ~]# vim /etc/ntp.conf
+<span class="org-comment-delimiter"># </span><span class="org-comment">restrict default kod nomodify notrap nopeer noquery
+</span>restrict default nomodify
+<span class="org-comment-delimiter"># </span><span class="org-comment">nomodify&#23458;&#25143;&#31471;&#21487;&#20197;&#21516;&#27493;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768;&#20869;&#32593;&#20854;&#20182;&#26426;&#22120;&#21516;&#27493;&#26102;&#38388;
+</span>restrict 172.16.1.0 mask 255.255.255.0 nomodify notrap
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23450;&#20041;&#20351;&#29992;&#30340;&#19978;&#28216; ntp&#26381;&#21153;&#22120;&#65292;&#23558;&#21407;&#26469;&#30340;&#27880;&#37322;
+</span>server ntp1.aliyun.com
+server time.nist.gov
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768;&#19978;&#23618;&#26102;&#38388;&#26381;&#21153;&#22120;&#20027;&#21160;&#20462;&#25913;&#26412;&#26426;&#26102;&#38388;
+</span>restrict ntp1.aliyun.com  nomodify notrap noquery
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22806;&#37096;&#26102;&#38388;&#26381;&#21153;&#22120;&#19981;&#21487;&#29992;&#26102;&#65292;&#20197;&#26412;&#22320;&#26102;&#38388;&#20316;&#20026;&#26102;&#38388;&#26381;&#21153;
+</span>server  127.127.1.0    
+fudge   127.127.1.0 stratum 10
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35745;&#31639;&#26412;ntp server &#19982;&#19978;&#23618;ntpserver&#30340;&#39057;&#29575;&#35823;&#24046;
+</span>driftfile /var/lib/ntp/drift
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Key file containing the keys and key identifiers used when operating
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">with symmetric key cryptography.
+</span>keys /etc/ntp/keys
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26085;&#24535;&#25991;&#20214;
+</span>logfile /var/log/ntp.log
+</pre>
+</div>
+
+<p>
+配置说明
+</p>
+
+<pre class="example" id="org1052046">
+restrict [address] mask [netmask_ip] [parameter]
+
+其中parameter的参数主要有：
+ignore     ：    拒绝所有类型的ntp连接
+nomodify   ：    客户端不能使用ntpc与ntpq两支程式来修改服务器的时间参数
+noquery    ：    客户端不能使用ntpq、ntpc等指令来查询服务器时间，等于不提供ntp的网络校时
+notrap     ：    不提供trap这个远程时间登录的功能
+notrust    ：    拒绝没有认证的客户端
+nopeer     ：    不与其他同一层的ntp服务器进行时间同步
+</pre>
+</div>
+</div>
+<div id="outline-container-h:c2023251-279d-490d-a747-3a09df9713fc" class="outline-4">
+<h4 id="h:c2023251-279d-490d-a747-3a09df9713fc"><a href="#h:c2023251-279d-490d-a747-3a09df9713fc">启动NTP服务器</a></h4>
+<div class="outline-text-4" id="text-h:c2023251-279d-490d-a747-3a09df9713fc">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#26524;&#35745;&#21010;&#20219;&#21153;&#26377;&#26102;&#38388;&#21516;&#27493;&#65292;&#20808;&#27880;&#37322;&#65292;&#20004;&#31181;&#29992;&#27861;&#20250;&#20914;&#31361;&#12290;
+</span>[root@o ~]# crontab -e
+<span class="org-comment-delimiter"># </span><span class="org-comment">time sync
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">*/5 * * * * /usr/sbin/ntpdate time.nist.gov &gt;/dev/null 2&gt;&amp;1
+</span>[root@o ~]# systemctl status ntpd
+<span class="org-comment-delimiter">#</span><span class="org-comment">/etc/init.d/ntpd start
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">/usr/sbin/ntpd -u ntp:ntp -g
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;ntp&#26381;&#21153;&#22120;&#19982;&#19978;&#23618;ntp&#26381;&#21153;&#22120;&#30340;&#29366;&#24577;:ntpq
+</span>[root@o ~]# ntpq -p
+remote refid st t when poll reach delay offset jitter
+==============================================================================
+*ntp1.aliyun.com 10.137.38.86 2 u 22 64 1 525.885 -42.367 0.000
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20854;&#20013;:
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">remote - &#26412;&#26426;&#21644;&#19978;&#23618;ntp&#30340;ip&#25110;&#20027;&#26426;&#21517;&#65292;&#8220;+&#8221;&#34920;&#31034;&#20248;&#20808;&#65292;&#8220;*&#8221;&#34920;&#31034;&#27425;&#20248;&#20808;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">refid  - &#21442;&#32771;&#19978;&#19968;&#23618;ntp&#20027;&#26426;&#22320;&#22336;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">st     - stratum&#38454;&#23618;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">when   - &#22810;&#23569;&#31186;&#21069;&#26366;&#32463;&#21516;&#27493;&#36807;&#26102;&#38388;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">poll   - &#19979;&#27425;&#26356;&#26032;&#22312;&#22810;&#23569;&#31186;&#21518;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">reach  - &#24050;&#32463;&#21521;&#19978;&#23618;ntp&#26381;&#21153;&#22120;&#35201;&#27714;&#26356;&#26032;&#30340;&#27425;&#25968;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">delay  - &#32593;&#32476;&#24310;&#36831;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">offset - &#26102;&#38388;&#34917;&#20607;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">jitter - &#31995;&#32479;&#26102;&#38388;&#19982;bios&#26102;&#38388;&#24046;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#25152;&#26377;&#36828;&#31243;&#26381;&#21153;&#22120;&#30340;jitter&#20540;&#26159;4000&#24182;&#19988;delay&#21644;reach&#30340;&#20540;&#26159;0&#65292;&#37027;&#20040;&#35828;&#26126;&#26102;&#38388;&#21516;&#27493;&#26159;&#26377;&#38382;&#39064;&#30340;&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#33021;&#30340;&#21407;&#22240;&#26159;&#38450;&#28779;&#22681;&#38459;&#26029;&#20102;&#19982;server&#20043;&#38388;&#30340;&#36890;&#35759;&#65292;&#21363;123&#31471;&#21475;&#26159;&#21542;&#27491;&#24120;&#24320;&#25918;&#65307;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;ntp&#26381;&#21153;&#22120;&#26377;&#26080;&#21644;&#19978;&#23618;&#36830;&#36890;
+</span>[root@o ~]# ntpstat
+synchronised to NTP server (110.75.186.247) at stratum 3
+<span class="org-builtin">time</span> correct to within 4257 ms
+polling server every 64 s
+
+&#26597;&#30475;ntp&#26381;&#21153;&#22120;&#19982;&#19978;&#23618;&#38388;&#30340;&#32852;&#31995;:ntptrace
+ntptrace -n 127.0.0.1
+
+127.0.0.1: stratum 3, offset -0.001095, synch distance 0.532610
+116.193.83.174: timed out, nothing received
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21516;&#27493;
+</span>[root@o ~]# ntpdate 10.0.0.9
+7 Dec 18:43:07 ntpdate[26950]: the NTP socket is<span class="org-keyword"> in</span> use, exiting
+ntpdate  time.windows.com
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:52fe2dd0-59b1-4db9-89fd-434db037c03c" class="outline-4">
+<h4 id="h:52fe2dd0-59b1-4db9-89fd-434db037c03c"><a href="#h:52fe2dd0-59b1-4db9-89fd-434db037c03c">客户机时间同步</a></h4>
+<div class="outline-text-4" id="text-h:52fe2dd0-59b1-4db9-89fd-434db037c03c">
+<p>
+客户机要等几分钟再与新启动的ntp服务器进行时间同步，否则会提示no server
+suitable for synchronization found错误。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@zyops ~]# ntpdate 10.0.0.9
+7 Dec 18:40:16 ntpdate[1453]: step time server 10.0.0.9 offset 40.880807 sec
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#21629;&#20196;&#25918;&#20837;&#35745;&#21010;&#20219;&#21153;&#21363;&#21487;&#12290;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:db2aaf16-f0fd-449f-bac8-3177e77e928e" class="outline-3">
+<h3 id="h:db2aaf16-f0fd-449f-bac8-3177e77e928e"><a href="#h:db2aaf16-f0fd-449f-bac8-3177e77e928e">Chrony</a></h3>
+<div class="outline-text-3" id="text-h:db2aaf16-f0fd-449f-bac8-3177e77e928e">
+</div>
+<div id="outline-container-h:2c08c084-9794-4b9c-9922-a07e021e4bb7" class="outline-4">
+<h4 id="h:2c08c084-9794-4b9c-9922-a07e021e4bb7"><a href="#h:2c08c084-9794-4b9c-9922-a07e021e4bb7">Chrony介绍</a></h4>
+<div class="outline-text-4" id="text-h:2c08c084-9794-4b9c-9922-a07e021e4bb7">
+<p>
+chrony 的优势：
+</p>
+
+<ul class="org-ul">
+<li>更快的同步只需要数分钟而非数小时时间，从而最大程度减少了时间和频率误
+差，对于并非全天24小时运行的虚拟计算机而言非常有用</li>
+<li>能够更好地响应时钟频率的快速变化，对于具备不稳定时钟的虚拟机或导致时
+钟频率发生变化的节能技术而言非常有用</li>
+<li>在初始同步后，它不会停止时钟，以防对需要系统时间保持单调的应用程序造成影响</li>
+<li>在应对临时非对称延迟时（例如，在大规模下载造成链接饱和时）提供了更好的稳定性</li>
+<li>无需对服务器进行定期轮询，因此具备间歇性网络连接的系统仍然可以快速同步时钟</li>
+</ul>
+
+<p>
+chrony官网：<a href="https://chrony.tuxfamily.org">https://chrony.tuxfamily.org</a>
+</p>
+
+<p>
+chrony官方文档：<a href="https://chrony.tuxfamily.org/documentation.html">https://chrony.tuxfamily.org/documentation.html</a>
+</p>
+
+<p>
+chrony与ntp都是时间同步软件
+</p>
+
+<p>
+两个软件不能够同时开启，会出现时间冲突。建议配置ntp较为简单，使用方便。
+</p>
+</div>
+</div>
+<div id="outline-container-h:68595b80-7637-449a-8d5c-be25c18c4ff2" class="outline-4">
+<h4 id="h:68595b80-7637-449a-8d5c-be25c18c4ff2"><a href="#h:68595b80-7637-449a-8d5c-be25c18c4ff2">Chrony 文件组成</a></h4>
+<div class="outline-text-4" id="text-h:68595b80-7637-449a-8d5c-be25c18c4ff2">
+<p>
+包：chrony
+</p>
+
+<p>
+两个主要程序：chronyd和chronyc
+</p>
+
+<ul class="org-ul">
+<li>chronyd：后台运行的守护进程，用于调整内核中运行的系统时钟和时钟服务
+器同步。它确定计算机增减时间的比率，并对此进行补偿</li>
+<li>chronyc：命令行用户工具，用于监控性能并进行多样化的配置。它可以在
+chronyd实例控制的计算机上工作，也可在一台不同的远程计算机上工作</li>
+</ul>
+
+<p>
+服务unit 文件： /usr/lib/systemd/system/chronyd.service
+</p>
+
+<p>
+监听端口：323/udp，123/udp
+</p>
+
+<p>
+配置文件： /etc/chrony.conf
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum install -y chrony
+systemctl start chrony.service
+systemctl enable chrony.service
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f7747200-0b88-483b-8b4a-8a8d73fc0eef" class="outline-4">
+<h4 id="h:f7747200-0b88-483b-8b4a-8a8d73fc0eef"><a href="#h:f7747200-0b88-483b-8b4a-8a8d73fc0eef">配置文件chrony.conf</a></h4>
+<div class="outline-text-4" id="text-h:f7747200-0b88-483b-8b4a-8a8d73fc0eef">
+<p>
+chrony服务使用的配置文件为/etc/chrony.conf，即充当服务端可以当客户端其
+配置内容格式和ntpd服务基本相似
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">
+
+$ cat /etc/chrony.conf
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992;pool.ntp.org&#39033;&#30446;&#20013;&#30340;&#20844;&#20849;&#26381;&#21153;&#22120;&#12290;&#20197;server&#24320;&#65292;&#29702;&#35770;&#19978;&#20320;&#24819;&#28155;&#21152;&#22810;&#23569;&#26102;&#38388;&#26381;&#21153;&#22120;&#37117;&#21487;&#20197;&#12290;
+</span><span class="org-comment-delimiter">################</span><span class="org-comment">&#24403;&#26381;&#21153;&#31471;################
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#25913;3&#22788; pool&#25110;server&#12289;allow&#12289;local
+</span>pool ntp1.aliyun.com iburst
+<span class="org-comment-delimiter">#</span><span class="org-comment">server ntp1.aliyun.com iburst
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">pool &#35813;&#25351;&#20196;&#30340;&#35821;&#27861;&#19982;server &#25351;&#20196;&#30340;&#35821;&#27861;&#30456;&#20284;&#65292;&#19981;&#21516;&#20043;&#22788;&#22312;&#20110;&#65292;&#23427;&#29992;&#20110;&#25351;&#23450;NTP&#26381;&#21153;&#22120;&#27744;&#32780;&#19981;&#26159;&#21333;&#20010;NTP&#26381;&#21153;&#22120;&#12290;&#27744;&#21517;&#31216;&#24212;&#35299;&#26512;&#20026;&#21487;&#33021;&#38543;&#26102;&#38388;&#21464;&#21270;&#30340;&#22810;&#20010;&#22320;&#22336;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#19968;&#21488;&#20027;&#26426;&#12289;&#23376;&#32593;&#65292;&#25110;&#32773;&#32593;&#32476;&#20197;&#20801;&#35768;&#25110;&#25298;&#32477;NTP&#36830;&#25509;&#21040;&#25198;&#28436;&#26102;&#38047;&#26381;&#21153;&#22120;&#30340;&#26426;&#22120;&#65292;&#30417;&#21548;&#22320;&#22336;&#21464;&#20026;0.0.0.0:123
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">allow 0.0.0.0/0
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">allow 192.168.0.0/16
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">deny 192.168/16
+</span><span class="org-comment-delimiter">################</span><span class="org-comment">END################
+</span>
+
+<span class="org-comment-delimiter">################</span><span class="org-comment">&#24403;&#23458;&#25143;&#31471;################
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">server 10.0.0.8 iburst
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">server ntp1.aliyun.com iburst
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">pool ntp1.aliyun.com iburst
+</span><span class="org-comment-delimiter">################</span><span class="org-comment">END################
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">----------&#19979;&#38754;&#37197;&#32622;&#19968;&#33324;&#19981;&#29992;&#25913;&#21160;------------------------
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#26681;&#25454;&#23454;&#38469;&#26102;&#38388;&#35745;&#31639;&#20986;&#26381;&#21153;&#22120;&#22686;&#20943;&#26102;&#38388;&#30340;&#27604;&#29575;&#65292;&#28982;&#21518;&#35760;&#24405;&#21040;&#19968;&#20010;&#25991;&#20214;&#20013;&#65292;&#22312;&#31995;&#32479;&#37325;&#21551;&#21518;&#20026;&#31995;&#32479;&#20570;&#20986;&#26368;&#20339;&#26102;&#38388;&#34917;&#20607;&#35843;&#25972;&#12290;
+</span>driftfile /var/lib/chrony/drift
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#21551;&#29992;&#19968;&#20010;&#20869;&#26680;&#27169;&#24335;&#65292;&#22312;&#35813;&#27169;&#24335;&#20013;&#65292;&#31995;&#32479;&#26102;&#38388;&#27599;11&#20998;&#38047;&#20250;&#25335;&#36125;&#21040;&#23454;&#26102;&#26102;&#38047;&#65288;RTC&#65289;&#12290;
+</span>rtcsync
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">chronyd&#26681;&#25454;&#38656;&#27714;&#20943;&#24930;&#25110;&#21152;&#36895;&#26102;&#38388;&#35843;&#25972;&#65292;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#22312;&#26576;&#20123;&#24773;&#20917;&#19979;&#31995;&#32479;&#26102;&#38047;&#21487;&#33021;&#28418;&#31227;&#36807;&#24555;&#65292;&#23548;&#33268;&#26102;&#38388;&#35843;&#25972;&#29992;&#26102;&#36807;&#38271;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#35813;&#25351;&#20196;&#24378;&#21046;chronyd&#35843;&#25972;&#26102;&#26399;&#65292;&#22823;&#20110;&#26576;&#20010;&#38400;&#20540;&#26102;&#27493;&#36827;&#35843;&#25972;&#31995;&#32479;&#26102;&#38047;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#21482;&#26377;&#22312;&#22240;chronyd&#21551;&#21160;&#26102;&#38388;&#36229;&#36807;&#25351;&#23450;&#30340;&#38480;&#21046;&#26102;&#65288;&#21487;&#20351;&#29992;&#36127;&#20540;&#26469;&#31105;&#29992;&#38480;&#21046;&#65289;&#27809;&#26377;&#26356;&#22810;&#26102;&#38047;&#26356;&#26032;&#26102;&#25165;&#29983;&#25928;&#12290;
+</span>makestep 10 3
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Enable hardware timestamping on all interfaces that support it.
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#36890;&#36807;&#20351;&#29992;hwtimestamp&#25351;&#20196;&#21551;&#29992;&#30828;&#20214;&#26102;&#38388;&#25139;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">hwtimestamp eth0
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">hwtimestamp eth1
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">hwtimestamp *
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">Increase the minimum number of selectable sources required to adjust
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">the system clock.
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">minsources 2
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22806;&#37096;&#26102;&#38388;&#26381;&#21153;&#22120;&#19981;&#21487;&#29992;&#26102;&#65292;&#20197;&#26412;&#22320;&#26102;&#38388;&#20316;&#20026;&#26102;&#38388;&#26381;&#21153;, &#23618;&#32423;10&#32423;&#65288;&#19982;&#20114;&#32852;&#30340;&#21516;&#27493;&#19981;&#21487;&#20197;&#36229;&#36807;10&#32423;&#65289;
+</span><span class="org-builtin">local</span> stratum 10
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#21253;&#21547;NTP&#39564;&#35777;&#23494;&#38053;&#30340;&#25991;&#20214;&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">keyfile /etc/chrony.keys
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#26085;&#24535;&#25991;&#20214;&#30340;&#30446;&#24405;&#12290;
+</span>logdir /var/log/chrony
+</pre>
+</div>
+
+
+<p>
+<b>参数说明</b>
+</p>
+
+<ul class="org-ul">
+<li>server - 可用于时钟服务器，iburst 选项当服务器可达时，发送一个八个数据包而不是通常的一个数据包。 包间隔通常为2秒,可加快初始同步速度</li>
+<li>driftfile - 根据实际时间计算出计算机增减时间的比率，将它记录到一个文件中，会在重启后为系统时钟作出补偿</li>
+<li>rtcsync - 启用内核模式，系统时间每11分钟会拷贝到实时时钟（RTC）</li>
+<li>allow / deny - 指定一台主机、子网，或者网络以允许或拒绝访问本服务器</li>
+<li>cmdallow / cmddeny - 可以指定哪台主机可以通过chronyd使用控制命令</li>
+<li>bindcmdaddress - 允许chronyd监听哪个接口来接收由chronyc执行的命令</li>
+<li>makestep - 通常chronyd将根据需求通过减慢或加速时钟，使得系统逐步纠正所有时间偏差。在某些特定情况下，系统时钟可能会漂移过快，导致该调整过程消耗很长的时间来纠正系统时钟。该指令强制chronyd在调整期大于某个阀值时调整系统时钟</li>
+<li>local stratum 10 - 即使server指令中时间服务器不可用，也允许将本地时间作为标准时间授时给其它客户端</li>
+<li>stratumweight 指令设置当chronyd从可用源中选择同步源时，每个层应该添加多少距离到同步距离。默认情况下，CentOS中设置为0，让chronyd在选择源时忽略源的层级</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:9cb41dab-6721-4df9-996d-84439649ddc5" class="outline-4">
+<h4 id="h:9cb41dab-6721-4df9-996d-84439649ddc5"><a href="#h:9cb41dab-6721-4df9-996d-84439649ddc5">Chronyc 命令</a></h4>
+<div class="outline-text-4" id="text-h:9cb41dab-6721-4df9-996d-84439649ddc5">
+<p>
+chronyc 可以运行在交互式和非交互式两种方式，支持以下子命令
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">help             <span class="org-comment-delimiter">#</span><span class="org-comment">&#21629;&#20196;&#21487;&#20197;&#26597;&#30475;&#26356;&#22810;chronyc&#30340;&#20132;&#20114;&#21629;&#20196;
+</span>accheck          <span class="org-comment-delimiter">#</span><span class="org-comment">&#26816;&#26597;&#26159;&#21542;&#23545;&#29305;&#23450;&#20027;&#26426;&#21487;&#35775;&#38382;&#24403;&#21069;&#26381;&#21153;&#22120;
+</span>activity         <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#26377;&#22810;&#23569;NTP&#28304;&#22312;&#32447;/&#31163;&#32447;
+</span>sources [-v]     <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#24403;&#21069;&#26102;&#38388;&#28304;&#30340;&#21516;&#27493;&#20449;&#24687;
+</span>sourcestats [-v] <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#24403;&#21069;&#26102;&#38388;&#28304;&#30340;&#21516;&#27493;&#32479;&#35745;&#20449;&#24687;
+</span>add server       <span class="org-comment-delimiter">#</span><span class="org-comment">&#25163;&#21160;&#28155;&#21152;&#19968;&#21488;&#26032;&#30340;NTP&#26381;&#21153;&#22120;
+</span>clients          <span class="org-comment-delimiter">#</span><span class="org-comment">&#25253;&#21578;&#24050;&#35775;&#38382;&#26412;&#26381;&#21153;&#22120;&#30340;&#23458;&#25143;&#31471;&#21015;&#34920;
+</span>delete           <span class="org-comment-delimiter">#</span><span class="org-comment">&#25163;&#21160;&#31227;&#38500;NTP&#26381;&#21153;&#22120;&#25110;&#23545;&#31561;&#26381;&#21153;&#22120;
+</span>settime          <span class="org-comment-delimiter">#</span><span class="org-comment">&#25163;&#21160;&#35774;&#32622;&#23432;&#25252;&#36827;&#31243;&#26102;&#38388;
+</span>tracking         <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#31995;&#32479;&#26102;&#38388;&#20449;&#24687;</span>
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#38388;&#21516;&#27493;&#28304;&#65306;
+</span>chronyc sources -v
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#38388;&#21516;&#27493;&#28304;&#29366;&#24577;&#65306;
+</span>chronyc sourcestats -v
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#30828;&#20214;&#26102;&#38388;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#30828;&#20214;&#26102;&#38388;&#40664;&#35748;&#20026;UTC&#65306;
+</span>timedatectl set-local-rtc 1
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#29992;NTP&#26102;&#38388;&#21516;&#27493;&#65306;
+</span>timedatectl set-ntp yes
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26657;&#20934;&#26102;&#38388;&#26381;&#21153;&#22120;&#65306;
+</span>chronyc tracking
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#chronyc 
+chrony version 3.5
+<span class="org-function-name">Copyright</span> (C) 1997-2003, 2007, 2009-2019 Richard P. Curnow and others
+chrony comes with ABSOLUTELY NO WARRANTY.  This is free software, and
+you are welcome to redistribute it under certain conditions.  See the
+GNU General Public License version 2 for details.
+
+chronyc&gt; clients
+Hostname                      NTP   Drop Int IntL Last     Cmd   Drop Int  Last
+===============================================================================
+10.0.0.77                       4      0   1   -  118m       0      0   -     -
+chronyc&gt; activity
+200 OK
+2 sources online
+0 sources offline
+0 sources doing burst (<span class="org-keyword">return</span> to online)
+0 sources doing burst (<span class="org-keyword">return</span> to offline)
+0 sources with unknown address
+chronyc&gt; sources -v
+210 Number of <span class="org-variable-name">sources</span> = 2
+
+  .-- Source mode  <span class="org-string">'^'</span> = server, <span class="org-string">'='</span> = peer, <span class="org-string">'#'</span> = local clock.
+ / .- Source state <span class="org-string">'*'</span> = current synced, <span class="org-string">'+'</span> = combined , <span class="org-string">'-'</span> = not combined,
+| /   <span class="org-string">'?'</span> = unreachable, <span class="org-string">'x'</span> = time may be<span class="org-keyword"> in</span> error, <span class="org-string">'~'</span> = time too variable.
+||                                                 .- xxxx [ yyyy ] +/- zzzz
+||      Reachability register (octal) -.           |  <span class="org-variable-name">xxxx</span> = adjusted offset,
+||      Log2(Polling interval) --.      |          |  <span class="org-variable-name">yyyy</span> = measured offset,
+||                                <span class="org-string">\ </span>    |          |  <span class="org-variable-name">zzzz</span> = estimated error.
+||                                 |    |           <span class="org-sh-escaped-newline">\</span>
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+^+ 203.107.6.88                  2   6   377    60  +3649us[+3649us] +/-   28ms
+^* 120.25.115.20                 2   6   377    62  +5670us[-1041ms] +/-   27ms
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a4fb5076-6704-47ec-b0af-8ed2355f86fc" class="outline-4">
+<h4 id="h:a4fb5076-6704-47ec-b0af-8ed2355f86fc"><a href="#h:a4fb5076-6704-47ec-b0af-8ed2355f86fc">公共NTP服务</a></h4>
+<div class="outline-text-4" id="text-h:a4fb5076-6704-47ec-b0af-8ed2355f86fc">
+<ul class="org-ul">
+<li>pool.ntp.org：项目是一个提供可靠易用的NTP服务的虚拟集群
+cn.pool.ntp.org，0-3.cn.pool.ntp.org</li>
+
+<li><p>
+阿里云公共NTP服务器
+</p>
+
+<p>
+Unix/linux类：ntp.aliyun.com，ntp1-7.aliyun.com
+</p>
+
+<p>
+windows类： time.pool.aliyun.com和 time.nist.gov
+</p>
+
+<p>
+Mac OS X 上自带的俩个：time.apple.com 和 time.asia.apple.com
+</p></li>
+
+<li><p>
+大学ntp服务
+</p>
+
+<p>
+s1a.time.edu.cn 北京邮电大学
+</p>
+
+<p>
+s1b.time.edu.cn 清华大学
+</p>
+
+<p>
+s1c.time.edu.cn 北京大学
+</p></li>
+
+<li>国家授时中心服务器：210.72.145.44</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:f7300e0a-b7a4-4f0b-b1c9-7a1e84494e82" class="outline-4">
+<h4 id="h:f7300e0a-b7a4-4f0b-b1c9-7a1e84494e82"><a href="#h:f7300e0a-b7a4-4f0b-b1c9-7a1e84494e82">时间工具</a></h4>
+<div class="outline-text-4" id="text-h:f7300e0a-b7a4-4f0b-b1c9-7a1e84494e82">
+<ul class="org-ul">
+<li>timedatectl 时间和时区管理</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26085;&#26399;&#26102;&#38388;&#12289;&#26102;&#21306;&#21450;NTP&#29366;&#24577;&#65306;
+</span>timedatectl
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#21306;&#21015;&#34920;&#65306;
+</span>timedatectl list-timezones
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#26102;&#21306;&#65306;
+</span>timedatectl set-timezone Asia/Shanghai
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#26102;&#21306;&#65306;
+</span>rm -f /etc/localtime
+ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+<span class="org-comment-delimiter">#</span><span class="org-comment">ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35774;&#32622;&#23436;&#26102;&#21306;&#21518;&#65292;&#24378;&#21046;&#21516;&#27493;&#19979;&#31995;&#32479;&#26102;&#38047;&#65306;
+</span>chronyc -a makestep
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#26085;&#26399;&#26102;&#38388;&#65306;
+</span>timedatectl set-time <span class="org-string">"2017-01-23 10:30:00"</span>&#65288;&#21487;&#20197;&#21482;&#20462;&#25913;&#20854;&#20013;&#19968;&#20010;&#65289;
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21551;NTP&#65306; 
+</span>timedatectl set-ntp true/false
+
+timedatectl set-timezone UTC <span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#26412;&#22320;&#26102;&#21306;&#35774;&#32622;&#20026;&#21327;&#35843;&#19990;&#30028;&#26102;&#65288;UTC&#65289;</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>ntpdate 时间同步命令</li>
+<li>system-config-date：图形化配置chrony服务的工具</li>
+</ul>
+
+<p>
+时区：
+</p>
+<ul class="org-ul">
+<li>配置文件：/etc/localtime</li>
+<li>时区列表目录：/usr/share/zoneinfo/</li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#22269;&#20869;&#28304;
+</span>cat  /etc/chrony/sources.d/ubuntu-ntp-pools.sources
+pool ntp.aliyun.com iburst
+pool ntp.tencent.com iburst
+pool ntp.sjtu.edu.cn iburst
+
+root@k8s-master01:~# chronyc sources
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^- 203.107.6.88                  2   6    17    56  +1386us[+1386us] +/-   36ms
+^* jptyo5-ntp-001.aaplimg.c&gt;     1   6    17    56   -951us[  -13ms] +/-   48ms
+^- jptyo5-ntp-003.aaplimg.c&gt;     1   6    17    56  +2598us[+2598us] +/-   46ms
+^+ 17.253.114.43                 1   6    17    56  -4446us[-4446us] +/-   39ms
+^+ 106.55.184.199                2   6    65    52    -13ms[  -13ms] +/-   53ms
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35828;&#26126;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">^* &#24403;&#21069;&#36873;&#20013;&#30340;&#20027;&#28304;&#65288;system peer&#65289;&#65292;chrony &#29992;&#36825;&#21488;&#26381;&#21153;&#22120;&#26469;&#26657;&#27491;&#26412;&#26426;&#31995;&#32479;&#26102;&#38388;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">^+ &#21512;&#26684;&#30340;&#22791;&#36873;&#28304;&#65292;&#26102;&#38388;&#21487;&#20449;&#65292;&#21644;&#20027;&#28304;&#26102;&#38388;&#25509;&#36817;&#65292;&#19968;&#26086;&#20027;&#28304;&#25346;&#20102;&#21487;&#20197;&#39030;&#19978;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">^- &#21487;&#29992;&#20294;&#19981;&#25512;&#33616;&#30340;&#28304;&#65292;&#26102;&#38388;&#25968;&#25454;&#26377;&#25928;&#65292;&#20294;&#21644;&#20854;&#20182;&#28304;&#23545;&#27604;&#26377;&#20559;&#24046;&#65292;&#19981;&#20250;&#36873;&#20026;&#20505;&#36873;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">^? &#28304;&#19981;&#21487;&#29992;&#65306;&#32593;&#32476;&#19981;&#36890;&#12289;&#28304;&#26080;&#21709;&#24212;&#12289;&#35748;&#35777;&#22833;&#36133;&#65292;&#20002;&#24323;&#36825;&#20010; NTP &#28304;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">^x &#34394;&#20551;&#28304;&#65288;falseticker&#65289;&#65292;&#36825;&#20010; NTP &#26381;&#21153;&#22120;&#26102;&#38388;&#26159;&#38169;&#30340;&#65292;chrony &#30452;&#25509;&#25289;&#40657;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">^~ &#28304;&#26102;&#38388;&#20559;&#24046;&#22826;&#22823;&#65292;&#34987;&#25490;&#38500;</span>
+</pre>
+</div>
+
+<p>
+范例
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">centos
+</span>yum install -y chrony
+systemctl enable --now chrony
+systemctl status chrony
+
+cat&gt;/etc/chrony.conf&lt;&lt;EOF<span class="org-sh-heredoc">
+server ntp1.aliyun.com iburst minpoll 4 maxpoll 10
+server cn.pool.ntp.org iburst minpoll 4 maxpoll 10
+server s1b.time.edu.cn iburst minpoll 4 maxpoll 10
+stratumweight 0
+driftfile /var/lib/chrony/chrony.drift
+rtcsync
+makestep 1 -1
+bindcmdaddress 127.0.0.1
+keyfile /etc/chrony/chrony.keys
+logdir /var/log/chrony
+logchange 1
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">ubuntu
+</span>cat &gt; /etc/chrony/sources.d/ubuntu-ntp-pools.sources &lt;&lt; EOF<span class="org-sh-heredoc">
+server ntp1.aliyun.com iburst minpoll 4 maxpoll 10
+server cn.pool.ntp.org iburst minpoll 4 maxpoll 10
+server s1b.time.edu.cn iburst minpoll 4 maxpoll 10
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25226;&#21407;&#26469; makestep 1.0 3 &#20462;&#25913;&#65292;&#21435;&#25481;&#27425;&#25968;&#38480;&#21046;&#65292;&#20559;&#24046;&gt;1s&#23601;&#20801;&#35768;&#36339;
+</span>cp /etc/chrony/chrony.conf{,.bak}
+sed -i <span class="org-string">'s/^makestep .*/makestep 1 -1/g'</span> /etc/chrony/chrony.conf
+
+systemctl restart chrony.service
+timedatectl set-timezone Asia/Shanghai <span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#26102;&#21306;
+</span>chronyc -a makestep <span class="org-comment-delimiter"># </span><span class="org-comment">&#24378;&#21046;&#21516;&#27493;&#19979;&#31995;&#32479;&#26102;&#38047;
+</span>timedatectl set-ntp yes <span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#29992;NTP&#26381;&#21153;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;&#35828;&#26126;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">rtcsync&#65306;chrony &#27599; 11 &#20998;&#38047;&#33258;&#21160;&#21516;&#27493;&#31995;&#32479;&#26102;&#38047;&#21040; RTC &#30828;&#20214;&#26102;&#38047;&#65292;&#26367;&#20195; hwclock -w
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">makestep 1.0 3    # &#20559;&#24046;&gt;1s&#65292;&#21069;3&#27425;&#21551;&#21160;&#30452;&#25509;&#36339;&#27493;&#26657;&#27491;
+</span>
+timedatectl
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#38388;&#21516;&#27493;&#28304;&#65306;
+</span>chronyc sources -v
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#38388;&#21516;&#27493;&#28304;&#29366;&#24577;&#65306;
+</span>chronyc sourcestats -v
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#21516;&#27493;&#20559;&#31227;&#37327;&#65292;&#30475;System time     : &#20559;&#31227;&#20540;&#65292;&#36234;&#23567;&#36234;&#22909;
+</span>chronyc tracking
+</pre>
+</div>
+
+
+<p>
+校准时间
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25191;&#34892; timedatectl &#21629;&#20196;
+</span>~# timedatectl
+Local time: Thu 2026-09-10 09:25:57 CST
+Universal time: Thu 2026-09-10 01:25:57 UTC
+RTC time: Thu 2026-09-10 00:34:15
+Time zone: Asia/Shanghai (CST, +0800)
+System clock synchronized: no
+NTP service: active
+RTC<span class="org-keyword"> in</span> local TZ: no
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20854;&#20013; System clock synchronized: no
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#35828;&#26126; RTC &#30828;&#20214;&#26102;&#38388;&#21644;&#31995;&#32479;&#26102;&#38388;&#19981;&#19968;&#33268;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20808;&#30475; chrony &#28304;&#29366;&#24577;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#30475;&#36755;&#20986;&#37324;&#26377;&#27809;&#26377; ^* &#26143;&#21495;&#65292;&#24102; * &#20195;&#34920;&#24403;&#21069;&#27491;&#22312;&#20351;&#29992;&#36825;&#20010; NTP &#28304;&#12289;&#21516;&#27493;&#25104;&#21151;&#12290;
+</span>chronyc sources
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#31435;&#21051;&#20877;&#30475;&#36319;&#36394;&#29366;&#24577; &#30475; System time &#27604; NTP &#24930;&#22810;&#23569;
+</span>chronyc tracking
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25226;&#21407;&#26469; makestep 1.0 3 &#20462;&#25913;&#65292;&#21435;&#25481;&#27425;&#25968;&#38480;&#21046;&#65292;&#20559;&#24046;&gt;1s&#23601;&#20801;&#35768;&#36339;
+</span>makestep 1.0 -1
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24378;&#21046; chrony &#31435;&#21363;&#21516;&#27493;
+</span>chronyc -a makestep
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20877;&#27425;&#26597;&#30475;
+</span>timedatectl
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#27491;&#24120;&#21518;&#20250;&#30475;&#21040;&#65306;System clock synchronized: yes
+</span>
+
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

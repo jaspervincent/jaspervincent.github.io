@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 基础篇-配置管理</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 基础篇-配置管理</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:f8a2dd78-6383-426a-8108-a5b8de14ed98">ConfigMap</a>
+<ul>
+<li><a href="#h:e3365f2c-d8f0-4588-9eb2-600accfcd95a">云原生要素-配置分离</a></li>
+<li><a href="#h:1c48e628-c8ea-4ace-aad5-1a8f3ac15272">什么是configmap</a></li>
+<li><a href="#h:13dc6c80-8fa5-4db9-ae59-49e948227fa9">yaml 文件中多行字符串</a></li>
+<li><a href="#h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e">创建 ConfigMap 的几种形式</a>
+<ul>
+<li><a href="#h:a56ec79b-7468-45d0-8cd2-1464c7ac4f0e">基于目录或文件创建 ConfigMap</a>
+<ul>
+<li><a href="#h:82b10780-6086-4e04-9e3f-96bae801eaf9">范例基于目录创建 ConfigMap</a></li>
+</ul>
+</li>
+<li><a href="#h:3d6e3644-79c3-4ea9-943e-6ceda9970562">基于key-value字符串的环境变量创建 ConfigMap</a>
+<ul>
+<li><a href="#h:d4dc7776-7a2f-4a32-a8a1-115eda1581fb">范例 env 文件创建 ConfigMap</a></li>
+</ul>
+</li>
+<li><a href="#h:3ce3ccd2-6145-4115-ac39-913e6d78a2ba">通过 yaml / json文件创建（推荐）</a></li>
+</ul>
+</li>
+<li><a href="#h:bf7ce744-8906-4fc0-9d05-13d8fceb29a6">使用 ConfigMap</a>
+<ul>
+<li><a href="#h:e6283ed4-1832-4085-99d3-d17614d0770b">使用 valueFrom 定义环境变量</a></li>
+<li><a href="#h:0a1e2303-d08a-4b78-8552-9c2195c87b78">使用 envFrom 批量生产环境变量</a>
+<ul>
+<li><a href="#h:dd6de04c-ed64-486d-9cc2-d77228de04a5">给每个环境变量名称加前缀</a></li>
+</ul>
+</li>
+<li><a href="#h:61253820-5fc3-4b45-8e0f-0fc06d2def3e">以文件的形式挂载 ConfigMap</a></li>
+<li><a href="#h:fcc99bc3-37bf-495d-aba0-76147b91e4da">自定义挂载权限及名称</a></li>
+</ul>
+</li>
+<li><a href="#org854ef6e">示例</a>
+<ul>
+<li><a href="#org241f0e6">挂载文件同时挂载nfs</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:59509409-e7ca-4b37-a2b1-bae141fee9bf">Secret</a>
+<ul>
+<li><a href="#h:bd0f183f-b061-407e-9f72-6bf6f79398b9">什么是secret</a>
+<ul>
+<li><a href="#h:fd50b684-9b4b-49e1-93b6-0a2b62ab426c">Secret 常用类型</a></li>
+</ul>
+</li>
+<li><a href="#h:b270ea20-028b-4401-842c-d00d933f4151">创建 Secret 的几种形式</a>
+<ul>
+<li><a href="#h:ad6ec919-df87-4e18-bc3e-3ca960868a97">使用 kubectl 命令创建 Secret</a>
+<ul>
+<li><a href="#h:404c1250-984e-4e00-a6e1-a32ec07ee29e">基于文件的方式创建</a></li>
+<li><a href="#h:34d3548e-55a9-4a62-8a3e-6c8142b20f26">基于 key-value 标签提供 Secret  数据</a></li>
+<li><a href="#h:cf4a6f57-854d-41da-aa84-9ad7ab10821a">镜像拉取凭证</a></li>
+<li><a href="#h:b69e117b-0751-48cb-9771-226a04b8d118">证书</a></li>
+</ul>
+</li>
+<li><a href="#h:9c2300e1-113c-4f37-a1df-468970b28e1b">yaml 文件</a>
+<ul>
+<li><a href="#h:6aed0710-18fe-49bb-838c-7d870aa570c0">基于明文方式创建</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:1a4e7338-06c9-4bff-a3ca-29f3acbc010a">使用 Secret</a>
+<ul>
+<li><a href="#h:5e97e772-1b37-40c0-b5d2-a0c257217f69">使用Secret拉取私有仓库镜像</a></li>
+<li><a href="#h:d48f3d9f-6098-4ce4-9624-bc41a3dcfa12">Secret管理HTTPS证书</a></li>
+</ul>
+</li>
+<li><a href="#h:41c885d0-c1bd-4ea1-a8bd-61eb61e2947e">ConfigMap&amp;Secret 热更新</a></li>
+<li><a href="#h:aa228c12-a2cf-4096-a5b6-75ba21c97277">手动为 ServiceAccount 创建长期有效的 API 令牌</a></li>
+<li><a href="#h:2b82006f-a76f-4519-b5b9-c07238ef12d2">ConfigMap&amp;Secret使用限制</a></li>
+<li><a href="#h:975b504c-fbc1-4abd-925a-3afbe85d4ead">k8s1.19的不可变Secret和ConfigMap</a></li>
+<li><a href="#h:7f9e9b07-aebf-48c6-a0ff-9b5a9ca6d2e0">解决 configmap 乱码</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:f8a2dd78-6383-426a-8108-a5b8de14ed98" class="outline-2">
+<h2 id="h:f8a2dd78-6383-426a-8108-a5b8de14ed98"><a href="#h:f8a2dd78-6383-426a-8108-a5b8de14ed98">ConfigMap</a></h2>
+<div class="outline-text-2" id="text-h:f8a2dd78-6383-426a-8108-a5b8de14ed98">
+</div>
+<div id="outline-container-h:e3365f2c-d8f0-4588-9eb2-600accfcd95a" class="outline-3">
+<h3 id="h:e3365f2c-d8f0-4588-9eb2-600accfcd95a"><a href="#h:e3365f2c-d8f0-4588-9eb2-600accfcd95a">云原生要素-配置分离</a></h3>
+<div class="outline-text-3" id="text-h:e3365f2c-d8f0-4588-9eb2-600accfcd95a">
+<ul class="org-ul">
+<li>Java Out of Code
+<ul class="org-ul">
+<li>SpringCloud  ConfigServer</li>
+<li>Apollo</li>
+<li>ConfigMap&amp;Secret</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:1c48e628-c8ea-4ace-aad5-1a8f3ac15272" class="outline-3">
+<h3 id="h:1c48e628-c8ea-4ace-aad5-1a8f3ac15272"><a href="#h:1c48e628-c8ea-4ace-aad5-1a8f3ac15272">什么是configmap</a></h3>
+<div class="outline-text-3" id="text-h:1c48e628-c8ea-4ace-aad5-1a8f3ac15272">
+<p>
+一般用 ConfigMap 去管理一些配置文件，或者一些大量的环境变量信息。
+</p>
+
+<p>
+ConfigMap 将配置和 Pod分开，有一个nginx, nginx.conf-&gt; configmap， nginx 去读取configmap的信息。更易于配置文件的自动更新和管理。
+</p>
+
+<p>
+Secret: Secret更倾向于存储和共享敏感、加密的配置信息。
+</p>
+
+<p>
+配置文档：<a href="https://kubernetes.io/docs/concepts/configuration/configmap/">https://kubernetes.io/docs/concepts/configuration/configmap/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:13dc6c80-8fa5-4db9-ae59-49e948227fa9" class="outline-3">
+<h3 id="h:13dc6c80-8fa5-4db9-ae59-49e948227fa9"><a href="#h:13dc6c80-8fa5-4db9-ae59-49e948227fa9">yaml 文件中多行字符串</a></h3>
+<div class="outline-text-3" id="text-h:13dc6c80-8fa5-4db9-ae59-49e948227fa9">
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://yaml.org/spec/1.2.2/#8112-block-chomping-indicator">8.1.1.2. Block Chomping Indicator</a></li>
+</ul>
+
+<p>
+yaml 文件中多行字符串可以使用 <code>|</code> 保留换行符，或者使用 <code>&gt;</code> 将换行符替换为空格。其中，这两个换行符有以下几种用法：
+</p>
+<ul class="org-ul">
+<li><code>|</code> ：文中自动换行，默认仅保留一行空行</li>
+<li><code>|+</code> ：文中自动换行，保留字符串后面所有的空行</li>
+<li><code>|-</code> ：文中自动换行，删除字符串后面所有的空行</li>
+<li><code>&gt;</code> ：文中不自动换行，默认仅保留一行空行</li>
+<li><code>&gt;+</code> ：文中不自动换行，保留字符串后面所有的空行</li>
+<li><code>&gt;-</code> ：文中不自动换行，删除字符串后面所有的空行</li>
+</ul>
+
+<p>
+多行字符串可以使用引号括起来： <code>" "</code> 会进行特殊字符转义， <code>' '</code> 保留原始字符串。
+</p>
+
+<p>
+测试
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">import</span> yaml
+
+<span class="org-keyword">with</span> <span class="org-builtin">open</span>(<span class="org-string">'string.yaml'</span>,<span class="org-string">'r'</span>, encoding<span class="org-operator">=</span><span class="org-string">'utf-8'</span>) <span class="org-keyword">as</span> f:
+    <span class="org-variable-name">data</span> <span class="org-operator">=</span> yaml.load(f, Loader<span class="org-operator">=</span>yaml.FullLoader)
+    
+<span class="org-keyword">for</span> key <span class="org-keyword">in</span> data:
+    <span class="org-builtin">print</span>(f<span class="org-string">'</span>{key}<span class="org-string">:</span>{data[key]}<span class="org-string">'</span>)
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-yaml">string_1: |
+  I am a string_1.
+  11111.
+string_2: |+
+  I am a string_2.
+  22222.
+string_3: |-
+  I am a string_3.
+  33333.
+string_4: &gt;
+  I am a string_4.
+  44444.
+string_5: &gt;+
+  I am a string_5.
+  55555.
+string_6: &gt;-
+  I am a string_6.
+  66666.
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@localhost ~]# python3 read_yaml.py
+string_1:I am a string_1.
+11111.
+
+string_2:I am a string_2.
+22222.
+
+string_3:I am a string_3.
+33333.
+string_4:I am a string_4. 44444.
+
+string_5:I am a string_5. 55555.
+
+string_6:I am a string_6. 66666.
+[root@localhost ~]#
+</pre>
+</div>
+
+<p>
+范例
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  containers:                                                                                                                                                                                                                 
+  - name: mq-nameserver-1
+    image: gehuiwin/rocketmq:4.9.2
+    imagePullPolicy: IfNotPresent
+    env:
+    - name: JAVA_OPT_EXT
+      value: |-
+        -XX:+PerfDisableSharedMem
+        -Xloggc:/home/rocketmq/logs/rocketmq_gc.log
+        -XX:+PrintGCDetails 
+        -XX:+PrintGCDateStamps 
+        -XX:+PrintGCTimeStamps
+        -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=4 -XX:GCLogFileSize=128M
+        -Duser.timezone=Asia/Calcutta -Duser.home=/home/rocketmq -Xms512M -Xmx512M -Xmn512m
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e" class="outline-3">
+<h3 id="h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e"><a href="#h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e">创建 ConfigMap 的几种形式</a></h3>
+<div class="outline-text-3" id="text-h:e27a7c5b-4e2e-4603-937a-1bc3c107a42e">
+</div>
+<div id="outline-container-h:a56ec79b-7468-45d0-8cd2-1464c7ac4f0e" class="outline-4">
+<h4 id="h:a56ec79b-7468-45d0-8cd2-1464c7ac4f0e"><a href="#h:a56ec79b-7468-45d0-8cd2-1464c7ac4f0e">基于目录或文件创建 ConfigMap</a></h4>
+<div class="outline-text-4" id="text-h:a56ec79b-7468-45d0-8cd2-1464c7ac4f0e">
+<p>
+&#x2013;from-file 可指定单个文件和目录创建，指定目录会创建包含该目录中所有文件的configmap：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#30446;&#24405;
+</span>kubectl create configmap *** --from-file=/path
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#25991;&#20214;&#25110;&#22810;&#20010;&#25991;&#20214;
+</span>kubectl create configmap *** --from-file=file1
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20854;&#20013;&#65292;--from-file&#21487;&#20197;&#20351;&#29992;&#22810;&#27425;&#65292;&#27604;&#22914;&#65306;
+</span>kubectl create configmap *** --from-file=file1 --from-file=file2
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#23450;&#20041; key &#21517;&#31216;&#65292; &#40664;&#35748;&#20026;&#25991;&#20214;&#21517;
+</span>kubectl create configmap *** --from-file=<span class="org-variable-name">keyname</span>=file1
+</pre>
+</div>
+</div>
+<div id="outline-container-h:82b10780-6086-4e04-9e3f-96bae801eaf9" class="outline-5">
+<h5 id="h:82b10780-6086-4e04-9e3f-96bae801eaf9"><a href="#h:82b10780-6086-4e04-9e3f-96bae801eaf9">范例基于目录创建 ConfigMap</a></h5>
+<div class="outline-text-5" id="text-h:82b10780-6086-4e04-9e3f-96bae801eaf9">
+<p>
+准备文件
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ mkdir conf
+$ cat conf/game1.conf
+<span class="org-variable-name">lives</span>=3
+secret.code=true
+$ cat conf/game2.conf
+color.good=purple
+<span class="org-variable-name">user</span>=tomcat
+</pre>
+</div>
+
+<p>
+基于目录创建 ConfigMap
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl  create cm cmfromdir --from-file=conf/
+
+$ kubectl  get cm cmfromdir -oyaml
+apiVersion: v1
+data:
+  game1.conf: |
+    <span class="org-variable-name">lives</span>=3
+    secret.code=true
+  game2.conf: |
+    color.good=purple
+    <span class="org-variable-name">user</span>=tomcat
+kind: ConfigMap
+metadata:
+  name: cmfromdir
+  namespace: default
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#33539;&#20363;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#39069;&#22806;&#28155;&#21152;&#25991;&#20214;&#25918;&#22312; add-file &#30446;&#24405;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">kubectl create cm ngfile-add-file --from-file add-file/
+</span>kubectl create cm ngfile-add-file --from-file add-file/ -o yaml --dry-run=client | kubectl apply -f -
+</pre>
+</div>
+
+<p>
+创建自定义文件名称的 ConfigMap
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl  create cm cmspecfile --from-file=<span class="org-variable-name">my</span>=conf/game2.conf
+
+$ kubectl  get cm cmspecfile -oyaml
+apiVersion: v1
+data:
+  my: |
+    color.good=purple
+    <span class="org-variable-name">user</span>=tomcat
+kind: ConfigMap
+metadata:
+  name: cmspecfile
+  namespace: default
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3d6e3644-79c3-4ea9-943e-6ceda9970562" class="outline-4">
+<h4 id="h:3d6e3644-79c3-4ea9-943e-6ceda9970562"><a href="#h:3d6e3644-79c3-4ea9-943e-6ceda9970562">基于key-value字符串的环境变量创建 ConfigMap</a></h4>
+<div class="outline-text-4" id="text-h:3d6e3644-79c3-4ea9-943e-6ceda9970562">
+<p>
+常用于 Pod 的环境变量
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create configmap *** --from-literal=<span class="org-variable-name">config1</span>=123 --from-literal=<span class="org-variable-name">PASSWORD</span>=234
+kubectl create cm *** --from-env-file=conf/game1.conf
+</pre>
+</div>
+<p>
+&#x2013;from-literal 变量比较少时使用
+</p>
+</div>
+<div id="outline-container-h:d4dc7776-7a2f-4a32-a8a1-115eda1581fb" class="outline-5">
+<h5 id="h:d4dc7776-7a2f-4a32-a8a1-115eda1581fb"><a href="#h:d4dc7776-7a2f-4a32-a8a1-115eda1581fb">范例 env 文件创建 ConfigMap</a></h5>
+<div class="outline-text-5" id="text-h:d4dc7776-7a2f-4a32-a8a1-115eda1581fb">
+<p>
+&#x2013;from-env-file 创建
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl  create cm envcm --from-env-file=conf/game1.conf
+
+$ kubectl  get cm envcm -oyaml
+apiVersion: v1
+data:
+  lives: <span class="org-string">"3"</span>
+  secret.code: <span class="org-string">"true"</span>
+kind: ConfigMap
+metadata:
+  name: envcm
+  namespace: default
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3ce3ccd2-6145-4115-ac39-913e6d78a2ba" class="outline-4">
+<h4 id="h:3ce3ccd2-6145-4115-ac39-913e6d78a2ba"><a href="#h:3ce3ccd2-6145-4115-ac39-913e6d78a2ba">通过 yaml / json文件创建（推荐）</a></h4>
+<div class="outline-text-4" id="text-h:3ce3ccd2-6145-4115-ac39-913e6d78a2ba">
+<p>
+这种是我比较推荐的方式，创建configmap.yaml:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: test-conf
+  namespace: test
+data:
+  test-conf: |+
+    SESSION_LIFETIME: 3600
+    URL: <span class="org-string">"http://test-server:8080"</span>
+</pre>
+</div>
+
+<p>
+注意：查看 ConfigMap 格式是乱码，一般为 yaml 文件内容换行前有空格，去掉即可。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:bf7ce744-8906-4fc0-9d05-13d8fceb29a6" class="outline-3">
+<h3 id="h:bf7ce744-8906-4fc0-9d05-13d8fceb29a6"><a href="#h:bf7ce744-8906-4fc0-9d05-13d8fceb29a6">使用 ConfigMap</a></h3>
+<div class="outline-text-3" id="text-h:bf7ce744-8906-4fc0-9d05-13d8fceb29a6">
+<p>
+<b>准备 deployment 文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl  create deploy  dp-cm --image=nginx --dry-run=client -oyaml &gt; dp-cm.yaml
+
+$ cat dp-cm.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dp-cm
+  name: dp-cm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dp-cm
+  template:
+    metadata:
+      labels:
+        app: dp-cm
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+</pre>
+</div>
+
+<p>
+<b>准备 ConfigMap 文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ cat app-config.yaml
+apiVersion: v1
+data:
+  TZ: Asia/Calcutta
+  APP_NAMESPACE: ludo-prd
+  APP_ENV: prod
+  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:<span class="org-variable-name">InitialRAMPercentage</span>=75.0
+    -XX:<span class="org-variable-name">MinRAMPercentage</span>=75.0
+    -XX:<span class="org-variable-name">MaxRAMPercentage</span>=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:<span class="org-variable-name">HeapDumpPath</span>=/opt/logs/
+  PreStop.sh: |-
+    <span class="org-comment-delimiter">#</span><span class="org-comment">! /bin/bash
+</span>    sleep 5
+    curl --connect-timeout 5 --max-time 5 -s -i <span class="org-string">"http://localhost:8080/admin/maintain"</span>
+    sleep 40
+    curl  --connect-timeout 5 --max-time 5 -s -i -H <span class="org-string">"Content-Type: application/json"</span> -X POST  http://localhost:8099/actuator/shutdown
+    sleep 60
+kind: ConfigMap
+metadata:
+  name: app-config
+</pre>
+</div>
+</div>
+<div id="outline-container-h:e6283ed4-1832-4085-99d3-d17614d0770b" class="outline-4">
+<h4 id="h:e6283ed4-1832-4085-99d3-d17614d0770b"><a href="#h:e6283ed4-1832-4085-99d3-d17614d0770b">使用 valueFrom 定义环境变量</a></h4>
+<div class="outline-text-4" id="text-h:e6283ed4-1832-4085-99d3-d17614d0770b">
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat dp-cm.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dp-cm
+  name: dp-cm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dp-cm
+  template:
+    metadata:
+      labels:
+        app: dp-cm
+    spec:
+      containers:
+      - env:  # 定义环境变量
+        - name: TZ  # 请注意这里可以和 ConfigMap 中的键名不一样的
+          valueFrom:
+            configMapKeyRef:
+              name: app-config # 这个值来自 ConfigMap
+              key: TZ          # 需要取值的键
+        - name: KAFKA_TOPIC_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SERVICE_NAME
+          value: "ludo-user"
+        image: nginx
+        name: nginx
+</pre>
+</div>
+
+<p>
+查看 Pod 环境变量
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl apply -f app-config.yaml
+$ kubectl apply -f dp-cm.yaml
+
+$ kubectl  exec -it dp-cm-f86b8cdf-glfnt -- env |grep -iE <span class="org-string">"TZ|KAFKA"</span>
+<span class="org-variable-name">KAFKA_TOPIC_NAME</span>=ludo-prd
+<span class="org-variable-name">TZ</span>=Asia/Calcutta
+</pre>
+</div>
+
+<p>
+自带的变量:
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">#  根据 kubecet get po -ojson 查看自带的变量
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0a1e2303-d08a-4b78-8552-9c2195c87b78" class="outline-4">
+<h4 id="h:0a1e2303-d08a-4b78-8552-9c2195c87b78"><a href="#h:0a1e2303-d08a-4b78-8552-9c2195c87b78">使用 envFrom 批量生产环境变量</a></h4>
+<div class="outline-text-4" id="text-h:0a1e2303-d08a-4b78-8552-9c2195c87b78">
+<p>
+envFrom  将所有 ConfigMap 的数据定义为容器环境变量
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat dp-cm.yaml
+...
+    spec:
+      containers:
+      - env:
+        - name: SERVICE_NAME
+          value: "ludo-user"
+        envFrom:
+        - configMapRef:
+            name: app-config
+        image: nginx
+        name: nginx
+</pre>
+</div>
+
+<p>
+注意：在 linux 中变量名不能包含点 . 的
+</p>
+</div>
+<div id="outline-container-h:dd6de04c-ed64-486d-9cc2-d77228de04a5" class="outline-5">
+<h5 id="h:dd6de04c-ed64-486d-9cc2-d77228de04a5"><a href="#h:dd6de04c-ed64-486d-9cc2-d77228de04a5">给每个环境变量名称加前缀</a></h5>
+<div class="outline-text-5" id="text-h:dd6de04c-ed64-486d-9cc2-d77228de04a5">
+<p>
+<code>deploy.spec.template.spec.containers[].envFrom[].prefix</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat dp-cm.yaml
+...
+    spec:
+      containers:
+      - env:
+        - name: SERVICE_NAME
+          value: "ludo-user"
+        envFrom:
+        - configMapRef:
+            name: app-config
+          prefix: "fromCm_"
+        image: nginx
+        name: nginx
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:61253820-5fc3-4b45-8e0f-0fc06d2def3e" class="outline-4">
+<h4 id="h:61253820-5fc3-4b45-8e0f-0fc06d2def3e"><a href="#h:61253820-5fc3-4b45-8e0f-0fc06d2def3e">以文件的形式挂载 ConfigMap</a></h4>
+<div class="outline-text-4" id="text-h:61253820-5fc3-4b45-8e0f-0fc06d2def3e">
+<div class="org-src-container">
+<pre class="src src-shell">$ cat dp-cm.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dp-cm
+  name: dp-cm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dp-cm
+  template:
+    metadata:
+      labels:
+        app: dp-cm
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        volumeMounts:
+        - mountPath: /opt/PreStop.sh
+          name: app-config             <span class="org-comment-delimiter"># </span><span class="org-comment">volumes &#20013;&#23545;&#24212;&#30340;&#21517;&#31216;
+</span>          subPath: PreStop.sh          <span class="org-comment-delimiter"># </span><span class="org-comment">&#21462; key &#23545;&#24212;&#30340; value &#20540;&#65292;&#25991;&#20214;&#26435;&#38480;511
+</span>        - mountPath: /opt/a/PreStop.sh
+          name: test   
+          subPath: PreStop.sh.bak
+        - mountPath: /opt/conf.d/
+          name: test                   <span class="org-comment-delimiter"># </span><span class="org-comment">&#25346;&#36733;&#30446;&#24405;&#65292;&#30446;&#24405;&#26412;&#36523;&#25991;&#20214;&#22240;&#25346;&#36733;&#32780;&#28040;&#22833;&#65292;&#21487;&#33258;&#21160;&#26356;&#26032;&#25991;&#20214;
+</span>      volumes:
+      - configMap:
+          defaultMode: 0777
+          name: app-config
+        name: app-config
+      - configMap:
+          defaultMode: 0644
+          items:                       <span class="org-comment-delimiter"># </span><span class="org-comment">&#21482;&#20351;&#29992; ConfigMap &#37096;&#20998;&#30340; key
+</span>          - key: PreStop.sh            <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450; ConfigMap &#20013;&#30340; key
+</span>            path: PreStop.sh           <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#25346;&#36733;&#30340;&#21517;&#31216;
+</span>          - key: PreStop.sh
+            path: PreStop.sh.bak
+            mode: 0755                 <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#25991;&#20214;&#26435;&#38480;&#65292;&#20248;&#20808;&#32423;&#39640;
+</span>          name: app-config
+        name: test
+</pre>
+</div>
+
+<p>
+查看
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ kubectl  exec -it dp-cm-bc6f948f-qd8jr -- bash
+root@dp-cm-bc6f948f-qd8jr:/# ls /opt/
+PreStop.sh  a  conf.d
+root@dp-cm-bc6f948f-qd8jr:/# ls /opt/a/
+PreStop.sh
+root@dp-cm-bc6f948f-qd8jr:/# ls /opt/conf.d/
+PreStop.sh  PreStop.sh.bak
+</pre>
+</div>
+
+<p>
+注意：
+</p>
+<ul class="org-ul">
+<li>默认挂载目录，目录本身的文件因挂载而消失，同时修改 ConfigMap 可自动更新 Pod 中文件内容</li>
+<li>subPath 无法动态更新文件内容。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:fcc99bc3-37bf-495d-aba0-76147b91e4da" class="outline-4">
+<h4 id="h:fcc99bc3-37bf-495d-aba0-76147b91e4da"><a href="#h:fcc99bc3-37bf-495d-aba0-76147b91e4da">自定义挂载权限及名称</a></h4>
+<div class="outline-text-4" id="text-h:fcc99bc3-37bf-495d-aba0-76147b91e4da">
+<p>
+名称用法见上文
+权限与 linux 中权限一致，推荐写 8 进制方式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">- configMap:
+    defaultMode: 420    <span class="org-comment-delimiter"># </span><span class="org-comment">&#21363; 8 &#36827;&#21046;&#30340; 0644
+</span>    items:              <span class="org-comment-delimiter"># </span><span class="org-comment">&#21482;&#20351;&#29992; ConfigMap &#37096;&#20998;&#30340; key
+</span>    - key: PreStop.sh
+      path: PreStop.sh.bak
+      mode: 0755        <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#25991;&#20214;&#26435;&#38480;&#65292;&#20248;&#20808;&#32423;&#39640;</span>
+</pre>
+</div>
+<p>
+defaultMode 是可选的：默认情况下，模式位用于为已创建的文件设置权限。 必须是 0000 到 0777 之间的八进制值或 0 到 511 之间的十进制值。 YAML 既接受八进制值也接受十进制值，JSON 针对模式位需要十进制值。此字段默认为 0644。
+</p>
+
+<p>
+8进制与10进制互转换
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">root@dp-cm-5f766576cb-kjmrv:/opt/conf.d/..data# ls -l
+total 8
+-rw-r--r-- 1 root root 251 Sep  6 17:18 PreStop.sh
+-rwxr-xr-x 1 root root 251 Sep  6 17:18 PreStop.sh.bak
+
+printf <span class="org-string">'%d\n'</span> 0644 <span class="org-comment-delimiter"># </span><span class="org-comment">8 &#36716; 10
+</span>420
+<span class="org-comment-delimiter"># </span><span class="org-comment">printf '%o\n' 511 # 10 &#36716; 8 
+</span>777
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org854ef6e" class="outline-3">
+<h3 id="org854ef6e"><a href="#org854ef6e">示例</a></h3>
+<div class="outline-text-3" id="text-org854ef6e">
+</div>
+<div id="outline-container-org241f0e6" class="outline-4">
+<h4 id="org241f0e6"><a href="#org241f0e6">挂载文件同时挂载nfs</a></h4>
+<div class="outline-text-4" id="text-org241f0e6">
+<p>
+配置configmap
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+data:
+  APP_ENV: prod
+  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:<span class="org-variable-name">InitialRAMPercentage</span>=75.0
+    -XX:<span class="org-variable-name">MinRAMPercentage</span>=75.0
+    -XX:<span class="org-variable-name">MaxRAMPercentage</span>=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:<span class="org-variable-name">HeapDumpPath</span>=/opt/logs/
+  APP_NAMESPACE: default
+  TZ: Asia/ShangHai
+  postStart.sh: |-
+    <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">set -ex
+</span>    
+    <span class="org-variable-name">service_name</span>=$<span class="org-variable-name">1</span>
+    [ -z ${<span class="org-variable-name">service_name</span>} ] &amp;&amp; { <span class="org-builtin">echo</span> <span class="org-string">"&#26410;&#23450;&#20041;service_name...&#36864;&#20986;"</span> ; <span class="org-keyword">exit</span>; }
+    
+    <span class="org-comment-delimiter">#</span><span class="org-comment">service_port=""
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">if [ ${service_name}  = "x11" ]; then
+</span>    <span class="org-comment-delimiter">#  </span><span class="org-comment">service_port='1028'
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">elif [ ${service_name}  = "x12" ]; then
+</span>    <span class="org-comment-delimiter">#  </span><span class="org-comment">service_port='1034'
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">else
+</span>    <span class="org-comment-delimiter">#  </span><span class="org-comment">service_port=""
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">fi
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">[ -z ${service_port} ] &amp;&amp; { echo "&#26410;&#23450;&#20041;service_port...&#36864;&#20986;" ; exit; }
+</span>
+    <span class="org-builtin">declare</span> -A name_port
+    <span class="org-variable-name">name_port</span>=()
+    <span class="org-variable-name">name_port</span>+=([x11]=<span class="org-string">'1028'</span>) 
+    <span class="org-variable-name">name_port</span>+=([x12]=<span class="org-string">'1029'</span>) 
+    <span class="org-variable-name">service_port</span>=${<span class="org-variable-name">name_port</span>[${<span class="org-variable-name">service_name</span>}]}
+
+    <span class="org-variable-name">APP_NAME</span>=<span class="org-string">"ROOT.jar"</span> 
+    <span class="org-variable-name">CAPTURE_DIR</span>=<span class="org-string">"/tmp/debug/${HOSTNAME}-`hostname -i`/arthas_captures"</span>
+
+    <span class="org-variable-name">REPORT_FILE</span>=<span class="org-string">"$CAPTURE_DIR/report.txt"</span>
+
+    monitor_health() {
+      <span class="org-keyword">while</span> : 
+      <span class="org-keyword">do</span>
+          command -v curl &amp;&gt; /dev/null || { <span class="org-builtin">echo</span> <span class="org-string">"&#27809;&#26377;curl&#21629;&#20196;&#65292;&#36864;&#20986;&#24490;&#29615;"</span> ; <span class="org-keyword">break</span>; }
+          <span class="org-variable-name">val</span>=$(curl -o /dev/null -s  -w <span class="org-string">"%{http_code}"</span> http://127.0.0.1:${<span class="org-variable-name">service_port</span>}/actuator/health/liveness)
+          <span class="org-builtin">echo</span> <span class="org-string">"val-&gt; ${val}"</span>
+          <span class="org-keyword">if</span> [[ $<span class="org-variable-name">val</span> != <span class="org-string">"200"</span> ]];<span class="org-keyword">then</span>
+              <span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#30446;&#24405;
+</span>              mkdir -p $<span class="org-variable-name">CAPTURE_DIR</span>
+              <span class="org-builtin">echo</span> <span class="org-string">"-----"</span> &gt; $<span class="org-variable-name">REPORT_FILE</span>
+              <span class="org-builtin">echo</span> <span class="org-string">"----------http://127.0.0.1:${service_port}/actuator/health/liveness &#38750;200&#65292;&#24320;&#22987;&#20998;&#26512;&#65306; $(TZ='CST-8' date +%Y%m%d_%H%M%S.%N)"</span> |tee  $<span class="org-variable-name">REPORT_FILE</span>
+              take_thread_dump |tee -a $<span class="org-variable-name">REPORT_FILE</span>
+          <span class="org-keyword">fi</span>
+          sleep 5
+      <span class="org-keyword">done</span>
+    }
+
+    take_thread_dump() {
+        <span class="org-comment-delimiter"># </span><span class="org-comment">&#33719;&#21462;PID
+</span>        <span class="org-variable-name">PID</span>=$(jps -l | grep <span class="org-string">"$APP_NAME"</span> | awk <span class="org-string">'{print $1}'</span>)
+
+        <span class="org-keyword">if</span> [ -z <span class="org-string">"$PID"</span> ]; <span class="org-keyword">then</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"&#38169;&#35823;: &#25214;&#19981;&#21040; $APP_NAME &#30340;&#36827;&#31243;"</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"&#24403;&#21069;Java&#36827;&#31243;:"</span>
+            jps -l
+            <span class="org-keyword">exit</span> 1
+        <span class="org-keyword">fi</span>
+
+        <span class="org-builtin">echo</span> <span class="org-string">"=== &#24212;&#29992;&#20449;&#24687; ==="</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"&#36827;&#31243;&#21517;&#31216;: $APP_NAME"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"&#36827;&#31243;PID: $PID"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"&#30417;&#21548;&#31471;&#21475;: $PORT"</span>
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#21807;&#19968;&#26102;&#38388;&#25139;&#65288;&#32435;&#31186;&#32423;&#65289;
+</span>        <span class="org-variable-name">TIMESTAMP</span>=$(<span class="org-variable-name">TZ</span>=<span class="org-string">'CST-8'</span> date +%Y%m%d_%H%M%S.%N)
+        <span class="org-builtin">echo</span> <span class="org-string">"=== &#24320;&#22987;&#25235;&#21462;&#29616;&#22330;&#25968;&#25454;: $TIMESTAMP ==="</span>
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">1. &#25235;&#21462;&#23436;&#25972;&#32447;&#31243;&#26632;&#65288;&#26368;&#20851;&#38190;&#30340;&#65289;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"1. &#25235;&#21462;jstack&#32447;&#31243;&#26632;..."</span>
+        jstack -l $<span class="org-variable-name">PID</span> &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_jstack_full.log 2&gt;&amp;1
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">2. &#37325;&#28857;&#25235;&#21462;XNIO/Undertow&#32447;&#31243;&#65288;&#26681;&#25454;&#20320;&#30340;&#32447;&#31243;&#21517;&#65289;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"2. &#25235;&#21462;XNIO&#30456;&#20851;&#32447;&#31243;..."</span>
+        jstack -l $<span class="org-variable-name">PID</span> | grep -B 5 -A 25 <span class="org-string">"XNIO"</span> &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_jstack_xnio.log 2&gt;&amp;1
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">3. &#25235;&#21462;GC&#20449;&#24687;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"3. &#25235;&#21462;GC&#20449;&#24687;..."</span>
+        jstat -gcutil $<span class="org-variable-name">PID</span> 1000 3 &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_jstat_gc.log 2&gt;&amp;1
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">4. &#25235;&#21462;&#22534;&#20869;&#23384;&#20449;&#24687;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"4. &#25235;&#21462;&#22534;&#20869;&#23384;&#20449;&#24687;..."</span>
+        jmap -heap $<span class="org-variable-name">PID</span> &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_jmap_heap.log 2&gt;&amp;1
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">5. &#32593;&#32476;&#36830;&#25509;&#20449;&#24687;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"5. &#25235;&#21462;&#32593;&#32476;&#36830;&#25509;..."</span>
+        netstat -ant | grep <span class="org-string">":$PORT"</span> &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_netstat.log 2&gt;&amp;1
+        netstat -ant | grep ESTABLISHED | wc -l &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_established_count.log 2&gt;&amp;1
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">6. &#31995;&#32479;&#36127;&#36733;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"6. &#25235;&#21462;&#31995;&#32479;&#20449;&#24687;..."</span>
+        uptime &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_system.log 2&gt;&amp;1
+        free -m &gt;&gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_system.log 2&gt;&amp;1
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">7. &#23581;&#35797;&#36890;&#36807;Arthas&#25235;&#21462;&#65288;&#22914;&#26524;&#24050;&#36830;&#25509;&#65289;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"7. &#23581;&#35797;&#36890;&#36807;Arthas&#25235;&#21462;..."</span>
+        <span class="org-keyword">if</span> command -v arthas &amp;&gt; /dev/null; <span class="org-keyword">then</span>
+            <span class="org-comment-delimiter"># </span><span class="org-comment">&#36825;&#37324;&#38656;&#35201;&#26681;&#25454;&#20320;&#30340;Arthas&#36830;&#25509;&#26041;&#24335;&#26469;&#35843;&#25972;
+</span>            <span class="org-builtin">echo</span> <span class="org-string">"&#27880;&#24847;: Arthas&#21629;&#20196;&#38656;&#35201;&#26681;&#25454;&#23454;&#38469;&#24773;&#20917;&#35843;&#25972;"</span> &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_arthas_note.txt
+        <span class="org-keyword">else</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"Arthas&#26410;&#23433;&#35013;&#25110;&#19981;&#22312;PATH&#20013;"</span> &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_arthas_note.txt
+        <span class="org-keyword">fi</span>
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">8. &#29983;&#25104;&#25688;&#35201;&#25253;&#21578;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">"8. &#29983;&#25104;&#25688;&#35201;&#25253;&#21578;..."</span>
+        {
+            <span class="org-builtin">echo</span> <span class="org-string">"=== &#29616;&#22330;&#25235;&#21462;&#25688;&#35201; ==="</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"&#26102;&#38388;: $(TZ='CST-8' date)"</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"PID: $PID"</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"&#24212;&#29992;: $APP_NAME"</span>
+            <span class="org-builtin">echo</span> <span class="org-string">""</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"=== &#32447;&#31243;&#29366;&#24577;&#32479;&#35745; ==="</span>
+            grep <span class="org-string">"java.lang.Thread.State:"</span> $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_jstack_full.log | sort | uniq -c
+            <span class="org-builtin">echo</span> <span class="org-string">""</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"=== &#27963;&#36291;&#36830;&#25509;&#25968; ==="</span>
+            cat $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_established_count.log
+            <span class="org-builtin">echo</span> <span class="org-string">""</span>
+            <span class="org-builtin">echo</span> <span class="org-string">"=== &#25235;&#21462;&#30340;&#25991;&#20214; ==="</span>
+            ls -la $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_*
+        } &gt; $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_summary.txt
+
+        <span class="org-builtin">echo</span> <span class="org-string">""</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"=== &#25235;&#21462;&#23436;&#25104; ==="</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"&#25968;&#25454;&#24050;&#20445;&#23384;&#21040; $CAPTURE_DIR/"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">""</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"=== &#20851;&#38190;&#20449;&#24687;&#25688;&#35201; ==="</span>
+        tail -20 $<span class="org-variable-name">CAPTURE_DIR</span>/${<span class="org-variable-name">TIMESTAMP</span>}_summary.txt
+
+        <span class="org-comment-delimiter"># </span><span class="org-comment">&#25552;&#20379;&#20998;&#26512;&#24314;&#35758;
+</span>        <span class="org-builtin">echo</span> <span class="org-string">""</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"=== &#20998;&#26512;&#24314;&#35758; ==="</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"1. &#26597;&#30475;&#24930;&#32447;&#31243;: grep -A 30 'XNIO-2 task' $CAPTURE_DIR/${TIMESTAMP}_jstack_full.log"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"2. &#26597;&#30475;&#32447;&#31243;&#29366;&#24577;: grep 'java.lang.Thread.State:' $CAPTURE_DIR/${TIMESTAMP}_jstack_full.log | sort | uniq -c"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"3. &#26597;&#30475;GC&#24773;&#20917;: cat $CAPTURE_DIR/${TIMESTAMP}_jstat_gc.log"</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"4. &#26597;&#30475;&#36830;&#25509;&#25968;: cat $CAPTURE_DIR/${TIMESTAMP}_established_count.log"</span>
+    }
+
+    <span class="org-variable-name">wtime</span>=$<span class="org-variable-name">2</span>
+    [ -z $<span class="org-variable-name">wtime</span> ] &amp;&amp; <span class="org-variable-name">wtime</span>=300 || :
+    <span class="org-builtin">echo</span> <span class="org-string">"&#21551;&#21160;&#30417;&#21548;&#65292;&#39044;&#22788;&#29702;&#31561;&#24453; $wtime s"</span>
+    sleep $<span class="org-variable-name">wtime</span>
+    monitor_health
+
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+</pre>
+</div>
+
+<p>
+测试POD
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: Pod
+metadata:
+  name: app1
+  namespace: default
+spec:
+  containers:
+  - name: app1
+    image: nginx
+    command: [<span class="org-string">"/bin/sh"</span>]
+    args: [<span class="org-string">"-c"</span>, <span class="org-string">"while true; do echo $(date -u) &gt;&gt; /data/out1.txt; sleep 5; done"</span>]
+
+    lifecycle:
+      postStart:  <span class="org-comment-delimiter">#  </span><span class="org-comment">&#21482;&#26377; postStart &#22788;&#29702;&#20989;&#25968;&#25191;&#34892;&#23436;&#27605;&#65292;&#23481;&#22120;&#30340;&#29366;&#24577;&#25165;&#20250;&#21464;&#25104; RUNNING&#12290; &#19981;&#33021;&#26159;&#27515;&#24490;&#29615;&#33050;&#26412;
+</span>        <span class="org-keyword">exec</span>:
+          command:
+          - /bin/bash
+          - -c 
+          - <span class="org-string">'/opt/postStart.sh'</span>
+    volumeMounts:
+    - mountPath: <span class="org-string">"/tmp/debug"</span>
+      name: <span class="org-string">"volume-0"</span>
+      readOnly: false
+    - mountPath: /opt/postStart.sh
+      name: app-config
+      subPath: postStart.sh
+  volumes:
+  - name: <span class="org-string">"volume-0"</span>
+    nfs:
+      path: <span class="org-string">"/mnt/nfs/debug"</span>
+      readOnly: false
+      server: <span class="org-string">"10.2.0.1"</span>
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: postStart.sh
+        path: postStart.sh
+        mode: 0755 
+      name: app-config
+    name: app-config
+</pre>
+</div>
+
+<p>
+deployment测试
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: x11
+  name: x11
+  namespace: default
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: x11
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    <span class="org-builtin">type</span>: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: x11
+    spec:
+      containers:
+        - command:
+            - sh
+            - <span class="org-string">'-c'</span>
+            - /opt/bin/postStart.sh x11 &amp; /start.sh
+          env:
+            - name: LANG
+              value: C.UTF-8
+            - name: JAVA_HOME
+              value: /usr/local/openjdk-8
+            - name: JAVA_BASE_URL
+              value: &gt;-
+                https://github.com/AdoptOpenJDK/openjdk8-upstream-binaries/releases/download/jdk8u222-b10/OpenJDK8U-jre_
+            - name: TZ
+              value: Asia/Shanghai
+            - name: JAVA_OPTS
+              value: <span class="org-string">'-Xmx1g -Xms1g'</span>
+            - name: aliyun_logs_x11-stdout
+              value: stdout
+          image: &gt;-
+            x.cr.xx.com/x/x11:273
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              <span class="org-keyword">exec</span>:
+                command:
+                  - sh
+                  - <span class="org-string">'-c'</span>
+                  - &gt;-
+                    curl -X POST http://127.0.0.1:1028/actuator/eureka-registry
+                    &amp;&amp;  sleep 90
+          livenessProbe:
+            failureThreshold: 8
+            httpGet:
+              path: /actuator/health/liveness
+              port: 1028
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: x11
+          readinessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /actuator/health/readiness
+              port: 1028
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: <span class="org-string">'1'</span>
+              memory: 2Gi
+            requests:
+              cpu: 100m
+              memory: 1Gi
+          volumeMounts:
+            - mountPath: /tmp/debug
+              name: volume-0
+            - mountPath: /opt/bin/
+              name: app-config
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: x1-docker-hub
+        - name: x2-docker-hub
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 100
+      volumes:
+        - name: volume-0
+          nfs:
+            path: /mnt/nfs/debug
+            server: 10.2.0.1
+        - configMap:
+            defaultMode: 420
+            items:
+              - key: postStart.sh
+                mode: 493
+                path: postStart.sh
+            name: app-config
+          name: app-config
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:59509409-e7ca-4b37-a2b1-bae141fee9bf" class="outline-2">
+<h2 id="h:59509409-e7ca-4b37-a2b1-bae141fee9bf"><a href="#h:59509409-e7ca-4b37-a2b1-bae141fee9bf">Secret</a></h2>
+<div class="outline-text-2" id="text-h:59509409-e7ca-4b37-a2b1-bae141fee9bf">
+</div>
+<div id="outline-container-h:bd0f183f-b061-407e-9f72-6bf6f79398b9" class="outline-3">
+<h3 id="h:bd0f183f-b061-407e-9f72-6bf6f79398b9"><a href="#h:bd0f183f-b061-407e-9f72-6bf6f79398b9">什么是secret</a></h3>
+<div class="outline-text-3" id="text-h:bd0f183f-b061-407e-9f72-6bf6f79398b9">
+<p>
+文档：<a href="https://kubernetes.io/docs/concepts/configuration/secret/">https://kubernetes.io/docs/concepts/configuration/secret/</a>
+</p>
+
+<p>
+用于存储和管理一些敏感数据，比如密码，token，密钥等敏感信息。它把 Pod 想要访问的加密数据存放到 Etcd 中。然后用户就可以通过在 Pod 的容器里挂载 Volume 的方式或者环境变量的方式访问到这些 Secret 里保存的信息了。
+</p>
+</div>
+<div id="outline-container-h:fd50b684-9b4b-49e1-93b6-0a2b62ab426c" class="outline-4">
+<h4 id="h:fd50b684-9b4b-49e1-93b6-0a2b62ab426c"><a href="#h:fd50b684-9b4b-49e1-93b6-0a2b62ab426c">Secret 常用类型</a></h4>
+<div class="outline-text-4" id="text-h:fd50b684-9b4b-49e1-93b6-0a2b62ab426c">
+<ul class="org-ul">
+<li>Opaque：通用型Secret，默认类型；</li>
+<li>kubernetes.io/service-account-token：作用于ServiceAccount，包含一个令牌，用于标识API服务账户；</li>
+<li>kubernetes.io/dockerconfigjson：下载私有仓库镜像使用的Secret，和宿主机的/root/.docker/config.json一致，宿主机登录后即可产生该文件；</li>
+<li>kubernetes.io/basic-auth：用于使用基本认证（账号密码）的Secret，可以使用Opaque取代；</li>
+<li>kubernetes.io/ssh-auth：用于存储ssh密钥的Secret</li>
+<li>kubernetes.io/tls：用于存储HTTPS域名证书文件的Secret，可以被Ingress使用；</li>
+<li>bootstrap.kubernetes.io/token：一种简单的 bearer token，用于创建新集群或将新节点添加到现有集群，在集群安装时可用于自动颁发集群的证书。</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b270ea20-028b-4401-842c-d00d933f4151" class="outline-3">
+<h3 id="h:b270ea20-028b-4401-842c-d00d933f4151"><a href="#h:b270ea20-028b-4401-842c-d00d933f4151">创建 Secret 的几种形式</a></h3>
+<div class="outline-text-3" id="text-h:b270ea20-028b-4401-842c-d00d933f4151">
+<ul class="org-ul">
+<li>使用 kubectl 命令来创建 Secret</li>
+<li>基于配置文件来创建 Secret</li>
+<li>使用 kustomize 来创建 Secret</li>
+</ul>
+</div>
+<div id="outline-container-h:ad6ec919-df87-4e18-bc3e-3ca960868a97" class="outline-4">
+<h4 id="h:ad6ec919-df87-4e18-bc3e-3ca960868a97"><a href="#h:ad6ec919-df87-4e18-bc3e-3ca960868a97">使用 kubectl 命令创建 Secret</a></h4>
+<div class="outline-text-4" id="text-h:ad6ec919-df87-4e18-bc3e-3ca960868a97">
+<p>
+命令行创建时可指定的类型
+</p>
+<ul class="org-ul">
+<li>docker-registry Create a secret for use with a Docker registry</li>
+<li>generic         Create a secret from a local file, directory or literal value</li>
+<li>tls             Create a TLS secret</li>
+</ul>
+</div>
+<div id="outline-container-h:404c1250-984e-4e00-a6e1-a32ec07ee29e" class="outline-5">
+<h5 id="h:404c1250-984e-4e00-a6e1-a32ec07ee29e"><a href="#h:404c1250-984e-4e00-a6e1-a32ec07ee29e">基于文件的方式创建</a></h5>
+<div class="outline-text-5" id="text-h:404c1250-984e-4e00-a6e1-a32ec07ee29e">
+<p>
+类似于 ConfigMap 创建
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">echo</span> -n <span class="org-string">'admin'</span> &gt; ./username.txt
+<span class="org-builtin">echo</span> -n <span class="org-string">'1f2d1e2e67df'</span> &gt; ./password.txt
+
+kubectl create secret generic db-user-pass <span class="org-sh-escaped-newline">\</span>
+  --from-file=./username.txt <span class="org-sh-escaped-newline">\</span>
+  --from-file=./password.txt
+  
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748;&#23494;&#38053;&#21517;&#31216;&#26159;&#25991;&#20214;&#21517;&#12290; &#20320;&#21487;&#20197;&#36873;&#25321;&#20351;&#29992; --from-file=[key=]source &#26469;&#35774;&#32622;&#23494;&#38053;&#21517;&#31216;&#12290;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:34d3548e-55a9-4a62-8a3e-6c8142b20f26" class="outline-5">
+<h5 id="h:34d3548e-55a9-4a62-8a3e-6c8142b20f26"><a href="#h:34d3548e-55a9-4a62-8a3e-6c8142b20f26">基于 key-value 标签提供 Secret  数据</a></h5>
+<div class="outline-text-5" id="text-h:34d3548e-55a9-4a62-8a3e-6c8142b20f26">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create secret generic db-user-pass <span class="org-sh-escaped-newline">\</span>
+  --from-literal=<span class="org-variable-name">username</span>=devuser <span class="org-sh-escaped-newline">\</span>
+  --from-literal=<span class="org-variable-name">password</span>=<span class="org-string">'S!B\*d$zDsb='</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#24847;&#65292;&#21253;&#21547;&#29305;&#27530;&#23383;&#31526;&#65288;&#20363;&#22914;&#65306;$&#65292;\&#65292;*&#65292;= &#21644; !&#65289;&#30001;&#20320;&#30340; shell &#35299;&#37322;&#25191;&#34892;&#65292;&#32780;&#19988;&#38656;&#35201;&#36716;&#20041;&#12290;&#25512;&#33616;&#20351;&#29992;&#21333;&#24341;&#21495;&#65292;&#32780;&#19981;&#20351;&#29992;&#21452;&#24341;&#21495;
+</span>
+
+
+<span class="org-comment-delimiter">### </span><span class="org-comment">&#35299;&#30721;
+</span>$ kubectl  get secrets db-user-pass -oyaml
+apiVersion: v1
+data:
+  password: UyFCXCpkJHpEc2I9
+  username: <span class="org-variable-name">ZGV2dXNlcg</span>==
+<span class="org-comment-delimiter"># </span><span class="org-comment">echo 'UyFCXCpkJHpEc2I9' | openssl base64 -d
+</span>S!B<span class="org-string">\*</span>d$<span class="org-variable-name">zDsb</span>=
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">kubectl get secret db-user-pass -o jsonpath='{.data.password}' |base64 -d
+</span>S!B<span class="org-string">\*</span>d$<span class="org-variable-name">zDsb</span>=
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cf4a6f57-854d-41da-aa84-9ad7ab10821a" class="outline-5">
+<h5 id="h:cf4a6f57-854d-41da-aa84-9ad7ab10821a"><a href="#h:cf4a6f57-854d-41da-aa84-9ad7ab10821a">镜像拉取凭证</a></h5>
+<div class="outline-text-5" id="text-h:cf4a6f57-854d-41da-aa84-9ad7ab10821a">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create secret docker-registry myregistrykey <span class="org-sh-escaped-newline">\</span>
+--docker-server=DOCKER_REGISTRY_SERVER <span class="org-sh-escaped-newline">\</span>
+--docker-username=DOCKER_USER <span class="org-sh-escaped-newline">\</span>
+--docker-password=DOCKER_PASSWORD <span class="org-sh-escaped-newline">\</span>
+--docker-email=DOCKER_EMAIL
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>docker-registry：指定Secret的类型</li>
+<li>myregistrykey： Secret名称</li>
+<li>DOCKER_REGISTRY_SERVER：镜像仓库地址</li>
+<li>DOCKER_USER：镜像仓库用户名，需要有拉取镜像的权限</li>
+<li>DOCKER_PASSWORD：镜像仓库密码</li>
+<li>DOCKER_EMAIL：邮箱信息，可以为空</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:b69e117b-0751-48cb-9771-226a04b8d118" class="outline-5">
+<h5 id="h:b69e117b-0751-48cb-9771-226a04b8d118"><a href="#h:b69e117b-0751-48cb-9771-226a04b8d118">证书</a></h5>
+<div class="outline-text-5" id="text-h:b69e117b-0751-48cb-9771-226a04b8d118">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create secret tls tomcat-ingress-secret --cert=tls.crt  --key=tls.key
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9c2300e1-113c-4f37-a1df-468970b28e1b" class="outline-4">
+<h4 id="h:9c2300e1-113c-4f37-a1df-468970b28e1b"><a href="#h:9c2300e1-113c-4f37-a1df-468970b28e1b">yaml 文件</a></h4>
+<div class="outline-text-4" id="text-h:9c2300e1-113c-4f37-a1df-468970b28e1b">
+</div>
+<div id="outline-container-h:6aed0710-18fe-49bb-838c-7d870aa570c0" class="outline-5">
+<h5 id="h:6aed0710-18fe-49bb-838c-7d870aa570c0"><a href="#h:6aed0710-18fe-49bb-838c-7d870aa570c0">基于明文方式创建</a></h5>
+<div class="outline-text-5" id="text-h:6aed0710-18fe-49bb-838c-7d870aa570c0">
+<p>
+官方文档：<a href="https://kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-config-file/#specify-unencoded-data-when-creating-a-secret">https://kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-config-file/#specify-unencoded-data-when-creating-a-secret</a>
+</p>
+
+<p>
+创建完后会自动加密
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+type: Opaque
+stringData:
+  config.yaml: |
+    apiUrl: "https://my.api.com/api/v1"
+    username: &lt;user&gt;
+    password: &lt;password&gt;
+</pre>
+</div>
+
+
+<p>
+其它详情请查看官方文档。
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1a4e7338-06c9-4bff-a3ca-29f3acbc010a" class="outline-3">
+<h3 id="h:1a4e7338-06c9-4bff-a3ca-29f3acbc010a"><a href="#h:1a4e7338-06c9-4bff-a3ca-29f3acbc010a">使用 Secret</a></h3>
+<div class="outline-text-3" id="text-h:1a4e7338-06c9-4bff-a3ca-29f3acbc010a">
+<p>
+挂载和生成环境变量与 ConfigMap 使用方式一样，这里不重启赘述了。
+</p>
+</div>
+<div id="outline-container-h:5e97e772-1b37-40c0-b5d2-a0c257217f69" class="outline-4">
+<h4 id="h:5e97e772-1b37-40c0-b5d2-a0c257217f69"><a href="#h:5e97e772-1b37-40c0-b5d2-a0c257217f69">使用Secret拉取私有仓库镜像</a></h4>
+<div class="outline-text-4" id="text-h:5e97e772-1b37-40c0-b5d2-a0c257217f69">
+<p>
+创建镜像 Secret
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">#kubectl create secret docker-registry docker-pull --docker-username=k8s-pull --docker-password=QpJUfm9LBv --docker-server=https://pg-ops-harbor.xxx.com -n default
+---
+apiVersion: v1
+data:
+  .dockerconfigjson: eyIjoiY0NVRFSjIifX19
+kind: Secret
+metadata:
+  name: docker-pull
+  namespace: default
+type: kubernetes.io/dockerconfigjson
+</pre>
+</div>
+
+<p>
+挂载镜像凭证
+</p>
+<ul class="org-ul">
+<li><code>pod.spec.imagePullSecrets[].name</code> pod 中指定镜像凭证，可多个，依次请求</li>
+<li>基于用户访问认证</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:d48f3d9f-6098-4ce4-9624-bc41a3dcfa12" class="outline-4">
+<h4 id="h:d48f3d9f-6098-4ce4-9624-bc41a3dcfa12"><a href="#h:d48f3d9f-6098-4ce4-9624-bc41a3dcfa12">Secret管理HTTPS证书</a></h4>
+<div class="outline-text-4" id="text-h:d48f3d9f-6098-4ce4-9624-bc41a3dcfa12">
+<p>
+做成自签证书
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">openssl genrsa -out tls.key 2048
+openssl req -new -x509 -days 365  -key tls.key -out tls.crt -subj /C=CN/ST=Beijing/L=Beijing/O=DevOps/CN=test.com
+</pre>
+</div>
+
+<p>
+创建证书 Secrets
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">#kubectl -n default create secret tls nginx-test-tls --key=tls.key --cert=tls.crt
+---
+apiVersion: v1
+data:
+  tls.crt: ***
+  tls.key: ***
+kind: Secret
+metadata:
+  name: nginx-test-tls
+  namespace: default
+type: kubernetes.io/tls
+</pre>
+</div>
+
+<p>
+使用 ingress
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+  name: example
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - nginx.test.com  # SSL 证书对应的域名 (必填)。
+    secretName: nginx-test-tls
+  rules:
+  - host: "nginx.test.com"
+    http:
+      paths:
+      - backend:
+          service:
+            name: nginx
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:41c885d0-c1bd-4ea1-a8bd-61eb61e2947e" class="outline-3">
+<h3 id="h:41c885d0-c1bd-4ea1-a8bd-61eb61e2947e"><a href="#h:41c885d0-c1bd-4ea1-a8bd-61eb61e2947e">ConfigMap&amp;Secret 热更新</a></h3>
+<div class="outline-text-3" id="text-h:41c885d0-c1bd-4ea1-a8bd-61eb61e2947e">
+<p>
+Kubernetes中提供configmap，用来管理应用的配置，configmap具备热更新的能力，但只有通过目录挂载的configmap才具备热更新能力，其余通过环境变量，通过subPath挂载的文件都不能动态更新。
+</p>
+
+<p>
+<b>使用volume的方式挂载configmap之后，当configmap更新之后，变量的值会发生变化</b>
+</p>
+
+<p>
+但是中间会存在一定的时间间隔，大约是10左右，这主要是因为kubelet 对pod的同步间隔是10秒，另外需要注意的是当使用subpath将configmap中的某个文件单独挂载到目录下，那这个文件是无法热更新的，这是configmap本身的逻辑决定的。
+</p>
+
+
+<p>
+热更新ConfigMap 和 Secert
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#22522;&#20110;&#25991;&#20214;&#30340;&#24418;&#24335;
+</span>kubectl create cm nginx-conf --from-file=nginx.conf --dry-run -oyaml | kubectl replace -f -
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:aa228c12-a2cf-4096-a5b6-75ba21c97277" class="outline-3">
+<h3 id="h:aa228c12-a2cf-4096-a5b6-75ba21c97277"><a href="#h:aa228c12-a2cf-4096-a5b6-75ba21c97277">手动为 ServiceAccount 创建长期有效的 API 令牌</a></h3>
+<div class="outline-text-3" id="text-h:aa228c12-a2cf-4096-a5b6-75ba21c97277">
+<p>
+<a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/">https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/</a>
+</p>
+
+<p>
+<a href="https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#auto-generated-legacy-serviceaccount-token-clean-up">https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#auto-generated-legacy-serviceaccount-token-clean-up</a>
+</p>
+
+<p>
+从 1.29 版本开始，如果传统 ServiceAccount 令牌在一定时间段（默认设置为一年）内未被使用，则会被标记为无效。
+</p>
+
+<blockquote>
+<p>
+说明：Kubernetes 在 v1.22 版本之前自动创建用来访问 Kubernetes API 的长
+期凭据。 这一较老的机制是基于创建令牌 Secret 对象来实现的，Secret 对象
+可被挂载到运行中的 Pod 内。 在最近的版本中，包括 Kubernetes v1.31，API
+凭据可以直接使用 <a href="https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/authentication-resources/token-request-v1/">TokenRequest API</a> 来获得，并使用一个<a href="https://kubernetes.io/zh-cn/docs/reference/access-authn-authz/service-accounts-admin/#bound-service-account-token-volume">投射卷</a>挂载到 Pod
+中。使用此方法获得的令牌具有受限的生命期长度，并且能够在挂载它们的 Pod
+被删除时自动被废弃。
+</p>
+
+<p>
+你仍然可以通过手动方式来创建服务账号令牌 Secret 对象，例如你需要一个永
+远不过期的令牌时。 不过，使用 TokenRequest 子资源来获得访问 API 的令牌
+的做法仍然是推荐的方式
+</p>
+</blockquote>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl create sa build-robot
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;&#20020;&#26102;token
+</span>kubectl create token build-robot  <span class="org-comment-delimiter">#</span><span class="org-comment">--duration &#21442;&#25968;&#26469;&#35831;&#27714;&#29305;&#23450;&#30340;&#20196;&#29260;&#26377;&#25928;&#26399;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25163;&#21160;&#20026; ServiceAccount &#21019;&#24314;&#38271;&#26399;&#26377;&#25928;&#30340; API &#20196;&#29260; 
+</span>kubectl apply -f - &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Secret
+metadata:
+  name: build-robot
+  annotations:
+    kubernetes.io/service-account.name: build-robot
+type: kubernetes.io/service-account-token
+EOF
+</span>
+kubectl get secret build-robot  -o <span class="org-variable-name">jsonpath</span>={<span class="org-string">".data.token"</span>} | base64 -d
+</pre>
+</div>
+
+<p>
+老方法
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">kubectl apply -f - &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-readonly
+  namespace: kube-system
+secrets:
+- name: cluster-readonly
+EOF
+</span>
+kubectl -n kube-system get secret cluster-readonly  -o <span class="org-variable-name">jsonpath</span>={<span class="org-string">".data.token"</span>} | base64 -d
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2b82006f-a76f-4519-b5b9-c07238ef12d2" class="outline-3">
+<h3 id="h:2b82006f-a76f-4519-b5b9-c07238ef12d2"><a href="#h:2b82006f-a76f-4519-b5b9-c07238ef12d2">ConfigMap&amp;Secret使用限制</a></h3>
+<div class="outline-text-3" id="text-h:2b82006f-a76f-4519-b5b9-c07238ef12d2">
+<ul class="org-ul">
+<li>提前场景ConfigMap和Secret</li>
+<li>引用Key必须存在</li>
+<li>envFrom、valueFrom无法热更新环境变量</li>
+<li>envFrom配置环境变量，如果key是无效的，它会忽略掉无效的key</li>
+<li>ConfigMap和Secret必须要和Pod或者是引用它资源在同一个命名空间</li>
+<li>subPath也是无法热更新的</li>
+<li>ConfigMap和Secret最好不要太大</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:975b504c-fbc1-4abd-925a-3afbe85d4ead" class="outline-3">
+<h3 id="h:975b504c-fbc1-4abd-925a-3afbe85d4ead"><a href="#h:975b504c-fbc1-4abd-925a-3afbe85d4ead">k8s1.19的不可变Secret和ConfigMap</a></h3>
+<div class="outline-text-3" id="text-h:975b504c-fbc1-4abd-925a-3afbe85d4ead">
+<p>
+比如秒杀系统中，设置了某个值是100，只能100个人秒杀成功，这个值不可变
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create cm test-immutable --from-file=/etc/kubernetes/admin.kubeconfig
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#21518;&#21152;&#19978;
+</span>kubectl edit cm test-immutable
+
+immutable: true
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20877;&#21435;&#20462;&#25913; kubectl edit cm test-immutable&#65292; &#21457;&#29616;&#26080;&#27861;&#20462;&#25913;</span>
+</pre>
+</div>
+<p>
+说明：
+一旦一个 Secret 或 ConfigMap 被标记为不可更改，撤销此操作或者更改 data 字段的内容都是 不 可能的。 只能删除并重新创建这个 Secret。现有的 Pod 将维持对已删除 Secret 的挂载点 &#x2013; 建议重新创建这些 Pod。
+</p>
+</div>
+</div>
+<div id="outline-container-h:7f9e9b07-aebf-48c6-a0ff-9b5a9ca6d2e0" class="outline-3">
+<h3 id="h:7f9e9b07-aebf-48c6-a0ff-9b5a9ca6d2e0"><a href="#h:7f9e9b07-aebf-48c6-a0ff-9b5a9ca6d2e0">解决 configmap 乱码</a></h3>
+<div class="outline-text-3" id="text-h:7f9e9b07-aebf-48c6-a0ff-9b5a9ca6d2e0">
+<p>
+制表符TAB、尾随空格
+</p>
+
+<p>
+Kubernetes ConfigMap在load过程中发现文件中包含tab缩进，直接转化为\n\t。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992;&#20197;&#19979;&#26041;&#27861;&#21024;&#38500;&#23614;&#38543;&#31354;&#26684;&#65292;&#31354;&#26684;&#26367;&#25442;&#21046;&#34920;&#31526;
+</span>sed -i -E <span class="org-string">'s/[[:space:]]+$//g'</span> file.txt
+sed -i <span class="org-string">'s/\t/    /g'</span> file.txt
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl get cm my-cm -o json | jq <span class="org-string">'.data."nginx.conf"'</span> -r
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;my-cm&#36825;&#20010;configmap&#36164;&#28304;&#20197;json&#26684;&#24335;&#21270;&#36755;&#20986;&#65292;&#26684;&#24335;&#21270;&#33539;&#22260;&#26159;/data/nginx.conf&#20869;&#23481;</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

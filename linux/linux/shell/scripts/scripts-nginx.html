@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-nginx</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-nginx</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae">备份</a></li>
+<li><a href="#h:20bb8cd9-5793-4491-9f28-3736be7974e4">同步</a></li>
+<li><a href="#h:83147386-8461-4a60-92f0-b4179f185928">nginx20秒健康检查</a></li>
+<li><a href="#h:75713da9-c104-4aec-903b-b580c9269f5e">nginx_auto_add_deny.pl</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae" class="outline-2">
+<h2 id="h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae"><a href="#h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae">备份</a></h2>
+<div class="outline-text-2" id="text-h:6b5c0847-aee5-47b8-b087-f9edfe4b8cae">
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /opt/shell/nginx_conf_bak.sh<span class="org-sh-heredoc">
+#!/bin/bash
+[ -d /data/nginx_conf_bak ] || mkdir -p /data/nginx_conf_bak
+cd /data/nginx_conf_bak                                                                                                                                                                                   
+zip -r -9 nginx_conf_$(date +%Y%m%d).zip /usr/local/nginx/conf/  &gt;/dev/null 2&gt;&amp;1
+
+find /data/nginx_conf_bak/*  -mtime +10 -name '*.zip' |xargs rm -f
+EOF
+</span>
+crontab -l
+0 1 * * * . /etc/profile;/opt/shell/nginx_conf_bak.sh
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:20bb8cd9-5793-4491-9f28-3736be7974e4" class="outline-2">
+<h2 id="h:20bb8cd9-5793-4491-9f28-3736be7974e4"><a href="#h:20bb8cd9-5793-4491-9f28-3736be7974e4">同步</a></h2>
+<div class="outline-text-2" id="text-h:20bb8cd9-5793-4491-9f28-3736be7974e4">
+<p>
+文件目录同步
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /opt/shell/rsync-nginx-web.sh<span class="org-sh-heredoc">
+#!/bin/bash
+#rsync nginx configuration
+n_ip="10.2.22.96 10.2.27.167"
+
+for n in $n_ip;do
+
+echo -e "\e[31m[Nginx]: $n conf sync.....\e[0m"
+
+/usr/bin/rsync -avz --delete -e 'ssh -p 65522 -i /root/.ssh/OPS.pem'  /usr/local/nginx/html/ $n:/usr/local/nginx/html/
+
+echo -e "\e[31m$n sync done\e[0m\n\n"
+done
+EOF
+</span>
+crontab -l
+* * * * * /bin/bash /opt/shell/rsync-nginx-web.sh &amp;&gt;/tmp/rsync-nginx-web.log
+</pre>
+</div>
+
+<p>
+配置文件同步
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /opt/shell/rsync-nginx.sh <span class="org-sh-heredoc">
+#!/bin/bash
+#rsync nginx configuration
+n_ip="10.2.22.96 10.2.27.167"
+
+for n in $n_ip;do
+
+echo -e "\e[31m[Nginx]: $n conf sync.....\e[0m"
+
+rsync -avz --delete -e 'ssh -p 65522 -i ~/.ssh/OPS.pem'  /usr/local/nginx/conf/ $n:/usr/local/nginx/conf/
+sleep 1
+#rsync -avz --delete -e 'ssh -p 65522 -i ~/.ssh/OPS.pem'  /usr/local/nginx/html/ $n:/usr/local/nginx/html/
+
+echo -e "\nnginx -t; nginx -s reload"
+ssh -p 65522 -i ~/.ssh/OPS.pem $n "nginx -t"
+ssh -p 65522 -i ~/.ssh/OPS.pem $n "nginx -s reload"
+
+echo -e "\e[31m$n sync done\e[0m\n\n"
+done
+EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:83147386-8461-4a60-92f0-b4179f185928" class="outline-2">
+<h2 id="h:83147386-8461-4a60-92f0-b4179f185928"><a href="#h:83147386-8461-4a60-92f0-b4179f185928">nginx20秒健康检查</a></h2>
+<div class="outline-text-2" id="text-h:83147386-8461-4a60-92f0-b4179f185928">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#65281;/bin/bash
+</span>
+<span class="org-variable-name">i</span>=0
+<span class="org-variable-name">interval</span>=3
+<span class="org-variable-name">count</span>=$[60/$<span class="org-variable-name">interval</span>]   <span class="org-comment-delimiter"># </span><span class="org-comment">$[]&#21482;&#33021;&#36827;&#34892;&#25972;&#25968;&#36816;&#31639;
+</span><span class="org-keyword">while</span> [ $<span class="org-variable-name">i</span> -lt $<span class="org-variable-name">count</span> ]; <span class="org-keyword">do</span>
+    <span class="org-variable-name">nginx_arr</span>=(pgrep nginx)
+    <span class="org-keyword">if</span> [ ${#<span class="org-variable-name">nginx_arr</span>[@]} == 0 ]; <span class="org-keyword">then</span>
+        nginx  -c  /usr/local/nginx/etc/nginx.conf &gt;/dev/null   2&gt;&amp;1
+    <span class="org-keyword">fi</span>
+    ((i++))
+    sleep $<span class="org-variable-name">interval</span>
+<span class="org-keyword">done</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:75713da9-c104-4aec-903b-b580c9269f5e" class="outline-2">
+<h2 id="h:75713da9-c104-4aec-903b-b580c9269f5e"><a href="#h:75713da9-c104-4aec-903b-b580c9269f5e">nginx_auto_add_deny.pl</a></h2>
+<div class="outline-text-2" id="text-h:75713da9-c104-4aec-903b-b580c9269f5e">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/usr/bin/</span><span class="org-keyword">perl</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">author : feng.sun
+</span>use strict;
+use warnings;
+use POSIX;
+use Date::Parse;
+use Smart::Comments;
+use File::Copy;
+
+  my(
+    $<span class="org-variable-name">deny</span>,
+    $<span class="org-variable-name">deny_num</span>,
+    $<span class="org-variable-name">app_log</span>,
+    $<span class="org-variable-name">reload_nginx</span>,
+  );
+   <span class="org-comment-delimiter">#</span><span class="org-comment">$deny = "deny 127.0.0.1";
+</span>
+sub init {
+    $<span class="org-variable-name">app_log</span> = <span class="org-string">"/etc/nginx/app.log"</span>;
+    open(LOG,<span class="org-string">"&gt;&gt; $app_log"</span>) or die <span class="org-string">"Can't open file:$!"</span>;
+
+    $<span class="org-variable-name">reload_nginx</span> = 0;
+    $<span class="org-variable-name">deny_num</span> = <span class="org-string">'1000'</span>;
+}
+
+<span class="org-comment-delimiter">### </span><span class="org-comment">$deny_num
+</span>
+sub match_deny_ip {
+
+    open(L,<span class="org-string">"tail -1000 /var/log/nginx/access.log|"</span>) or die <span class="org-string">"Can't open file:$?"</span>;
+    my %match_ip;
+
+    <span class="org-keyword">while</span>(&lt;L&gt;){
+        chomp;
+        my @<span class="org-variable-name">segment</span> = split / /;
+        my $<span class="org-variable-name">ip</span>        = $<span class="org-variable-name">segment</span>[0];       
+        my $<span class="org-variable-name">status</span>    = $<span class="org-variable-name">segment</span>[8];       
+        <span class="org-comment-delimiter">#</span><span class="org-comment">print "$ip -&gt; $status\n";   
+</span>        <span class="org-keyword">if</span>(defined $<span class="org-variable-name">ip</span> &amp;&amp; $<span class="org-variable-name">status</span> == <span class="org-string">'200'</span>){
+            $<span class="org-variable-name">match_ip</span>{$<span class="org-variable-name">ip</span>}++;   
+        }
+    }
+    <span class="org-comment-delimiter">## </span><span class="org-comment">%match_ip
+</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#29992;&#25143;&#35775;&#38382;&#35760;&#24405;&#22823;&#20110; $deny_num &#21017;&#20889;&#20837;nginx.conf&#25991;&#20214;
+</span>
+    my $<span class="org-variable-name">match_num</span> = 0;
+    <span class="org-keyword">foreach</span> my $<span class="org-variable-name">key</span> (keys %match_ip){
+        <span class="org-keyword">if</span>($<span class="org-variable-name">match_ip</span>{$<span class="org-variable-name">key</span>} &gt; $<span class="org-variable-name">deny_num</span>){
+
+            my $<span class="org-variable-name">match_num</span> = <span class="org-sh-quoted-exec">`grep $key /etc/nginx/conf.d/deny.conf|wc -l`</span>;
+            chomp $<span class="org-variable-name">match_num</span>;
+            <span class="org-comment-delimiter">### </span><span class="org-comment">$match_num
+</span>            <span class="org-keyword">if</span>($<span class="org-variable-name">match_num</span> == 0){
+                update_ngxconf($<span class="org-variable-name">key</span>);
+                $<span class="org-variable-name">reload_nginx</span> = 1;
+            }
+        }
+    }
+}
+
+
+sub update_ngxconf {
+  my(
+    $<span class="org-variable-name">line</span>,
+    $<span class="org-variable-name">record</span>,
+    $<span class="org-variable-name">curr_ngxconf</span>,
+    $<span class="org-variable-name">new_ngxconf</span>,
+    $<span class="org-variable-name">back_ngxconf</span>,
+    $<span class="org-variable-name">marker</span>,
+    $<span class="org-variable-name">time</span>,
+    $<span class="org-variable-name">timestamp</span>,
+  );
+
+    $<span class="org-variable-name">record</span> = shift;
+    $<span class="org-variable-name">marker</span> = 0;
+    $<span class="org-variable-name">line</span>   = <span class="org-string">'1'</span>;
+
+    $<span class="org-variable-name">time</span>   = <span class="org-sh-quoted-exec">`date "+%Y%m%d  %T"`</span>;
+    $<span class="org-variable-name">timestamp</span>   = str2time($<span class="org-variable-name">time</span>);
+    <span class="org-comment-delimiter">## </span><span class="org-comment">$timestamp
+</span>
+    $<span class="org-variable-name">back_ngxconf</span> = <span class="org-string">'/root/ngx_bak/deny.conf'</span> . <span class="org-string">"_"</span> .<span class="org-string">"$timestamp"</span>;   
+
+    mesg(<span class="org-string">"Add deny ip:$record to nginx.conf"</span>);
+    <span class="org-comment-delimiter">#</span><span class="org-comment">$curr_ngxconf = "/etc/nginx/nginx.conf";
+</span>    $<span class="org-variable-name">curr_ngxconf</span> = <span class="org-string">"/etc/nginx/conf.d/deny.conf"</span>;
+
+    copy(<span class="org-string">"$curr_ngxconf"</span>,<span class="org-string">"$back_ngxconf"</span>) or die <span class="org-string">"Can't copy file:$?"</span>;
+    mesg(<span class="org-string">"Backup nginx file complete."</span>);
+
+    open(C,<span class="org-string">"$curr_ngxconf"</span>) or die <span class="org-string">"Can't open file:$?"</span>; 
+
+    $<span class="org-variable-name">new_ngxconf</span> = <span class="org-string">"/etc/nginx/conf.d/new_deny.conf"</span>;
+    open(N,<span class="org-string">"&gt; $new_ngxconf"</span>) or die <span class="org-string">"Can't open file:$?"</span>;
+
+    <span class="org-keyword">while</span>(&lt;C&gt;){
+        $<span class="org-variable-name">marker</span>++;
+        <span class="org-keyword">if</span>($<span class="org-variable-name">marker</span> == $<span class="org-variable-name">line</span>){
+            <span class="org-builtin">print</span> N <span class="org-string">"    "</span> . <span class="org-string">"deny  "</span> . $<span class="org-variable-name">record</span> . <span class="org-string">";"</span> . <span class="org-string">"\n"</span>;
+        }
+        <span class="org-builtin">print</span> N $<span class="org-variable-name">_</span>;
+    }
+
+    mesg(<span class="org-string">"Generate $new_ngxconf file complete."</span>);
+
+    system(<span class="org-string">"mv"</span> , <span class="org-string">"-f"</span> , <span class="org-string">"$new_ngxconf"</span> , <span class="org-string">"$curr_ngxconf"</span>) == 0 
+        or die <span class="org-string">"system commend failed: $?"</span>;
+
+    mesg(<span class="org-string">"New nginxconf cover complete."</span>);
+
+}
+
+sub reload_nginx
+{
+    system(<span class="org-string">"/usr/sbin/nginx"</span> , <span class="org-string">"-s"</span> , <span class="org-string">"reload"</span>) == 0
+        or die <span class="org-string">"system commend failed:$?"</span>;
+
+    mesg(<span class="org-string">"Reload nginx.conf complete."</span>);
+}
+
+sub mesg
+{
+    my (
+        $<span class="org-variable-name">app_name</span>,
+        $<span class="org-variable-name">mesg_time</span>,
+        $<span class="org-variable-name">mesg_content</span>,
+    );
+    $<span class="org-variable-name">app_name</span>   = <span class="org-string">'auto_add_deny.pl'</span>;
+    $<span class="org-variable-name">mesg_time</span>  = strftime(<span class="org-string">'%F %T'</span>,localtime);
+    $<span class="org-variable-name">mesg_content</span>   = $<span class="org-variable-name">mesg_time</span>.<span class="org-string">" "</span>.$<span class="org-variable-name">app_name</span>.<span class="org-string">"\[$$\]: "</span>.shift;
+    $<span class="org-variable-name">mesg_content</span>   =~ s/\n/ /g;
+    $<span class="org-variable-name">mesg_content</span>   .= <span class="org-string">"\n"</span>;
+    <span class="org-builtin">print</span> LOG $<span class="org-variable-name">mesg_content</span>;
+}
+
+
+<span class="org-comment-delimiter">##</span><span class="org-comment">main##
+</span><span class="org-function-name">init</span>();
+<span class="org-function-name">match_deny_ip</span>();
+<span class="org-comment-delimiter">#</span><span class="org-comment">update_ngxconf($deny);
+</span><span class="org-function-name">reload_nginx</span>() <span class="org-keyword">if</span> $<span class="org-variable-name">reload_nginx</span>;
+
+<span class="org-comment-delimiter">### </span><span class="org-comment">$reload_nginx</span>
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

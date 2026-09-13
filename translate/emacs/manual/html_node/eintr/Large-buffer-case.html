@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 本书是 Emacs Lisp 编程入门，面向非程序员读者。
+
+
+随 Emacs 版本 30.2 一同发布。
+
+版权所有 © 1990-1995, 1997, 2001-2025 自由软件基金会。
+
+
+
+可从 https://shop.fsf.org/ 购买纸质版。出版方：
+
+GNU Press,                        https://www.fsf.org/licensing/gnu-press/
+自由软件基金会下属部门                邮箱：sales@fsf.org
+Free Software Foundation, Inc.    电话：+1 (617) 542-5942
+31 Milk Street, # 960789          传真：+1 (617) 542-2652
+Boston, MA 02196 USA
+
+
+ISBN 1-882114-43-4
+
+允许依据自由软件基金会发布的《GNU 自由文档许可证》第1.3版或其更新版本，对本文档进行复制、分发或修改。
+本文档无固定章节，前封面文本为 "A GNU Manual"，后封面文本见下文 (a) 条款。
+许可证副本收录在名为 "GNU Free Documentation License" 的章节中。
+
+(a) 自由软件基金会后封面文本为： "您拥有复制与修改本 GNU 手册的自由。
+从自由软件基金会购买本手册，将助力其开发 GNU 系统并推广软件自由。" -->
+<title>Large buffer case (翻译: Emacs Lisp 编程)</title>
+
+<meta name="description" content="Large buffer case (翻译: Emacs Lisp 编程)">
+<meta name="keywords" content="Large buffer case (翻译: Emacs Lisp 编程)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Intro-index.html" rel="index" title="Intro index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="beginning_002dof_002dbuffer-opt-arg.html" rel="up" title="beginning-of-buffer opt arg">
+<link href="Small-buffer-case.html" rel="next" title="Small buffer case">
+<link href="Disentangle-beginning_002dof_002dbuffer.html" rel="prev" title="Disentangle beginning-of-buffer">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="unnumberedsubsubsec-level-extent" id="Large-buffer-case">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Small-buffer-case.html" accesskey="n" rel="next">小缓冲区的处理逻辑</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Disentangle-beginning_002dof_002dbuffer.html" accesskey="p" rel="prev">拆解 <code class="code">beginning-of-buffer</code></a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="beginning_002dof_002dbuffer-opt-arg.html" accesskey="u" rel="up">带参数的 <code class="code">beginning-of-buffer</code></a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Intro-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="unnumberedsubsubsec" id="g_t_5927_7f13_51b2_533a_7684_5904_7406"><span>大缓冲区的处理<a class="copiable-link" href="#g_t_5927_7f13_51b2_533a_7684_5904_7406"> &para;</a></span></h4>
+
+<p>在 <code class="code">beginning-of-buffer</code> 中，内层 if 判断缓冲区大小是否超过 10000 字符。它使用 <code class="code">&gt;</code> 函数和 <code class="code">let</code> 表达式中计算出的 <code class="code">size</code>。
+</p>
+<p>早期版本使用 <code class="code">buffer-size</code>，该函数会被多次调用，且返回整个缓冲区大小而非可访问部分。只对可访问部分计算才更合理。（关于聚焦到可访问部分的更多信息，参见 See <a class="xref" href="Narrowing-_0026-Widening.html">Narrowing and Widening</a>。）
+</p>
+<p>判断语句如下：
+</p>
+<div class="example smallexample">
+<pre class="example-preformatted">(if (&gt; size 10000)
+</pre></div>
+
+<p>如果缓冲区很大，就会执行 <code class="code">if</code> 表达式的 then 分支。格式化以便阅读后，代码如下所示：
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(*
+  (prefix-numeric-value arg)
+  (/ size 10))
+</pre></div></div>
+
+<p>该表达式是一个乘法运算，向函数 <code class="code">*</code> 传入两个参数。
+</p>
+<p>第一个参数是 <code class="code">(prefix-numeric-value arg)</code>。当
+<code class="code">&quot;P&quot;</code> 用作 <code class="code">interactive</code> 的参数时，传递给函数的参数是一个 <em class="dfn">原始前缀参数(raw prefix argument)</em>，而非数字。（它是一个包含数字的列表。）要进行算术运算，需要进行类型转换，而
+<code class="code">prefix-numeric-value</code> 就承担这一工作。
+</p>
+<a class="index-entry-id" id="index-_002f-_0028division_0029"></a>
+<a class="index-entry-id" id="index-Division"></a>
+<p>第二个参数是 <code class="code">(/ size 10)</code>。该表达式将缓冲区可访问部分的大小对应的数值除以十。由此得到的数值，表示缓冲区大小的十分之一对应多少个字符。（在 Lisp 中，<code class="code">/</code> 用于除法，正如 <code class="code">*</code> 用于乘法。）
+</p>
+<p>在整个乘法表达式中，该数值会与前缀参数的值相乘 &mdash; 乘法形式如下：
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(* <var class="var">numeric-value-of-prefix-arg</var>
+   <var class="var">number-of-characters-in-one-tenth-of-the-accessible-buffer</var>)
+</pre></div></div>
+
+<p>例如，若前缀参数为 &lsquo;<samp class="samp">7</samp>&rsquo;，十分之一长度的数值会乘以 7，得到缓冲区百分之七十位置的偏移量。
+</p>
+<p>综上，当缓冲区可访问部分较大时，<code class="code">goto-char</code> 表达式如下：
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(goto-char (* (prefix-numeric-value arg)
+              (/ size 10)))
+</pre></div></div>
+
+<p>这样就将光标定位到了目标位置。
+</p>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

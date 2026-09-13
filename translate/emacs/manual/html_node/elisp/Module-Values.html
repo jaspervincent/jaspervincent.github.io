@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Module Values (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Module Values (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Module Values (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Writing-Dynamic-Modules.html" rel="up" title="Writing Dynamic Modules">
+<link href="Module-Misc.html" rel="next" title="Module Misc">
+<link href="Module-Functions.html" rel="prev" title="Module Functions">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Module-Values">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Module-Misc.html" accesskey="n" rel="next">模块专用的杂项便捷函数</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Functions.html" accesskey="p" rel="prev">编写模块函数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="u" rel="up">编写可动态加载的模块</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="Lisp-_4e0e_6a21_5757_503c_4e4b_95f4_7684_8f6c_6362"><span>E.8.3 Lisp 与模块值之间的转换<a class="copiable-link" href="#Lisp-_4e0e_6a21_5757_503c_4e4b_95f4_7684_8f6c_6362"> &para;</a></span></h4>
+<a class="index-entry-id" id="index-module-values_002c-conversion"></a>
+
+<a class="index-entry-id" id="index-emacs_005fvalue-data-type"></a>
+<p>除极少数情况外，大多数模块都需要与调用它们的 Lisp 程序交换数据：接收模块函数的参数，并从模块函数返回值。为此，模块 <abbr class="acronym">API</abbr> 提供了 <code class="code">emacs_value</code> 类型，用于表示通过 <abbr class="acronym">API</abbr> 传递的 Emacs Lisp 对象；它在功能上等同于 Emacs C 原语中使用的 <code class="code">Lisp_Object</code> 类型（see <a class="pxref" href="Writing-Emacs-Primitives.html">编写 Emacs 原语</a>）。本节介绍模块 <abbr class="acronym">API</abbr> 中用于创建与基础 Lisp 数据类型对应的 <code class="code">emacs_value</code> 对象的部分，以及如何从 C 代码中访问 <code class="code">emacs_value</code> 对象中对应 Lisp 对象的数据。
+</p>
+<p>下文描述的所有函数实际上都是 <em class="emph">函数指针</em>，通过每个模块函数接收的环境指针提供。因此，模块代码应通过环境指针调用这些函数，示例如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">emacs_env *env;  /* the environment pointer */
+env-&gt;some_function (arguments...);
+</pre></div>
+
+<p><code class="code">emacs_env</code> 指针通常来自模块函数的第一个参数；如果需要在模块初始化函数中使用环境，则通过调用 <code class="code">get_environment</code> 获取。
+</p>
+<p>下文描述的大多数函数从 Emacs 25 版本开始可用，该版本是首个支持动态模块的 Emacs 版本。对于后续 Emacs 版本新增的少数函数，我们会标注其首次支持的版本号。
+</p>
+<p>以下 <abbr class="acronym">API</abbr> 函数从 <code class="code">emacs_value</code> 对象中提取各种 C 数据类型的值。如果参数 <code class="code">emacs_value</code> 对象的类型与函数预期不符，所有这些函数都会触发 <code class="code">wrong-type-argument</code> 错误条件（see <a class="pxref" href="Type-Predicates.html">类型谓词</a>）。see <a class="pxref" href="Module-Nonlocal.html">模块中的非本地退出</a> 章节详细介绍了 Emacs 模块中错误信号的触发机制，以及如何在错误上报给 Emacs 之前在模块内部捕获错误。<abbr class="acronym">API</abbr> 函数 <code class="code">type_of</code>（see <a class="pxref" href="Module-Misc.html">type_of</a>）可用于获取 <code class="code">emacs_value</code> 对象的类型。
+</p>
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-extract_005finteger"><span class="category-def">Function: </span><span><code class="def-type">intmax_t</code> <strong class="def-name">extract_integer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>)</code><a class="copiable-link" href="#index-extract_005finteger"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">arg</var> 指定的 Lisp 整数的值。返回值的 C 数据类型 <code class="code">intmax_t</code> 是 C 编译器支持的最宽整数类型，通常为 <code class="code">long&nbsp;long</code><!-- /@w -->。如果 <var class="var">arg</var> 的值无法存入 <code class="code">intmax_t</code>，函数会使用错误符号 <code class="code">overflow-error</code> 触发错误。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-extract_005fbig_005finteger"><span class="category-def">Function: </span><span><code class="def-type">bool</code> <strong class="def-name">extract_big_integer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>, int *<var class="var">sign</var>, ptrdiff_t *<var class="var">count</var>, emacs_limb_t *<var class="var">magnitude</var>)</code><a class="copiable-link" href="#index-extract_005fbig_005finteger"> &para;</a></span></dt>
+<dd><p>该函数从 Emacs 27 版本开始可用，用于提取 <var class="var">arg</var> 的整数值。<var class="var">arg</var> 的值必须是整数（定长整数或大数）。如果 <var class="var">sign</var> 不为 <code class="code">NULL</code>，函数会将 <var class="var">arg</var> 的符号（-1、0 或 +1）存入 <code class="code">*sign</code>。绝对值的存储规则如下：如果 <var class="var">count</var> 和 <var class="var">magnitude</var> 均不为 <code class="code">NULL</code>，则 <var class="var">magnitude</var> 必须指向一个至少包含 <code class="code">*count</code> 个 <code class="code">unsigned long</code> 元素的数组。如果 <var class="var">magnitude</var> 数组足够容纳 <var class="var">arg</var> 的绝对值，函数会以小端格式将绝对值写入 <var class="var">magnitude</var> 数组，将实际写入的数组元素数量存入 <code class="code">*count</code>，并返回 <code class="code">true</code>。如果 <var class="var">magnitude</var> 数组空间不足，函数会将所需的数组大小存入 <code class="code">*count</code>，触发错误，并返回 <code class="code">false</code>。如果 <var class="var">count</var> 不为 <code class="code">NULL</code> 且 <var class="var">magnitude</var> 为 <code class="code">NULL</code>，函数会将所需的数组大小存入 <code class="code">*count</code> 并返回 <code class="code">true</code>。
+</p>
+<p>Emacs 保证 <code class="code">*count</code> 的最大所需值永远不会超过 <code class="code">min (PTRDIFF_MAX, SIZE_MAX) / sizeof (emacs_limb_t)</code>，因此你可以使用 <code class="code">malloc (*count * sizeof *magnitude)</code> 分配 <code class="code">magnitude</code> 数组，无需担心大小计算时发生整数溢出。
+</p></dd></dl>
+
+<dl class="first-deftp def-block">
+<dt class="deftp def-line" id="index-emacs_005flimb_005ft"><span class="category-def">Type alias: </span><span><strong class="def-name">emacs_limb_t</strong><a class="copiable-link" href="#index-emacs_005flimb_005ft"> &para;</a></span></dt>
+<dd><p>这是一个无符号整数类型，用作大数转换函数的绝对值数组的元素类型。该类型保证具有唯一的对象表示，即无填充位。
+</p></dd></dl>
+
+<dl class="first-defvr def-block">
+<dt class="defvr def-line" id="index-EMACS_005fLIMB_005fMAX"><span class="category-def">Macro: </span><span><strong class="def-name">EMACS_LIMB_MAX</strong><a class="copiable-link" href="#index-EMACS_005fLIMB_005fMAX"> &para;</a></span></dt>
+<dd><p>该宏展开为一个常量表达式，表示 <code class="code">emacs_limb_t</code> 对象的最大可能值。
+该表达式适用于 <code class="code">#if</code> 条件判断。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-extract_005ffloat"><span class="category-def">Function: </span><span><code class="def-type">double</code> <strong class="def-name">extract_float</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>)</code><a class="copiable-link" href="#index-extract_005ffloat"> &para;</a></span></dt>
+<dd><p>该函数以 C <code class="code">double</code> 类型返回 <var class="var">arg</var> 指定的 Lisp 浮点数的值。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-extract_005ftime"><span class="category-def">Function: </span><span><code class="def-type">struct timespec</code> <strong class="def-name">extract_time</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>)</code><a class="copiable-link" href="#index-extract_005ftime"> &para;</a></span></dt>
+<dd><p>该函数从 Emacs 27 版本开始可用，将 <var class="var">arg</var> 解析为 Emacs Lisp 时间值，并返回对应的 <code class="code">struct timespec</code>。See <a class="xref" href="Time-of-Day.html">时刻</a>。<code class="code">struct timespec</code> 表示纳秒精度的时间戳，包含以下成员：
+</p>
+<dl class="table">
+<dt><code class="code">time_t tv_sec</code></dt>
+<dd><p>整数秒数。
+</p></dd>
+<dt><code class="code">long tv_nsec</code></dt>
+<dd><p>纳秒级的小数秒。
+对于 <code class="code">extract_time</code> 返回的时间戳，
+该值始终非负且小于十亿。
+（尽管 POSIX 要求 <code class="code">tv_nsec</code> 的类型为 <code class="code">long</code>，
+但在部分非标准平台上该类型为 <code class="code">long long</code>。）
+</p></dd>
+</dl>
+
+<p>See <a data-manual="libc" href="https://www.gnu.org/software/libc/manual/html_node/Elapsed-Time.html#Elapsed-Time">(libc)Elapsed Time</a>。
+</p>
+<p>如果 <var class="var">time</var> 的精度高于纳秒，函数会向负无穷方向截断至纳秒精度。如果 <var class="var">time</var>（截断至纳秒后）无法用 <code class="code">struct timespec</code> 表示，函数会触发错误。例如，如果 <code class="code">time_t</code> 是 32 位整数类型，值为一百亿秒的 <var class="var">time</var> 会触发错误，而值为 600 皮秒的 <var class="var">time</var> 会被截断为零。
+</p>
+<p>如果需要处理无法用 <code class="code">struct timespec</code> 表示的时间值，或需要更高精度，请调用 Lisp 函数 <code class="code">encode-time</code> 并处理其返回值。See <a class="xref" href="Time-Conversion.html">时间转换</a>。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-copy_005fstring_005fcontents"><span class="category-def">Function: </span><span><code class="def-type">bool</code> <strong class="def-name">copy_string_contents</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>, char *<var class="var">buf</var>, ptrdiff_t *<var class="var">len</var>)</code><a class="copiable-link" href="#index-copy_005fstring_005fcontents"> &para;</a></span></dt>
+<dd><p>该函数将 <var class="var">arg</var> 指定的 Lisp 字符串的 UTF-8 编码文本存入 <var class="var">buf</var> 指向的 <code class="code">char</code> 数组，数组空间需至少容纳 <code class="code">*<var class="var">len</var></code> 字节（包含结束的空字节）。参数 <var class="var">len</var> 不能为 <code class="code">NULL</code> 指针；调用函数时，它需指向一个表示 <var class="var">buf</var> 字节大小的值。
+</p>
+<p>如果 <code class="code">*<var class="var">len</var></code> 指定的缓冲区大小足够容纳字符串文本，函数会将实际复制到 <var class="var">buf</var> 的字节数（包含结束的空字节）存入 <code class="code">*<var class="var">len</var></code>，并返回 <code class="code">true</code>。如果缓冲区空间不足，函数会触发 <code class="code">args-out-of-range</code> 错误条件，将所需字节数存入 <code class="code">*<var class="var">len</var></code>，并返回 <code class="code">false</code>。See <a class="xref" href="Module-Nonlocal.html">模块中的非本地退出</a> 介绍了如何处理待处理的错误条件。
+</p>
+<p>参数 <var class="var">buf</var> 可以是 <code class="code">NULL</code> 指针，此时函数会将存储 <var class="var">arg</var> 内容所需的字节数存入 <code class="code">*<var class="var">len</var></code> 并返回 <code class="code">true</code>。你可以通过这种方式确定存储特定字符串所需的 <var class="var">buf</var> 大小：首先以 <code class="code">NULL</code> 作为 <var class="var">buf</var> 调用 <code class="code">copy_string_contents</code>，然后根据函数存入 <code class="code">*<var class="var">len</var></code> 的字节数分配足够的内存，最后以非 <code class="code">NULL</code> 的 <var class="var">buf</var> 再次调用函数完成实际的文本复制。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-vec_005fget"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">vec_get</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">vector</var>, ptrdiff_t <var class="var">index</var>)</code><a class="copiable-link" href="#index-vec_005fget"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">vector</var> 中索引为 <var class="var">index</var> 的元素。向量第一个元素的索引为 0。如果 <var class="var">index</var> 的值无效，函数会触发 <code class="code">args-out-of-range</code> 错误条件。要从函数返回的值中提取 C 数据，请根据向量元素存储的 Lisp 数据类型，使用本文描述的其他提取函数。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-vec_005fsize"><span class="category-def">Function: </span><span><code class="def-type">ptrdiff_t</code> <strong class="def-name">vec_size</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">vector</var>)</code><a class="copiable-link" href="#index-vec_005fsize"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">vector</var> 中的元素数量。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-vec_005fset"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">vec_set</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">vector</var>, ptrdiff_t <var class="var">index</var>, emacs_value <var class="var">value</var>)</code><a class="copiable-link" href="#index-vec_005fset"> &para;</a></span></dt>
+<dd><p>该函数将 <var class="var">value</var> 存入 <var class="var">vector</var> 中索引为 <var class="var">index</var> 的元素。如果 <var class="var">index</var> 的值无效，函数会触发 <code class="code">args-out-of-range</code> 错误条件。
+</p></dd></dl>
+
+<p>以下 <abbr class="acronym">API</abbr> 函数从基础 C 数据类型创建 <code class="code">emacs_value</code> 对象，所有函数均返回创建的 <code class="code">emacs_value</code> 对象。
+</p>
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005finteger"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_integer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, intmax_t <var class="var">n</var>)</code><a class="copiable-link" href="#index-make_005finteger"> &para;</a></span></dt>
+<dd><p>该函数接收整数参数 <var class="var">n</var>，返回对应的 <code class="code">emacs_value</code> 对象。根据 <var class="var">n</var> 的值是否在 <code class="code">most-negative-fixnum</code> 和 <code class="code">most-positive-fixnum</code> 设定的范围内（see <a class="pxref" href="Integer-Basics.html">整数基础</a>），返回定长整数或大数。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005fbig_005finteger"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_big_integer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, int sign, ptrdiff_t count, const emacs_limb_t *magnitude)</code><a class="copiable-link" href="#index-make_005fbig_005finteger"> &para;</a></span></dt>
+<dd><p>该函数从 Emacs 27 版本开始可用，接收任意大小的整数参数，返回对应的 <code class="code">emacs_value</code> 对象。参数 <var class="var">sign</var> 指定返回值的符号。如果 <var class="var">sign</var> 非零，则 <var class="var">magnitude</var> 必须指向一个至少包含 <var class="var">count</var> 个元素的数组，以小端格式指定返回值的绝对值。
+</p></dd></dl>
+
+<p>以下示例使用 GNU 高精度算术库（GMP）计算给定整数之后的下一个可能素数。See <a data-manual="gmp" href="https://www.gmplib.org/manual/index.html#Top">(gmp)Top</a> 是 GMP 的概述，see <a data-manual="gmp" href="https://www.gmplib.org/manual/Integer-Import-and-Export.html#Integer-Import-and-Export">(gmp)Integer Import and Export</a> 介绍了如何在 <code class="code">magnitude</code> 数组与 GMP 的 <code class="code">mpz_t</code> 值之间进行转换。
+</p>
+<div class="example">
+<pre class="example-preformatted">#include &lt;emacs-module.h&gt;
+int plugin_is_GPL_compatible;
+
+#include &lt;assert.h&gt;
+#include &lt;limits.h&gt;
+#include &lt;stdint.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+#include &lt;gmp.h&gt;
+
+static void
+memory_full (emacs_env *env)
+{
+  static const char message[] = &quot;Memory exhausted&quot;;
+  emacs_value data = env-&gt;make_string (env, message,
+                                       strlen (message));
+  env-&gt;non_local_exit_signal
+    (env, env-&gt;intern (env, &quot;error&quot;),
+     env-&gt;funcall (env, env-&gt;intern (env, &quot;list&quot;), 1, &amp;data));
+}
+
+enum
+{
+  order = -1, endian = 0, nails = 0,
+  limb_size = sizeof (emacs_limb_t),
+  max_nlimbs = ((SIZE_MAX &lt; PTRDIFF_MAX ? SIZE_MAX : PTRDIFF_MAX)
+                / limb_size)
+};
+
+static bool
+extract_big_integer (emacs_env *env, emacs_value arg, mpz_t result)
+{
+  ptrdiff_t nlimbs;
+  bool ok = env-&gt;extract_big_integer (env, arg, NULL, &amp;nlimbs, NULL);
+  if (!ok)
+    return false;
+  assert (0 &lt; nlimbs &amp;&amp; nlimbs &lt;= max_nlimbs);
+  emacs_limb_t *magnitude = malloc (nlimbs * limb_size);
+  if (magnitude == NULL)
+    {
+      memory_full (env);
+      return false;
+    }
+  int sign;
+  ok = env-&gt;extract_big_integer (env, arg, &amp;sign, &amp;nlimbs, magnitude);
+  assert (ok);
+  mpz_import (result, nlimbs, order, limb_size, endian, nails, magnitude);
+  free (magnitude);
+  if (sign &lt; 0)
+    mpz_neg (result, result);
+  return true;
+}
+
+static emacs_value
+make_big_integer (emacs_env *env, const mpz_t value)
+{
+  size_t nbits = mpz_sizeinbase (value, 2);
+  int bitsperlimb = CHAR_BIT * limb_size - nails;
+  size_t nlimbs = nbits / bitsperlimb + (nbits % bitsperlimb != 0);
+  emacs_limb_t *magnitude
+    = nlimbs &lt;= max_nlimbs ? malloc (nlimbs * limb_size) : NULL;
+  if (magnitude == NULL)
+    {
+      memory_full (env);
+      return NULL;
+    }
+  size_t written;
+  mpz_export (magnitude, &amp;written, order, limb_size, endian, nails, value);
+  assert (written == nlimbs);
+  assert (nlimbs &lt;= PTRDIFF_MAX);
+  emacs_value result = env-&gt;make_big_integer (env, mpz_sgn (value),
+                                              nlimbs, magnitude);
+  free (magnitude);
+  return result;
+}
+
+static emacs_value
+next_prime (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+            void *data)
+{
+  assert (nargs == 1);
+  mpz_t p;
+  mpz_init (p);
+  extract_big_integer (env, args[0], p);
+  mpz_nextprime (p, p);
+  emacs_value result = make_big_integer (env, p);
+  mpz_clear (p);
+  return result;
+}
+
+int
+emacs_module_init (struct emacs_runtime *runtime)
+{
+  emacs_env *env = runtime-&gt;get_environment (runtime);
+  emacs_value symbol = env-&gt;intern (env, &quot;next-prime&quot;);
+  emacs_value func
+    = env-&gt;make_function (env, 1, 1, next_prime, NULL, NULL);
+  emacs_value args[] = {symbol, func};
+  env-&gt;funcall (env, env-&gt;intern (env, &quot;defalias&quot;), 2, args);
+  return 0;
+}
+</pre></div>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005ffloat"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_float</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, double <var class="var">d</var>)</code><a class="copiable-link" href="#index-make_005ffloat"> &para;</a></span></dt>
+<dd><p>该函数接收 <code class="code">double</code> 类型参数 <var class="var">d</var>，返回对应的 Emacs 浮点数值。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005ftime"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_time</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, struct timespec <var class="var">time</var>)</code><a class="copiable-link" href="#index-make_005ftime"> &para;</a></span></dt>
+<dd><p>该函数从 Emacs 27 版本开始可用，接收 <code class="code">struct timespec</code> 类型参数 <var class="var">time</var>，以 <code class="code">(<var class="var">ticks</var> . <var class="var">hz</var>)</code> 对的形式返回对应的 Emacs 时间戳。See <a class="xref" href="Time-of-Day.html">时刻</a>。返回值与 <var class="var">time</var> 表示完全相同的时间戳：所有输入值均可表示，且无精度损失。<code class="code"><var class="var">time</var>.tv_sec</code> 和 <code class="code"><var class="var">time</var>.tv_nsec</code> 可以是任意值，特别地，不要求 <var class="var">time</var> 是标准化格式。这意味着 <code class="code"><var class="var">time</var>.tv_nsec</code> 可以为负数或大于 999,999,999。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005fstring"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_string</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, const char *<var class="var">str</var>, ptrdiff_t <var class="var">len</var>)</code><a class="copiable-link" href="#index-make_005fstring"> &para;</a></span></dt>
+<dd><p>该函数从 <var class="var">str</var> 指向的 C 文本字符串创建 Emacs 字符串，<var class="var">len</var> 是不包含结束空字节的字节长度。<var class="var">str</var> 中的原始字符串可以是 <abbr class="acronym">ASCII</abbr> 字符串或 UTF-8 编码的非 <abbr class="acronym">ASCII</abbr> 字符串；可以包含嵌入的空字节，且无需在 <code class="code"><var class="var">str</var>[<var class="var">len</var>]</code> 位置以结束空字节结尾。如果 <var class="var">len</var> 为负数或超过 Emacs 字符串的最大长度，函数会触发 <code class="code">overflow-error</code> 错误条件。如果 <var class="var">len</var> 为 0，则 <var class="var">str</var> 可以是 <code class="code">NULL</code>，否则必须指向有效的内存。对于非零的 <var class="var">len</var>，<code class="code">make_string</code> 返回唯一的可变字符串对象。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005funibyte_005fstring"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_unibyte_string</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, const char *<var class="var">str</var>, ptrdiff_t <var class="var">len</var>)</code><a class="copiable-link" href="#index-make_005funibyte_005fstring"> &para;</a></span></dt>
+<dd><p>该函数与 <code class="code">make_string</code> 类似，但对 C 字符串中的字节值无限制，可用于以单字节字符串的形式向 Emacs 传递二进制数据。
+</p></dd></dl>
+
+<p><abbr class="acronym">API</abbr> 未提供操作 Lisp 数据结构的函数，例如使用 <code class="code">cons</code> 和 <code class="code">list</code> 创建列表（see <a class="pxref" href="Building-Lists.html">构建 cons 单元与列表</a>）、使用 <code class="code">car</code> 和 <code class="code">cdr</code> 提取列表成员（see <a class="pxref" href="List-Elements.html">访问列表元素</a>）、使用 <code class="code">vector</code> 创建向量（see <a class="pxref" href="Vector-Functions.html">向量相关函数</a>）等。对于这些操作，请使用下一小节介绍的 <code class="code">intern</code> 和 <code class="code">funcall</code> 调用对应的 Lisp 函数。
+</p>
+<p>通常情况下，<code class="code">emacs_value</code> 对象的生命周期非常短：当创建它们所用的 <code class="code">emacs_env</code> 指针超出作用域时，生命周期即结束。偶尔你可能需要创建 <em class="dfn">全局引用(global references)</em>：生命周期可自定义的 <code class="code">emacs_value</code> 对象。使用以下两个函数管理此类对象。
+</p>
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005fglobal_005fref"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_global_ref</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">value</var>)</code><a class="copiable-link" href="#index-make_005fglobal_005fref"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">value</var> 的全局引用。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-free_005fglobal_005fref"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">free_global_ref</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">global_value</var>)</code><a class="copiable-link" href="#index-free_005fglobal_005fref"> &para;</a></span></dt>
+<dd><p>该函数释放之前由 <code class="code">make_global_ref</code> 创建的 <var class="var">global_value</var>。调用后 <var class="var">global_value</var> 不再有效。你的模块代码应将每一次 <code class="code">make_global_ref</code> 调用与对应的 <code class="code">free_global_ref</code> 调用配对使用。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-user-pointer_002c-using-in-module-functions"></a>
+<p>保存后续需要传递给模块函数的 C 数据结构的一种替代方案是创建 <em class="dfn">用户指针(user pointer)</em> 对象。用户指针（<code class="code">user-ptr</code>）对象是封装了 C 指针的 Lisp 对象，可以关联一个终结器函数，该函数会在对象被垃圾回收时调用（see <a class="pxref" href="Garbage-Collection.html">垃圾回收</a>）。模块 <abbr class="acronym">API</abbr> 提供了创建和访问 <code class="code">user-ptr</code> 对象的函数。如果这些函数作用于不表示 <code class="code">user-ptr</code> 对象的 <code class="code">emacs_value</code>，会触发 <code class="code">wrong-type-argument</code> 错误条件。
+</p>
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-make_005fuser_005fptr"><span class="category-def">Function: </span><span><code class="def-type">emacs_value</code> <strong class="def-name">make_user_ptr</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_finalizer <var class="var">fin</var>, void *<var class="var">ptr</var>)</code><a class="copiable-link" href="#index-make_005fuser_005fptr"> &para;</a></span></dt>
+<dd><p>该函数创建并返回一个封装了 C 指针 <var class="var">ptr</var> 的 <code class="code">user-ptr</code> 对象。终结器函数 <var class="var">fin</var> 可以是 <code class="code">NULL</code> 指针（表示无终结器），也可以是具有以下签名的函数：
+</p>
+<div class="example">
+<pre class="example-preformatted">typedef void (*emacs_finalizer) (void *<var class="var">ptr</var>);
+</pre></div>
+
+<p>如果 <var class="var">fin</var> 不为 <code class="code">NULL</code> 指针，当 <code class="code">user-ptr</code> 对象被垃圾回收时，会以 <var class="var">ptr</var> 为参数调用该函数。不要在终结器中运行耗时较长的代码，因为垃圾回收必须快速完成以保证 Emacs 的响应性。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-_0028emacs_005fenv"><span class="category-def">Function: </span><span><code class="def-type">void *get_user_ptr</code> <strong class="def-name">(emacs_env</strong> <code class="def-code-arguments">*<var class="var">env</var>, emacs_value <var class="var">arg</var>)</code><a class="copiable-link" href="#index-_0028emacs_005fenv"> &para;</a></span></dt>
+<dd><p>该函数从 <var class="var">arg</var> 表示的 Lisp 对象中提取 C 指针。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-set_005fuser_005fptr"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">set_user_ptr</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>, void *<var class="var">ptr</var>)</code><a class="copiable-link" href="#index-set_005fuser_005fptr"> &para;</a></span></dt>
+<dd><p>该函数将 <var class="var">arg</var> 表示的 <code class="code">user-ptr</code> 对象中嵌入的 C 指针设置为 <var class="var">ptr</var>。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-get_005fuser_005ffinalizer"><span class="category-def">Function: </span><span><code class="def-type">emacs_finalizer</code> <strong class="def-name">get_user_finalizer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>)</code><a class="copiable-link" href="#index-get_005fuser_005ffinalizer"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">arg</var> 表示的 <code class="code">user-ptr</code> 对象的终结器；如果没有终结器，则返回 <code class="code">NULL</code>。
+</p></dd></dl>
+
+<dl class="first-deftypefn def-block">
+<dt class="deftypefn def-line" id="index-set_005fuser_005ffinalizer"><span class="category-def">Function: </span><span><code class="def-type">void</code> <strong class="def-name">set_user_finalizer</strong> <code class="def-code-arguments">(emacs_env *<var class="var">env</var>, emacs_value <var class="var">arg</var>, emacs_finalizer <var class="var">fin</var>)</code><a class="copiable-link" href="#index-set_005fuser_005ffinalizer"> &para;</a></span></dt>
+<dd><p>该函数将 <var class="var">arg</var> 表示的 <code class="code">user-ptr</code> 对象的终结器修改为 <var class="var">fin</var>。如果 <var class="var">fin</var> 是 <code class="code">NULL</code> 指针，<code class="code">user-ptr</code> 对象将不再有终结器。
+</p></dd></dl>
+
+<p>注意，<code class="code">emacs_finalizer</code> 类型同时适用于用户指针和模块函数终结器。See <a class="xref" href="Module-Functions.html#Module-Function-Finalizers">Module Function Finalizers</a>。
+</p>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Module-Misc.html">模块专用的杂项便捷函数</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Module-Functions.html">编写模块函数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html">编写可动态加载的模块</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Magic File Names (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Magic File Names (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Magic File Names (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Files.html" rel="up" title="Files">
+<link href="Format-Conversion.html" rel="next" title="Format Conversion">
+<link href="Create_002fDelete-Dirs.html" rel="prev" title="Create/Delete Dirs">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Magic-File-Names">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Format-Conversion.html" accesskey="n" rel="next">文件格式转换</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Create_002fDelete-Dirs.html" accesskey="p" rel="prev">创建、复制和删除目录</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Files.html" accesskey="u" rel="up">文件</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5b9e_73b0_0060_0060_9b54_6cd5_0027_0027_6587_4ef6_540d_673a_5236"><span>26.12 实现&ldquo;魔法&rdquo;文件名机制<a class="copiable-link" href="#g_t_5b9e_73b0_0060_0060_9b54_6cd5_0027_0027_6587_4ef6_540d_673a_5236"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-magic-file-names"></a>
+
+<p>你可以为特定文件名实现特殊处理逻辑，这被称为将这些名称设为<em class="dfn">魔法（magic）</em>文件名。该特性的主要用途是实现远程文件访问（see <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Remote-Files.html#Remote-Files">Remote Files</a> in <cite class="cite">The GNU Emacs Manual</cite>）。
+</p>
+<p>要定义一类魔法文件名，你需要提供一个正则表达式来界定该类名称（所有匹配该正则的名称），并提供一个处理器函数，为匹配的文件名实现所有 Emacs 基础文件操作。
+</p>
+<a class="index-entry-id" id="index-file-name-handler"></a>
+<a class="index-entry-id" id="index-file_002dname_002dhandler_002dalist"></a>
+<p>变量 <code class="code">file-name-handler-alist</code> 存储处理器列表，以及决定何时应用每个处理器的正则表达式。列表中每个元素的格式如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">(<var class="var">regexp</var> . <var class="var">handler</var>)
+</pre></div>
+
+<p>所有用于文件访问和文件名转换的 Emacs 基础函数都会检查给定文件名是否匹配 <code class="code">file-name-handler-alist</code>。
+如果文件名匹配 <var class="var">regexp</var>，这些基础函数会通过调用 <var class="var">handler</var> 来处理该文件。
+</p>
+<p>传给 <var class="var">handler</var> 的第一个参数是基础函数名（符号形式），后续参数是传给该基础函数的参数。（这些参数中的第一个通常是文件名本身。）例如，执行以下代码时：
+</p>
+<div class="example">
+<pre class="example-preformatted">(file-exists-p <var class="var">filename</var>)
+</pre></div>
+
+<p>如果 <var class="var">filename</var> 对应的处理器是 <var class="var">handler</var>，则 <var class="var">handler</var> 会被这样调用：
+</p>
+<div class="example">
+<pre class="example-preformatted">(funcall <var class="var">handler</var> 'file-exists-p <var class="var">filename</var>)
+</pre></div>
+
+<p>当一个函数接收两个或更多必须是文件名的参数时，会检查每个参数对应的处理器。例如，执行以下代码时：
+</p>
+<div class="example">
+<pre class="example-preformatted">(expand-file-name <var class="var">filename</var> <var class="var">dirname</var>)
+</pre></div>
+
+<p>会先检查 <var class="var">filename</var> 的处理器，再检查 <var class="var">dirname</var> 的处理器。无论匹配到哪个，<var class="var">handler</var> 都会被这样调用：
+</p>
+<div class="example">
+<pre class="example-preformatted">(funcall <var class="var">handler</var> 'expand-file-name <var class="var">filename</var> <var class="var">dirname</var>)
+</pre></div>
+
+<p>此时 <var class="var">handler</var> 需要自行判断是处理 <var class="var">filename</var> 还是 <var class="var">dirname</var>。
+</p>
+<p>如果指定文件名匹配多个处理器，则匹配位置在文件名中起始位置最晚的处理器优先。选择此规则是为了让解压缩等处理器先于远程文件访问等处理器执行。
+</p>
+<p>以下是魔法文件名处理器需要处理的操作：
+</p>
+<p><code class="code">abbreviate-file-name</code>, <code class="code">access-file</code>,
+<code class="code">add-name-to-file</code>, <code class="code">byte-compiler-base-file-name</code>,<br>
+<code class="code">copy-directory</code>, <code class="code">copy-file</code>,
+<code class="code">delete-directory</code>, <code class="code">delete-file</code>,
+<code class="code">diff-latest-backup-file</code>,
+<code class="code">directory-file-name</code>,
+<code class="code">directory-files</code>,
+<code class="code">directory-files-and-attributes</code>,
+<code class="code">dired-compress-file</code>, <code class="code">dired-uncache</code>,
+<code class="code">exec-path</code>, <code class="code">expand-file-name</code>,<br>
+<code class="code">file-accessible-directory-p</code>,
+<code class="code">file-acl</code>,
+<code class="code">file-attributes</code>,
+<code class="code">file-directory-p</code>,
+<code class="code">file-equal-p</code>,
+<code class="code">file-executable-p</code>, <code class="code">file-exists-p</code>,
+<code class="code">file-group-gid</code>, <code class="code">file-in-directory-p</code>,
+<code class="code">file-local-copy</code>, <code class="code">file-locked-p</code>,
+<code class="code">file-modes</code>, <code class="code">file-name-all-completions</code>,
+<code class="code">file-name-as-directory</code>,
+<code class="code">file-name-case-insensitive-p</code>,
+<code class="code">file-name-completion</code>,
+<code class="code">file-name-directory</code>,
+<code class="code">file-name-nondirectory</code>,
+<code class="code">file-name-sans-versions</code>, <code class="code">file-newer-than-file-p</code>,
+<code class="code">file-notify-add-watch</code>, <code class="code">file-notify-rm-watch</code>,
+<code class="code">file-notify-valid-p</code>,
+<code class="code">file-ownership-preserved-p</code>,
+<code class="code">file-readable-p</code>, <code class="code">file-regular-p</code>,
+<code class="code">file-remote-p</code>, <code class="code">file-selinux-context</code>,
+<code class="code">file-symlink-p</code>, <code class="code">file-system-info</code>,
+<code class="code">file-truename</code>, <code class="code">file-user-uid</code>,
+<code class="code">file-writable-p</code>,
+<code class="code">find-backup-file-name</code>,<br>
+<code class="code">get-file-buffer</code>,
+<code class="code">insert-directory</code>,
+<code class="code">insert-file-contents</code>,<br>
+<code class="code">list-system-processes</code>,
+<code class="code">load</code>, <code class="code">lock-file</code>,
+<code class="code">make-auto-save-file-name</code>,
+<code class="code">make-directory</code>,
+<code class="code">make-lock-file-name</code>,
+<code class="code">make-nearby-temp-file</code>,
+<code class="code">make-process</code>,
+<code class="code">make-symbolic-link</code>,<br>
+<code class="code">memory-info</code>, <code class="code">process-attributes</code>, <code class="code">process-file</code>,
+<code class="code">rename-file</code>, <code class="code">set-file-acl</code>, <code class="code">set-file-modes</code>,
+<code class="code">set-file-selinux-context</code>, <code class="code">set-file-times</code>,
+<code class="code">set-visited-file-modtime</code>, <code class="code">shell-command</code>,
+<code class="code">start-file-process</code>,
+<code class="code">substitute-in-file-name</code>,<br>
+<code class="code">temporary-file-directory</code>,
+<code class="code">unhandled-file-name-directory</code>,
+<code class="code">unlock-file</code>,
+<code class="code">vc-registered</code>,
+<code class="code">verify-visited-file-modtime</code>,<br>
+<code class="code">write-region</code>.
+</p>
+<p>处理 <code class="code">insert-file-contents</code> 的处理器通常需要在 <var class="var">visit</var> 参数非 <code class="code">nil</code> 时清除缓冲区的修改标记（使用 <code class="code">(set-buffer-modified-p nil)</code>）。这同时也会解锁被锁定的缓冲区。
+</p>
+<p>处理器函数必须处理上述所有操作，以及未来可能新增的其他操作。它无需自行实现所有操作——对于无需特殊处理的操作，可重新调用基础函数以常规方式处理。对于无法识别的操作，应始终重新调用基础函数。实现方式如下：
+</p>
+<div class="example smallexample">
+<pre class="example-preformatted">(defun my-file-handler (operation &amp;rest args)
+  ;; <span class="r">First check for the specific operations</span>
+  ;; <span class="r">that we have special handling for.</span>
+  (cond ((eq operation 'insert-file-contents) ...)
+        ((eq operation 'write-region) ...)
+        ...
+        ;; <span class="r">Handle any operation we don&rsquo;t know about.</span>
+        (t (let ((inhibit-file-name-handlers
+                  (cons 'my-file-handler
+                        (and (eq inhibit-file-name-operation operation)
+                             inhibit-file-name-handlers)))
+                 (inhibit-file-name-operation operation))
+             (apply operation args)))))
+</pre></div>
+
+<p>当处理器函数决定调用 Emacs 常规基础函数处理当前操作时，需要防止基础函数再次调用同一个处理器，从而导致无限递归。
+上述示例展示了如何通过变量 <code class="code">inhibit-file-name-handlers</code> 和 <code class="code">inhibit-file-name-operation</code> 实现这一点。
+务必严格按照示例中的方式使用这些变量——在多处理器场景下，以及处理包含多个可能各有处理器的文件名的操作时，细节对正确行为至关重要。
+</p>
+<a class="index-entry-id" id="index-safe_002dmagic-_0028property_0029"></a>
+<p>对于文件实际访问无需特殊处理的处理器（例如仅为远程文件名实现主机名补全的处理器），应设置非 <code class="code">nil</code> 的 <code class="code">safe-magic</code> 属性。
+例如，Emacs 通常会保护 <code class="code">PATH</code> 中找到的目录名，若其看起来像魔法文件名，则在前面添加 &lsquo;<samp class="samp">/:</samp>&rsquo; 以避免被识别为魔法文件名。
+但如果对应的处理器的 <code class="code">safe-magic</code> 属性为非 <code class="code">nil</code>，则不会添加 &lsquo;<samp class="samp">/:</samp>&rsquo;。
+</p>
+<a class="index-entry-id" id="index-operations-_0028property_0029"></a>
+<p>文件名处理器可设置 <code class="code">operations</code> 属性，声明其需要做特殊处理的操作。
+若该属性值非 <code class="code">nil</code>，则应为操作列表；此时只有列表中的操作会调用该处理器。
+这能避免低效调用，主要用于自动加载的处理器函数，确保仅在有实际工作要做时才加载它们。
+</p>
+<p>简单地将所有操作委托给常规基础函数是不可行的。例如，如果文件名处理器作用于 <code class="code">file-exists-p</code>，则必须自行处理 <code class="code">load</code>，因为常规的 <code class="code">load</code> 代码在此场景下无法正常工作。
+但如果处理器通过 <code class="code">operations</code> 属性声明不处理 <code class="code">file-exists-p</code>，则无需对 <code class="code">load</code> 做特殊处理。
+</p>
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-inhibit_002dfile_002dname_002dhandlers"><span class="category-def">Variable: </span><span><strong class="def-name">inhibit-file-name-handlers</strong><a class="copiable-link" href="#index-inhibit_002dfile_002dname_002dhandlers"> &para;</a></span></dt>
+<dd><p>该变量存储当前被禁止用于特定操作的处理器列表。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-inhibit_002dfile_002dname_002doperation"><span class="category-def">Variable: </span><span><strong class="def-name">inhibit-file-name-operation</strong><a class="copiable-link" href="#index-inhibit_002dfile_002dname_002doperation"> &para;</a></span></dt>
+<dd><p>当前禁止某些处理器生效的操作名称。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-find_002dfile_002dname_002dhandler"><span class="category-def">Function: </span><span><strong class="def-name">find-file-name-handler</strong> <var class="def-var-arguments">file operation</var><a class="copiable-link" href="#index-find_002dfile_002dname_002dhandler"> &para;</a></span></dt>
+<dd><p>该函数返回文件名 <var class="var">file</var> 对应的处理器函数，若无则返回 <code class="code">nil</code>。参数 <var class="var">operation</var> 应为要对文件执行的操作——即调用处理器时作为第一个参数传入的值。
+如果 <var class="var">operation</var> 等于 <code class="code">inhibit-file-name-operation</code>，或未出现在处理器的 <code class="code">operations</code> 属性中，该函数返回 <code class="code">nil</code>。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-file_002dlocal_002dcopy"><span class="category-def">Function: </span><span><strong class="def-name">file-local-copy</strong> <var class="def-var-arguments">filename</var><a class="copiable-link" href="#index-file_002dlocal_002dcopy"> &para;</a></span></dt>
+<dd><p>如果文件 <var class="var">filename</var> 不在本地主机上，该函数会将其复制到本地主机的普通非魔法文件中。
+指向其他机器文件的魔法文件名应处理 <code class="code">file-local-copy</code> 操作。
+用于远程文件访问以外用途的魔法文件名不应处理 <code class="code">file-local-copy</code>，此时该函数会将文件视为本地文件。
+</p>
+<p>如果 <var class="var">filename</var> 是本地文件（无论是否为魔法文件），该函数不执行任何操作并返回 <code class="code">nil</code>。否则返回本地副本的文件名。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-file_002dremote_002dp"><span class="category-def">Function: </span><span><strong class="def-name">file-remote-p</strong> <var class="def-var-arguments">filename &amp;optional identification connected</var><a class="copiable-link" href="#index-file_002dremote_002dp"> &para;</a></span></dt>
+<dd><p>该函数检查 <var class="var">filename</var> 是否为远程文件。如果 <var class="var">filename</var> 是本地文件（非远程），返回 <code class="code">nil</code>。
+如果确实是远程文件，返回标识远程系统的字符串。
+</p>
+<p>该标识符字符串可包含主机名、用户名，以及指定访问远程系统方式的字符。例如，文件名 <code class="code">/sudo::/some/file</code> 的远程标识符字符串是 <code class="code">/sudo:root@localhost:</code>。
+</p>
+<p>如果 <code class="code">file-remote-p</code> 对两个不同文件名返回相同标识符，表示它们存储在同一文件系统上，且可相对彼此本地访问。
+这意味着例如可以启动一个远程进程同时访问这两个文件。文件名处理器的实现者需要确保该原则有效。
+</p>
+<p><var class="var">identification</var> 指定要返回的标识符部分。<var class="var">identification</var> 可以是符号 <code class="code">method</code>、<code class="code">user</code>、<code class="code">host</code> 或 <code class="code">localname</code>；
+其他值视为 <code class="code">nil</code>，表示返回完整的标识符字符串。在上述示例中，远程 <code class="code">user</code> 标识符字符串为 <code class="code">root</code>。
+</p>
+<p>如果远程文件 <var class="var">file</var> 不包含访问方式、用户名或主机名，则返回相应的默认值。
+<var class="var">identification</var> 为 <code class="code">localname</code> 时返回的字符串可能因是否存在现有连接而不同。
+特定的文件名处理器实现可支持更多 <var class="var">identification</var> 符号；例如 See <a data-manual="tramp" href="https://www.gnu.org/software/emacs/manual/html_node/tramp/index.html#Top">Tramp</a>, 还支持 <code class="code">hop</code> 符号。
+</p>
+<p>如果 <var class="var">connected</var> 非 <code class="code">nil</code>，即使 <var class="var">filename</var> 是远程文件，若 Emacs 与对应主机无网络连接，该函数也返回 <code class="code">nil</code>。
+这在需要避免因无连接而产生连接延迟时非常有用。如果 <var class="var">connected</var> 为 <code class="code">never</code>，则**绝不**使用现有连接返回标识符（其他行为与 <code class="code">nil</code> 相同）。
+这可防止任何连接相关的逻辑，例如展开文件名的本地部分。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-unhandled_002dfile_002dname_002ddirectory"><span class="category-def">Function: </span><span><strong class="def-name">unhandled-file-name-directory</strong> <var class="def-var-arguments">filename</var><a class="copiable-link" href="#index-unhandled_002dfile_002dname_002ddirectory"> &para;</a></span></dt>
+<dd><p>该函数返回一个非魔法目录名。对于非魔法文件名 <var class="var">filename</var>，返回对应的目录名（see <a class="pxref" href="Directory-Names.html">目录名</a>）。
+对于魔法文件名 <var class="var">filename</var>，调用其文件名处理器，由处理器决定返回值。
+如果 <var class="var">filename</var> 无法被本地进程访问，文件名处理器应返回 <code class="code">nil</code> 以标识此情况。
+</p>
+<p>这在运行子进程时非常有用：每个子进程都需要一个非魔法目录作为当前目录，该函数是获取此类目录的理想方式。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-local-part-of-remote-file-name"></a>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-file_002dlocal_002dname"><span class="category-def">Function: </span><span><strong class="def-name">file-local-name</strong> <var class="def-var-arguments">filename</var><a class="copiable-link" href="#index-file_002dlocal_002dname"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">filename</var> 的<em class="dfn">本地部分(local part)</em>。这是文件名在远程主机上标识文件的部分，通常通过从远程文件名中移除指定远程主机和访问方式的部分得到。例如：
+</p>
+<div class="example smallexample">
+<pre class="example-preformatted">(file-local-name &quot;/ssh:<var class="var">user</var>@<var class="var">host</var>:/foo/bar&quot;)
+     &rArr; &quot;/foo/bar&quot;
+</pre></div>
+
+<p>对于远程文件名 <var class="var">filename</var>，该函数返回的文件名可直接用作远程进程的参数（see <a class="pxref" href="Asynchronous-Processes.html">创建异步进程</a> 和 see <a class="pxref" href="Synchronous-Processes.html">创建同步进程</a>），也可作为要在远程主机上运行的程序名。
+如果 <var class="var">filename</var> 是本地文件，该函数原样返回。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-remote_002dfile_002dname_002dinhibit_002dcache"><span class="category-def">User Option: </span><span><strong class="def-name">remote-file-name-inhibit-cache</strong><a class="copiable-link" href="#index-remote_002dfile_002dname_002dinhibit_002dcache"> &para;</a></span></dt>
+<dd><p>为提升性能，远程文件的属性可被缓存。如果这些属性在 Emacs 控制之外被修改，缓存值会失效，必须重新读取。
+</p>
+<p>当该变量设为 <code class="code">nil</code> 时，缓存值永不过期。使用此设置时需谨慎，仅当确定除 Emacs 外无其他程序修改远程文件时使用。
+设为 <code class="code">t</code> 时，永不使用缓存值。这是最安全的设置，但可能导致性能下降。
+</p>
+<p>折中方案是将其设为正数，表示缓存值自缓存时起可使用指定秒数。
+如果定期检查远程文件，可将该变量临时绑定为小于连续检查间隔的值。例如：
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun display-time-file-nonempty-p (file)
+  (let ((remote-file-name-inhibit-cache
+         (- display-time-interval 5)))
+    (and (file-exists-p file)
+         (&lt; 0 (file-attribute-size
+               (file-attributes
+                (file-chase-links file)))))))
+</pre></div>
+</dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-without_002dremote_002dfiles"><span class="category-def">Macro: </span><span><strong class="def-name">without-remote-files</strong> <var class="def-var-arguments">body&hellip;</var><a class="copiable-link" href="#index-without_002dremote_002dfiles"> &para;</a></span></dt>
+<dd><p><code class="code">without-remote-files</code> 宏在禁用远程文件的文件名处理器的情况下求值 <var class="var">body</var> 中的表达式。
+这些文件名会被按字面量处理。
+</p>
+<p>该宏仅应在明确不会出现远程文件，或有意不处理远程文件名的场景中使用。
+它还能减少对 <code class="code">file-name-handler-alist</code> 的检查，提升代码性能。
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Format-Conversion.html">文件格式转换</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Create_002fDelete-Dirs.html">创建、复制和删除目录</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Files.html">文件</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

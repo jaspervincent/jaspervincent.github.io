@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 基础篇-服务发布</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 基础篇-服务发布</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:197eeef9-9484-4110-8506-3a6d0ca5c2f5">k8s基础篇-服务发布</a>
+<ul>
+<li><a href="#h:acb59841-0230-46f1-90ee-745e8289ec44">在 k8s 上是如何发布服务的</a></li>
+<li><a href="#h:d92956e1-7bb4-43f2-a827-93d5a6efeeaa">Label &amp;&amp; Selector</a>
+<ul>
+<li><a href="#h:ade3afea-1a97-45b5-be6c-1f9d550c221f">如何定义Label</a></li>
+<li><a href="#h:f9ced850-7fed-4381-8568-75eba9ad393d">Selector条件匹配</a></li>
+<li><a href="#h:9d181500-f63e-41dd-b0ad-8d4f51018137">管理标签（Label）</a></li>
+</ul>
+</li>
+<li><a href="#h:5be0c9ad-3932-4b3e-82ae-fa69502ce3e6">Service</a>
+<ul>
+<li><a href="#h:433a643d-e0fe-4a77-8db9-bf300f772cfd">什么是Service</a></li>
+<li><a href="#h:d16e2780-9356-483f-aed5-f94530158bae">创建一个简单的Service</a></li>
+<li><a href="#h:12197749-24c6-4dfd-8095-53c46a017f1b">Service 类型</a></li>
+<li><a href="#h:3b68e3ab-7c4c-4e3b-a894-5cfdb4a1f863">NodePort 类型</a></li>
+<li><a href="#h:6baf1eb9-0055-4fcc-bddb-bec4b20fa517">使用 Service 代理 k8s 外部应用</a></li>
+<li><a href="#h:561c41a4-5f89-49cd-be18-270752d347c4">使用Service反代域名</a></li>
+<li><a href="#h:c9972193-ab83-4c1d-8b85-f48ebe1785a8">多端口 Service</a></li>
+<li><a href="#h:13a9ef64-0344-4e90-84cd-26e900a6d4f0">LoadBalancer</a>
+<ul>
+<li><a href="#h:c30b346e-e10d-409c-afd0-9e051cb1384c">AWS NLB</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:5fecdcb9-9846-4fea-aa8f-2ffeb03f12bc">Ingress</a>
+<ul>
+<li><a href="#h:e7a06c75-0d87-4f4f-b7a6-e8d05360a45c">什么是Ingress</a>
+<ul>
+<li><a href="#h:cb777157-be0a-45a3-a386-b15d3bbae347">使用 Ingress 发布服务的流程</a></li>
+<li><a href="#h:fd8270ac-b8b2-473e-ac7e-8b7de55db01b">Ingress 组成</a></li>
+</ul>
+</li>
+<li><a href="#h:2b22f8e9-f32d-4208-a23e-9c1edfd5d6ad">Ingress安装</a>
+<ul>
+<li><a href="#h:3001890e-9b89-4e40-87e3-7edde7b15219">使用 yaml 文件安装 Ingress（推荐）</a></li>
+<li><a href="#h:097f8e49-6cfc-45af-8c48-2bda6674b885">使用 helm 安装 Ingress</a></li>
+</ul>
+</li>
+<li><a href="#h:3d7996eb-59b0-466a-980a-49c9cf3465aa">使用域名发布 K8s 的服务</a></li>
+<li><a href="#h:cb1b1473-9467-4351-810f-443aab96a218">Ingress 特例：不配置域名发布服务</a></li>
+<li><a href="#h:c0b8e871-7617-47ed-b5ec-4ffe64f7a40f">Ingress 接口变化解析</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:197eeef9-9484-4110-8506-3a6d0ca5c2f5" class="outline-2">
+<h2 id="h:197eeef9-9484-4110-8506-3a6d0ca5c2f5"><a href="#h:197eeef9-9484-4110-8506-3a6d0ca5c2f5">k8s基础篇-服务发布</a></h2>
+<div class="outline-text-2" id="text-h:197eeef9-9484-4110-8506-3a6d0ca5c2f5">
+</div>
+<div id="outline-container-h:acb59841-0230-46f1-90ee-745e8289ec44" class="outline-3">
+<h3 id="h:acb59841-0230-46f1-90ee-745e8289ec44"><a href="#h:acb59841-0230-46f1-90ee-745e8289ec44">在 k8s 上是如何发布服务的</a></h3>
+<div class="outline-text-3" id="text-h:acb59841-0230-46f1-90ee-745e8289ec44">
+<p>
+传统架构服务发布方式
+在裸机或者虚拟机上部署服务之后，前面会加代理层如 Nginx 或者 slb。
+服务间访问东西流量、服务外访问是南北流量
+</p>
+
+<p>
+k8s 服务发布方式
+通过 ingress controller 访问到服务Servcie，内部访问使用 Service  name。
+</p>
+</div>
+</div>
+<div id="outline-container-h:d92956e1-7bb4-43f2-a827-93d5a6efeeaa" class="outline-3">
+<h3 id="h:d92956e1-7bb4-43f2-a827-93d5a6efeeaa"><a href="#h:d92956e1-7bb4-43f2-a827-93d5a6efeeaa">Label &amp;&amp; Selector</a></h3>
+<div class="outline-text-3" id="text-h:d92956e1-7bb4-43f2-a827-93d5a6efeeaa">
+<p>
+Label：Label（标签）可以对 k8s 的一些对象，如 Pod 和节点进行"分组"。通过添加 `key=value` 格式的标签，用于区分同样资源的不同的分组。
+</p>
+
+<p>
+Selector：Selector（标签选择器）可以通过根据资源的标签查询出精确对象的信息。
+</p>
+</div>
+<div id="outline-container-h:ade3afea-1a97-45b5-be6c-1f9d550c221f" class="outline-4">
+<h4 id="h:ade3afea-1a97-45b5-be6c-1f9d550c221f"><a href="#h:ade3afea-1a97-45b5-be6c-1f9d550c221f">如何定义Label</a></h4>
+<div class="outline-text-4" id="text-h:ade3afea-1a97-45b5-be6c-1f9d550c221f">
+<p>
+应用案例：
+</p>
+
+<p>
+公司与xx银行有一条专属的高速光纤通道，此通道只能与192.168.7.0网段进行通信，因此只能将与xx银行通信的应用部署到192.168.7.0网段所在的节点上，此时可以对节点进行Label（即加标签）：
+</p>
+
+<p>
+给k8s-node02节点打标签
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl label node k8s-node02 <span class="org-variable-name">region</span>=subnet7
+node/k8s-node02 labeled
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#25214;&#21018;&#21018;&#25171;&#26631;&#31614;&#30340;&#33410;&#28857;&#65292;&#36890;&#36807;Selector&#23545;&#20854;&#31579;&#36873;
+</span>[root@k8s-master01 ~]# kubectl get no -l <span class="org-variable-name">region</span>=subnet7
+NAME         STATUS   ROLES    AGE   VERSION
+k8s-node02   Ready    &lt;none&gt;   44h   v1.20.0
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#21518;&#65292;&#22312;Deployment&#25110;&#20854;&#20182;&#25511;&#21046;&#22120;&#20013;&#25351;&#23450;&#23558;Pod&#37096;&#32626;&#21040;&#35813;&#33410;&#28857;&#65306;
+</span>containers:
+  ......
+dnsPolicy: ClusterFirst
+nodeSelector:
+  region: subnet7              <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#21018;&#21018;&#25105;&#20204;&#25171;&#30340;&#26631;&#31614;
+</span>restartPolicy: Always
+......
+</pre>
+</div>
+
+
+<p>
+也可以用同样的方式对Service进行Label
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# kubectl label svc canary-v1 -n canary-production <span class="org-variable-name">env</span>=canary <span class="org-variable-name">version</span>=v1
+service/canary-v1 labeled
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;Labels&#65306;
+</span>[root@k8s-master01 ~]# kubectl get svc -n canary-production --show-labels
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36824;&#21487;&#20197;&#26597;&#30475;&#25152;&#26377;Version&#20026;v1&#30340;svc
+</span>kubectl get svc --all-namespaces -l <span class="org-variable-name">version</span>=v1
+</pre>
+</div>
+
+<p>
+其他资源的Label方式相同
+</p>
+</div>
+</div>
+<div id="outline-container-h:f9ced850-7fed-4381-8568-75eba9ad393d" class="outline-4">
+<h4 id="h:f9ced850-7fed-4381-8568-75eba9ad393d"><a href="#h:f9ced850-7fed-4381-8568-75eba9ad393d">Selector条件匹配</a></h4>
+<div class="outline-text-4" id="text-h:f9ced850-7fed-4381-8568-75eba9ad393d">
+<p>
+Selector主要用于资源的匹配，只有符合条件的资源才会被调用或使用，可以使用该方式对集群中的各类资源进行分配。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#20551;&#22914;&#23545;Selector&#36827;&#34892;&#26465;&#20214;&#21305;&#37197;&#65292;&#30446;&#21069;&#24050;&#26377;&#30340;Label&#22914;&#19979;
+</span>[root@k8s-master01 ~]# kubectl get no --show-labels 
+NAME           STATUS   ROLES    AGE   VERSION   LABELS
+k8s-master01   Ready    matser   44h   v1.20.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8s-master01,kubernetes.io/os=linux,node-role.kubernetes.io/matser=,node.kubernetes.io/node=
+k8s-master02   Ready    &lt;none&gt;   44h   v1.20.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8s-master02,kubernetes.io/os=linux,node.kubernetes.io/node=
+k8s-master03   Ready    &lt;none&gt;   44h   v1.20.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8s-master03,kubernetes.io/os=linux,node.kubernetes.io/node=
+k8s-node01     Ready    &lt;none&gt;   44h   v1.20.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8s-node01,kubernetes.io/os=linux,node.kubernetes.io/node=
+k8s-node02     Ready    &lt;none&gt;   44h   v1.20.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8s-node02,kubernetes.io/os=linux,node.kubernetes.io/node=,<span class="org-variable-name">region</span>=subnet7
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36873;&#25321;app&#20026;reviews&#25110;&#32773;productpage&#30340;svc
+</span>[root@k8s-master01 ~]# kubectl get svc -l  <span class="org-string">'app in (details, productpage)'</span> --show-labels
+NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE     LABELS
+details       ClusterIP   10.99.9.178      &lt;none&gt;        9080/TCP   45h     <span class="org-variable-name">app</span>=details
+nginx         ClusterIP   10.106.194.137   &lt;none&gt;        80/TCP     2d21h   <span class="org-variable-name">app</span>=productpage,<span class="org-variable-name">version</span>=v1
+productpage   ClusterIP   10.105.229.52    &lt;none&gt;        9080/TCP   45h     <span class="org-variable-name">app</span>=productpage,<span class="org-variable-name">tier</span>=frontend
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36873;&#25321;app&#20026;productpage&#25110;reviews&#20294;&#19981;&#21253;&#25324;version=v1&#30340;svc
+</span>[root@k8s-master01 ~]# kubectl get svc -l  version!=v1,<span class="org-string">'app in (details, productpage)'</span> --show-labels
+NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   LABELS
+details       ClusterIP   10.99.9.178     &lt;none&gt;        9080/TCP   45h   <span class="org-variable-name">app</span>=details
+productpage   ClusterIP   10.105.229.52   &lt;none&gt;        9080/TCP   45h   <span class="org-variable-name">app</span>=productpage,<span class="org-variable-name">tier</span>=frontend
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36873;&#25321;labelkey&#21517;&#20026;app&#30340;svc
+</span>[root@k8s-master01 ~]# kubectl get svc -l app --show-labels
+NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE     LABELS
+details       ClusterIP   10.99.9.178      &lt;none&gt;        9080/TCP   45h     <span class="org-variable-name">app</span>=details
+nginx         ClusterIP   10.106.194.137   &lt;none&gt;        80/TCP     2d21h   <span class="org-variable-name">app</span>=productpage,<span class="org-variable-name">version</span>=v1
+productpage   ClusterIP   10.105.229.52    &lt;none&gt;        9080/TCP   45h     <span class="org-variable-name">app</span>=productpage,<span class="org-variable-name">tier</span>=frontend
+ratings       ClusterIP   10.96.104.95     &lt;none&gt;        9080/TCP   45h
+
+
+[root@k8s-master01 ~]# kubectl get po -A --show-labels
+NAMESPACE              NAME                                         READY   STATUS    RESTARTS   AGE   LABELS
+default                busybox                                      1/1     Running   1          14h   &lt;none&gt;
+default                nginx-66bbc9fdc5-8sbxs                       1/1     Running   1          14h   <span class="org-variable-name">app</span>=nginx,pod-template-hash=66bbc9fdc5
+kube-system            calico-kube-controllers-5f6d4b864b-kxtmq     1/1     Running   1          14h   k8s-app=calico-kube-controllers,pod-template-hash=5f6d4b864b
+kube-system            calico-node-6fqbv                            1/1     Running   1          14h   controller-revision-hash=5fd5cdd8c4,k8s-app=calico-node,pod-template-generation=1
+kube-system            calico-node-7x2j4                            1/1     Running   1          14h   controller-revision-hash=5fd5cdd8c4,k8s-app=calico-node,pod-template-generation=1
+kube-system            calico-node-8p269                            1/1     Running   1          14h   controller-revision-hash=5fd5cdd8c4,k8s-app=calico-node,pod-template-generation=1
+kube-system            calico-node-kxp25                            1/1     Running   1          14h   controller-revision-hash=5fd5cdd8c4,k8s-app=calico-node,pod-template-generation=1
+kube-system            calico-node-xlvd9                            1/1     Running   1          14h   controller-revision-hash=5fd5cdd8c4,k8s-app=calico-node,pod-template-generation=1
+kube-system            coredns-867d46bfc6-5nzq7                     1/1     Running   1          14h   k8s-app=kube-dns,pod-template-hash=867d46bfc6
+kube-system            metrics-server-595f65d8d5-7qhdk              1/1     Running   1          14h   k8s-app=metrics-server,pod-template-hash=595f65d8d5
+kubernetes-dashboard   dashboard-metrics-scraper-7645f69d8c-h9wqd   1/1     Running   1          14h   k8s-app=dashboard-metrics-scraper,pod-template-hash=7645f69d8c
+kubernetes-dashboard   kubernetes-dashboard-78cb679857-6q686        1/1     Running   1          14h   k8s-app=kubernetes-dashboard,pod-template-hash=78cb679857
+
+[root@k8s-master01 ~]# kubectl get po -A -l <span class="org-string">'k8s-app in(metrics-server, kubernetes-dashboard)'</span>
+NAMESPACE              NAME                                    READY   STATUS    RESTARTS   AGE
+kube-system            metrics-server-595f65d8d5-7qhdk         1/1     Running   1          14h
+kubernetes-dashboard   kubernetes-dashboard-78cb679857-6q686   1/1     Running   1          14h
+
+</pre>
+</div>
+
+<p>
+deployment 示例
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  selector:
+    matchLabels:
+      app: poker-gateway-1
+      department: poker-gateway
+      env: prod
+  template:
+    metadata:
+      labels:
+        app: poker-gateway-1
+        department: poker-gateway
+        env: prod
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9d181500-f63e-41dd-b0ad-8d4f51018137" class="outline-4">
+<h4 id="h:9d181500-f63e-41dd-b0ad-8d4f51018137"><a href="#h:9d181500-f63e-41dd-b0ad-8d4f51018137">管理标签（Label）</a></h4>
+<div class="outline-text-4" id="text-h:9d181500-f63e-41dd-b0ad-8d4f51018137">
+<p>
+在实际使用中，Label的更改是经常发生的事情，可以使用overwrite参数修改标签。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#26631;&#31614;&#65292;&#27604;&#22914;&#23558;version=v1&#25913;&#20026;version=v2
+</span>[root@k8s-master01 ~]# kubectl get svc -n canary-production --show-labels
+NAME        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   LABELS
+canary-v1   ClusterIP   10.110.253.62   &lt;none&gt;        8080/TCP   26h   <span class="org-variable-name">env</span>=canary,<span class="org-variable-name">version</span>=v1
+[root@k8s-master01 canary]# kubectl label svc canary-v1 -n canary-production <span class="org-variable-name">version</span>=v2 --overwrite
+service/canary-v1 labeled
+[root@k8s-master01 canary]# kubectl get svc -n canary-production --show-labels
+NAME        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   LABELS
+canary-v1   ClusterIP   10.110.253.62   &lt;none&gt;        8080/TCP   26h   <span class="org-variable-name">env</span>=canary,<span class="org-variable-name">version</span>=v2
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;&#26631;&#31614;
+</span>[root@k8s-master01 ~]# kubectl label svc canary-v1 -n canary-production version-
+service/canary-v1 labeled
+[root@k8s-master01 canary]# kubectl get svc -n canary-production --show-labels
+NAME        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   LABELS
+canary-v1   ClusterIP   10.110.253.62   &lt;none&gt;        8080/TCP   26h   <span class="org-variable-name">env</span>=canary
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5be0c9ad-3932-4b3e-82ae-fa69502ce3e6" class="outline-3">
+<h3 id="h:5be0c9ad-3932-4b3e-82ae-fa69502ce3e6"><a href="#h:5be0c9ad-3932-4b3e-82ae-fa69502ce3e6">Service</a></h3>
+<div class="outline-text-3" id="text-h:5be0c9ad-3932-4b3e-82ae-fa69502ce3e6">
+</div>
+<div id="outline-container-h:433a643d-e0fe-4a77-8db9-bf300f772cfd" class="outline-4">
+<h4 id="h:433a643d-e0fe-4a77-8db9-bf300f772cfd"><a href="#h:433a643d-e0fe-4a77-8db9-bf300f772cfd">什么是Service</a></h4>
+<div class="outline-text-4" id="text-h:433a643d-e0fe-4a77-8db9-bf300f772cfd">
+<p>
+Service可以简单的理解为逻辑上的一组Pod。一种可以访问Pod的策略，而且其他Pod可以通过这个Service访问到这个Service代理的Pod。相对于Pod而言，它会有一个固定的名称，一旦创建就固定不变。
+</p>
+
+<p>
+可以简单的理解成访问一个或者一组Pod的时候，先访问service再去访的IP的,service的名称的固定的，不管你怎么重启Pod，Pod的IP怎么改变，都不影响用户的使用
+</p>
+</div>
+</div>
+<div id="outline-container-h:d16e2780-9356-483f-aed5-f94530158bae" class="outline-4">
+<h4 id="h:d16e2780-9356-483f-aed5-f94530158bae"><a href="#h:d16e2780-9356-483f-aed5-f94530158bae">创建一个简单的Service</a></h4>
+<div class="outline-text-4" id="text-h:d16e2780-9356-483f-aed5-f94530158bae">
+<p>
+创建服务：
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+</pre>
+</div>
+
+<p>
+定义 Service 的 yaml 文件如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">cat nginx-svc.yaml
+</span>kind: Service
+apiVersion: v1
+metadata:
+  name: my-service
+spec:
+  selector:
+    app: nginx
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;service
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">kubectl create -f nginx-svc.yaml  
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">kubectl get svc
+</span>
+</pre>
+</div>
+
+<p>
+该示例为 my-service:80 即可访问到具有 app=myapp 标签的 Pod 的 80 端口上。
+</p>
+
+<p>
+需要注意的是，Service 能够将一个接收端口映射到任意的 targetPort，如果 targetPort 为空，targetPort 将被设置为与 Port 字段相同的值。targetPort 可以设置为一个字符串，引用 backend Pod 的一个端口的名称，这样的话即使更改了 Pod 的端口，也不会对 Service 的访问造成影响。
+</p>
+
+<p>
+Kubernetes Service 能够支持 TCP、UDP、SCTP 等协议，默认为 TCP 协议.
+</p>
+
+<p>
+访问的格式为：
+  serviceName.namespace.svc.cluster.local
+</p>
+
+<p>
+同名称空间下访问地址：
+web-0.nginx
+</p>
+
+<p>
+不同名称空间下访问地址：
+web-0.nginx.default
+</p>
+</div>
+</div>
+<div id="outline-container-h:12197749-24c6-4dfd-8095-53c46a017f1b" class="outline-4">
+<h4 id="h:12197749-24c6-4dfd-8095-53c46a017f1b"><a href="#h:12197749-24c6-4dfd-8095-53c46a017f1b">Service 类型</a></h4>
+<div class="outline-text-4" id="text-h:12197749-24c6-4dfd-8095-53c46a017f1b">
+<p>
+Kubernetes Service Type（服务类型）主要包括以下几种：
+</p>
+<ul class="org-ul">
+<li>ClusterIP：在集群内部使用，也是默认值，只能从集群中访问。</li>
+<li>NodePort：在所有安装了kube-proxy的节点上打开一个端口，此端口可以代理至后端Pod，可以通过 NodePort 从集群外部访问集群内的服务，格式为 NodeIP:NodePort。NodePort端口范围默认是30000-32767</li>
+<li>LoadBalancer：使用云提供商的负载均衡器公开服务，成本较高。</li>
+<li>ExternalName：通过返回定义的 CNAME 别名，没有设置任何类型的代理，需要 1.7 或更高版本 kube-dns 支持。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:3b68e3ab-7c4c-4e3b-a894-5cfdb4a1f863" class="outline-4">
+<h4 id="h:3b68e3ab-7c4c-4e3b-a894-5cfdb4a1f863"><a href="#h:3b68e3ab-7c4c-4e3b-a894-5cfdb4a1f863">NodePort 类型</a></h4>
+<div class="outline-text-4" id="text-h:3b68e3ab-7c4c-4e3b-a894-5cfdb4a1f863">
+<p>
+如果将 Service 的 type 字段设置为 NodePort，则 Kubernetes 将从 kubelet  <code>--service-node-port-range</code> 参数指定的范围（默认为 30000-32767）中自动分配端口，也可以手动指定 NodePort，创建该 Service后，集群每个节点都将暴露一个端口，通过某个宿主机的 IP+端口即可访问到后端的应用。
+</p>
+
+<p>
+定义一个 NodePort 类型的 Service 格式如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    k8s-app: kubernetes-dashboard
+  name: kubernetes-dashboard
+  namespace: kube-system
+spec:
+  type: NodePort
+  ports:
+  - port: 443
+    targetPort: 8443
+    nodePort: 30000
+  selector:
+    k8s-app: kubernetes-dashboard
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6baf1eb9-0055-4fcc-bddb-bec4b20fa517" class="outline-4">
+<h4 id="h:6baf1eb9-0055-4fcc-bddb-bec4b20fa517"><a href="#h:6baf1eb9-0055-4fcc-bddb-bec4b20fa517">使用 Service 代理 k8s 外部应用</a></h4>
+<div class="outline-text-4" id="text-h:6baf1eb9-0055-4fcc-bddb-bec4b20fa517">
+<p>
+使用场景：
+</p>
+<ul class="org-ul">
+<li>希望在生产环境中使用某个固定的名称而非IP地址进行访问外部的中间件服务</li>
+<li>希望Service指向另一个Namespace中或其他集群中的服务</li>
+<li>正在将工作负载转移到 Kubernetes 集群，但是一部分服务仍运行在 Kubernetes 集群之外的 backend。</li>
+</ul>
+
+<p>
+范例：ci-mysql指向集群外IP
+</p>
+
+<ul class="org-ul">
+<li>1.33+版本，使用<a href="https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/">EndpointSlice</a>，利用标签匹配service</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; ci-mysql.yaml<span class="org-sh-heredoc">
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ci-mysql
+  namespace: ci
+spec:
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: ci-mysql
+  namespace: ci
+  labels:
+    kubernetes.io/service-name: ci-mysql
+addressType: IPv4
+ports:
+- name: mysql
+  port: 3306
+  protocol: TCP
+endpoints:
+- addresses:
+  - "10.0.224.4"
+EOF</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>1.33版本前做法，利用endpoints中name名称保持一致</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; ci-mysql.yaml<span class="org-sh-heredoc">
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ci-mysql
+  namespace: ci
+spec:
+  clusterIP: None
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ci-mysql  #&#21517;&#23383;&#35201;&#36319;svc&#30340;&#19968;&#33268;
+  namespace: ci
+subsets:
+- addresses:
+  - ip: 10.0.224.4
+  ports:
+  - port: 3306
+EOF</span>
+</pre>
+</div>
+
+
+<p>
+不配置标签选择器就没有对就的 endpoint
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;&#31867;&#22411;&#20026;external&#30340;service&#65288;svc&#65289;&#65292;&#36825;&#20010;svc&#19981;&#20250;&#33258;&#21160;&#21019;&#24314;&#19968;&#20010;ep
+</span>[root@k8s-master01 ~]# vim nginx-svc-external.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-svc-external
+  name: nginx-svc-external
+spec:
+  ports:
+  - name: http <span class="org-comment-delimiter"># </span><span class="org-comment">Service&#31471;&#21475;&#30340;&#21517;&#31216;
+</span>    port: 80 <span class="org-comment-delimiter"># </span><span class="org-comment">Service&#33258;&#24049;&#30340;&#31471;&#21475;, servicea --&gt; serviceb http://serviceb,  http://serviceb:8080 
+</span>    protocol: TCP <span class="org-comment-delimiter"># </span><span class="org-comment">UDP TCP SCTP default: TCP
+</span>    targetPort: 80 <span class="org-comment-delimiter"># </span><span class="org-comment">&#21518;&#31471;&#24212;&#29992;&#30340;&#31471;&#21475;
+</span>  sessionAffinity: None
+  <span class="org-builtin">type</span>: ClusterIP
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25163;&#21160;&#21019;&#24314;&#19968;&#20010;ep&#65292;&#36319;&#19978;&#38754;&#21019;&#24314;&#30340;svc&#20851;&#32852;&#36215;&#26469;
+</span>[root@k8s-master01 ~]# vim nginx-ep-external.yaml 
+apiVersion: v1
+kind: Endpoints
+metadata:
+  labels:
+    app: nginx-svc-external   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21517;&#23383;&#35201;&#36319;svc&#30340;&#19968;&#33268;
+</span>  name: nginx-svc-external
+  namespace: default
+subsets:
+- addresses:
+  - ip: 220.181.38.148 <span class="org-comment-delimiter"># </span><span class="org-comment">baidu
+</span>  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+   
+<span class="org-comment-delimiter"># </span><span class="org-comment">create svc , create ep
+</span>[root@k8s-master01 ~]# kubectl create -f nginx-svc-external.yaml 
+[root@k8s-master01 ~]# kubectl create -f nginx-ep-external.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;ep (EP&#21518;&#38754;&#23545;&#24212;&#30340;&#21015;&#34920;&#23601;&#26159;&#21487;&#29992;Pod&#30340;&#21015;&#34920;)
+</span>[root@k8s-master01 ~]# kubectl get ep
+NAME                 ENDPOINTS                                                               AGE
+nginx-svc-external   220.181.38.148:80                                                       35s
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35775;&#38382;ep
+</span>[root@k8s-master01 ~]# curl 220.181.38.148:80 -I
+HTTP/1.1 200 OK
+Date: Sat, 26 Dec 2020 16:00:57 GMT
+Server: Apache
+Last-Modified: Tue, 12 Jan 2010 13:48:00 GMT
+ETag: <span class="org-string">"51-47cf7e6ee8400"</span>
+Accept-Ranges: bytes
+Content-Length: 81
+Cache-Control: max-age=86400
+Expires: Sun, 27 Dec 2020 16:00:57 GMT
+Connection: Keep-Alive
+Content-Type: text/html
+</pre>
+</div>
+
+<p>
+注意：Endpoint IP 地址不能是 loopback（127.0.0.0/8）、link-local（169.254.0.0/16）或者 link-local 多播地址（224.0.0.0/24）。
+</p>
+
+<p>
+访问没有 Selector 的 Service 与有 Selector 的 Service 的原理相同，通过 Service 名称即可访
+问，请求将被路由到用户定义的 Endpoint。
+</p>
+</div>
+</div>
+<div id="outline-container-h:561c41a4-5f89-49cd-be18-270752d347c4" class="outline-4">
+<h4 id="h:561c41a4-5f89-49cd-be18-270752d347c4"><a href="#h:561c41a4-5f89-49cd-be18-270752d347c4">使用Service反代域名</a></h4>
+<div class="outline-text-4" id="text-h:561c41a4-5f89-49cd-be18-270752d347c4">
+<p>
+ExternalName Service 是 Service 的特例，它没有 Selector，也没有定义任何端口和 Endpoint，它通过返回该外部服务的别名来提供服务。
+</p>
+
+<p>
+比如可以定义一个 Service，后端设置为一个外部域名，这样通过 Service 的名称即可访问到该域名。使用 nslookup 解析以下文件定义的 Service，集群的 DNS 服务将返回一个值为my.database.example.com 的 CNAME 记录：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; nginx-externalName.yaml  &lt;&lt; EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-externalname
+  name: nginx-externalname
+spec:
+  type: ExternalName
+  externalName: www.baidu.com
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">create svc
+</span>[root@k8s-master01 ~]# kubectl create -f nginx-externalName.yaml
+service/nginx-externalname created
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;svc
+</span>[root@k8s-master01 ~]# kubectl get svc
+NAME                 TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)          AGE
+kubernetes           ClusterIP      10.96.0.1       &lt;none&gt;          443/TCP          6d4h
+nginx-externalname   ExternalName   &lt;none&gt;          www.baidu.com   &lt;none&gt;           27s
+nginx-svc            ClusterIP      10.96.141.65    &lt;none&gt;          80/TCP,443/TCP   4d3h
+nginx-svc-external   ClusterIP      10.109.18.238   &lt;none&gt;          80/TCP           18m
+</pre>
+</div>
+
+<p>
+好处：service 名称固定，后端可以动态改变。内部 pod 访问不需要重启可获得新的 dns 解析地址。
+</p>
+</div>
+</div>
+<div id="outline-container-h:c9972193-ab83-4c1d-8b85-f48ebe1785a8" class="outline-4">
+<h4 id="h:c9972193-ab83-4c1d-8b85-f48ebe1785a8"><a href="#h:c9972193-ab83-4c1d-8b85-f48ebe1785a8">多端口 Service</a></h4>
+<div class="outline-text-4" id="text-h:c9972193-ab83-4c1d-8b85-f48ebe1785a8">
+<p>
+例如将 Service 的 80 端口代理到后端的 9376,443 端口代理到后端的 9377：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# cat nginx-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+spec:
+  ports:
+  - name: http    <span class="org-comment-delimiter"># </span><span class="org-comment">Service&#31471;&#21475;&#30340;&#21517;&#31216;
+</span>    port: 80      <span class="org-comment-delimiter"># </span><span class="org-comment">Service&#33258;&#24049;&#30340;&#31471;&#21475;, servicea --&gt; serviceb http://serviceb,  http://serviceb:8080 
+</span>    protocol: TCP   <span class="org-comment-delimiter"># </span><span class="org-comment">UDP TCP SCTP default: TCP
+</span>    targetPort: 80  <span class="org-comment-delimiter"># </span><span class="org-comment">&#21518;&#31471;&#24212;&#29992;&#30340;&#31471;&#21475;
+</span>  - name: https     
+    port: 443
+    protocol: TCP
+    targetPort: 9377
+  selector:
+    app: nginx
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:13a9ef64-0344-4e90-84cd-26e900a6d4f0" class="outline-4">
+<h4 id="h:13a9ef64-0344-4e90-84cd-26e900a6d4f0"><a href="#h:13a9ef64-0344-4e90-84cd-26e900a6d4f0">LoadBalancer</a></h4>
+<div class="outline-text-4" id="text-h:13a9ef64-0344-4e90-84cd-26e900a6d4f0">
+<p>
+externalTrafficPolicy: Local  和 ClusterIP
+</p>
+</div>
+<div id="outline-container-h:c30b346e-e10d-409c-afd0-9e051cb1384c" class="outline-5">
+<h5 id="h:c30b346e-e10d-409c-afd0-9e051cb1384c"><a href="#h:c30b346e-e10d-409c-afd0-9e051cb1384c">AWS NLB</a></h5>
+<div class="outline-text-5" id="text-h:c30b346e-e10d-409c-afd0-9e051cb1384c">
+<p>
+官方文档：<a href="https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/">https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/</a>
+</p>
+
+<p>
+公网
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-name: template-nlb
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: 'true'
+    service.beta.kubernetes.io/aws-load-balancer-type: "external" #使用aws loadbalance controller，否则 name 无效
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: stickiness.enabled=true,stickiness.type=source_ip,deregistration_delay.timeout_seconds=120,deregistration_delay.connection_termination.enabled=true,preserve_client_ip.enabled=true # 源ip关联(源ip亲和)，延迟注销时间120s, 注销时连接终止，保留客户端ip，因为 aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-0d81fb125f688f939, subnet-0ba764e6283d8ac38 # 有公网网关的子网，对应主机实例安全组允许该子网通信
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing" #外网
+    service.beta.kubernetes.io/load-balancer-source-ranges: 13.235.32.25/32 #必须，办公网出口网关ip #在安全组中手动增加白名单cidr和服务端口配置，不加安全组会自动添加0.0.0.0/0允许，不安全
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: Techteam=PGC, Application=Ops, IgnoreCostAdvisor=true, ignoreoldgen=true, Name=template-nlb, BusinessUnit=PG, Owner=r, Environment=Ops
+    # tls 配置
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:ap-south-1:898496923608:certificate/582fb25b-d603-49f4-9970-8b80d8157370
+    service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: ELBSecurityPolicy-2016-08
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+
+  name: template-web
+  namespace: ops
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: template-80
+    - port: 443
+      targetPort: 443
+      protocol: TCP
+      name: template-443
+  selector:
+    app: template
+</pre>
+</div>
+
+<p>
+私网配置
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">service.beta.kubernetes.io/aws-load-balancer-scheme: "internal（私网） | internet-facing（公网）"
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5fecdcb9-9846-4fea-aa8f-2ffeb03f12bc" class="outline-3">
+<h3 id="h:5fecdcb9-9846-4fea-aa8f-2ffeb03f12bc"><a href="#h:5fecdcb9-9846-4fea-aa8f-2ffeb03f12bc">Ingress</a></h3>
+<div class="outline-text-3" id="text-h:5fecdcb9-9846-4fea-aa8f-2ffeb03f12bc">
+</div>
+<div id="outline-container-h:e7a06c75-0d87-4f4f-b7a6-e8d05360a45c" class="outline-4">
+<h4 id="h:e7a06c75-0d87-4f4f-b7a6-e8d05360a45c"><a href="#h:e7a06c75-0d87-4f4f-b7a6-e8d05360a45c">什么是Ingress</a></h4>
+<div class="outline-text-4" id="text-h:e7a06c75-0d87-4f4f-b7a6-e8d05360a45c">
+<p>
+Ingress 为 kubernetes 集群中的服务提供入口，可以提供负均衡、SSL 终端和基于堪称 （域名）的虚拟主机、应用的灰度发布等功能，在生产环境中常用的 Ingress 有 Treafik、Nginx、HAPproxy、Istio 等。
+</p>
+
+<p>
+Ingress &#x2013;&gt; Service &#x2013;&gt; Pod
+</p>
+
+<p>
+如果 Service 的 NodePort 来用做南北流量管理是很麻烦的。
+</p>
+</div>
+<div id="outline-container-h:cb777157-be0a-45a3-a386-b15d3bbae347" class="outline-5">
+<h5 id="h:cb777157-be0a-45a3-a386-b15d3bbae347"><a href="#h:cb777157-be0a-45a3-a386-b15d3bbae347">使用 Ingress 发布服务的流程</a></h5>
+<div class="outline-text-5" id="text-h:cb777157-be0a-45a3-a386-b15d3bbae347">
+
+<figure id="org3f0bb04">
+<img style="aspect-ratio:1368/738" decoding="async" loading="lazy" src="./images/Snipaste_2022-09-06_06-12-34.webp" alt="Snipaste_2022-09-06_06-12-34.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:fd8270ac-b8b2-473e-ac7e-8b7de55db01b" class="outline-5">
+<h5 id="h:fd8270ac-b8b2-473e-ac7e-8b7de55db01b"><a href="#h:fd8270ac-b8b2-473e-ac7e-8b7de55db01b">Ingress 组成</a></h5>
+<div class="outline-text-5" id="text-h:fd8270ac-b8b2-473e-ac7e-8b7de55db01b">
+<p>
+Kind: Ingress &#x2013;&gt; 相当于 nginx.conf 配置文件
+Ingress Controller &#x2013;&gt;  相当于 Nginx 服务
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2b22f8e9-f32d-4208-a23e-9c1edfd5d6ad" class="outline-4">
+<h4 id="h:2b22f8e9-f32d-4208-a23e-9c1edfd5d6ad"><a href="#h:2b22f8e9-f32d-4208-a23e-9c1edfd5d6ad">Ingress安装</a></h4>
+<div class="outline-text-4" id="text-h:2b22f8e9-f32d-4208-a23e-9c1edfd5d6ad">
+<p>
+官方： <a href="https://kubernetes.github.io/ingress-nginx/deploy/">https://kubernetes.github.io/ingress-nginx/deploy/</a>
+</p>
+
+<p>
+github：<a href="https://github.com/kubernetes/ingress-nginx">https://github.com/kubernetes/ingress-nginx</a>
+</p>
+
+<p>
+如果有多个 ingress 可以通过注释或指定ingressClassName名称来确认使用哪个ingress
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">  annotations:
+    kubernetes.io/ingress.class: "nginx"
+
+spec:
+  ingressClassName: nginx
+</pre>
+</div>
+</div>
+<div id="outline-container-h:3001890e-9b89-4e40-87e3-7edde7b15219" class="outline-5">
+<h5 id="h:3001890e-9b89-4e40-87e3-7edde7b15219"><a href="#h:3001890e-9b89-4e40-87e3-7edde7b15219">使用 yaml 文件安装 Ingress（推荐）</a></h5>
+<div class="outline-text-5" id="text-h:3001890e-9b89-4e40-87e3-7edde7b15219">
+<p>
+ingress nodePort <a href="https://kubernetes.github.io/ingress-nginx/deploy/#bare-metal-clusters">https://kubernetes.github.io/ingress-nginx/deploy/#bare-metal-clusters</a>
+</p>
+</div>
+<ul class="org-ul">
+<li><a id="h:2215ef66-1d8a-4ae4-8f0d-fc0747b7f997"></a><a href="#h:2215ef66-1d8a-4ae4-8f0d-fc0747b7f997">ingress 结合云厂商安装</a><br>
+<div class="outline-text-6" id="text-h:2215ef66-1d8a-4ae4-8f0d-fc0747b7f997">
+<p>
+如 aws
+</p>
+<ul class="org-ul">
+<li>方案1 NLB</li>
+</ul>
+
+<p>
+<a href="https://kubernetes.github.io/ingress-nginx/deploy/#aws">https://kubernetes.github.io/ingress-nginx/deploy/#aws</a>
+</p>
+</div>
+<ul class="org-ul">
+<li><a id="h:5dde2580-2e96-4cdf-a91c-976064e1615a"></a><a href="#h:5dde2580-2e96-4cdf-a91c-976064e1615a">service 配置</a><br>
+<div class="outline-text-7" id="text-h:5dde2580-2e96-4cdf-a91c-976064e1615a">
+<p>
+官方文档：<a href="https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/">https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/</a>
+</p>
+
+<ul class="org-ul">
+<li>方案2 ALB</li>
+</ul>
+
+<p>
+<a href="https://kubernetes.github.io/ingress-nginx/deploy/#aws">https://kubernetes.github.io/ingress-nginx/deploy/#aws</a>
+</p>
+
+<p>
+把 Service 从 LoadBalancer  改为正常的 ClusterIP。创建 ALB 文件，可以从安全组限制访问白名单，使用 aws 证书管理统一颁发 ALB  证书。
+</p>
+</div>
+</li>
+<li><a id="h:d48d3197-aef8-4b94-877b-e76bccc32041"></a><a href="#h:d48d3197-aef8-4b94-877b-e76bccc32041">alb 配置</a><br>
+<div class="outline-text-7" id="text-h:d48d3197-aef8-4b94-877b-e76bccc32041">
+<p>
+官方文档：<a href="https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/ingress/annotations/">https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/ingress/annotations/</a>
+</p>
+
+<p>
+公网
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-ops-client
+  namespace: ops
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/group.name: "internet-client" #  多个 ingress 可使用同一个 alb，要组名相同且组 ID 不同
+    alb.ingress.kubernetes.io/group.order: "900" # 0-1000可取 0优先级最高
+    alb.ingress.kubernetes.io/load-balancer-name: slb-ingress-ops-client
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/security-groups: sg-0c30c767ba9769b64, sg-0c7a998514454e576 # 安全组可限制访问
+    alb.ingress.kubernetes.io/subnets: subnet-0d81fb125f688f939, subnet-0ba764e6283d8ac38  # 有公网网关的子网，EKS 集群安全组允许该子网通信
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/success-codes: '404'  # 默认不匹配返回状态码
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    #alb.ingress.kubernetes.io/healthcheck-path: /health.htm   # 健康检查地址
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-2016-08  # ssl 加密协议
+    #alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/tags: Techteam=PGC, Application=Platform,Environment=Ops,SubModule=Ops,Usage=EKS, IgnoreCostAdvisor=true, ignoreoldgen=true, Name=pgc-ops-slb-ingress-ops-client, BusinessUnit=PG, Owner=jasper #  打标签区分资源，成本控制时需要
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:898496923608:certificate/582fb25b-d603-49f4-9970-8b80d8157370 # 证书 arn 号
+    #alb.ingress.kubernetes.io/actions.response-404: &gt;
+    #{"type":"fixed-response","fixedResponseConfig":{"contentType":"text/plain","statusCode":"404","messageBody":"404 error text"}}
+spec:
+  rules:
+  - host: "*.xxx.com"
+    http:
+      paths:
+      - backend:
+          service:
+            name: response-444
+            port:
+              name: use-annotation
+        path: /api/actuator*
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ingress-nginx-ops-controller
+            port:
+              number: 80
+        path: /*
+        pathType: ImplementationSpecific
+</pre>
+</div>
+
+<p>
+私网
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">alb.ingress.kubernetes.io/scheme	internal（私网） | internet-facing（公网）
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:097f8e49-6cfc-45af-8c48-2bda6674b885" class="outline-5">
+<h5 id="h:097f8e49-6cfc-45af-8c48-2bda6674b885"><a href="#h:097f8e49-6cfc-45af-8c48-2bda6674b885">使用 helm 安装 Ingress</a></h5>
+<div class="outline-text-5" id="text-h:097f8e49-6cfc-45af-8c48-2bda6674b885">
+<p>
+安装 helm
+</p>
+
+<p>
+<a href="https://helm.sh/docs/intro/install/">https://helm.sh/docs/intro/install/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1&#12289;&#19979;&#36733;
+</span>[root@k8s-master01 ~]# wget https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2&#12289;&#23433;&#35013;
+</span>[root@k8s-master01 ~]# tar -zxvf helm-v3.4.2-linux-amd64.tar.gz 
+[root@k8s-master01 ~]# mv linux-amd64/helm /usr/local/bin/helm
+</pre>
+</div>
+</div>
+<ul class="org-ul">
+<li><a id="h:4ac86e8b-5bdd-4efc-a5a3-8193d5caeb86"></a><a href="#h:4ac86e8b-5bdd-4efc-a5a3-8193d5caeb86">使用helm安装ingress</a><br>
+<div class="outline-text-6" id="text-h:4ac86e8b-5bdd-4efc-a5a3-8193d5caeb86">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1&#12289;&#28155;&#21152;ingress&#30340;helm&#20179;&#24211;
+</span>[root@k8s-master01 ~]# helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+<span class="org-string">"ingress-nginx"</span> has been added to your repositories
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2&#12289;&#19979;&#36733;ingress&#30340;helm&#21253;&#33267;&#26412;&#22320;
+</span>[root@k8s-master01 ~]# mkdir /helm_images &amp;&amp; <span class="org-builtin">cd</span> /helm_images
+[root@k8s-master01 helm_images]# helm pull ingress-nginx/ingress-nginx
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3&#12289;&#26356;&#25913;&#23545;&#24212;&#30340;&#37197;&#32622;
+</span>[root@k8s-master01 helm_images]# tar -zxvf ingress-nginx-3.17.0.tgz &amp;&amp; <span class="org-builtin">cd</span> ingress-nginx
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">4&#12289;&#38656;&#35201;&#20462;&#25913;&#30340;&#20301;&#32622;
+</span>  a)  Controller&#21644;admissionWebhook&#30340;&#38236;&#20687;&#22320;&#22336;&#65292;&#38656;&#35201;&#23558;&#20844;&#32593;&#38236;&#20687;&#21516;&#27493;&#33267;&#20844;&#21496;&#20869;&#32593;&#38236;&#20687;&#20179;&#24211;
+  b)  hostNetwork&#35774;&#32622;&#20026;true
+  c)  dnsPolicy&#35774;&#32622;&#20026; ClusterFirstWithHostNet
+  d)  NodeSelector&#28155;&#21152;ingress: <span class="org-string">"true"</span>&#37096;&#32626;&#33267;&#25351;&#23450;&#33410;&#28857;
+  e)  &#31867;&#22411;&#26356;&#25913;&#20026;kind: DaemonSet
+  f)  &#38236;&#20687;&#20179;&#24211;&#22320;&#22336;&#38656;&#35201;&#25913;2&#22788;
+  g)  <span class="org-builtin">type</span>: ClusterIP 
+  
+  &#20462;&#25913;&#23436;&#25104;&#21518;&#30340;&#25991;&#20214;&#65306;
+  
+controller:
+  image:
+    repository: registry.cn-beijing.aliyuncs.com/dotbalo/controller   <span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#22788;
+</span>    tag: <span class="org-string">"v0.40.2"</span>
+    pullPolicy: IfNotPresent
+    runAsUser: 101
+    allowPrivilegeEscalation: true
+  containerPort:
+    http: 80
+    https: 443
+  config: {}
+  configAnnotations: {}
+  proxySetHeaders: {}
+  addHeaders: {}
+  dnsConfig: {}
+  dnsPolicy: ClusterFirstWithHostNet  <span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#22788;
+</span>  reportNodeInternalIp: false
+  hostNetwork: true   <span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#22788;
+</span>  hostPort:
+    enabled: false
+    ports:
+      http: 80
+      https: 443
+  electionID: ingress-controller-leader
+  ingressClass: nginx
+  podLabels: {}
+  podSecurityContext: {}
+  sysctls: {}
+  publishService:
+    enabled: true
+    pathOverride: <span class="org-string">""</span>
+  scope:
+    enabled: false
+  tcp:
+    annotations: {}
+  udp:
+    annotations: {}
+  maxmindLicenseKey: <span class="org-string">""</span>
+  extraArgs: {}
+  extraEnvs: []
+  kind: DaemonSet <span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#22788;
+</span>  annotations: {}
+  labels: {}
+  updateStrategy: {}
+  minReadySeconds: 0
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  terminationGracePeriodSeconds: 300
+  nodeSelector:
+    kubernetes.io/os: linux
+    ingress: <span class="org-string">"true"</span>     <span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#22788;
+</span>  livenessProbe:
+    failureThreshold: 5
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+    port: 10254
+  readinessProbe:
+    failureThreshold: 3
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+    port: 10254
+  healthCheckPath: <span class="org-string">"/healthz"</span>
+  podAnnotations: {}
+  replicaCount: 1
+  minAvailable: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 90Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 11
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 50
+  autoscalingTemplate: []
+  keda:
+    apiVersion: <span class="org-string">"keda.sh/v1alpha1"</span>
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 11
+    pollingInterval: 30
+    cooldownPeriod: 300
+    restoreToOriginalReplicaCount: false
+    triggers: []
+    behavior: {}
+  enableMimalloc: true
+  customTemplate:
+    configMapName: <span class="org-string">""</span>
+    configMapKey: <span class="org-string">""</span>
+  service:
+    enabled: true
+    annotations: {}
+    labels: {}
+    externalIPs: []
+    loadBalancerSourceRanges: []
+    enableHttp: true
+    enableHttps: true
+    ports:
+      http: 80
+      https: 443
+    targetPorts:
+      http: http
+      https: https
+    <span class="org-builtin">type</span>: ClusterIP   <span class="org-comment-delimiter"># </span><span class="org-comment">&#27492;&#22788;
+</span>    nodePorts:
+      http: <span class="org-string">""</span>
+      https: <span class="org-string">""</span>
+      tcp: {}
+      udp: {}
+    internal:
+      enabled: false
+      annotations: {}
+      loadBalancerSourceRanges: []
+  extraContainers: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  extraInitContainers: []
+  admissionWebhooks:
+    annotations: {}
+    enabled: true
+    failurePolicy: Fail
+    port: 8443
+    certificate: <span class="org-string">"/usr/local/certificates/cert"</span>
+    key: <span class="org-string">"/usr/local/certificates/key"</span>
+    namespaceSelector: {}
+    objectSelector: {}
+    service:
+      annotations: {}
+      externalIPs: []
+      loadBalancerSourceRanges: []
+      servicePort: 443
+      <span class="org-builtin">type</span>: ClusterIP
+    patch:
+      enabled: true
+      image:
+        repository: registry.cn-beijing.aliyuncs.com/dotbalo/kube-webhook-certgen <span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#22788;
+</span>        tag: v1.3.0
+        pullPolicy: IfNotPresent
+      priorityClassName: <span class="org-string">""</span>
+      podAnnotations: {}
+      nodeSelector: {}
+      tolerations: []
+      runAsUser: 2000
+  metrics:
+    port: 10254
+    enabled: false
+    service:
+      annotations: {}
+      externalIPs: []
+      loadBalancerSourceRanges: []
+      servicePort: 9913
+      <span class="org-builtin">type</span>: ClusterIP
+    serviceMonitor:
+      enabled: false
+      additionalLabels: {}
+      namespace: <span class="org-string">""</span>
+      namespaceSelector: {}
+      scrapeInterval: 30s
+      targetLabels: []
+      metricRelabelings: []
+    prometheusRule:
+      enabled: false
+      additionalLabels: {}
+      rules: []
+  lifecycle:
+    preStop:
+      <span class="org-keyword">exec</span>:
+        command:
+          - /wait-shutdown
+  priorityClassName: <span class="org-string">""</span>
+revisionHistoryLimit: 10
+defaultBackend:
+  enabled: false
+  name: defaultbackend
+  image:
+    repository: k8s.gcr.io/defaultbackend-amd64
+    tag: <span class="org-string">"1.5"</span>
+    pullPolicy: IfNotPresent
+    runAsUser: 65534
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+  extraArgs: {}
+  serviceAccount:
+    create: true
+    name:
+  extraEnvs: []
+  port: 8080
+  livenessProbe:
+    failureThreshold: 3
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 5
+  readinessProbe:
+    failureThreshold: 6
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 5
+  tolerations: []
+  affinity: {}
+  podSecurityContext: {}
+  podLabels: {}
+  nodeSelector: {}
+  podAnnotations: {}
+  replicaCount: 1
+  minAvailable: 1
+  resources: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 50
+  service:
+    annotations: {}
+    externalIPs: []
+    loadBalancerSourceRanges: []
+    servicePort: 80
+    <span class="org-builtin">type</span>: ClusterIP
+  priorityClassName: <span class="org-string">""</span>
+rbac:
+  create: true
+  scope: false
+podSecurityPolicy:
+  enabled: false
+serviceAccount:
+  create: true
+  name:
+imagePullSecrets: []
+tcp: {}
+udp: {}
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">5&#12289;&#37096;&#32626;ingress&#65292;&#32473;&#38656;&#35201;&#37096;&#32626;ingress&#30340;&#33410;&#28857;&#19978;&#25171;&#26631;&#31614;&#65292;&#36825;&#26679;&#23601;&#33021;&#25351;&#23450;&#35201;&#37096;&#32626;&#30340;&#33410;&#28857;&#20102;
+</span>[root@k8s-master01 ~]# kubectl label node k8s-master03 <span class="org-variable-name">ingress</span>=true
+node/k8s-master03 labeled
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;ns
+</span>[root@k8s-master01 ~]# kubectl create ns ingress-nginx
+namespace/ingress-nginx created
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37096;&#32626;ingress
+</span>[root@k8s-master01 ingress-nginx]# helm install ingress-nginx -n ingress-nginx .
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#21018;&#21018;&#26500;&#24314;&#30340;ingress
+</span>[root@k8s-master01 ingress-nginx]# kubectl get  pod -n ingress-nginx 
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">ingress&#25193;&#23481;&#19982;&#32553;&#23481;&#65292;&#21482;&#38656;&#35201;&#32473;&#24819;&#35201;&#25193;&#23481;&#30340;&#33410;&#28857;&#21152;&#26631;&#31614;&#23601;&#34892;&#65292;&#32553;&#23481;&#23601;&#25226;&#33410;&#28857;&#26631;&#31614;&#21435;&#38500;&#21363;&#21487;
+</span>[root@k8s-master01 ~]# kubectl label node k8s-master02 <span class="org-variable-name">ingress</span>=true
+node/k8s-master02 labeled
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">ingress&#32553;&#23481;
+</span>[root@k8s-master01 ~]# kubectl label node k8s-master03 ingress-
+node/k8s-master03 labeled
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:3d7996eb-59b0-466a-980a-49c9cf3465aa" class="outline-4">
+<h4 id="h:3d7996eb-59b0-466a-980a-49c9cf3465aa"><a href="#h:3d7996eb-59b0-466a-980a-49c9cf3465aa">使用域名发布 K8s 的服务</a></h4>
+<div class="outline-text-4" id="text-h:3d7996eb-59b0-466a-980a-49c9cf3465aa">
+<p>
+创建一个 web 服务：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create deploy nginx --image=nginx:1.15.12
+</pre>
+</div>
+
+<p>
+暴露服务：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl expose deploy nginx --port 80
+</pre>
+</div>
+
+<p>
+创建ingress
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; ingress.yaml &lt;&lt; EFO<span class="org-sh-heredoc">
+apiVersion: networking.k8s.io/v1 # &#23567;&#20110; 1.22&#29256;&#26412;&#20026; networking.k8s.io/v1beta1 &#19988;&#37197;&#32622;&#20869;&#23481;&#26377;&#21306;&#21035;
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+  name: example
+spec:
+  ingressClassName: nginx
+  rules: # &#19968;&#20010;Ingress&#21487;&#20197;&#37197;&#32622;&#22810;&#20010;rules
+  - host: "nginx.test.com" # &#22495;&#21517;&#37197;&#32622;&#65292;&#21487;&#20197;&#19981;&#20889;&#65292;&#21305;&#37197;*&#65292; *.bar.com
+    http:
+      paths: # &#30456;&#24403;&#20110;nginx&#30340;location&#37197;&#21512;&#65292;&#21516;&#19968;&#20010;host&#21487;&#20197;&#37197;&#32622;&#22810;&#20010;path / /abc
+      - backend:
+          service:
+            name: nginx
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+EFO</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>pathType：路径的匹配方式，目前有 ImplementationSpecific、Exact 和 Prefix 方式
+<ul class="org-ul">
+<li>Exact：精确匹配，比如配置的 path 为/bar，那么/bar/将不能被路由；</li>
+<li>Prefix：前缀匹配，基于以 / 分隔的 URL 路径。比如 path 为/abc，可以匹配到/abc/bbb 等，比较常用的配置；</li>
+<li>ImplementationSpecific：这种类型的路由匹配根据 Ingress Controller 来实现，可以当做一个单独的类型，也可以当做 Prefix 和 Exact。ImplementationSpecific是 1.18 版本引入 Prefix 和 Exact 的默认配置；</li>
+</ul></li>
+</ul>
+
+<p>
+如果有多个 ingress 可以通过注释或指定ingressClassName名称来确认使用哪个ingress。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">  annotations:
+    kubernetes.io/ingress.class: "nginx"
+
+spec:
+  ingressClassName: nginx
+</pre>
+</div>
+
+<p>
+可以查看 nginx 启动参数确认ClassName。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;
+</span>[root@k8s-master01 ~]# kubectl create -f ingress.yaml
+
+ <span class="org-comment-delimiter"># </span><span class="org-comment">win&#37197;&#32622; hosts
+</span> <span class="org-comment-delimiter"># </span><span class="org-comment">&#27969;&#28010;&#22120;&#35775;&#38382;&#65306; http://foo2.bar.com</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;&#22810;&#22495;&#21517;ingress
+</span>cat ingress-mulDomain.yaml 
+apiVersion: networking.k8s.io/v1beta1 <span class="org-comment-delimiter"># </span><span class="org-comment">networking.k8s.io/v1 / extensions/v1beta1 
+</span>kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: <span class="org-string">"nginx"</span>
+  name: example
+spec:
+  rules: <span class="org-comment-delimiter"># </span><span class="org-comment">&#19968;&#20010;Ingress&#21487;&#20197;&#37197;&#32622;&#22810;&#20010;rules
+</span>  - host: foo.bar.com <span class="org-comment-delimiter"># </span><span class="org-comment">&#22495;&#21517;&#37197;&#32622;&#65292;&#21487;&#20197;&#19981;&#20889;&#65292;&#21305;&#37197;*&#65292; *.bar.com
+</span>    http:
+      paths: <span class="org-comment-delimiter"># </span><span class="org-comment">&#30456;&#24403;&#20110;nginx&#30340;location&#37197;&#21512;&#65292;&#21516;&#19968;&#20010;host&#21487;&#20197;&#37197;&#32622;&#22810;&#20010;path / /abc
+</span>      - backend:
+          serviceName: nginx-svc 
+          servicePort: 80
+        path: /
+  - host: foo2.bar.com <span class="org-comment-delimiter"># </span><span class="org-comment">&#22495;&#21517;&#37197;&#32622;&#65292;&#21487;&#20197;&#19981;&#20889;&#65292;&#21305;&#37197;*&#65292; *.bar.com
+</span>    http:
+      paths: <span class="org-comment-delimiter"># </span><span class="org-comment">&#30456;&#24403;&#20110;nginx&#30340;location&#37197;&#21512;&#65292;&#21516;&#19968;&#20010;host&#21487;&#20197;&#37197;&#32622;&#22810;&#20010;path / /abc
+</span>      - backend:
+          serviceName: nginx-svc-external
+          servicePort: 80
+        path: /
+        
+ [root@k8s-master01 ~]# kubectl replace -f ingress-mulDomain.yaml
+ [root@k8s-master01 ~]# kubectl get ingress
+ 
+ <span class="org-comment-delimiter"># </span><span class="org-comment">win&#37197;&#32622; hosts
+</span> <span class="org-comment-delimiter"># </span><span class="org-comment">&#27969;&#28010;&#22120;&#35775;&#38382;&#65306; http://foo2.bar.com</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cb1b1473-9467-4351-810f-443aab96a218" class="outline-4">
+<h4 id="h:cb1b1473-9467-4351-810f-443aab96a218"><a href="#h:cb1b1473-9467-4351-810f-443aab96a218">Ingress 特例：不配置域名发布服务</a></h4>
+<div class="outline-text-4" id="text-h:cb1b1473-9467-4351-810f-443aab96a218">
+<p>
+去掉 host，host 值为星*。
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1 # k8s &gt;= 1.22 必须 v1
+kind: Ingress
+metadata:
+  name: nginx-ingress-no-host
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: nginx
+            port:
+              number: 80
+        path: /no-host
+        pathType: ImplementationSpecific
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c0b8e871-7617-47ed-b5ec-4ffe64f7a40f" class="outline-4">
+<h4 id="h:c0b8e871-7617-47ed-b5ec-4ffe64f7a40f"><a href="#h:c0b8e871-7617-47ed-b5ec-4ffe64f7a40f">Ingress 接口变化解析</a></h4>
+<div class="outline-text-4" id="text-h:c0b8e871-7617-47ed-b5ec-4ffe64f7a40f">
+<p>
+1.19 之前的 v1beta1:
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: networking.k8s.io/v1beta1 # 1.22 之前可以使用 v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "nginx" # 不同的 controller，ingress.class可能不一致
+  name:  simple-fanout-example
+spec:
+  rules:
+  - host: taskcenterconsole.xxx.com
+    http:
+      paths:
+      - backend:
+          serviceName: taskcenter-console-website
+          servicePort: 80
+        path: /
+        pathType: ImplementationSpecific
+      - path: /api*
+        backend:
+          serviceName: taskcenter-console-server
+          servicePort: 9017
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

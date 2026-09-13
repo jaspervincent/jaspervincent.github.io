@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Writing PEG Rules (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Writing PEG Rules (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Writing PEG Rules (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Parsing-Expression-Grammars.html" rel="up" title="Parsing Expression Grammars">
+<link href="Parsing-Actions.html" rel="prev" title="Parsing Actions">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Writing-PEG-Rules">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Parsing-Actions.html" accesskey="p" rel="prev">解析动作</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html" accesskey="u" rel="up">解析表达式文法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_7f16_5199-PEG-_89c4_5219"><span>37.3 编写 PEG 规则<a class="copiable-link" href="#g_t_7f16_5199-PEG-_89c4_5219"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-PEG-rules_002c-pitfalls"></a>
+<a class="index-entry-id" id="index-Parsing-Expression-Grammar_002c-pitfalls-in-rules"></a>
+
+<p>编写 PEG 规则时需要注意它们是贪婪的。
+可以消耗可变长度文本的规则总会尽可能消耗最多内容，
+即使这会导致后续原本可能匹配的规则失败——不存在回溯。
+例如，这条规则永远不会成功：
+</p>
+<div class="example">
+<pre class="example-preformatted">(forest (+ &quot;tree&quot; (* [blank])) &quot;tree&quot; (eol))
+</pre></div>
+
+<p><abbr class="acronym">PEX</abbr> <code class="code">(+&nbsp;&quot;tree&quot;&nbsp;(*&nbsp;[blank]))</code><!-- /@w --> 会消耗掉所有单词 &lsquo;<samp class="samp">tree</samp>&rsquo; 的重复出现，
+导致没有剩余内容匹配最后的 &lsquo;<samp class="samp">tree</samp>&rsquo;。
+</p>
+<p>在这类场景中，可以通过使用谓词与守卫（即 <code class="code">not</code>、<code class="code">if</code> 与 <code class="code">guard</code> 表达式）
+约束行为以获得预期结果。例如：
+</p>
+<div class="example">
+<pre class="example-preformatted">(forest (+ &quot;tree&quot; (* [blank])) (not (eol)) &quot;tree&quot; (eol))
+</pre></div>
+
+<p><code class="code">if</code> 与 <code class="code">not</code> 运算符接收一个解析表达式并将其解释为布尔值，
+且不会移动点位置。<code class="code">guard</code> 运算符中的内容会作为普通 Lisp 代码
+（而非 <abbr class="acronym">PEX</abbr>）求值，并应返回布尔值。<code class="code">nil</code> 值会导致匹配失败。
+</p>
+<p>另一个可能出乎意料的行为是，即使解析最终失败，
+解析过程仍会尽可能移动点位置。这条规则：
+</p>
+<div class="example">
+<pre class="example-preformatted">(end-game &quot;game&quot; (eob))
+</pre></div>
+
+<p>在点之后包含文本 &ldquo;game over&rdquo; 的缓冲区中运行时，
+会将点移动到 &ldquo;game&rdquo; 之后，然后停止解析并返回 <code class="code">nil</code>。
+成功的解析总会返回 <code class="code">t</code>，或是解析栈中的内容。
+</p></div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

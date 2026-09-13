@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: Kubernetes存储性能对比</title>
+<meta name="description" content="Kubernetes存储性能对比" />
+<meta name="keywords" content="linux,kubernetes,test" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: Kubernetes存储性能对比</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:7d27813e-fd9c-44c8-baee-1ec0ccac2595">Kubernetes存储性能对比</a>
+<ul>
+<li><a href="#h:9242f447-518b-48e8-8c25-b9b5be2a9fbf">对比</a>
+<ul>
+<li><a href="#h:3091b675-f2f1-4b1b-b619-cb8e6657489e">测试结果</a></li>
+<li><a href="#h:c4ff071a-b022-4cc1-be63-f346622cc71d">测试过程</a>
+<ul>
+<li><a href="#h:25c9246f-ef82-46b5-b5b8-2fb3fa059acf">docker</a></li>
+<li><a href="#h:edb5b16c-b931-4541-b3f6-cf9714a183c4">StorageClass</a></li>
+<li><a href="#h:e1595d33-a6c3-4ea6-aa39-6935098e95d9">pvc+job</a></li>
+<li><a href="#h:21241ffc-5ff4-4f22-8a58-236e52228342">deploy</a></li>
+<li><a href="#h:692afd12-6b8b-4f57-9ec1-babcead4f714">result</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:9c693210-7e6b-4df0-b082-d3399d075648">参考</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:7d27813e-fd9c-44c8-baee-1ec0ccac2595" class="outline-2">
+<h2 id="h:7d27813e-fd9c-44c8-baee-1ec0ccac2595"><a href="#h:7d27813e-fd9c-44c8-baee-1ec0ccac2595">Kubernetes存储性能对比</a></h2>
+<div class="outline-text-2" id="text-h:7d27813e-fd9c-44c8-baee-1ec0ccac2595">
+<p>
+目标：存储高可用
+</p>
+
+<p>
+当前：使用本地存储，优点是性能高，缺点机器宕机无法快速迁移数据。
+</p>
+</div>
+<div id="outline-container-h:9242f447-518b-48e8-8c25-b9b5be2a9fbf" class="outline-3">
+<h3 id="h:9242f447-518b-48e8-8c25-b9b5be2a9fbf"><a href="#h:9242f447-518b-48e8-8c25-b9b5be2a9fbf">对比</a></h3>
+<div class="outline-text-3" id="text-h:9242f447-518b-48e8-8c25-b9b5be2a9fbf">
+<p>
+测试存储类型：
+</p>
+<ul class="org-ul">
+<li>腾讯云盘CBS HSSD (高可用)</li>
+<li>local 高性能云盘 SATA HDD (单点)</li>
+<li>local NVME SSD （单点）</li>
+<li>腾讯云文件存储系统NFS （高可用）</li>
+</ul>
+</div>
+<div id="outline-container-h:3091b675-f2f1-4b1b-b619-cb8e6657489e" class="outline-4">
+<h4 id="h:3091b675-f2f1-4b1b-b619-cb8e6657489e"><a href="#h:3091b675-f2f1-4b1b-b619-cb8e6657489e">测试结果</a></h4>
+<div class="outline-text-4" id="text-h:3091b675-f2f1-4b1b-b619-cb8e6657489e">
+<p>
+除现有local本地挂载方式，其它存储类型效果不佳。云盘cbs性能比较低，CFS性能比较低
+</p>
+
+
+<p>
+为了运行测试，使用 <a href="https://github.com/axboe/fio">FIO</a> 运行 测试用例，指定不同测试：
+</p>
+<ul class="org-ul">
+<li>随机读写带宽。</li>
+<li>随机读写 IOPS。</li>
+<li>读写延迟。</li>
+<li>顺序读写。</li>
+<li>混合读写 IOPS</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c4ff071a-b022-4cc1-be63-f346622cc71d" class="outline-4">
+<h4 id="h:c4ff071a-b022-4cc1-be63-f346622cc71d"><a href="#h:c4ff071a-b022-4cc1-be63-f346622cc71d">测试过程</a></h4>
+<div class="outline-text-4" id="text-h:c4ff071a-b022-4cc1-be63-f346622cc71d">
+</div>
+<div id="outline-container-h:25c9246f-ef82-46b5-b5b8-2fb3fa059acf" class="outline-5">
+<h5 id="h:25c9246f-ef82-46b5-b5b8-2fb3fa059acf"><a href="#h:25c9246f-ef82-46b5-b5b8-2fb3fa059acf">docker</a></h5>
+<div class="outline-text-5" id="text-h:25c9246f-ef82-46b5-b5b8-2fb3fa059acf">
+<div class="org-src-container">
+<pre class="src src-bash"><span class="org-comment-delimiter">#</span><span class="org-comment">&#21046;&#20316;&#38236;&#20687;
+</span>git clone https://github.com/leeliu/dbench.git
+<span class="org-builtin">cd</span> dbench
+docker build -t registry.cn-hangzhou.aliyuncs.com/gpdb/dbench:latest .
+docker push registry.cn-hangzhou.aliyuncs.com/gpdb/dbench:latest
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:edb5b16c-b931-4541-b3f6-cf9714a183c4" class="outline-5">
+<h5 id="h:edb5b16c-b931-4541-b3f6-cf9714a183c4"><a href="#h:edb5b16c-b931-4541-b3f6-cf9714a183c4">StorageClass</a></h5>
+<div class="outline-text-5" id="text-h:edb5b16c-b931-4541-b3f6-cf9714a183c4">
+<p>
+local本地
+</p>
+<div class="org-src-container">
+<pre class="src src-bash">cat &lt;&lt;\EOF |kubectl apply -f -<span class="org-sh-heredoc">
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: test-local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+EOF
+</span>
+cat &lt;&lt;\EOF | kubectl apply -f -<span class="org-sh-heredoc">
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: test-local-hssd
+  labels:
+    storage: test-local-data
+    app: hssd
+spec:
+  capacity:
+    storage: "500Gi"
+  accessModes:
+    - "ReadWriteOnce"
+  volumeMode: Filesystem
+  local:
+    path: /data/xcw/gitaly
+  storageClassName: "test-local-storage"
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          #- 10.22.0.7 #&#39640;&#24615;&#33021;
+          - 10.22.0.26 #nvme ssd
+EOF</span>
+</pre>
+</div>
+
+<p>
+ssd
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">https://cloud.tencent.com/document/product/457/44239
+</span>cat &lt;&lt;\EOF |kubectl apply -f -<span class="org-sh-heredoc">
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: test-cbs-ssd
+provisioner: cloud.tencent.com/qcloud-cbs
+parameters:
+  type: CLOUD_SSD
+  paymode: POSTPAID
+  zone: "800003"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+EOF</span>
+</pre>
+</div>
+
+<p>
+hssd
+</p>
+<div class="org-src-container">
+<pre class="src src-bash"><span class="org-comment-delimiter">#</span><span class="org-comment">https://cloud.tencent.com/document/product/457/44239
+</span>Cat &lt;&lt;\EOF |kubectl apply -f -<span class="org-sh-heredoc">
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: test-cbs-hssd
+provisioner: cloud.tencent.com/qcloud-cbs
+parameters:
+  type: CLOUD_HSSD
+  paymode: POSTPAID
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+EOF</span>
+</pre>
+</div>
+
+<p>
+nfs+pv+pvc
+</p>
+<div class="org-src-container">
+<pre class="src src-bash"><span class="org-comment-delimiter">#</span><span class="org-comment">nfs-pv
+</span>cat &lt;&lt;\EOF | kubectl apply -f -<span class="org-sh-heredoc">
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: dbench-pv-0
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 500Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: dbench-pv-claim
+    namespace: gitlab-test-xcw
+  mountOptions:
+  - hard
+  - nfsvers=3
+  - nolock
+  nfs:
+    path: /nvxa7jnu/tmp-test/gitaly
+    server: 10.22.0.29
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">nfs-pvc
+</span>cat &lt;&lt;\EOF |kubectl apply -f -<span class="org-sh-heredoc">
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dbench-pv-claim
+  namespace: gitlab-test-xcw
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  volumeMode: Filesystem
+  volumeName: dbench-pv-0
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e1595d33-a6c3-4ea6-aa39-6935098e95d9" class="outline-5">
+<h5 id="h:e1595d33-a6c3-4ea6-aa39-6935098e95d9"><a href="#h:e1595d33-a6c3-4ea6-aa39-6935098e95d9">pvc+job</a></h5>
+<div class="outline-text-5" id="text-h:e1595d33-a6c3-4ea6-aa39-6935098e95d9">
+<div class="org-src-container">
+<pre class="src src-bash">cat &lt;&lt;\EOF&gt; dbench.yaml<span class="org-sh-heredoc">
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: dbench-pv-claim
+  namespace: gitlab-test-xcw
+spec:
+  storageClassName: test-cbs-hssd
+  # storageClassName: gp2
+  # storageClassName: test-local-storage
+  # storageClassName: ibmc-block-bronze
+  # storageClassName: ibmc-block-silver
+  # storageClassName: ibmc-block-gold
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dbench
+  namespace: gitlab-test-xcw
+spec:
+  template:
+    spec:
+      containers:
+      - name: dbench
+        image: registry.cn-hangzhou.aliyuncs.com/gpdb/dbench:latest
+        imagePullPolicy: Always
+        env:
+          - name: DBENCH_MOUNTPOINT
+            value: /data
+          # - name: DBENCH_QUICK
+          #   value: "yes"
+          # - name: FIO_SIZE
+          #   value: 1G
+          # - name: FIO_OFFSET_INCREMENT
+          #   value: 256M
+          # - name: FIO_DIRECT
+          #   value: "0"
+        volumeMounts:
+        - name: dbench-pv
+          mountPath: /data
+      restartPolicy: Never
+      volumes:
+      - name: dbench-pv
+        persistentVolumeClaim:
+          claimName: dbench-pv-claim
+  backoffLimit: 4
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:21241ffc-5ff4-4f22-8a58-236e52228342" class="outline-5">
+<h5 id="h:21241ffc-5ff4-4f22-8a58-236e52228342"><a href="#h:21241ffc-5ff4-4f22-8a58-236e52228342">deploy</a></h5>
+<div class="outline-text-5" id="text-h:21241ffc-5ff4-4f22-8a58-236e52228342">
+<div class="org-src-container">
+<pre class="src src-bash">kubectl apply -f dbench.yaml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:692afd12-6b8b-4f57-9ec1-babcead4f714" class="outline-5">
+<h5 id="h:692afd12-6b8b-4f57-9ec1-babcead4f714"><a href="#h:692afd12-6b8b-4f57-9ec1-babcead4f714">result</a></h5>
+<div class="outline-text-5" id="text-h:692afd12-6b8b-4f57-9ec1-babcead4f714">
+<div class="org-src-container">
+<pre class="src src-bash">kubectl logs -f job/dbench
+</pre>
+</div>
+<p>
+类似
+</p>
+<div class="org-src-container">
+<pre class="src src-bash">==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 75.7k/59.7k. BW: 523MiB/s / 500MiB/s
+Average Latency (usec) Read/Write: 183.07/76.91
+Sequential Read/Write: 536MiB/s / 512MiB/s
+Mixed Random Read/Write IOPS: 43.1k/14.4k
+</pre>
+</div>
+
+
+
+<p>
+<a href="https://cloud.tencent.com/document/product/213/43861">不同云硬盘异同点</a>
+</p>
+
+<p>
+<a href="https://cloud.tencent.com/document/product/213/32811">不同云盘性能指标</a> hssd 1元/GB/小时
+</p>
+
+<p>
+<a href="https://cloud.tencent.com/document/product/582/38112">文件存储性能指标</a> 1.6元/GiB/月
+</p>
+
+<p>
+hssd
+</p>
+
+<p>
+是基于全 NVMe SSD 存储介质
+</p>
+<div class="org-src-container">
+<pre class="src src-bash">==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 26.6k/20.7k. BW: 348MiB/s / 330MiB/s
+Average Latency (usec) Read/Write: 307.98/634.11
+Sequential Read/Write: 344MiB/s / 333MiB/s
+Mixed Random Read/Write IOPS: 17.1k/5987
+</pre>
+</div>
+
+<p>
+nfs 通用标准型
+</p>
+<div class="org-src-container">
+<pre class="src src-bash">==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 69.9k/8995. BW: 113MiB/s / 101MiB/s
+Average Latency (usec) Read/Write: 331.85/1843.09
+Sequential Read/Write: 102MiB/s / 102MiB/s
+Mixed Random Read/Write IOPS: 28.4k/9479
+</pre>
+</div>
+
+<p>
+local 高性能云盘 SATA HDD
+</p>
+<div class="org-src-container">
+<pre class="src src-bash">==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 110k/27.4k. BW: 2519MiB/s / 965MiB/s
+Average Latency (usec) Read/Write: 183.90/220.97
+Sequential Read/Write: 3624MiB/s / 989MiB/s
+Mixed Random Read/Write IOPS: 28.9k/9600
+
+==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 116k/25.1k. BW: 3125MiB/s / 906MiB/s
+Average Latency (usec) Read/Write: 181.99/219.65
+Sequential Read/Write: 3357MiB/s / 984MiB/s
+Mixed Random Read/Write IOPS: 26.7k/8844
+</pre>
+</div>
+
+
+<p>
+local NVME SSD
+</p>
+<div class="org-src-container">
+<pre class="src src-bash">==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 245k/222k. BW: 2361MiB/s / 2636MiB/s
+Average Latency (usec) Read/Write: 104.23/22.16
+Sequential Read/Write: 2726MiB/s / 2763MiB/s
+Mixed Random Read/Write IOPS: 163k/54.4k
+==================
+= Dbench <span class="org-variable-name">Summary</span> =
+==================
+Random Read/Write IOPS: 237k/210k. BW: 2179MiB/s / 2681MiB/s
+Average Latency (usec) Read/Write: 102.78/24.52
+Sequential Read/Write: 2722MiB/s / 2750MiB/s
+Mixed Random Read/Write IOPS: 178k/59.4k
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9c693210-7e6b-4df0-b082-d3399d075648" class="outline-3">
+<h3 id="h:9c693210-7e6b-4df0-b082-d3399d075648"><a href="#h:9c693210-7e6b-4df0-b082-d3399d075648">参考</a></h3>
+<div class="outline-text-3" id="text-h:9c693210-7e6b-4df0-b082-d3399d075648">
+<ul class="org-ul">
+<li><a href="https://blog.fleeto.us/post/kubernetes-storage-performance-comparison/">Kubernetes 存储性能对比</a></li>
+</ul>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

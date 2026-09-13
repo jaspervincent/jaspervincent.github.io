@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Logstash</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Logstash</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:98b3970f-2c06-469e-a416-fb8adce11870">调试</a></li>
+<li><a href="#h:ea646749-4860-44af-8c38-82551e5d90f8">Grok</a>
+<ul>
+<li><a href="#h:c969559c-68e3-4ba3-bf9d-cd0178789451">logstash内置正则</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Log</a></li>
+</ul>
+<section id="outline-container-h:98b3970f-2c06-469e-a416-fb8adce11870" class="outline-2">
+<h2 id="h:98b3970f-2c06-469e-a416-fb8adce11870"><a href="#h:98b3970f-2c06-469e-a416-fb8adce11870">调试</a></h2>
+<div class="outline-text-2" id="text-h:98b3970f-2c06-469e-a416-fb8adce11870">
+<p>
+a.conf
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">input {
+  file {
+    <span class="org-variable-name">path</span> =&gt; [<span class="org-string">"/root/.jasper/logstash-8.14.1/b.txt"</span>]
+    <span class="org-variable-name">type</span> =&gt; <span class="org-string">"system"</span>
+    <span class="org-variable-name">start_position</span> =&gt; <span class="org-string">"beginning"</span>
+  }
+}
+
+filter {
+  mutate{
+    <span class="org-variable-name">add_field</span> =&gt; { <span class="org-string">"index_name"</span> =&gt; <span class="org-string">"%{[@metadata][kafka][topic]}"</span>}
+  }
+  <span class="org-comment-delimiter">#</span><span class="org-comment">mutate {
+</span>  <span class="org-comment-delimiter">#  </span><span class="org-comment">rename =&gt; { "log" =&gt; "log_info" }
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">}
+</span>  json {
+    <span class="org-variable-name">source</span> =&gt; <span class="org-string">"message"</span>
+  }
+  json {
+    <span class="org-variable-name">source</span> =&gt; <span class="org-string">"log"</span>
+    <span class="org-variable-name">target</span> =&gt; <span class="org-string">"log"</span>
+  }
+  mutate{
+    <span class="org-variable-name">add_field</span> =&gt; { <span class="org-string">"haa"</span> =&gt; <span class="org-string">"%{[log_kafka_topic]}"</span>}
+  }
+  <span class="org-comment-delimiter">#</span><span class="org-comment">if [kafka_topic] != "server-exception-dialog" {
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">json {
+</span>  <span class="org-comment-delimiter">#  </span><span class="org-comment">source =&gt; "message"
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">}
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">mutate {
+</span>  <span class="org-comment-delimiter">#  </span><span class="org-comment">remove_field =&gt; ["message"]
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">}} 
+</span>}
+output{stdout{<span class="org-variable-name">codec</span>=&gt;rubydebug}}
+</pre>
+</div>
+
+<p>
+命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy logstash-8.14.1]# bin/logstash -f a.conf
+</pre>
+</div>
+
+
+<p>
+配置示例
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">input{
+file {
+<span class="org-variable-name">path</span> =&gt; [<span class="org-string">"/var/log/*.log"</span>, <span class="org-string">"/var/log/message"</span>]
+<span class="org-variable-name">type</span> =&gt; <span class="org-string">"system"</span>
+<span class="org-variable-name">start_position</span> =&gt; <span class="org-string">"beginning"</span>
+}
+}
+</pre>
+</div>
+<p>
+解释
+</p>
+<ul class="org-ul">
+<li><p>
+discover_interval
+</p>
+
+<p>
+logstash 每隔多久去检查一次被监听的 path 下是否有新文件。默认值是 15 秒。
+</p></li>
+<li><p>
+exclude
+</p>
+
+<p>
+不想被监听的文件可以排除出去，这里跟 path 一样支持 glob 展开。
+</p></li>
+<li><p>
+sincedb_path
+</p>
+
+<p>
+如果你不想用默认的 $HOME/.sincedb(Windows 平台上在C:\Windows\System32\config\systemprofile\.sincedb)，可以通过这个配置定义 sincedb 文件到其他位置。
+</p></li>
+
+<li><p>
+sincedb_write_interval
+</p>
+
+<p>
+logstash 每隔多久写一次 sincedb 文件，默认是 15 秒。
+</p></li>
+<li><p>
+stat_interval
+</p>
+
+<p>
+logstash 每隔多久检查一次被监听文件状态（是否有更新），默认是 1 秒。
+</p></li>
+<li><p>
+start_position
+</p>
+
+<p>
+logstash 从什么位置开始读取文件数据，默认是结束位置，也就是说 logstash 进程会以类似 tail -F 的形式运行。如果你是要导入原有数据，把这个设定改成 "beginning"，logstash 进程就从头开始读取，有点类似cat，但是读到最后一行不会终止，而是继续变成 tail -F。
+</p></li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:ea646749-4860-44af-8c38-82551e5d90f8" class="outline-2">
+<h2 id="h:ea646749-4860-44af-8c38-82551e5d90f8"><a href="#h:ea646749-4860-44af-8c38-82551e5d90f8">Grok</a></h2>
+<div class="outline-text-2" id="text-h:ea646749-4860-44af-8c38-82551e5d90f8">
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://help.aliyun.com/zh/sls/user-guide/getting-started-with-regular-expressions?spm=a2c4g.11186623.0.0.100c3be0d7UbvS#1e6ec2a0e5ntv">正则表达式入门教程</a></li>
+<li><a href="https://developer.aliyun.com/article/1488858?spm=a2c4g.11186623.0.0.205d5d4ftvgi2j">阿里最佳实践-Grok语法解析日志</a></li>
+<li><a href="https://xiaorui.cc/archives/1055">logstash使用grok正则解析日志和kibana遇到的问题</a></li>
+<li><a href="https://www.cnblogs.com/iiiiher/p/7919149.html">博客-[elk]logstash grok原理</a></li>
+<li><a href="https://help.aliyun.com/zh/sls/user-guide/extract-content-from-log-fields?scm=20140722.S_help%40%40%E6%96%87%E6%A1%A3%40%40196154.S_RQW%40ag0%2BBB2%40ag0%2BBB1%40ag0%2Bhot%2Bos0.ID_196154-RL_grok-LOC_doc%7EUND%7Eab-OR_ser-PAR1_2102029c17455437618702825d68d1-V_4-P0_6-P1_0&amp;spm=a2c4g.11186623.help-search.i6#section-67d-dzp-uga">阿里文档-Logtail处理插件-提取字段</a></li>
+</ul>
+
+<p>
+在线调试：<a href="https://grokdebugger.com/">https://grokdebugger.com/</a>  <a href="https://grokconstructor.appspot.com/do/match">https://grokconstructor.appspot.com/do/match</a>
+</p>
+
+<p>
+grok 语法：<a href="https://github.com/kkos/oniguruma/blob/master/doc/RE">https://github.com/kkos/oniguruma/blob/master/doc/RE</a>
+</p>
+
+
+<p>
+范例-正则
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">2025-04-24 17:21:00.775 INFO  [] [] [AsyncResolver-bootstrap-executor-0] c.n.d.s.r.aws.ConfigClusterResolver - Resolving eureka endpoints via configuration
+2025-04-25 09:31:35.908 ERROR [54290fcaaa5e38de] [54290fcaaa5e38de] [http-nio-1060-exec-8] c.r.o.a.m.controller.TestController - testing log for error level without stack trace
+
+
+&#25552;&#21462;&#23383;&#27573;
+<span class="org-builtin">time</span>&#65306;2025-04-25 09:31:35.908
+level&#65306;ERROR
+traceId&#65306;54290fcaaa5e38de
+spanId&#65306;54290fcaaa5e38de
+thread-name&#65306;http-nio-1060-exec-8
+logger&#65306;c.r.o.a.m.controller.TestController
+msg&#65306;testing log for error level without stack trace
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#27491;&#21017;&#34920;&#36798;&#24335;
+</span>(\S+ \S+[\d.]+) (\S+)\s+<span class="org-string">\[</span>(\S+)?<span class="org-string">\]</span> <span class="org-string">\[</span>(\S+)?<span class="org-string">\]</span> <span class="org-string">\[</span>(\S+)?<span class="org-string">\]</span> (\S+) - (.*)
+&#25110;
+(\d+-\d+-\d+\s\S+)\s(\w+)\s<span class="org-string">\[</span>(\w+)?<span class="org-string">\]</span>\s<span class="org-string">\[</span>(\w+)?<span class="org-string">\]</span>\s<span class="org-string">\[</span>([^<span class="org-string">\]</span>]+)<span class="org-string">\]</span>\s(\S+)\s-\s(.*)
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">GROK
+</span>%{TIMESTAMP_ISO8601:time}\s+%{LOGLEVEL:level}\s+<span class="org-string">\[</span>(?&lt;traceId&gt;([\d\w]+)?)<span class="org-string">\]</span>\s+<span class="org-string">\[</span>(?&lt;spanId&gt;([\d\w]+)?)<span class="org-string">\]</span>\s+<span class="org-string">\[</span>(?&lt;thread-name&gt;[\d\w-]+)<span class="org-string">\]</span>\s+%{USERNAME:logger} - %{GREEDYDATA:msg}
+</pre>
+</div>
+
+
+<p>
+logstash filter 语法：
+</p>
+
+
+<p>
+范例-1
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">55.3.244.1 GET /index.html 15824 0.043
+
+%{IP:client} %{WORD:method} %{URIPATHPARAM:request} %{NUMBER:bytes} %{NUMBER:duration}
+</pre>
+</div>
+
+<p>
+配置文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">input {
+  file {
+    <span class="org-variable-name">path</span> =&gt; &#8220;/var/log/http.log&#8221;
+  }
+}
+filter {
+  grok {
+    <span class="org-variable-name">match</span> =&gt; [ <span class="org-string">"message"</span>, <span class="org-string">"%{IP:client} %{WORD:method} %{URIPATHPARAM:request} %{NUMBER:bytes} %{NUMBER:duration}"</span> ]
+  }
+}
+</pre>
+</div>
+
+<p>
+解析后
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">client: 55.3.244.1
+method: GET
+request: /index.html
+bytes: 15824
+duration: 0.043
+</pre>
+</div>
+
+<p>
+自定义正则
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">(?&lt;field_name&gt;the pattern here)
+(?&lt;queue_id&gt;[0-9A-F]{10,11})
+</pre>
+</div>
+
+<p>
+当然你也可以把众多的正则，放在一个集中文件里面。 
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">in ./patterns/postfix 
+</span>POSTFIX_QUEUEID [0-9A-F]{10,11}
+filter {
+  grok {
+    <span class="org-variable-name">patterns_dir</span> =&gt; &#8220;./patterns&#8221;
+    <span class="org-variable-name">match</span> =&gt; [ <span class="org-string">"message"</span>, <span class="org-string">"%{SYSLOGBASE} %{POSTFIX_QUEUEID:queue_id}: %{GREEDYDATA:syslog_message}"</span> ]
+  }
+}
+</pre>
+</div>
+</div>
+<div id="outline-container-h:c969559c-68e3-4ba3-bf9d-cd0178789451" class="outline-3">
+<h3 id="h:c969559c-68e3-4ba3-bf9d-cd0178789451"><a href="#h:c969559c-68e3-4ba3-bf9d-cd0178789451">logstash内置正则</a></h3>
+<div class="outline-text-3" id="text-h:c969559c-68e3-4ba3-bf9d-cd0178789451">
+<p>
+logstash已经自带了不少的正则，如果想偷懒的话，可以在内置正则里借用下。 
+<a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok</a>
+</p>
+
+<p>
+grok-patterns: <a href="https://github.com/logstash-plugins/logstash-patterns-core/blob/main/patterns/legacy/grok-patterns">https://github.com/logstash-plugins/logstash-patterns-core/blob/main/patterns/legacy/grok-patterns</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">USERNAME [a-zA-Z0-9._-]+
+USER %{USERNAME}
+EMAILLOCALPART [a-zA-Z][a-zA-Z0-9_.+-=:]+
+EMAILADDRESS %{EMAILLOCALPART}@%{HOSTNAME}
+<span class="org-function-name">INT</span> (?:[+-]?(?:[0-9]+))
+<span class="org-function-name">BASE10NUM</span> (?&lt;![0-9.+-])(?&gt;[+-]?(?:(?:[0-9]+(?:<span class="org-string">\.</span>[0-9]+)?)|(?:<span class="org-string">\.</span>[0-9]+)))
+<span class="org-function-name">NUMBER</span> (?:%{BASE10NUM})
+<span class="org-function-name">BASE16NUM</span> (?&lt;![0-9A-Fa-f])(?:[+-]?(?:0x)?(?:[0-9A-Fa-f]+))
+BASE16FLOAT \b(?&lt;![0-9A-Fa-f.])(?:[+-]?(?:0x)?(?:(?:[0-9A-Fa-f]+(?:<span class="org-string">\.</span>[0-9A-Fa-f]*)?)|(?:<span class="org-string">\.</span>[0-9A-Fa-f]+)))\b
+
+POSINT \b(?:[1-9][0-9]*)\b
+NONNEGINT \b(?:[0-9]+)\b
+WORD \b\w+\b
+NOTSPACE \S+
+SPACE \s*
+DATA .*?
+GREEDYDATA .*
+<span class="org-function-name">QUOTEDSTRING</span> (?&gt;(?&lt;!<span class="org-string">\\</span>)(?&gt;<span class="org-string">"(?&gt;\\.|[^\\"</span>]+)+<span class="org-string">"|""|(?&gt;'(?&gt;\\.|[^\\']+)+')|''|(?&gt;`(?&gt;\\.|[^\\`]+)+`)|``))
+UUID [A-Fa-f0-9]{8}-(?:[A-Fa-f0-9]{4}-){3}[A-Fa-f0-9]{12}
+# URN, allowing use of RFC 2141 section 2.3 reserved characters
+URN urn:[0-9A-Za-z][0-9A-Za-z-]{0,31}:(?:%[0-9a-fA-F]{2}|[0-9A-Za-z()+,.:=@;$_!*'/?#-])+
+
+# Networking
+MAC (?:%{CISCOMAC}|%{WINDOWSMAC}|%{COMMONMAC})
+CISCOMAC (?:(?:[A-Fa-f0-9]{4}\.){2}[A-Fa-f0-9]{4})
+WINDOWSMAC (?:(?:[A-Fa-f0-9]{2}-){5}[A-Fa-f0-9]{2})
+COMMONMAC (?:(?:[A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2})
+IPV6 ((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?
+IPV4 (?&lt;![0-9])(?:(?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))(?![0-9])
+IP (?:%{IPV6}|%{IPV4})
+HOSTNAME \b(?:[0-9A-Za-z][0-9A-Za-z-]{0,62})(?:\.(?:[0-9A-Za-z][0-9A-Za-z-]{0,62}))*(\.?|\b)
+IPORHOST (?:%{IP}|%{HOSTNAME})
+HOSTPORT %{IPORHOST}:%{POSINT}
+
+# paths (only absolute paths are matched)
+PATH (?:%{UNIXPATH}|%{WINPATH})
+UNIXPATH (/[[[:alnum:]]_%!$@:.,+~-]*)+
+TTY (?:/dev/(pts|tty([pq])?)(\w+)?/?(?:[0-9]+))
+WINPATH (?&gt;[A-Za-z]+:|\\)(?:\\[^\\?*]*)+
+URIPROTO [A-Za-z]([A-Za-z0-9+\-.]+)+
+URIHOST %{IPORHOST}(?::%{POSINT:port})?
+# uripath comes loosely from RFC1738, but mostly from what Firefox
+# doesn't turn into %XX
+URIPATH (?:/[A-Za-z0-9$.+!*'(){},~:;=@#%&amp;_\-]*)+
+#URIPARAM \?(?:[A-Za-z0-9]+(?:=(?:[^&amp;]*))?(?:&amp;(?:[A-Za-z0-9]+(?:=(?:[^&amp;]*))?)?)*)?
+URIPARAM \?[A-Za-z0-9$.+!*'|(){},~@#%&amp;/=:;_?\-\[\]&lt;&gt;]*
+URIPATHPARAM %{URIPATH}(?:%{URIPARAM})?
+URI %{URIPROTO}://(?:%{USER}(?::[^@]*)?@)?(?:%{URIHOST})?(?:%{URIPATHPARAM})?
+
+# Months: January, Feb, 3, 03, 12, December
+MONTH \b(?:[Jj]an(?:uary|uar)?|[Ff]eb(?:ruary|ruar)?|[Mm](?:a|&#228;)?r(?:ch|z)?|[Aa]pr(?:il)?|[Mm]a(?:y|i)?|[Jj]un(?:e|i)?|[Jj]ul(?:y|i)?|[Aa]ug(?:ust)?|[Ss]ep(?:tember)?|[Oo](?:c|k)?t(?:ober)?|[Nn]ov(?:ember)?|[Dd]e(?:c|z)(?:ember)?)\b
+MONTHNUM (?:0?[1-9]|1[0-2])
+MONTHNUM2 (?:0[1-9]|1[0-2])
+MONTHDAY (?:(?:0[1-9])|(?:[12][0-9])|(?:3[01])|[1-9])
+
+# Days: Monday, Tue, Thu, etc...
+DAY (?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)
+
+# Years?
+YEAR (?&gt;\d\d){1,2}
+HOUR (?:2[0123]|[01]?[0-9])
+MINUTE (?:[0-5][0-9])
+# '60' is a leap second in most time standards and thus is valid.
+SECOND (?:(?:[0-5]?[0-9]|60)(?:[:.,][0-9]+)?)
+TIME (?!&lt;[0-9])%{HOUR}:%{MINUTE}(?::%{SECOND})(?![0-9])
+# datestamp is YYYY/MM/DD-HH:MM:SS.UUUU (or something like it)
+DATE_US %{MONTHNUM}[/-]%{MONTHDAY}[/-]%{YEAR}
+DATE_EU %{MONTHDAY}[./-]%{MONTHNUM}[./-]%{YEAR}
+ISO8601_TIMEZONE (?:Z|[+-]%{HOUR}(?::?%{MINUTE}))
+ISO8601_SECOND (?:%{SECOND}|60)
+TIMESTAMP_ISO8601 %{YEAR}-%{MONTHNUM}-%{MONTHDAY}[T ]%{HOUR}:?%{MINUTE}(?::?%{SECOND})?%{ISO8601_TIMEZONE}?
+DATE %{DATE_US}|%{DATE_EU}
+DATESTAMP %{DATE}[- ]%{TIME}
+TZ (?:[APMCE][SD]T|UTC)
+DATESTAMP_RFC822 %{DAY} %{MONTH} %{MONTHDAY} %{YEAR} %{TIME} %{TZ}
+DATESTAMP_RFC2822 %{DAY}, %{MONTHDAY} %{MONTH} %{YEAR} %{TIME} %{ISO8601_TIMEZONE}
+DATESTAMP_OTHER %{DAY} %{MONTH} %{MONTHDAY} %{TIME} %{TZ} %{YEAR}
+DATESTAMP_EVENTLOG %{YEAR}%{MONTHNUM2}%{MONTHDAY}%{HOUR}%{MINUTE}%{SECOND}
+
+# Syslog Dates: Month Day HH:MM:SS
+SYSLOGTIMESTAMP %{MONTH} +%{MONTHDAY} %{TIME}
+PROG [\x21-\x5a\x5c\x5e-\x7e]+
+SYSLOGPROG %{PROG:program}(?:\[%{POSINT:pid}\])?
+SYSLOGHOST %{IPORHOST}
+SYSLOGFACILITY &lt;%{NONNEGINT:facility}.%{NONNEGINT:priority}&gt;
+HTTPDATE %{MONTHDAY}/%{MONTH}/%{YEAR}:%{TIME} %{INT}
+
+# Shortcuts
+QS %{QUOTEDSTRING}
+
+# Log formats
+SYSLOGBASE %{SYSLOGTIMESTAMP:timestamp} (?:%{SYSLOGFACILITY} )?%{SYSLOGHOST:logsource} %{SYSLOGPROG}:
+
+# Log Levels
+LOGLEVEL ([Aa]lert|ALERT|[Tt]race|TRACE|[Dd]ebug|DEBUG|[Nn]otice|NOTICE|[Ii]nfo?(?:rmation)?|INFO?(?:RMATION)?|[Ww]arn?(?:ing)?|WARN?(?:ING)?|[Ee]rr?(?:or)?|ERR?(?:OR)?|[Cc]rit?(?:ical)?|CRIT?(?:ICAL)?|[Ff]atal|FATAL|[Ss]evere|SEVERE|EMERG(?:ENCY)?|[Ee]merg(?:ency)?)</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

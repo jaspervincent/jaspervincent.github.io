@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Identity: Keycloak</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Identity: Keycloak</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:a154132d-f331-40a6-88d3-22753f749f42">安装</a></li>
+<li><a href="#orga806101">配置</a>
+<ul>
+<li><a href="#orge6316e9">实验</a></li>
+</ul>
+</li>
+<li><a href="#org0487892">认证</a>
+<ul>
+<li><a href="#h:b239a506-32c5-4eac-ada5-48cda667daa5">grafana 认证</a>
+<ul>
+<li><a href="#h:b618baa9-e96d-4423-ac30-b4efe3b48537">keycloak配置</a></li>
+<li><a href="#h:ed583581-db07-4313-9664-159309fb1b24">grafana配置</a></li>
+</ul>
+</li>
+<li><a href="#org1194388">jenkin认证</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Identity</a></li>
+</ul>
+
+<p>
+官网： <a href="https://www.keycloak.org/">https://www.keycloak.org/</a>
+</p>
+
+<p>
+架构：<a href="https://www.keycloak.org/docs/26.0.2/authorization_services/">https://www.keycloak.org/docs/26.0.2/authorization_services/</a>
+</p>
+
+<p>
+目录结构：<a href="https://www.keycloak.org/server/directory-structure">https://www.keycloak.org/server/directory-structure</a>
+</p>
+<section id="outline-container-h:a154132d-f331-40a6-88d3-22753f749f42" class="outline-2">
+<h2 id="h:a154132d-f331-40a6-88d3-22753f749f42"><a href="#h:a154132d-f331-40a6-88d3-22753f749f42">安装</a></h2>
+<div class="outline-text-2" id="text-h:a154132d-f331-40a6-88d3-22753f749f42">
+<div class="org-src-container">
+<pre class="src src-sh">kubectl create -f https://raw.githubusercontent.com/keycloak/keycloak-quickstarts/latest/kubernetes/keycloak.yaml
+</pre>
+</div>
+<p>
+账号密码：admin/admin
+</p>
+
+<p>
+nginx keycloak代理变量
+</p>
+<pre class="example" id="orgd9980d3">
+KC_PROXY_HEADERS=xforwarded
+KC_HOSTNAME=https://keycloak.online.local
+KC_HTTP_ENABLED=true  
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">server {
+        listen       80;
+        server_name  keycloak.online.local;
+
+        proxy_set_header Host $<span class="org-variable-name">http_host</span>;
+        proxy_set_header X-Real-IP $<span class="org-variable-name">remote_addr</span>;
+        proxy_set_header X-Forwarded-For $<span class="org-variable-name">proxy_add_x_forwarded_for</span>;
+        proxy_set_header X-Forwarded-Proto $<span class="org-variable-name">scheme</span>;
+
+        location / {
+                proxy_pass http://10.2.22.94:8080;
+        }
+}
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-orga806101" class="outline-2">
+<h2 id="orga806101"><a href="#orga806101">配置</a></h2>
+<div class="outline-text-2" id="text-orga806101">
+<p>
+文档：<a href="https://www.keycloak.org/documentation.html">https://www.keycloak.org/documentation.html</a>
+</p>
+
+<p>
+container配置： <a href="https://www.keycloak.org/server/containers">https://www.keycloak.org/server/containers</a>
+</p>
+
+<p>
+支持数据库类型：<a href="https://www.keycloak.org/server/db">https://www.keycloak.org/server/db</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">KC_DB</span>=dev-file &#65288;&#40664;&#35748;&#65289;&#12289; dev-mem &#12289; mariadb &#12289; mssql &#12289; mysql &#12289; oracle &#12289; postgres
+</pre>
+</div>
+
+<p>
+可选功能：<a href="https://www.keycloak.org/server/features">https://www.keycloak.org/server/features</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">KC_FEATURES</span>=xxx,xxxx
+</pre>
+</div>
+
+<p>
+导入导出领域配置： <a href="https://www.keycloak.org/server/importExport">https://www.keycloak.org/server/importExport</a>
+</p>
+</div>
+<div id="outline-container-orge6316e9" class="outline-3">
+<h3 id="orge6316e9"><a href="#orge6316e9">实验</a></h3>
+<div class="outline-text-3" id="text-orge6316e9">
+<p>
+<b>创建realm</b>
+</p>
+
+<p>
+默认realm(领域)是master，一般不用，这里可以创建一个新realm，如myrealm
+</p>
+
+<p>
+<b>创建用户</b>
+</p>
+
+<p>
+在领域下创建用于登录的用户
+</p>
+
+<p>
+Users&#x2013;&gt;Create new user &#x2013;Name(save) &#x2013;&gt;Credentials(Set password)
+</p>
+
+<p>
+如用户test
+</p>
+<pre class="example" id="orgac1763d">
+Username: test
+Email: test@test.com
+Firt name: my
+Last name: test
+</pre>
+
+<p>
+设置密码时，取消勾选“Temporary”，否则下次登录还要重新设置密码
+</p>
+
+<p>
+登录：<a href="http://localhost:8080/realms/myrealm/account">http://localhost:8080/realms/myrealm/account</a>
+</p>
+
+<p>
+<b>创建第一个应用程序</b>
+</p>
+
+<ol class="org-ol">
+<li>打开Keycloak 管理控制台。</li>
+<li>单击左上角的master一词，然后单击myrealm 。</li>
+<li>单击“Clients” 。</li>
+<li>单击Create client</li>
+<li>使用以下值填写表格：
+<ul class="org-ul">
+<li>客户端类型： OpenID Connect</li>
+<li>Client ID ： myclient</li>
+</ul></li>
+<li>点击 Next</li>
+<li>确认 Standard flow 是启动的.</li>
+<li>点击 Next.</li>
+<li>在登录设置下进行这些更改、
+<ul class="org-ul">
+<li>Set Valid redirect URIs to <a href="https://www.keycloak.org/app/">https://www.keycloak.org/app/</a>*</li>
+<li>Set Web origins to <a href="https://www.keycloak.org">https://www.keycloak.org</a></li>
+</ul></li>
+<li>点击 Save.</li>
+</ol>
+
+<p>
+打开<a href="https://www.keycloak.org/app/">https://www.keycloak.org/app/</a>  
+</p>
+
+<p>
+验证角色权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">curl --location <span class="org-string">'http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/token'</span> <span class="org-sh-escaped-newline">\</span>
+--header <span class="org-string">'Content-Type: application/x-www-form-urlencoded'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'grant_type=password'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'client_id=grafana-oauth'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'client_secret=PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'username=test'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'password=123456'</span>
+</pre>
+</div>
+
+<p>
+将得到的access_token解析， 使用token转换：<a href="https://jwt.io/">https://jwt.io/</a>
+</p>
+
+
+
+<p>
+<b>中文</b>
+</p>
+
+<p>
+Realm setting &#x2013;&gt; Localization &#x2013;&gt; Locales 启动
+</p>
+
+<p>
+在支持的语言中选择简体中文，本地默认选择中文，刷新页面即可。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-org0487892" class="outline-2">
+<h2 id="org0487892"><a href="#org0487892">认证</a></h2>
+<div class="outline-text-2" id="text-org0487892">
+</div>
+<div id="outline-container-h:b239a506-32c5-4eac-ada5-48cda667daa5" class="outline-3">
+<h3 id="h:b239a506-32c5-4eac-ada5-48cda667daa5"><a href="#h:b239a506-32c5-4eac-ada5-48cda667daa5">grafana 认证</a></h3>
+<div class="outline-text-3" id="text-h:b239a506-32c5-4eac-ada5-48cda667daa5">
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/keycloak/">grafana官方文档</a></li>
+</ul>
+</div>
+<div id="outline-container-h:b618baa9-e96d-4423-ac30-b4efe3b48537" class="outline-4">
+<h4 id="h:b618baa9-e96d-4423-ac30-b4efe3b48537"><a href="#h:b618baa9-e96d-4423-ac30-b4efe3b48537">keycloak配置</a></h4>
+<div class="outline-text-4" id="text-h:b618baa9-e96d-4423-ac30-b4efe3b48537">
+<p>
+1.在领域下创建用于登录的用户
+</p>
+
+<p>
+如用户test
+</p>
+
+<p>
+2.创建Clients
+</p>
+
+<p>
+grafana-oauth
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Client ID: grafana-oauth
+Name: grafana-oauth
+Client authentication: On
+Standard flow: On
+Direct access grants: On
+Implicit flow: OFF
+Root URL: http://10.0.0.128:3000
+Home URL: http://10.0.0.128:3000
+Valid redirect URIs: http://10.0.0.128:3000/login/* <span class="org-comment-delimiter">#</span><span class="org-comment">&#29992;&#20110;&#37325;&#26032;&#30331;&#24405;grafana&#25509;&#21475;&#39564;&#35777;
+</span>Web origins : http://10.0.0.128:3000
+Admin URL: http://10.0.0.128:3000
+</pre>
+</div>
+
+<p>
+完成后可在Credentials看到Client Secret密钥信息。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Client ID: grafana-oauth
+Client Secret: PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3
+</pre>
+</div>
+
+<p>
+3.添加角色引用
+</p>
+
+<p>
+Clients&#x2013;&gt;grafana-oauth&#x2013;&gt;Client scopes&#x2013;&gt;grafana-oauth-dedicated&#x2013;&gt;Mappers
+</p>
+
+<p>
+添加一个映射器 Add mapper &#x2013;&gt; By configuration &#x2013;&gt; User Real Role
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">name: grafana roles <span class="org-comment-delimiter">#</span><span class="org-comment">&#38543;&#24847;
+</span>Token Cliam Name: roles
+</pre>
+</div>
+
+<p>
+保存
+</p>
+
+<p>
+4.添加领域角色
+</p>
+
+<p>
+Realm roles &#x2013;&gt; Create role
+</p>
+
+<p>
+创建3个角色：admin, editor, viewer
+</p>
+
+<p>
+5.用户绑定角色
+</p>
+
+<p>
+Users 选择一个用户，如test，选择"Role mapping" &#x2013;&gt; Assign role&#x2013;&gt;过滤条件选择Filter by realm roles
+</p>
+
+<p>
+绑定领域角色，如editor
+</p>
+
+
+<p>
+6.验证角色权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">curl --location <span class="org-string">'http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/token'</span> <span class="org-sh-escaped-newline">\</span>
+--header <span class="org-string">'Content-Type: application/x-www-form-urlencoded'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'grant_type=password'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'client_id=grafana-oauth'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'client_secret=PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'username=test'</span> <span class="org-sh-escaped-newline">\</span>
+--data-urlencode <span class="org-string">'password=123456'</span>
+</pre>
+</div>
+
+<p>
+将得到的access_token解析， 使用token转换：<a href="https://jwt.io/">https://jwt.io/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:ed583581-db07-4313-9664-159309fb1b24" class="outline-4">
+<h4 id="h:ed583581-db07-4313-9664-159309fb1b24"><a href="#h:ed583581-db07-4313-9664-159309fb1b24">grafana配置</a></h4>
+<div class="outline-text-4" id="text-h:ed583581-db07-4313-9664-159309fb1b24">
+<p>
+root_url在docker环境变量为GF_SERVER_ROOT_URL
+</p>
+
+<p>
+grafana.ini
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[server]
+<span class="org-variable-name">root_url</span> = http://10.0.0.128:3000
+
+[auth.generic_oauth]
+<span class="org-variable-name">enabled</span> = true
+<span class="org-variable-name">name</span> = OAuth
+<span class="org-variable-name">allow_sign_up</span> = true
+<span class="org-variable-name">client_id</span> = grafana-oauth
+<span class="org-variable-name">client_secret</span> = PagYQZ2PhITlVVgw6A6KP5Nr3GEUYMK3
+<span class="org-variable-name">scopes</span> = openid email profile offline_access roles
+<span class="org-variable-name">email_attribute_path</span> = email
+<span class="org-variable-name">login_attribute_path</span> = username
+<span class="org-variable-name">name_attribute_path</span> = full_name
+<span class="org-variable-name">auth_url</span> = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/auth
+<span class="org-variable-name">token_url</span> = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/token
+<span class="org-variable-name">api_url</span> = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/userinfo
+<span class="org-variable-name">redirect_url</span> = http://10.0.0.128:8080/login/generic_oauth
+<span class="org-variable-name">role_attribute_path</span> = contains(roles[*], <span class="org-string">'admin'</span>) &amp;&amp; <span class="org-string">'Admin'</span> || contains(roles[*], <span class="org-string">'editor'</span>) &amp;&amp; <span class="org-string">'Editor'</span> || <span class="org-string">'Viewer'</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">role_attribute_path = contains(realm_access.roles[*], 'Admin') &amp;&amp; 'Admin' || contains(realm_access.roles[*], 'editor') &amp;&amp; 'Editor' || 'Viewer'
+</span><span class="org-variable-name">signout_redirect_url</span> = http://10.0.0.128:8080/realms/myrealm/protocol/openid-connect/logout?<span class="org-variable-name">post_logout_redirect_uri</span>=http%3A%2F%2F10.0.0.128%3A3000%2Flogin
+<span class="org-variable-name">use_refresh_token</span> = true
+</pre>
+</div>
+
+<p>
+访问grafana地址，验证用户登录。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org1194388" class="outline-3">
+<h3 id="org1194388"><a href="#org1194388">jenkin认证</a></h3>
+<div class="outline-text-3" id="text-org1194388">
+<p>
+1.登录Keycloak，在对应Realm领域中创建Client客户端, 如jenkins
+</p>
+
+<p>
+配置好，在右上角操作选项中点击下载配置(Download adapter config)，复制内容。
+</p>
+
+<pre class="example" id="org508bf1b">
+{
+  "realm": "myrealm",
+  "auth-server-url": "http://10.0.0.128:8080/",
+  "ssl-required": "external",
+  "resource": "jenkins",
+  "credentials": {
+    "secret": "hoQVgcYlc4cK76XzpPUNJWoTkavimwKk"
+  },
+  "confidential-port": 0
+}
+</pre>
+
+<p>
+2.登录jenkins
+</p>
+
+<p>
+安装插件keycloak。在【系统管理】-【全局安全配置】点击安全域选择配置keycloak，将keycloak客户端
+配置粘贴到Keycloak JSON中, 授权策略可选做任何事或者安全矩阵。
+</p>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

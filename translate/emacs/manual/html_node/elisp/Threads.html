@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Threads (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Threads (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Threads (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="index.html" rel="up" title="Top">
+<link href="Processes.html" rel="next" title="Processes">
+<link href="Abbrevs.html" rel="prev" title="Abbrevs">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="chapter-level-extent" id="Threads">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Processes.html" accesskey="n" rel="next">进程</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Abbrevs.html" accesskey="p" rel="prev">缩写与缩写展开</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="index.html" accesskey="u" rel="up">翻译: Emacs Lisp</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h2 class="chapter" id="g_t_7ebf_7a0b"><span>40 线程<a class="copiable-link" href="#g_t_7ebf_7a0b"> &para;</a></span></h2>
+<a class="index-entry-id" id="index-threads"></a>
+<a class="index-entry-id" id="index-concurrency"></a>
+
+<p>Emacs Lisp 提供一种有限形式的并发机制，称为
+<em class="dfn">线程(threads)</em>。Emacs 单个实例中的所有线程共享同一块内存。
+Emacs Lisp 中的并发为 &ldquo;基本协作式(mostly cooperative)&rdquo;，意味着 Emacs 仅会在明确规定的时机
+在不同线程间切换执行。不过，Emacs 的线程支持在设计上已为后续支持更细粒度的并发
+做好了准备，正确的程序不应依赖协作式线程。
+</p>
+<p>目前，线程切换会在以下场景发生：通过 <code class="code">thread-yield</code> 显式请求时、
+等待键盘输入或异步进程的输出时（例如在 <code class="code">accept-process-output</code> 期间），
+或是在与线程相关的阻塞操作中，如互斥锁加锁或 <code class="code">thread-join</code>。
+</p>
+<p>Emacs Lisp 提供创建和控制线程的原语，同时也支持创建和控制互斥锁与条件变量，
+这些常用于线程同步。
+</p>
+<p>全局变量在所有 Emacs Lisp 线程间共享，而局部变量则不共享&mdash;动态的 <code class="code">let</code>
+绑定是线程局部的。每个线程还拥有各自的当前缓冲区（see <a class="pxref" href="Current-Buffer.html">当前缓冲区</a>）
+以及各自的匹配数据（see <a class="pxref" href="Match-Data.html">匹配数据</a>）。
+</p>
+<p>注意，Emacs Lisp 实现会对 <code class="code">let</code> 绑定做特殊处理。
+除使用 <code class="code">let</code> 之外，无法复制这种变量入栈与恢复的行为。
+例如，用 <code class="code">unwind-protect</code> 手动实现的 <code class="code">let</code> 无法让变量值
+具备线程局部特性。
+</p>
+<p>对于词法绑定（see <a class="pxref" href="Variable-Scoping.html">Scoping 变量绑定的作用域规则</a>），闭包在 Emacs Lisp 中
+与其他对象无异，闭包中的绑定会被所有调用该闭包的线程共享。
+</p>
+
+<ul class="mini-toc">
+<li><a href="Basic-Thread-Functions.html" accesskey="1">基础线程函数</a></li>
+<li><a href="Mutexes.html" accesskey="2">互斥锁</a></li>
+<li><a href="Condition-Variables.html" accesskey="3">条件变量</a></li>
+<li><a href="The-Thread-List.html" accesskey="4">线程列表</a></li>
+</ul>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

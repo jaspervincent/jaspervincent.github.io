@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CICD: sanorqueb</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">CICD: sanorqueb</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgbe6a7d1">sonarqube</a>
+<ul>
+<li><a href="#org7b02055">Sonarqube 介绍</a></li>
+<li><a href="#org86613e8">安装</a>
+<ul>
+<li><a href="#org9d21181">部署前环境依赖</a></li>
+<li><a href="#org1a0f45d">部署命令</a></li>
+</ul>
+</li>
+<li><a href="#org519f7ce">maven 方式接入</a>
+<ul>
+<li><a href="#orgda9e661">maven 命令接入</a></li>
+<li><a href="#orge7cfa02">sonar-scanner</a></li>
+</ul>
+</li>
+<li><a href="#org85a9f9f">sonarqube 审查规则</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../cicd.html">cicd</a></li>
+</ul>
+<section id="outline-container-orgbe6a7d1" class="outline-2">
+<h2 id="orgbe6a7d1"><a href="#orgbe6a7d1">sonarqube</a></h2>
+<div class="outline-text-2" id="text-orgbe6a7d1">
+</div>
+<div id="outline-container-org7b02055" class="outline-3">
+<h3 id="org7b02055"><a href="#org7b02055">Sonarqube 介绍</a></h3>
+<div class="outline-text-3" id="text-org7b02055">
+<p>
+SonarQube 是一款用于代码质量管理的开源工具，它主要用于管理源代码的质量。 通过插件形式，可以支持众多计算机语言，比如 java, C#, go，C/C++, PL/SQL, Cobol, JavaScrip, Groovy 等。sonar可以通过PMD,CheckStyle,Findbugs等等代码规则检测工具来检测你的代码，帮助你发现代码的漏洞，Bug，异味等信息。
+</p>
+
+<p>
+Sonar 不仅提供了对 IDE 的支持，可以在 Eclipse和 IntelliJ IDEA 这些工具里联机查看结果；同时 Sonar 还对大量的持续集成工具提供了接口支持，可以很方便地在持续集成中使用 Sonar。
+</p>
+</div>
+</div>
+<div id="outline-container-org86613e8" class="outline-3">
+<h3 id="org86613e8"><a href="#org86613e8">安装</a></h3>
+<div class="outline-text-3" id="text-org86613e8">
+</div>
+<div id="outline-container-org9d21181" class="outline-4">
+<h4 id="org9d21181"><a href="#org9d21181">部署前环境依赖</a></h4>
+<div class="outline-text-4" id="text-org9d21181">
+<p>
+参考文档: <a href="https://docs.sonarqube.org/latest/requirements/prerequisites-and-overview/">Prerequisites and overview</a>
+</p>
+
+<p>
+提前安装：
+</p>
+<ul class="org-ul">
+<li>Oracle JRE 11 或者 OpenJDK 11
+<ul class="org-ul">
+<li>小规模团队:  2GBRAM才能高效运行OS需要1GB的空闲RAM</li>
+</ul></li>
+<li>docker</li>
+<li>postgres  13</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org1a0f45d" class="outline-4">
+<h4 id="org1a0f45d"><a href="#org1a0f45d">部署命令</a></h4>
+<div class="outline-text-4" id="text-org1a0f45d">
+<div class="org-src-container">
+<pre class="src src-shell">docker run   -d   --name sonarqube9.3   -p 8888:9000  
+-e <span class="org-variable-name">SONARQUBE_JDBC_URL</span>=jdbc:postgresql://bor.ws.com:5432/sonar_new  
+-e <span class="org-variable-name">SONARQUBE_JDBC_USERNAME</span>=postgres     
+-e <span class="org-variable-name">SONARQUBE_JDBC_PASSWORD</span>=xxx 
+-v conf:/opt/sonarqube/conf   
+-v extensions:/opt/sonarqube/extensions  
+-v logs:/opt/sonarqube/logs  
+-v data:/opt/sonarqube/data  
+harbor.xxx.com/ops/sonarqube:latest
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org519f7ce" class="outline-3">
+<h3 id="org519f7ce"><a href="#org519f7ce">maven 方式接入</a></h3>
+<div class="outline-text-3" id="text-org519f7ce">
+<ul class="org-ul">
+<li>登录 sonarqube 平台，创建管理员的 token 用于登录，个人&#x2013;&gt; my acount</li>
+</ul>
+</div>
+<div id="outline-container-orgda9e661" class="outline-4">
+<h4 id="orgda9e661"><a href="#orgda9e661">maven 命令接入</a></h4>
+<div class="outline-text-4" id="text-orgda9e661">
+<p>
+在 sonarqube 上提前创建好 projectKey 对应的项目，扫描代码时候需要唯一
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">mvn -Dmaven.repo.local=/m2/repository sonar:sonar -Dsonar.projectKey=ludo-gateway -Dsonar.host.url=https://sonarqube.xxx.com -Dsonar.login=623e254a011fe10e6b7f38594464b764f9eaff70
+
+
+<span class="org-variable-name">JAVA_HOME</span>=/opt/jdk-11.0.2;/usr/maven/bin/mvn sonar:sonar  -Dsonar.projectKey=${<span class="org-variable-name">application</span>}_${<span class="org-variable-name">service_name</span>} -Dsonar.projectName=${<span class="org-variable-name">application</span>}_${<span class="org-variable-name">service_name</span>}  -pl analysis-server -am -Dsonar.coverage.jacoco.xmlReportPaths=analysis-server/target/site/jacoco/jacoco.xml -Dsonar.exclusions=**/src/**/msg/**/*,**/target/**/msg/**/*,**/src/**/proto/**/*,**/target/**/proto/**/*,utils/**/*,**/msg/*,core-sdk/**/*
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35828;&#26126;
+</span>-Dsonar.projectName &#20250;&#22312; sonarqube &#33258;&#21160;&#21019;&#24314;&#39033;&#30446;
+-Dsonar.exclusions &#36807;&#28388;&#19981;&#25195;&#25551;
+</pre>
+</div>
+
+
+
+<p>
+Dockerfile
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">maven java 11 package
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">FROM  xxx.com/ops/ludo-maven:3.6.0-jdk-11-slim-20220420 as builder
+</span>FROM xxx.com/ops/ludo-maven:test as builder
+WORKDIR /opt/
+COPY . .
+RUN mvn -Dmaven.repo.local=/m2/repository clean package -Dmaven.test.skip=true
+RUN mvn -Dmaven.repo.local=/m2/repository sonar:sonar -Dsonar.projectKey=ludo-gateway -Dsonar.host.url=https://sonarqube.xxx.com -Dsonar.login=623e254a011fe10e6b7f38594464b764f9eaff70 -Dsonar.exclusions=**/src/**/msg/**/*,**/target/**/msg/**/*,**/src/**/proto/**/*,**/target/**/proto/**/*
+
+FROM xxx.com/ops/ludo_base_amazonlinux_java:20220420  
+RUN ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime &amp;&amp; <span class="org-builtin">echo</span> <span class="org-string">'Asia/Kolkata'</span> &gt;/etc/timezone  &amp;&amp; mkdir -p /opt/
+<span class="org-comment-delimiter">#</span><span class="org-comment">Copy the two-stage output program to run the jar to the specified /opt directory
+</span>COPY --from=builder /opt/web/target/ludo-gateway.jar /opt/  
+WORKDIR /opt/
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orge7cfa02" class="outline-4">
+<h4 id="orge7cfa02"><a href="#orge7cfa02">sonar-scanner</a></h4>
+<div class="outline-text-4" id="text-orge7cfa02">
+<div class="org-src-container">
+<pre class="src src-shell">sonar-scanner -Dsonar.projectKey=${<span class="org-variable-name">application</span>}_${<span class="org-variable-name">service_name</span>} -Dsonar.host.url=${<span class="org-variable-name">sonar_url</span>} -Dsonar.sourceEncoding=UTF-8 -Dsonar.sources=${<span class="org-variable-name">code_path</span>}/gameinfo-server/src/main -Dsonar.java.binaries=${<span class="org-variable-name">code_path</span>}/gameinfo-server/target/classes -Dsonar.exclusions=**/src/**/msg/**/*,**/target/**/msg/**/*,**/src/**/proto/**/*,**/target/**/proto/**/*
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org85a9f9f" class="outline-3">
+<h3 id="org85a9f9f"><a href="#org85a9f9f">sonarqube 审查规则</a></h3>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

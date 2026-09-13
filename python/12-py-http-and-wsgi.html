@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Python: WEB开发-HTTP协议与WSGI</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Python: WEB开发-HTTP协议与WSGI</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:5b0f0836-81a2-427c-a494-86d02bd2c27a">WEB开发</a>
+<ul>
+<li><a href="#h:10d65449-96c0-45cc-973e-94d37fdacbcb">CS编程</a></li>
+<li><a href="#h:06742056-1478-479c-97e9-c4125af924ad">BS编程</a></li>
+</ul>
+</li>
+<li><a href="#h:4ed871f6-65bd-47f9-b38e-1f5ad01401cd">HTTP协议</a>
+<ul>
+<li><a href="#h:aaccc5e6-0e73-45dd-8b04-0bcf323b3359">安装httpd</a></li>
+<li><a href="#h:634a262f-cbec-46df-9c84-4aeeea0895b3">无状态，有连接和短连接</a></li>
+<li><a href="#h:1e5d323a-b74f-4ffa-8efd-5f7fb5147160">协议</a>
+<ul>
+<li><a href="#h:ae0dc43c-47d6-4c22-a215-87e8ca051bce">URL组成</a></li>
+<li><a href="#h:0bc8073c-ae81-4f3f-b8ea-0ab334eeb096">HTTP消息</a>
+<ul>
+<li><a href="#h:ef6011b3-6df9-4b3b-b397-022f4149e191">请求报文</a></li>
+<li><a href="#h:ccc6cad4-02ff-4c5c-9ce9-d54b6b09e1f8">常见传递信息的方式</a></li>
+<li><a href="#h:572c0a59-db82-482e-941a-eb718833bdd8">响应报文</a></li>
+<li><a href="#h:a7a09fd2-7068-4ff3-b890-5301f756e231">status code状态码</a></li>
+</ul>
+</li>
+<li><a href="#h:3594c6c2-4ca8-4473-b9af-71e2dcbe993a">Cookie技术</a></li>
+<li><a href="#h:aa39b629-6950-4aa1-a269-fa367d43ba82">Session技术</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:1c36d79d-6d16-4261-8ae8-e2a407b85d22">WSGI</a>
+<ul>
+<li><a href="#h:5d20cabd-8d07-4578-9dc0-1c85e8560189">WSGI服务器&#x2013;wsgiref</a></li>
+<li><a href="#h:43c964f5-d056-4267-b706-1fe2747e2475">WSGI服务器作用</a></li>
+<li><a href="#h:a8cc29e2-8a16-48c0-9182-f31602f75c4c">WSGI APP应用程序端</a>
+<ul>
+<li><a href="#h:7b7ca0b8-a1c3-4ce3-b103-44375f0a8af1">函数实现</a></li>
+<li><a href="#h:4427d308-7907-43ec-a2bf-69e96056565a">类实现</a></li>
+<li><a href="#h:1fcad869-693f-41f3-833e-f69134f9cec8">类实现，可调用对象</a></li>
+<li><a href="#h:e06f9abf-25b4-4b84-9321-03953d66ddca">自定义 返回头</a></li>
+<li><a href="#h:f7a9305d-ee87-48a5-83cf-fc9110d22f5f">environ</a></li>
+<li><a href="#h:a42563a4-eb19-4b19-83e2-79ff827e8cbf">start_response</a></li>
+</ul>
+</li>
+<li><a href="#h:23cd6b72-7a1a-4960-a482-7d29874035f0">服务器端</a>
+<ul>
+<li><a href="#h:9ef1c2e5-0d44-4521-999c-a4c37430c37e">Linux 测试用命令</a></li>
+<li><a href="#h:3bc4b5c8-34b5-4a47-ab92-29b1e31580b2">WSGI WEB服务器</a></li>
+<li><a href="#h:69d6051b-005d-4ebc-9242-f8fedb1a632a">WSGI APP应用程序</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Python</a></li>
+</ul>
+<section id="outline-container-h:5b0f0836-81a2-427c-a494-86d02bd2c27a" class="outline-2">
+<h2 id="h:5b0f0836-81a2-427c-a494-86d02bd2c27a"><a href="#h:5b0f0836-81a2-427c-a494-86d02bd2c27a">WEB开发</a></h2>
+<div class="outline-text-2" id="text-h:5b0f0836-81a2-427c-a494-86d02bd2c27a">
+</div>
+<div id="outline-container-h:10d65449-96c0-45cc-973e-94d37fdacbcb" class="outline-3">
+<h3 id="h:10d65449-96c0-45cc-973e-94d37fdacbcb"><a href="#h:10d65449-96c0-45cc-973e-94d37fdacbcb">CS编程</a></h3>
+<div class="outline-text-3" id="text-h:10d65449-96c0-45cc-973e-94d37fdacbcb">
+<p>
+CS编程，即客户端、服务器编程。
+</p>
+
+<p>
+客户端、服务端之间需要使用Socket，约定协议、版本（往往使用的协议是TCP或者UDP），指定地址和端口，就可以通信了。
+</p>
+
+<p>
+客户端、服务端传输数据，数据可以有一定的格式，双方必须先约定好。
+</p>
+</div>
+</div>
+<div id="outline-container-h:06742056-1478-479c-97e9-c4125af924ad" class="outline-3">
+<h3 id="h:06742056-1478-479c-97e9-c4125af924ad"><a href="#h:06742056-1478-479c-97e9-c4125af924ad">BS编程</a></h3>
+<div class="outline-text-3" id="text-h:06742056-1478-479c-97e9-c4125af924ad">
+<p>
+BS编程，即Browser、Server开发。
+</p>
+
+<p>
+Browser浏览器，一种特殊的客户端，支持HTTP(s)协议，能够通过URL向服务端发起请求，等待服务端返回HTML等数据，并在浏览器内可视化展示的程序。
+</p>
+
+<p>
+Server，支持HTTP(s)协议，能够接受众多客户端发起的HTTP协议请求，经过处理，将HTML等数据返回给浏览器。
+</p>
+
+<p>
+本质上来说，BS是一种特殊的CS，即客户端必须是一种支持HTTP协议且能解析并渲染HTML的软件，服务端必须是能够接收多客户端HTTP访问的服务器软件。
+</p>
+
+<p>
+HTTP协议底层基于TCP协议实现。
+</p>
+
+<p>
+BS开发分为两端开发
+</p>
+<ul class="org-ul">
+<li>客户端开发，或称前端开发。HTML、CSS、JavaScript等</li>
+<li>服务端开发，Python有WSGI、Django、Flask、Tornado等</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:4ed871f6-65bd-47f9-b38e-1f5ad01401cd" class="outline-2">
+<h2 id="h:4ed871f6-65bd-47f9-b38e-1f5ad01401cd"><a href="#h:4ed871f6-65bd-47f9-b38e-1f5ad01401cd">HTTP协议</a></h2>
+<div class="outline-text-2" id="text-h:4ed871f6-65bd-47f9-b38e-1f5ad01401cd">
+</div>
+<div id="outline-container-h:aaccc5e6-0e73-45dd-8b04-0bcf323b3359" class="outline-3">
+<h3 id="h:aaccc5e6-0e73-45dd-8b04-0bcf323b3359"><a href="#h:aaccc5e6-0e73-45dd-8b04-0bcf323b3359">安装httpd</a></h3>
+<div class="outline-text-3" id="text-h:aaccc5e6-0e73-45dd-8b04-0bcf323b3359">
+<p>
+可以安装httpd或nginx等服务端服务程序，通过浏览器访问，观察http协议
+</p>
+</div>
+</div>
+<div id="outline-container-h:634a262f-cbec-46df-9c84-4aeeea0895b3" class="outline-3">
+<h3 id="h:634a262f-cbec-46df-9c84-4aeeea0895b3"><a href="#h:634a262f-cbec-46df-9c84-4aeeea0895b3">无状态，有连接和短连接</a></h3>
+<div class="outline-text-3" id="text-h:634a262f-cbec-46df-9c84-4aeeea0895b3">
+<p>
+无连接：HTTP 1.1之前，都是一个请求一个连接，连接用完即刻断开，其实是无连接
+</p>
+<ul class="org-ul">
+<li>有连接：是因为它基于TCP协议，是面向连接的，需要3次握手、4次断开。</li>
+<li>短连接：而Tcp的连接创建销毁成本高，对服务器有很大的影响。所以，自Http 1.1开始，支持keep-alive，默认也开启，一个连接打开后，会保持一段时间（可设置），浏览器再访问该服务器就使用这个Tcp连接，减轻了服务器压力，提高了效率。</li>
+</ul>
+
+<p>
+无状态：指的是服务器无法知道2次请求之间的联系，即使是前后2次同一个浏览器也没有任何数据能够判断出是同一个浏览器的请求。后来可以通过cookie、session来判断。
+</p>
+</div>
+</div>
+<div id="outline-container-h:1e5d323a-b74f-4ffa-8efd-5f7fb5147160" class="outline-3">
+<h3 id="h:1e5d323a-b74f-4ffa-8efd-5f7fb5147160"><a href="#h:1e5d323a-b74f-4ffa-8efd-5f7fb5147160">协议</a></h3>
+<div class="outline-text-3" id="text-h:1e5d323a-b74f-4ffa-8efd-5f7fb5147160">
+<p>
+Http协议是无状态协议。
+</p>
+
+<p>
+同一个客户端的两次请求之间没有任何关系，从服务器端角度来说，它不知道这两个请求来自同一个客户端。
+</p>
+</div>
+<div id="outline-container-h:ae0dc43c-47d6-4c22-a215-87e8ca051bce" class="outline-4">
+<h4 id="h:ae0dc43c-47d6-4c22-a215-87e8ca051bce"><a href="#h:ae0dc43c-47d6-4c22-a215-87e8ca051bce">URL组成</a></h4>
+<div class="outline-text-4" id="text-h:ae0dc43c-47d6-4c22-a215-87e8ca051bce">
+<p>
+URL可以说就是地址，uniform resource locator 统一资源定位符，每一个链接指向一个资源供客户端访问。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">schema://host[:port#]/path/.../[;url-params][?query-string][#anchor]
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#35299;&#37322;
+</span>scheme &#27169;&#24335;&#12289;&#21327;&#35758;
+- http&#12289;ftp&#12289;https&#12289;file&#12289;mailto&#31561;&#31561;
+host:port
+- www.python.org:80 &#65292;80&#31471;&#21475;&#26159;&#40664;&#35748;&#31471;&#21475;&#21487;&#20197;&#19981;&#20889;&#12290;&#22495;&#21517;&#20250;&#20351;&#29992;DNS&#35299;&#26512;&#65292;&#22495;
+  &#21517;&#20250;&#35299;&#26512;&#25104;IP&#25165;&#33021;&#20351;&#29992;&#12290;&#23454;&#38469;&#19978;&#20250;&#23545;&#35299;&#26512;&#21518;&#36820;&#22238;&#30340;IP&#30340;TCP&#30340;80&#31471;&#21475;&#21457;&#36215;&#35775;&#38382;
+/path/to/resource
+- path&#65292;&#25351;&#21521;&#36164;&#28304;&#30340;&#36335;&#24452;
+?<span class="org-variable-name">key1</span>=value1&amp;<span class="org-variable-name">key2</span>=value2
+- query string&#65292;&#26597;&#35810;&#23383;&#31526;&#20018;&#65292;&#38382;&#21495;&#29992;&#26469;&#21644;&#36335;&#24452;&#20998;&#24320;&#65292;<span class="org-variable-name">&#21518;&#38754;key</span>=value&#24418;&#24335;&#65292;&#19988;&#20351;&#29992;&amp;&#31526;&#21495;&#20998;&#21106;
+<span class="org-comment-delimiter">#</span><span class="org-comment">anchor &#38170;&#28857;</span>
+</pre>
+</div>
+
+<p>
+例如，通过下面的URL访问网页
+</p>
+
+<pre class="example" id="org8862c1f">
+http://www.bing.com/pathon/index.html?id=5&amp;name=python
+</pre>
+
+<p>
+访问静态资源时，通过上面这个URL访问的是网站的某路径下的index.html文件，
+而这个文件对应磁盘上的真实的文件。就会从磁盘上读取这个文件，并把文件的
+内容发回浏览器端。
+</p>
+</div>
+</div>
+<div id="outline-container-h:0bc8073c-ae81-4f3f-b8ea-0ab334eeb096" class="outline-4">
+<h4 id="h:0bc8073c-ae81-4f3f-b8ea-0ab334eeb096"><a href="#h:0bc8073c-ae81-4f3f-b8ea-0ab334eeb096">HTTP消息</a></h4>
+<div class="outline-text-4" id="text-h:0bc8073c-ae81-4f3f-b8ea-0ab334eeb096">
+<p>
+<a href="https://datatracker.ietf.org/doc/html/rfc7230#section-1.1">https://datatracker.ietf.org/doc/html/rfc7230#section-1.1</a>
+</p>
+
+<p>
+消息分为Request请求、Response响应
+</p>
+<ul class="org-ul">
+<li>Request：浏览器向服务器发起的请求
+<ul class="org-ul">
+<li>请求报文由Header消息报头、Body消息正文组成（可选）</li>
+<li>请求报文第一行称为请求行</li>
+</ul></li>
+<li>Response：服务器对客户端请求的响应
+<ul class="org-ul">
+<li>响应报文由Header消息报头、Body消息正文组成（可选）</li>
+<li>响应报头第一行称为状态行</li>
+</ul></li>
+<li>每一行使用回车和换行符作为结尾</li>
+<li>如果有Body部分，Header、Body之间留一行空行，也就是2次回车换行。</li>
+</ul>
+
+<pre class="example" id="org54c7c5e">
+"http://www.example.com/hello.txt":
+
+Client request:
+ GET /hello.txt HTTP/1.1
+ User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3
+ Host: www.example.com
+ Accept-Language: en, mi
+
+
+Server response:
+ HTTP/1.1 200 OK
+ Date: Mon, 27 Jul 2009 12:28:53 GMT
+ Server: Apache
+ Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
+ ETag: "34aa387-d-1568eb00"
+ Accept-Ranges: bytes
+ Content-Length: 51
+ Vary: Accept-Encoding
+ Content-Type: text/plain
+
+ Hello World! My payload includes a trailing CRLF.
+</pre>
+</div>
+<div id="outline-container-h:ef6011b3-6df9-4b3b-b397-022f4149e191" class="outline-5">
+<h5 id="h:ef6011b3-6df9-4b3b-b397-022f4149e191"><a href="#h:ef6011b3-6df9-4b3b-b397-022f4149e191">请求报文</a></h5>
+<div class="outline-text-5" id="text-h:ef6011b3-6df9-4b3b-b397-022f4149e191">
+<p>
+请求消息行：请求方法Method 请求路径 协议版本CRLF
+</p>
+
+<p>
+请求方法Method
+</p>
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">方法</td>
+<td class="org-left">说明</td>
+</tr>
+
+<tr>
+<td class="org-left">GET</td>
+<td class="org-left">请求获取URL对应的资源</td>
+</tr>
+
+<tr>
+<td class="org-left">POST</td>
+<td class="org-left">提交数据至服务器端</td>
+</tr>
+
+<tr>
+<td class="org-left">HEAD</td>
+<td class="org-left">和GET类似，不过不返回响应报文的正文</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<a href="https://datatracker.ietf.org/doc/html/rfc2616#section-5.1.1">https://datatracker.ietf.org/doc/html/rfc2616#section-5.1.1</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:ccc6cad4-02ff-4c5c-9ce9-d54b6b09e1f8" class="outline-5">
+<h5 id="h:ccc6cad4-02ff-4c5c-9ce9-d54b6b09e1f8"><a href="#h:ccc6cad4-02ff-4c5c-9ce9-d54b6b09e1f8">常见传递信息的方式</a></h5>
+<div class="outline-text-5" id="text-h:ccc6cad4-02ff-4c5c-9ce9-d54b6b09e1f8">
+<ol class="org-ol">
+<li><p>
+GET方法使用Query String
+</p>
+
+<p>
+<a href="http://www.bing.com/pathon/index.html?id=5&amp;name=python&amp;name=linux">http://www.bing.com/pathon/index.html?id=5&amp;name=python&amp;name=linux</a>
+</p>
+
+<p>
+通过查询字符串在URL中传递参数，而URL在请求报文的头部的第一行
+</p></li>
+
+<li><p>
+POST方法提交数据
+</p>
+
+<p>
+请求时提交的数据是在请求报文的正文Body部分
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#35831;&#27714;&#28040;&#24687;&#22914;&#19979;
+POST /xxx/yyy?<span class="org-variable-name">id</span>=5&amp;<span class="org-variable-name">name</span>=bing HTTP/1.1
+HOST: 127.0.0.1:9999
+content-length: 26
+content-type: application/x-www-form-urlencoded
+
+<span class="org-variable-name">age</span>=5&amp;<span class="org-variable-name">weight</span>=80&amp;<span class="org-variable-name">height</span>=170
+</pre>
+</div></li>
+
+<li><p>
+URL中本身就包含着信息
+</p>
+
+<p>
+<a href="http://www.bing.com/python/student/001">http://www.bing.com/python/student/001</a>
+</p></li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:572c0a59-db82-482e-941a-eb718833bdd8" class="outline-5">
+<h5 id="h:572c0a59-db82-482e-941a-eb718833bdd8"><a href="#h:572c0a59-db82-482e-941a-eb718833bdd8">响应报文</a></h5>
+<div class="outline-text-5" id="text-h:572c0a59-db82-482e-941a-eb718833bdd8">
+<p>
+响应消息行：协议版本 状态码 消息描述CRLF
+</p>
+</div>
+</div>
+<div id="outline-container-h:a7a09fd2-7068-4ff3-b890-5301f756e231" class="outline-5">
+<h5 id="h:a7a09fd2-7068-4ff3-b890-5301f756e231"><a href="#h:a7a09fd2-7068-4ff3-b890-5301f756e231">status code状态码</a></h5>
+<div class="outline-text-5" id="text-h:a7a09fd2-7068-4ff3-b890-5301f756e231">
+<p>
+状态码在响应头第一行
+</p>
+<pre class="example" id="org77d9b7c">
+1xx 提示信息，表示请求已被成功接收，继续处理
+2xx 表示正常响应
+    200 正常返回了网页内容
+3xx 重定向
+    301 页面永久性移走，永久重定向。看Location, 返回新的URL，浏览器会根据返回的url发起新的request请求
+    302 临时重定向
+    304 资源未修改，浏览器使用本地缓存
+4xx 客户端请求错误
+    404 Not Found，网页找不到，客户端请求的资源有错
+    400 请求语法错误
+    401 请求要求身份验证
+    403 服务器拒绝请求
+5xx 服务器端错误
+    500 服务器内部错误
+    502 上游服务器错误，例如nginx反向代理的时候
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3594c6c2-4ca8-4473-b9af-71e2dcbe993a" class="outline-4">
+<h4 id="h:3594c6c2-4ca8-4473-b9af-71e2dcbe993a"><a href="#h:3594c6c2-4ca8-4473-b9af-71e2dcbe993a">Cookie技术</a></h4>
+<div class="outline-text-4" id="text-h:3594c6c2-4ca8-4473-b9af-71e2dcbe993a">
+<p>
+官方文档：<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie">Set-Cookie</a>
+</p>
+
+<ul class="org-ul">
+<li>键值对信息</li>
+<li>是一种客户端、服务器端传递数据的技术</li>
+<li>一般来说cookie信息是在服务器端生成，返回给浏览器端的</li>
+<li>浏览器端可以保持这些值，浏览器对同一域发起每一请求时，都会把Cookie信息发给服务器端</li>
+<li>服务端收到浏览器端发过来的Cookie，处理这些信息，可以用来判断这次请求是否和之前的请求有关联</li>
+</ul>
+
+<p>
+曾经Cookie唯一在浏览器端存储数据的手段，目前浏览器端存储数据的方案很多，Cookie正在被淘汰。
+</p>
+
+<p>
+当服务器收到HTTP请求时，服务器可以在响应头里面添加一个Set-Cookie键值对。
+浏览器收到响应后通常会保存这些Cookie，之后对该服务器每一次请求中都通过
+Cookie请求头部将Cookie信息发送给服务器。
+</p>
+
+<p>
+另外，Cookie的过期时间、域、路径、有效期、适用站点都可以根据需要来指定。
+</p>
+
+<p>
+可以使用 <code>Set－Cookie: NAME=VALUE；Expires=DATE；Path=PATH；Domain=DOMAIN_NAME；SECURE</code>
+</p>
+
+<p>
+例如：
+</p>
+<pre class="example" id="orgd613c5c">
+set-cookie:aliyungf_tc=xxxxw4Y; Path=/; HttpOnly
+set-cookie:test_cookie=CheckForPermission; expires=Tue, 19-Mar-2018 15:53:02 GMT; path=/; 
+domain=.doubleclick.net
+
+Set-Cookie: BD_HOME=1; path=/
+</pre>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">key</th>
+<th scope="col" class="org-left">value说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Cookie过期</td>
+<td class="org-left">Cookie可以设定过期终止时间，过期后将被浏览器清除</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">如果缺省，Cookie不会持久化，浏览器关闭Cookie消失，称为会话级Cookie</td>
+</tr>
+
+<tr>
+<td class="org-left">Cookie域</td>
+<td class="org-left">域确定有哪些域可以存取这个Cookie</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">缺省设置属性值为当前主机，例如 www.python.org</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">如果设置为 python.org 表示包含子域</td>
+</tr>
+
+<tr>
+<td class="org-left">Path</td>
+<td class="org-left">确定哪些目录及子目录访问可以使用该Cookie</td>
+</tr>
+
+<tr>
+<td class="org-left">Secure</td>
+<td class="org-left">表示Cookie随着HTTPS加密过得请求发送给服务端</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">有些浏览器已经不允许 <a href="http://">http://</a> 协议使用Secure</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">这个Secure不能保证Cookie是安全的，Cookie中不要传输敏感信息</td>
+</tr>
+
+<tr>
+<td class="org-left">HttpOnly</td>
+<td class="org-left">将Cookie设置此标记，就不能被JavaScript访问，只能发给服务器端</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+查看Chrome浏览器f12，找到Application中Cookies。
+</p>
+
+<pre class="example" id="org30c21f1">
+Set-Cookie: id=a3fWa; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Secure; HttpOnly
+
+告诉浏览器端设置这个Cookie的键值对，有过期时间，使用HTTPS加密传输到服
+务器端，且不能被浏览器中JS脚本访问该Cookie
+</pre>
+
+<pre class="example" id="org4818d6f">
+Cookie的作用域：Domain和Path定义Cookie的作用域
+
+Domain
+domain=www.baidu.com 表示只有该域的URL才能使用
+domain=.baidu.com 表示可以包含子域，例如www.baidu.com 、python.baidu.com 等
+
+Path
+path=/ 所有/的子路径可以使用
+domain=www.baidu.com; path=/webapp 表示只有www.baidu.com/webapp下的URL匹配，
+例如http://www.baidu.com/webapp/a.html就可以
+</pre>
+
+<p>
+缺点
+</p>
+<ul class="org-ul">
+<li>Cookie一般明文传输（Secure是加密传输），安全性极差，不要传输敏感数据</li>
+<li>有4kB大小限制</li>
+<li>每次请求中都会发送Cookie，增加了流量</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:aa39b629-6950-4aa1-a269-fa367d43ba82" class="outline-4">
+<h4 id="h:aa39b629-6950-4aa1-a269-fa367d43ba82"><a href="#h:aa39b629-6950-4aa1-a269-fa367d43ba82">Session技术</a></h4>
+<div class="outline-text-4" id="text-h:aa39b629-6950-4aa1-a269-fa367d43ba82">
+<p>
+WEB 服务器端，尤其是动态网页服务端Server，有时需要知道浏览器方是谁，但是HTTP是无状态的，怎么办？
+</p>
+
+<p>
+服务端会为每一次浏览器端第一次访问生成一个SessionID，用来唯一标识该浏览器，通过Set-Cookie发送到浏览器端。
+</p>
+
+<p>
+浏览器端收到之后并不永久保持这个Cookie，只是会话级的。浏览器访问服务端时，会使用Cookie，也会带上这个SessionID的Cookie值。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Set-Cookie:<span class="org-variable-name">JSESSIONID</span>=741248A52EEB83DF182009912A4ABD86.Tomcat1; <span class="org-variable-name">Path</span>=/; HttpOnly
+</pre>
+</div>
+
+<p>
+服务端会维持这个SessionID一段时间，如果超时，会清理这些超时没有人访问的SessionID。如果浏览器端发来的SessionID无法在服务端找到，就会自动再次分配新的SessionID，并通过Set-Cookie发送到浏览器端以覆盖原有的存在浏览器中的会话级的SessionID.
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:1c36d79d-6d16-4261-8ae8-e2a407b85d22" class="outline-2">
+<h2 id="h:1c36d79d-6d16-4261-8ae8-e2a407b85d22"><a href="#h:1c36d79d-6d16-4261-8ae8-e2a407b85d22">WSGI</a></h2>
+<div class="outline-text-2" id="text-h:1c36d79d-6d16-4261-8ae8-e2a407b85d22">
+
+<figure id="org97627d2">
+<img style="aspect-ratio:527/302" decoding="async" loading="lazy" src="./images/img_20250520_102516.webp" alt="img_20250520_102516.webp" width="50%">
+
+</figure>
+
+<p>
+WSGI（Web Server Gateway Interface）主要规定了服务器端和应用程序间的接口。
+</p>
+
+<p>
+WEB Server主要负责HTTP协议请求和响应，但不一定支持WSGI接口访问。
+</p>
+
+<p>
+WEBServer集成WSGI模块，比如NGINX.
+</p>
+
+<figure id="org15244d1">
+<img style="aspect-ratio:773/433" decoding="async" loading="lazy" src="./images/img_20250520_113549.webp" alt="img_20250520_113549.webp" width="50%">
+
+</figure>
+
+<p>
+start_response解决响应报文头，解决响应报文正文。
+</p>
+</div>
+<div id="outline-container-h:5d20cabd-8d07-4578-9dc0-1c85e8560189" class="outline-3">
+<h3 id="h:5d20cabd-8d07-4578-9dc0-1c85e8560189"><a href="#h:5d20cabd-8d07-4578-9dc0-1c85e8560189">WSGI服务器&#x2013;wsgiref</a></h3>
+<div class="outline-text-3" id="text-h:5d20cabd-8d07-4578-9dc0-1c85e8560189">
+<ul class="org-ul">
+<li>wsgiref是Python提供的一个WSGI参考实现库，不适合生产环境使用</li>
+<li>wsgiref.simple_server 模块实现一个简单的WSGI HTTP服务器</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">&#36820;&#22238;&#25991;&#26412;&#20363;&#23376;
+</span><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server,demo_app
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, demo_app) <span class="org-comment-delimiter"># </span><span class="org-comment">demo_app&#24212;&#29992;&#31243;&#24207;&#65292;&#21487;&#35843;&#29992;
+</span>server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+
+<p>
+范例
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server, demo_app
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">1 TCP server HTTP bind listen   ip, port; HTTP &#24212;&#29992;&#23618; &#25991;&#26412; 
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#35299;&#26512;HTTP&#25253;&#25991;&#12289;&#23553;&#35013;Response&#25253;&#25991; &#36825;&#26679;&#25165;&#33021;&#31216;&#20026;WEB HTTP Server
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">2 WSGI &#25903;&#25345;&#25509;&#21475;&#35268;&#33539;, ref &#22522;&#20110; HTTP Server
+</span>
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(<span class="org-string">'127.0.0.1'</span>, 8080, demo_app)
+<span class="org-comment-delimiter"># </span><span class="org-comment">socketserver &#23454;&#29616;&#65292;&#19968;&#20010;&#35831;&#27714;&#23601;&#20351;&#29992;Handler&#31867;&#23454;&#20363;&#21270;&#23545;&#24212;&#19968;&#20010;&#35831;&#27714;&#12290; handler&#26041;&#27861;&#22788;&#29702;&#35831;&#27714;&#65292;App? setup handle finish
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">handle &#19977;&#26679;&#23646;&#24615;&#65292;socket&#23545;&#35937;&#12289;&#23545;&#31471;&#20449;&#24687;&#12289;server
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">server.application=app
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">app&#20013;&#38656;&#35201;&#20934;&#22791;&#20869;&#23481;&#65292;&#22312;return&#20043;&#21069;&#65292;&#38656;&#35201;&#20351;&#29992;start_response&#20989;&#25968;&#20934;&#22791;&#29366;&#24577;&#30721;&#21644;&#22836;&#30340;&#23383;&#27573;&#65292;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">return &#21487;&#36845;&#20195;&#23545;&#35937;&#65292;&#20803;&#32032;&#26159;&#20869;&#23481;&#30340;&#19968;&#37096;&#20998;&#65292;&#20803;&#32032;&#26159;bytes&#31867;&#22411;
+</span>server.serve_forever()
+</pre>
+</div>
+
+<p>
+执行结果
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#27983;&#35272;&#22120;&#35775;&#27714;127.0.0.1&#65306;8080&#31471;&#21475;
+</span>PS D:\project\pyproj\trae&gt; &amp; D:/py/py313/python.exe d:/project/pyproj/trae/t1.py
+127.0.0.1 - - [21/May/2025 13:41:57] <span class="org-string">"GET / HTTP/1.1"</span> 200 5386
+127.0.0.1 - - [21/May/2025 13:41:57] <span class="org-string">"GET /favicon.ico HTTP/1.1"</span> 200 5305
+</pre>
+</div>
+
+<p>
+查看demo_app源码
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">def</span> <span class="org-function-name">demo_app</span>(environ,start_response):
+    <span class="org-keyword">from</span> io <span class="org-keyword">import</span> StringIO
+    <span class="org-variable-name">stdout</span> <span class="org-operator">=</span> StringIO()
+    <span class="org-builtin">print</span>(<span class="org-string">"Hello world!"</span>, <span class="org-builtin">file</span><span class="org-operator">=</span>stdout)
+    <span class="org-builtin">print</span>(<span class="org-builtin">file</span><span class="org-operator">=</span>stdout)
+    <span class="org-variable-name">h</span> <span class="org-operator">=</span> <span class="org-builtin">sorted</span>(environ.items())
+    <span class="org-keyword">for</span> k,v <span class="org-keyword">in</span> h:
+        <span class="org-builtin">print</span>(k,<span class="org-string">'='</span>,<span class="org-builtin">repr</span>(v), <span class="org-builtin">file</span><span class="org-operator">=</span>stdout)
+    start_response(<span class="org-string">"200 OK"</span>, [(<span class="org-string">'Content-Type'</span>,<span class="org-string">'text/plain; charset=utf-8'</span>)])
+    <span class="org-keyword">return</span> [stdout.getvalue().encode(<span class="org-string">"utf-8"</span>)]
+</pre>
+</div>
+
+
+<ul class="org-ul">
+<li>StringIO 在内存中读写str</li>
+<li>print("Hello world!", file=stdout)</li>
+<li>将Hello world!内容写入内存中</li>
+<li>start_response 构造head</li>
+<li>getvalue 把缓冲区的内容全部读取出来，内容必须为btyes</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:43c964f5-d056-4267-b706-1fe2747e2475" class="outline-3">
+<h3 id="h:43c964f5-d056-4267-b706-1fe2747e2475"><a href="#h:43c964f5-d056-4267-b706-1fe2747e2475">WSGI服务器作用</a></h3>
+<div class="outline-text-3" id="text-h:43c964f5-d056-4267-b706-1fe2747e2475">
+<ul class="org-ul">
+<li>监听HTTP服务端口（TCPServer，默认端口80）</li>
+<li>接收浏览器端的HTTP请求并解析封装成environ环境数据</li>
+<li>负责调用应用程序，将environ数据和start_response方法两个实参传入给Application</li>
+<li>将应用程序响应的正文封装成HTTP响应报文返回浏览器端</li>
+<li>所有头和内容都是由server来封装</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:a8cc29e2-8a16-48c0-9182-f31602f75c4c" class="outline-3">
+<h3 id="h:a8cc29e2-8a16-48c0-9182-f31602f75c4c"><a href="#h:a8cc29e2-8a16-48c0-9182-f31602f75c4c">WSGI APP应用程序端</a></h3>
+<div class="outline-text-3" id="text-h:a8cc29e2-8a16-48c0-9182-f31602f75c4c">
+<ul class="org-ul">
+<li><p>
+应用程序应该是一个可调用对象
+</p>
+
+<p>
+Python中应该是函数、类、实现了 <span class="underline"><span class="underline">call</span></span> 方法的类的实例
+</p></li>
+
+<li>这个可调用对象应该接收两个参数</li>
+</ul>
+</div>
+<div id="outline-container-h:7b7ca0b8-a1c3-4ce3-b103-44375f0a8af1" class="outline-4">
+<h4 id="h:7b7ca0b8-a1c3-4ce3-b103-44375f0a8af1"><a href="#h:7b7ca0b8-a1c3-4ce3-b103-44375f0a8af1">函数实现</a></h4>
+<div class="outline-text-4" id="text-h:7b7ca0b8-a1c3-4ce3-b103-44375f0a8af1">
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server
+
+<span class="org-variable-name">return_res</span> <span class="org-operator">=</span> b<span class="org-string">'Hello World'</span>
+
+<span class="org-keyword">def</span> <span class="org-function-name">application</span>(environ, start_response):
+    start_response(<span class="org-string">"200 OK"</span>, [(<span class="org-string">'Content-Type'</span>, <span class="org-string">'text/plain; charset=utf-8'</span>)])
+    <span class="org-keyword">return</span> [return_res]
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, application) <span class="org-comment-delimiter"># </span><span class="org-comment">demo_app&#24212;&#29992;&#31243;&#24207;&#65292;&#21487;&#35843;&#29992;
+</span>server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4427d308-7907-43ec-a2bf-69e96056565a" class="outline-4">
+<h4 id="h:4427d308-7907-43ec-a2bf-69e96056565a"><a href="#h:4427d308-7907-43ec-a2bf-69e96056565a">类实现</a></h4>
+<div class="outline-text-4" id="text-h:4427d308-7907-43ec-a2bf-69e96056565a">
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server
+
+<span class="org-variable-name">return_res</span> <span class="org-operator">=</span> b<span class="org-string">'Hello World'</span>
+
+
+<span class="org-keyword">class</span> <span class="org-type">Application</span>:
+    <span class="org-keyword">def</span> <span class="org-function-name">__init__</span>(<span class="org-keyword">self</span>, environ, start_response):
+        <span class="org-keyword">self</span>.<span class="org-variable-name">env</span> <span class="org-operator">=</span> environ
+        <span class="org-keyword">self</span>.<span class="org-variable-name">sr</span> <span class="org-operator">=</span> start_response
+    <span class="org-keyword">def</span> <span class="org-function-name">__iter__</span>(<span class="org-keyword">self</span>): <span class="org-comment-delimiter"># </span><span class="org-comment">&#23545;&#35937;&#21487;&#36845;&#20195;
+</span>        <span class="org-keyword">self</span>.sr(<span class="org-string">"200 OK"</span>, [(<span class="org-string">'Content-Type'</span>, <span class="org-string">'text/plain; charset=utf-8'</span>)])
+        <span class="org-comment-delimiter">#</span><span class="org-comment">return iter(['&#19968;&#20999;'.encode()])
+</span>        <span class="org-comment-delimiter">#</span><span class="org-comment">yield from ['&#19968;&#20999;'.encode()]
+</span>        <span class="org-keyword">yield</span> return_res
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, Application) <span class="org-comment-delimiter"># </span><span class="org-comment">Demo_app&#24212;&#29992;&#31243;&#24207;&#65292;&#21487;&#35843;&#29992;
+</span>server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1fcad869-693f-41f3-833e-f69134f9cec8" class="outline-4">
+<h4 id="h:1fcad869-693f-41f3-833e-f69134f9cec8"><a href="#h:1fcad869-693f-41f3-833e-f69134f9cec8">类实现，可调用对象</a></h4>
+<div class="outline-text-4" id="text-h:1fcad869-693f-41f3-833e-f69134f9cec8">
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server
+
+<span class="org-variable-name">return_res</span> <span class="org-operator">=</span> b<span class="org-string">'Hello World'</span>
+
+
+<span class="org-keyword">class</span> <span class="org-type">Application</span>:
+    <span class="org-keyword">def</span> <span class="org-function-name">__call__</span>(<span class="org-keyword">self</span>, environ, start_response):
+        start_response(<span class="org-string">"200 OK"</span>, [(<span class="org-string">'Content-Type'</span>, <span class="org-string">'text/plain; charset=utf-8'</span>)])
+        <span class="org-keyword">return</span> [return_res]
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, Application()) <span class="org-comment-delimiter"># </span><span class="org-comment">Application(e,s)
+</span>server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>environ和start_response这两个参数名可以是任何合法名，但是一般默认都是这2个名字</li>
+<li>应用程序端还有些其他的规定，暂不用关心</li>
+</ul>
+
+<p>
+注意：第2、第3种实现调用时的不同
+</p>
+</div>
+</div>
+<div id="outline-container-h:e06f9abf-25b4-4b84-9321-03953d66ddca" class="outline-4">
+<h4 id="h:e06f9abf-25b4-4b84-9321-03953d66ddca"><a href="#h:e06f9abf-25b4-4b84-9321-03953d66ddca">自定义 返回头</a></h4>
+<div class="outline-text-4" id="text-h:e06f9abf-25b4-4b84-9321-03953d66ddca">
+<p>
+一般自定义习惯用‘X’开头
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server
+
+<span class="org-variable-name">return_res</span> <span class="org-operator">=</span> b<span class="org-string">'Hello World'</span>
+
+<span class="org-keyword">class</span> <span class="org-type">Application</span>:
+    <span class="org-keyword">def</span> <span class="org-function-name">__call__</span>(<span class="org-keyword">self</span>, environ, start_response):
+        start_response(<span class="org-string">"200 OK"</span>, [
+            (<span class="org-string">'Content-Type'</span>, <span class="org-string">'text/plain; charset=utf-8'</span>),
+            (<span class="org-string">'X-Server'</span>, <span class="org-string">'MyDemo_app'</span>)
+        ])
+        <span class="org-keyword">return</span> [return_res]
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, Application()) <span class="org-comment-delimiter"># </span><span class="org-comment">Application&#24212;&#29992;&#31243;&#24207;&#65292;&#21487;&#35843;&#29992;
+</span>server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f7a9305d-ee87-48a5-83cf-fc9110d22f5f" class="outline-4">
+<h4 id="h:f7a9305d-ee87-48a5-83cf-fc9110d22f5f"><a href="#h:f7a9305d-ee87-48a5-83cf-fc9110d22f5f">environ</a></h4>
+<div class="outline-text-4" id="text-h:f7a9305d-ee87-48a5-83cf-fc9110d22f5f">
+<p>
+environ是包含Http请求信息的dict字典对象
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">名称</td>
+<td class="org-left">含义</td>
+</tr>
+
+<tr>
+<td class="org-left">REQUEST_METHOD</td>
+<td class="org-left">请求方法，GET、POST等</td>
+</tr>
+
+<tr>
+<td class="org-left">PATH_INFO</td>
+<td class="org-left">URL中的路径部分</td>
+</tr>
+
+<tr>
+<td class="org-left">QUERY_STRING</td>
+<td class="org-left">查询字符串</td>
+</tr>
+
+<tr>
+<td class="org-left">SERVER_NAME,SERVER_PORT</td>
+<td class="org-left">服务器名、端口</td>
+</tr>
+
+<tr>
+<td class="org-left">HTTP_HOST</td>
+<td class="org-left">地址和端口</td>
+</tr>
+
+<tr>
+<td class="org-left">SERVER_PROTOCOL</td>
+<td class="org-left">协议</td>
+</tr>
+
+<tr>
+<td class="org-left">HTTP_USER_AGENT</td>
+<td class="org-left">UserAgent信息</td>
+</tr>
+</tbody>
+</table>
+
+<pre class="example" id="org8c1be98">
+CONTENT_TYPE = 'text/plain'
+HTTP_HOST = '127.0.0.1:9999'
+HTTP_USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 6.1; zh-CN) AppleWebKit/537.36 (KHTML, 
+like Gecko) Version/5.0.1 Safari/537.36'
+PATH_INFO = '/'
+QUERY_STRING = ''
+REMOTE_ADDR = '127.0.0.1'
+REMOTE_HOST = ''
+REQUEST_METHOD = 'GET'
+SERVER_NAME = 'DESKTOP-D34H5HF'
+SERVER_PORT = '9999'
+SERVER_PROTOCOL = 'HTTP/1.1'
+SERVER_SOFTWARE = 'WSGIServer/0.2'
+</pre>
+
+<p>
+打印environ信息
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server
+
+<span class="org-variable-name">return_res</span> <span class="org-operator">=</span> <span class="org-string">'&#20320;&#22909;'</span>
+
+<span class="org-keyword">def</span> <span class="org-function-name">application</span>(environ, start_response):
+    <span class="org-builtin">print</span>(<span class="org-operator">*</span>environ.items(), sep<span class="org-operator">=</span><span class="org-string">'</span><span class="org-constant">\n</span><span class="org-string">'</span>)
+    
+    start_response(<span class="org-string">"200 OK"</span>, [(<span class="org-string">'Content-Type'</span>, <span class="org-string">'text/plain; charset=utf-8'</span>)])
+    <span class="org-keyword">return</span> [return_res.encode(<span class="org-string">'utf-8'</span>)]
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, application) <span class="org-comment-delimiter"># </span><span class="org-comment">demo_app&#24212;&#29992;&#31243;&#24207;&#65292;&#21487;&#35843;&#29992;
+</span>server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a42563a4-eb19-4b19-83e2-79ff827e8cbf" class="outline-4">
+<h4 id="h:a42563a4-eb19-4b19-83e2-79ff827e8cbf"><a href="#h:a42563a4-eb19-4b19-83e2-79ff827e8cbf">start_response</a></h4>
+<div class="outline-text-4" id="text-h:a42563a4-eb19-4b19-83e2-79ff827e8cbf">
+<p>
+它是一个可调用对象。有3个参数，定义如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">start_response(status, response_headers, exc_info<span class="org-operator">=</span><span class="org-constant">None</span>)
+</pre>
+</div>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">参数名称</td>
+<td class="org-left">说明</td>
+</tr>
+
+<tr>
+<td class="org-left">status</td>
+<td class="org-left">状态码和状态描述，例如 200 OK</td>
+</tr>
+
+<tr>
+<td class="org-left">response_headers</td>
+<td class="org-left">一个元素为二元组的列表</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">例如[('Content-Type', 'text/plain;charset=utf-8')]</td>
+</tr>
+
+<tr>
+<td class="org-left">exc_info</td>
+<td class="org-left">在错误处理的时候使用</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+start_response应该在返回可迭代对象之前调用，因为它返回的是Response Header。返回的可迭代对象是Response Body
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:23cd6b72-7a1a-4960-a482-7d29874035f0" class="outline-3">
+<h3 id="h:23cd6b72-7a1a-4960-a482-7d29874035f0"><a href="#h:23cd6b72-7a1a-4960-a482-7d29874035f0">服务器端</a></h3>
+<div class="outline-text-3" id="text-h:23cd6b72-7a1a-4960-a482-7d29874035f0">
+<p>
+服务器程序需要调用符合上述定义的可调用对象APP，传入environ、start_response，APP处理后，返回响应头和可迭代对象的正文，由服务器封装返回浏览器端
+</p>
+
+<p>
+返回网页的例子
+</p>
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">from</span> wsgiref.simple_server <span class="org-keyword">import</span> make_server
+
+<span class="org-keyword">def</span> <span class="org-function-name">application</span>(environ, start_response):
+    <span class="org-variable-name">status</span> <span class="org-operator">=</span> <span class="org-string">'200 OK'</span>
+    <span class="org-variable-name">headers</span> <span class="org-operator">=</span> [(<span class="org-string">'Content-Type'</span>, <span class="org-string">'text/html;charset=utf-8'</span>)]
+    start_response(status, headers)
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#36820;&#22238;&#21487;&#36845;&#20195;&#23545;&#35937;
+</span>    <span class="org-variable-name">html</span> <span class="org-operator">=</span> <span class="org-string">'&lt;h1&gt;Hello World&lt;/h1&gt;'</span>.encode(<span class="org-string">"utf-8"</span>)
+    <span class="org-keyword">return</span> [html]
+
+<span class="org-variable-name">ip</span> <span class="org-operator">=</span> <span class="org-string">'127.0.0.1'</span>
+<span class="org-variable-name">port</span> <span class="org-operator">=</span> 9999
+<span class="org-variable-name">server</span> <span class="org-operator">=</span> make_server(ip, port, application)
+server.serve_forever() <span class="org-comment-delimiter"># </span><span class="org-comment">server.handle_request() &#25191;&#34892;&#19968;&#27425;</span>
+</pre>
+</div>
+
+<p>
+simple_server 只是参考用，不能用于生产环境
+</p>
+</div>
+<div id="outline-container-h:9ef1c2e5-0d44-4521-999c-a4c37430c37e" class="outline-4">
+<h4 id="h:9ef1c2e5-0d44-4521-999c-a4c37430c37e"><a href="#h:9ef1c2e5-0d44-4521-999c-a4c37430c37e">Linux 测试用命令</a></h4>
+<div class="outline-text-4" id="text-h:9ef1c2e5-0d44-4521-999c-a4c37430c37e">
+<div class="org-src-container">
+<pre class="src src-sh">curl -I http://192.168.142.1:9999/xxx?<span class="org-variable-name">id</span>=5
+curl -X POST http://192.168.142.1:9999/yyy -d <span class="org-string">'{"x":2}'</span>
+
+-I &#20351;&#29992;HEAD&#26041;&#27861;
+-X &#25351;&#23450;&#26041;&#27861;&#65292;-d&#20256;&#36755;&#25968;&#25454;
+</pre>
+</div>
+
+<p>
+到这里就完成了一个简单的WEB 程序开发
+</p>
+</div>
+</div>
+<div id="outline-container-h:3bc4b5c8-34b5-4a47-ab92-29b1e31580b2" class="outline-4">
+<h4 id="h:3bc4b5c8-34b5-4a47-ab92-29b1e31580b2"><a href="#h:3bc4b5c8-34b5-4a47-ab92-29b1e31580b2">WSGI WEB服务器</a></h4>
+<div class="outline-text-4" id="text-h:3bc4b5c8-34b5-4a47-ab92-29b1e31580b2">
+<p>
+本质上就是一个TCP服务器，监听在特定端口上
+</p>
+
+<p>
+支持HTTP协议，能够将HTTP请求报文进行解析，能够把响应数据进行HTTP协议的报文封装并返回浏览器端
+</p>
+
+<p>
+实现了WSGI协议，该协议约定了和应用程序之间接口（参看PEP333，<a href="https://www.python.org/dev/peps/pep-0333/">https://www.python.org/dev/peps/pep-0333/</a> ）
+</p>
+</div>
+</div>
+<div id="outline-container-h:69d6051b-005d-4ebc-9242-f8fedb1a632a" class="outline-4">
+<h4 id="h:69d6051b-005d-4ebc-9242-f8fedb1a632a"><a href="#h:69d6051b-005d-4ebc-9242-f8fedb1a632a">WSGI APP应用程序</a></h4>
+<div class="outline-text-4" id="text-h:69d6051b-005d-4ebc-9242-f8fedb1a632a">
+<ul class="org-ul">
+<li>遵从WSGI协议</li>
+<li>本身是一个可调用对象</li>
+<li>调用start_response，返回响应头部</li>
+<li>返回包含正文的可迭代对象</li>
+</ul>
+
+<p>
+WSGI 框架库往往可以看做增强的更加复杂的Application
+</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Type Predicates (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Type Predicates (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Type Predicates (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Lisp-Data-Types.html" rel="up" title="Lisp Data Types">
+<link href="Equality-Predicates.html" rel="next" title="Equality Predicates">
+<link href="Circular-Objects.html" rel="prev" title="Circular Objects">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Type-Predicates">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Equality-Predicates.html" accesskey="n" rel="next">相等性谓词</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Circular-Objects.html" accesskey="p" rel="prev">循环对象的读取语法</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Lisp-Data-Types.html" accesskey="u" rel="up">Lisp 数据类型</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_7c7b_578b_8c13_8bcd"><span>2.7 类型谓词<a class="copiable-link" href="#g_t_7c7b_578b_8c13_8bcd"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-type-checking"></a>
+<a class="index-entry-id" id="index-wrong_002dtype_002dargument"></a>
+
+<p>Emacs Lisp 解释器本身不会在函数调用时，对传递给函数的实际参数执行类型检查。这是因为 Lisp 中的函数参数不像其他编程语言那样有声明的数据类型，因此解释器无法完成这类检查。故而，需要由各个函数自行检验每个实际参数是否属于该函数可处理的类型。
+</p>
+<p>所有内置函数都会在适当时机检查其实际参数的类型；若参数类型错误，会触发 <code class="code">wrong-type-argument</code> 错误。例如，向 <code class="code">+</code> 函数传入其无法处理的参数时，会出现如下情况：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(+ 2 'a)
+     error&rarr; Wrong type argument: number-or-marker-p, a  
+</pre></div></div>
+
+<a class="index-entry-id" id="index-type-predicates"></a>
+<a class="index-entry-id" id="index-testing-types"></a>
+<p>若希望程序根据不同类型执行不同逻辑，必须显式进行类型检查。检查对象类型最常用的方式是调用 <em class="dfn">type predicate类型谓词</em> 函数。Emacs 为每种类型都提供了对应的类型谓词，同时也包含一些针对类型组合的谓词。
+</p>
+<p>类型谓词函数接收一个参数：若该参数属于对应类型，则返回 <code class="code">t</code>，否则返回 <code class="code">nil</code>。遵循 Lisp 谓词函数的通用约定，大多数类型谓词的名称以 &lsquo;<samp class="samp">p</samp>&rsquo; 结尾。
+</p>
+<p>以下示例使用谓词 <code class="code">listp</code> 检查列表类型、<code class="code">symbolp</code> 检查符号类型：
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun add-on (x)
+  (cond ((symbolp x)
+         ;; If X is a symbol, put it on LIST.
+         (setq list (cons x list)))
+        ((listp x)
+         ;; If X is a list, add its elements to LIST.
+         (setq list (append x list)))
+        (t
+         ;; We handle only symbols and lists.
+         (error &quot;Invalid argument %s in add-on&quot; x))))
+</pre></div>
+
+<p>下表按字母顺序列出了预定义的类型谓词，并标注了进一步说明的引用位置：
+</p>
+<dl class="table">
+<dt><code class="code">atom</code></dt>
+<dd><p>See <a class="xref" href="List_002drelated-Predicates.html">atom</a>.
+</p>
+</dd>
+<dt><code class="code">arrayp</code></dt>
+<dd><p>See <a class="xref" href="Array-Functions.html">arrayp</a>.
+</p>
+</dd>
+<dt><code class="code">bignump</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Numbers.html">bignump</a>.
+</p>
+</dd>
+<dt><code class="code">bool-vector-p</code></dt>
+<dd><p>See <a class="xref" href="Bool_002dVectors.html">bool-vector-p</a>.
+</p>
+</dd>
+<dt><code class="code">booleanp</code></dt>
+<dd><p>See <a class="xref" href="nil-and-t.html">booleanp</a>.
+</p>
+</dd>
+<dt><code class="code">bufferp</code></dt>
+<dd><p>See <a class="xref" href="Buffer-Basics.html">bufferp</a>.
+</p>
+</dd>
+<dt><code class="code">byte-code-function-p</code></dt>
+<dd><p>See <a class="xref" href="Closure-Type.html">byte-code-function-p</a>.
+</p>
+</dd>
+<dt><code class="code">case-table-p</code></dt>
+<dd><p>See <a class="xref" href="Case-Tables.html">case-table-p</a>.
+</p>
+</dd>
+<dt><code class="code">char-or-string-p</code></dt>
+<dd><p>See <a class="xref" href="Predicates-for-Strings.html">char-or-string-p</a>.
+</p>
+</dd>
+<dt><code class="code">char-table-p</code></dt>
+<dd><p>See <a class="xref" href="Char_002dTables.html">char-table-p</a>.
+</p>
+</dd>
+<dt><code class="code">closurep</code></dt>
+<dd><p>See <a class="xref" href="What-Is-a-Function.html">closurep</a>.
+</p>
+</dd>
+<dt><code class="code">commandp</code></dt>
+<dd><p>See <a class="xref" href="Interactive-Call.html">commandp</a>.
+</p>
+</dd>
+<dt><code class="code">compiled-function-p</code></dt>
+<dd><p>See <a class="xref" href="Closure-Type.html">compiled-function-p</a>.
+</p>
+</dd>
+<dt><code class="code">condition-variable-p</code></dt>
+<dd><p>See <a class="xref" href="Condition-Variables.html">condition-variable-p</a>.
+</p>
+</dd>
+<dt><code class="code">consp</code></dt>
+<dd><p>See <a class="xref" href="List_002drelated-Predicates.html">consp</a>.
+</p>
+</dd>
+<dt><code class="code">custom-variable-p</code></dt>
+<dd><p>See <a class="xref" href="Variable-Definitions.html">custom-variable-p</a>.
+</p>
+</dd>
+<dt><code class="code">fixnump</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Numbers.html">fixnump</a>.
+</p>
+</dd>
+<dt><code class="code">floatp</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Numbers.html">floatp</a>.
+</p>
+</dd>
+<dt><code class="code">fontp</code></dt>
+<dd><p>See <a class="xref" href="Low_002dLevel-Font.html">底层字体表示</a>.
+</p>
+</dd>
+<dt><code class="code">frame-configuration-p</code></dt>
+<dd><p>See <a class="xref" href="Frame-Configurations.html">frame-configuration-p</a>.
+</p>
+</dd>
+<dt><code class="code">frame-live-p</code></dt>
+<dd><p>See <a class="xref" href="Deleting-Frames.html">frame-live-p</a>.
+</p>
+</dd>
+<dt><code class="code">framep</code></dt>
+<dd><p>See <a class="xref" href="Frames.html">framep</a>.
+</p>
+</dd>
+<dt><code class="code">functionp</code></dt>
+<dd><p>See <a class="xref" href="Functions.html">functionp</a>.
+</p>
+</dd>
+<dt><code class="code">hash-table-p</code></dt>
+<dd><p>See <a class="xref" href="Other-Hash.html">hash-table-p</a>.
+</p>
+</dd>
+<dt><code class="code">integer-or-marker-p</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Markers.html">integer-or-marker-p</a>.
+</p>
+</dd>
+<dt><code class="code">integerp</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Numbers.html">integerp</a>.
+</p>
+</dd>
+<dt><code class="code">interpreted-function-p</code></dt>
+<dd><p>See <a class="xref" href="What-Is-a-Function.html">interpreted-function-p</a>.
+</p>
+</dd>
+<dt><code class="code">keymapp</code></dt>
+<dd><p>See <a class="xref" href="Creating-Keymaps.html">keymapp</a>.
+</p>
+</dd>
+<dt><code class="code">keywordp</code></dt>
+<dd><p>See <a class="xref" href="Constant-Variables.html">永不改变的变量</a>.
+</p>
+</dd>
+<dt><code class="code">listp</code></dt>
+<dd><p>See <a class="xref" href="List_002drelated-Predicates.html">listp</a>.
+</p>
+</dd>
+<dt><code class="code">markerp</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Markers.html">markerp</a>.
+</p>
+</dd>
+<dt><code class="code">mutexp</code></dt>
+<dd><p>See <a class="xref" href="Mutexes.html">mutexp</a>.
+</p>
+</dd>
+<dt><code class="code">nlistp</code></dt>
+<dd><p>See <a class="xref" href="List_002drelated-Predicates.html">nlistp</a>.
+</p>
+</dd>
+<dt><code class="code">number-or-marker-p</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Markers.html">number-or-marker-p</a>.
+</p>
+</dd>
+<dt><code class="code">numberp</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Numbers.html">numberp</a>.
+</p>
+</dd>
+<dt><code class="code">obarrayp</code></dt>
+<dd><p>See <a class="xref" href="Creating-Symbols.html">obarrayp</a>.
+</p>
+</dd>
+<dt><code class="code">overlayp</code></dt>
+<dd><p>See <a class="xref" href="Overlays.html">overlayp</a>.
+</p>
+</dd>
+<dt><code class="code">processp</code></dt>
+<dd><p>See <a class="xref" href="Processes.html">processp</a>.
+</p>
+</dd>
+<dt><code class="code">recordp</code></dt>
+<dd><p>See <a class="xref" href="Record-Type.html">recordp</a>.
+</p>
+</dd>
+<dt><code class="code">sequencep</code></dt>
+<dd><p>See <a class="xref" href="Sequence-Functions.html">sequencep</a>.
+</p>
+</dd>
+<dt><code class="code">string-or-null-p</code></dt>
+<dd><p>See <a class="xref" href="Predicates-for-Strings.html">string-or-null-p</a>.
+</p>
+</dd>
+<dt><code class="code">stringp</code></dt>
+<dd><p>See <a class="xref" href="Predicates-for-Strings.html">stringp</a>.
+</p>
+</dd>
+<dt><code class="code">subrp</code></dt>
+<dd><p>See <a class="xref" href="Function-Cells.html">subrp</a>.
+</p>
+</dd>
+<dt><code class="code">symbolp</code></dt>
+<dd><p>See <a class="xref" href="Symbols.html">symbolp</a>.
+</p>
+</dd>
+<dt><code class="code">syntax-table-p</code></dt>
+<dd><p>See <a class="xref" href="Syntax-Tables.html">syntax-table-p</a>.
+</p>
+</dd>
+<dt><code class="code">threadp</code></dt>
+<dd><p>See <a class="xref" href="Basic-Thread-Functions.html">threadp</a>.
+</p>
+</dd>
+<dt><code class="code">vectorp</code></dt>
+<dd><p>See <a class="xref" href="Vectors.html">vectorp</a>.
+</p>
+</dd>
+<dt><code class="code">wholenump</code></dt>
+<dd><p>See <a class="xref" href="Predicates-on-Numbers.html">wholenump</a>.
+</p>
+</dd>
+<dt><code class="code">window-configuration-p</code></dt>
+<dd><p>See <a class="xref" href="Window-Configurations.html">window-configuration-p</a>.
+</p>
+</dd>
+<dt><code class="code">window-live-p</code></dt>
+<dd><p>See <a class="xref" href="Deleting-Windows.html">window-live-p</a>.
+</p>
+</dd>
+<dt><code class="code">windowp</code></dt>
+<dd><p>See <a class="xref" href="Basic-Windows.html">windowp</a>.
+</p></dd>
+</dl>
+
+<p>检查对象类型最通用的方式是调用 <code class="code">type-of</code> 函数。需注意，每个对象仅属于一种原始类型； <code class="code">type-of</code> 会返回该对象所属的原始类型（see <a class="pxref" href="Lisp-Data-Types.html">Lisp 数据类型</a>）。但 <code class="code">type-of</code> 无法识别非原始类型，因此在大多数情况下，使用类型谓词比 <code class="code">type-of</code> 更合适。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-type_002dof"><span class="category-def">Function: </span><span><strong class="def-name">type-of</strong> <var class="def-var-arguments">object</var><a class="copiable-link" href="#index-type_002dof"> &para;</a></span></dt>
+<dd><p>该函数返回一个符号，代表 <var class="var">object</var> 的原始类型。返回值为以下符号之一：
+<code class="code">bool-vector</code>,
+<code class="code">buffer</code>, <code class="code">char-table</code>, <code class="code">compiled-function</code>,
+<code class="code">condition-variable</code>, <code class="code">cons</code>, <code class="code">finalizer</code>,
+<code class="code">float</code>, <code class="code">font-entity</code>, <code class="code">font-object</code>,
+<code class="code">font-spec</code>, <code class="code">frame</code>, <code class="code">hash-table</code>, <code class="code">integer</code>,
+<code class="code">marker</code>, <code class="code">mutex</code>, <code class="code">obarray</code>, <code class="code">overlay</code>, <code class="code">process</code>,
+<code class="code">string</code>, <code class="code">subr</code>, <code class="code">symbol</code>, <code class="code">thread</code>,
+<code class="code">vector</code>, <code class="code">window</code>, or <code class="code">window-configuration</code>。
+但如果 <var class="var">object</var> 是记录（record），则返回其第一个槽位指定的类型；<a class="ref" href="Records.html">记录</a>。
+</p>
+<div class="example">
+<pre class="example-preformatted">(type-of 1)
+     &rArr; integer
+</pre><div class="group"><pre class="example-preformatted">(type-of 'nil)
+     &rArr; symbol
+(type-of '())    ; <span class="r"><code class="code">()</code> is <code class="code">nil</code>.</span>
+     &rArr; symbol
+(type-of '(x))
+     &rArr; cons
+(type-of (record 'foo))
+     &rArr; foo
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-cl_002dtype_002dof"><span class="category-def">Function: </span><span><strong class="def-name">cl-type-of</strong> <var class="def-var-arguments">object</var><a class="copiable-link" href="#index-cl_002dtype_002dof"> &para;</a></span></dt>
+<dd><p>该函数返回一个符号，代表 <var class="var">object</var> 的<em class="emph">类型</em>。其行为通常与 <code class="code">type-of</code> 一致，但会保证返回尽可能精确的类型 &mdash; 这也意味着，它返回的具体类型可能随 Emacs 版本变化。因此，原则上不应将其返回值与固定的类型集合做比较。
+</p>
+<div class="example">
+<pre class="example-preformatted">(cl-type-of 1)
+     &rArr; fixnum
+</pre><div class="group"><pre class="example-preformatted">(cl-type-of 'nil)
+     &rArr; null
+(cl-type-of (record 'foo))
+     &rArr; foo
+</pre></div></div>
+</dd></dl>
+
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Equality-Predicates.html">相等性谓词</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Circular-Objects.html">循环对象的读取语法</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Lisp-Data-Types.html">Lisp 数据类型</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

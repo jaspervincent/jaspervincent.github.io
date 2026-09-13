@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CICD: jenkins发布服务到kubernetes</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">CICD: jenkins发布服务到kubernetes</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:f3ec77aa-f92d-4f19-81cd-488aa00420ed">jenkins-cicd1-and-helm</a>
+<ul>
+<li><a href="#h:E0688D54-D295-41B2-A289-F3C5FBEBF985">jenkins job 选项参数</a></li>
+<li><a href="#h:695D4A6F-4166-4083-A00F-7D57FC8C4BFE">deploy/Jenkinsfile</a></li>
+</ul>
+</li>
+<li><a href="#h:92a48402-b18a-4968-b8d3-6b154c0dd0a9">jenkins-cicd2</a></li>
+<li><a href="#h:74C71FF9-58FE-4C6A-AE12-82AD71974B88">jenkins-cd-and-argocd-cd</a>
+<ul>
+<li><a href="#h:8C88FA85-A3B0-4960-B42F-527E92284191">回溯脚本</a></li>
+</ul>
+</li>
+<li><a href="#h:a2fdf4ea-e67d-475e-89eb-cca950178eab">服务发布更新减少耗时方案</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">cicd</a></li>
+</ul>
+<section id="outline-container-h:f3ec77aa-f92d-4f19-81cd-488aa00420ed" class="outline-2">
+<h2 id="h:f3ec77aa-f92d-4f19-81cd-488aa00420ed"><a href="#h:f3ec77aa-f92d-4f19-81cd-488aa00420ed">jenkins-cicd1-and-helm</a></h2>
+<div class="outline-text-2" id="text-h:f3ec77aa-f92d-4f19-81cd-488aa00420ed">
+<p>
+jenkins 页面构建通过 helm 发布到 k8s 集群中
+</p>
+</div>
+<div id="outline-container-h:E0688D54-D295-41B2-A289-F3C5FBEBF985" class="outline-3">
+<h3 id="h:E0688D54-D295-41B2-A289-F3C5FBEBF985"><a href="#h:E0688D54-D295-41B2-A289-F3C5FBEBF985">jenkins job 选项参数</a></h3>
+<div class="outline-text-3" id="text-h:E0688D54-D295-41B2-A289-F3C5FBEBF985">
+<div class="org-src-container">
+<pre class="src src-shell">branch: master
+SVC_ENV: prod
+PORT: 8080
+JAVA_OPT: &#31354;
+Nacos_Server: http://nacos-headless.nacos.svc:8848
+Nacos_Namespace: 00f675efda
+replicas: 2
+k8s_namespace: xxx-dev
+skywalking: xxx:11800
+</pre>
+</div>
+
+<p>
+流水线
+</p>
+<ul class="org-ul">
+<li>SCM
+<ul class="org-ul">
+<li>git
+<ul class="org-ul">
+<li>repository url  代码仓库</li>
+<li>脚本路径: deploy/Jenkinsfile</li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:695D4A6F-4166-4083-A00F-7D57FC8C4BFE" class="outline-3">
+<h3 id="h:695D4A6F-4166-4083-A00F-7D57FC8C4BFE"><a href="#h:695D4A6F-4166-4083-A00F-7D57FC8C4BFE">deploy/Jenkinsfile</a></h3>
+<div class="outline-text-3" id="text-h:695D4A6F-4166-4083-A00F-7D57FC8C4BFE">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">!groovy
+</span><span class="org-function-name">node</span>(<span class="org-string">'master'</span>) {
+    def <span class="org-variable-name">jobname</span> = env.JOB_BASE_NAME
+    def <span class="org-variable-name">name</span> = jobname.split(/(dev-|qa-|prod-)/)[1]
+    def <span class="org-variable-name">workdir</span> = env.WORKSPACE
+    def <span class="org-variable-name">port</span> = env.PORT
+    def <span class="org-variable-name">nacosserver</span> = env.Nacos_Server
+    def <span class="org-variable-name">nacosns</span> = env.Nacos_Namespace
+    def <span class="org-variable-name">dockerid</span> = env.BUILD_TAG
+    def <span class="org-variable-name">appenv</span> = env.SVC_ENV
+    def <span class="org-variable-name">k8sns</span> = env.k8s_namespace
+    def <span class="org-variable-name">k8sreplicas</span> = env.replicas
+    def <span class="org-variable-name">skywalking</span> = env.skywalking
+
+    stage(<span class="org-string">'&#20195;&#30721;&#33719;&#21462;'</span>) {
+        dir(<span class="org-string">"${workdir}"</span>) {
+            checkout scm
+        }
+    }
+
+    stage(<span class="org-string">'&#26500;&#24314;&#20195;&#30721;'</span>) {
+        sh <span class="org-string">"mvn clean package"</span>
+        sh <span class="org-string">"cp ${name}/target/${name}.jar deploy"</span>
+    }
+
+    stage(<span class="org-string">'&#26500;&#24314;Docker&#38236;&#20687;'</span>) {
+        docker.withRegistry(<span class="org-string">'https://registry-vpc.cn-beijing.aliyuncs.com'</span>, <span class="org-string">'e87917f6-1219-4d80-8c3e-d054ecbe268d'</span>) {
+            def <span class="org-variable-name">Image</span> = docker.build(<span class="org-string">"registry-vpc.cn-beijing.aliyuncs.com/xxx-${appenv}/${name}:latest"</span>, <span class="org-string">"./deploy --build-arg JAR_FILE=${name}.jar --build-arg SERVER_NAME=${name} --build-arg PORT=${port} --build-arg ENV=${appenv} --build-arg NACOS_SERVER=${nacosserver} --build-arg NACOS_NS=${nacosns} --build-arg SKYWALKING_SERVER=${skywalking}"</span>)
+            Image.push(<span class="org-string">"${dockerid}"</span>)
+            Image.push(<span class="org-string">"latest"</span>)
+        }
+    }
+
+    try {
+        stage(<span class="org-string">'&#21368;&#36733;&#26381;&#21153;'</span>) {
+            sh <span class="org-string">"helm --kubeconfig /root/.kube/cici/${appenv}-config uninstall ${name} -n ${k8sns}"</span>
+            sh <span class="org-string">"sed -i 's/service-name/${name}/g' deploy/helm/Chart.yaml"</span>
+        }
+    } catch (Exception e) {
+        <span class="org-builtin">echo</span> <span class="org-string">"continue"</span>
+    }
+
+    stage(<span class="org-string">'&#21457;&#24067;&#26381;&#21153;'</span>) {
+        sh <span class="org-string">"helm --kubeconfig /root/.kube/cici/${appenv}-config upgrade ${name} deploy/helm \
+             --install \
+             --timeout 5m0s \
+             --namespace ${k8sns} \
+             --set service.port=${port} \
+             --set name=${name} \
+             --set replicas=${k8sreplicas} \
+             --set deployment.image.registry=registry-vpc.cn-beijing.aliyuncs.com/cici-${appenv}/${name} \
+             --set deployment.image.version=${dockerid}"</span>
+    }
+
+    stage(<span class="org-string">'&#26381;&#21153;&#21015;&#34920;'</span>) {
+        sh <span class="org-string">"helm --kubeconfig /root/.kube/cici/${appenv}-config list -A | grep ${name}"</span>
+    }
+}
+</pre>
+</div>
+
+<p>
+deploy/Dockerfile
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">FROM registry-vpc.cn-beijing.aliyuncs.com/cici-dev/openjdk8:oap-latest
+
+ARG JAR_FILE 
+ARG PORT
+ARG ENV
+ARG NACOS_SERVER
+ARG NACOS_NS
+ARG JAVA_OPT
+ARG SKYWALKING_SERVER 
+ARG SERVER_NAME
+
+ENV <span class="org-variable-name">TZ</span>=Asia/Shanghai
+ENV <span class="org-variable-name">JAR_FILE</span>=${<span class="org-variable-name">JAR_FILE</span>}
+ENV <span class="org-variable-name">PORT</span>=${<span class="org-variable-name">PORT</span>}
+ENV <span class="org-variable-name">ENV</span>=${<span class="org-variable-name">ENV</span>}
+ENV <span class="org-variable-name">NACOS_SERVER</span>=${<span class="org-variable-name">NACOS_SERVER</span>}
+ENV <span class="org-variable-name">NACOS_NS</span>=${<span class="org-variable-name">NACOS_NS</span>}
+ENV <span class="org-variable-name">JAVA_OPT</span>=${<span class="org-variable-name">JAVA_OPT</span>}
+ENV <span class="org-variable-name">SKYWALKING_SERVER</span>=${<span class="org-variable-name">SKYWALKING_SERVER</span>}
+ENV <span class="org-variable-name">SERVER_NAME</span>=${<span class="org-variable-name">SERVER_NAME</span>}
+
+WORKDIR /app
+
+COPY ${<span class="org-variable-name">JAR_FILE</span>} . 
+COPY down_nacos.sh .
+
+EXPOSE ${<span class="org-variable-name">PORT</span>}
+
+ENTRYPOINT exec java ${<span class="org-variable-name">JAVA_OPT</span>} -javaagent:/opt/apache-skywalking-apm-bin/agent/skywalking-agent.jar -Dskywalking.agent.service_name=${<span class="org-variable-name">SERVER_NAME</span>} -Dskywalking.collector.backend_service=${<span class="org-variable-name">SKYWALKING_SERVER</span>} -jar ${<span class="org-variable-name">JAR_FILE</span>} --server.port=${<span class="org-variable-name">PORT</span>} --spring.profiles.active=${<span class="org-variable-name">ENV</span>} --spring.cloud.nacos.config.server-addr=${<span class="org-variable-name">NACOS_SERVER</span>} --spring.cloud.nacos.config.namespace=${<span class="org-variable-name">NACOS_NS</span>}
+
+</pre>
+</div>
+
+<p>
+deploy/down_nacos.sh
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">ip</span>=<span class="org-sh-quoted-exec">`ifconfig  | grep inet | awk '{print $2}' | grep -v "127.0.0.1"`</span>
+<span class="org-variable-name">serviceName</span>=<span class="org-sh-quoted-exec">`ls /app | grep *.jar | awk -F '.' '{print $1}'`</span>
+<span class="org-variable-name">port</span>=<span class="org-sh-quoted-exec">`ps -ef | grep java | grep -v grep  | awk -F '--server.port=' '{print $2}' | awk '{print $1}'`</span>
+<span class="org-variable-name">namespacesId</span>=<span class="org-sh-quoted-exec">`ps -ef | grep java | grep -v grep  | awk -F '--spring.cloud.nacos.config.namespace=' '{print $2}' | awk '{print $1}'`</span>
+<span class="org-variable-name">nacosServer</span>=<span class="org-sh-quoted-exec">`ps -ef | grep java | grep -v grep  | awk -F '--spring.cloud.nacos.config.server-addr=' '{print $2}' | awk '{print $1}'`</span>
+
+curl -X PUT -d <span class="org-string">"serviceName=$serviceName"</span> -d <span class="org-string">"ip=$ip"</span> -d <span class="org-string">"port=$port"</span> -d <span class="org-string">"enabled=false"</span> -d <span class="org-string">"namespacesId=$namespacesId"</span> $<span class="org-variable-name">nacosServer</span>/nacos/v1/ns/instance<span class="org-string">\?</span>serviceName<span class="org-string">\=</span>$<span class="org-variable-name">serviceName</span><span class="org-string">\&amp;</span>ip<span class="org-string">\=</span>$<span class="org-variable-name">ip</span><span class="org-string">\&amp;</span>port<span class="org-string">\=</span>$<span class="org-variable-name">port</span><span class="org-string">\&amp;</span>enabled<span class="org-string">\=</span>false<span class="org-string">\&amp;</span>namespaceId<span class="org-string">\=</span>$<span class="org-variable-name">namespacesId</span>
+
+sleep 30
+</pre>
+</div>
+
+<p>
+deploy/helm/Chart.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+description: service-name service 
+name: service-name-helm
+version: 1.0.0 
+</pre>
+</div>
+
+<p>
+deploy/helm/values.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">name: cici-gateway 
+
+replicas: 2
+
+service:
+  port: 9999
+  check: /health
+
+deployment:
+  image:
+    registry: registry.cn-beijing.aliyuncs.com/cici-dev/cici-gateway 
+    version: latest
+    pullSecretName: cici-dev-registry 
+</pre>
+</div>
+
+<p>
+deploy/helm/templates/deployment.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    cici.apps: {{.Values.name}}
+  name: {{.Values.name}}
+  namespace: {{.Values.namespace}}
+spec:
+  replicas: {{.Values.replicas}} 
+  selector:
+    matchLabels:
+      cici.apps: {{.Values.name}}
+  template:
+    metadata:
+      labels:
+        cici.apps: {{.Values.name}}
+    spec:
+{{- with .Values.deployment.image}}
+      imagePullSecrets:      
+      - name: {{.pullSecretName}}
+      containers:
+      - image: {{ .registry}}:{{.version}}
+        imagePullPolicy: {{ .pullPolicy | default <span class="org-string">"Always"</span> | quote }}
+{{- end}}
+        name: {{.Values.name}}
+        ports:
+        - containerPort: {{.Values.service.port}} 
+        readinessProbe:
+          httpGet:
+            path: {{.Values.service.check}}
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 2
+          successThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: {{.Values.service.check}}
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 1
+          successThreshold: 1
+        lifecycle:
+          preStop:
+            <span class="org-keyword">exec</span>:
+              command: [<span class="org-string">"/bin/bash"</span>, <span class="org-string">"/app/down_nacos.sh"</span>]
+        resources:
+          requests:
+            memory: <span class="org-string">"2000Mi"</span>
+      restartPolicy: Always
+</pre>
+</div>
+
+<p>
+deploy/helm/templates/service.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cici.apps: {{.Values.name}}
+  name: {{.Values.name}}
+  namespace: {{.Values.namespace}} 
+spec:
+  selector:
+    cici.apps: {{.Values.name}}
+  ports:
+  - name: tcp 
+    port: {{.Values.service.port}}
+    targetPort: {{.Values.service.port}}
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:92a48402-b18a-4968-b8d3-6b154c0dd0a9" class="outline-2">
+<h2 id="h:92a48402-b18a-4968-b8d3-6b154c0dd0a9"><a href="#h:92a48402-b18a-4968-b8d3-6b154c0dd0a9">jenkins-cicd2</a></h2>
+<div class="outline-text-2" id="text-h:92a48402-b18a-4968-b8d3-6b154c0dd0a9">
+<p>
+jenkins 页面构建通过 <a href="https://plugins.jenkins.io/kubernetes/">kubernetes插件</a> 发布到 k8s 集群中
+</p>
+
+
+<p>
+脚本式流水线与声明式流水线等价
+</p>
+
+
+<p>
+声明式(前端)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">pipeline {
+    environment {
+      <span class="org-variable-name">COMMIT_ID</span> = <span class="org-string">""</span>
+      <span class="org-variable-name">imgurl</span> = <span class="org-string">"1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/${JOB_BASE_NAME}"</span>  //&#29983;&#25104;&#38236;&#20687;&#23384;&#25918;&#38236;&#20687;&#30340;&#20179;&#24211;&#22320;&#22336;
+      <span class="org-variable-name">GIT_ADDR</span> = <span class="org-string">"git@xxx.git/we/r.git"</span>  //&#20195;&#30721;&#20179;&#24211;&#22320;&#22336;
+      <span class="org-variable-name">BRANCH</span> = <span class="org-string">'develop'</span> //master develop
+      <span class="org-variable-name">ENV</span> = <span class="org-string">'dev'</span>
+      <span class="org-variable-name">TAG</span> = <span class="org-string">""</span>                               //&#38236;&#20687;tag,&#20250;&#22312;&#19979;&#38754;&#29983;&#25104;,&#36825;&#37324;&#21482;&#26159;&#23450;&#20041;&#20840;&#23616;&#21464;&#37327;
+    }
+    //&#20840;&#23616;&#37197;&#32622;
+    options {
+      timestamps()                     //&#25152;&#26377;&#36755;&#20986;&#27599;&#34892;&#37117;&#20250;&#25171;&#21360;&#26102;&#38388;&#25139;
+      buildDiscarder(logRotator(numToKeepStr: <span class="org-string">'20'</span>))  //&#20445;&#30041;20&#20010;&#21382;&#21490;&#26500;&#24314;&#29256;&#26412;
+    }
+    agent {
+        kubernetes {
+            cloud <span class="org-string">'aws-overseas'</span>
+            yaml <span class="org-string">'''
+apiVersion: v1
+kind: Pod
+spec:
+  #imagePullSecrets:
+  #- name: abcd-hub
+  containers:
+  - name: jnlp
+    image: 1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/jnlp-slave:latest
+    imagePullPolicy: IfNotPresent
+    args: [\'</span>$(JENKINS_SECRET)<span class="org-string">\'</span>, <span class="org-string">\'</span>$(JENKINS_NAME)<span class="org-string">\'</span>]
+    workingDir: /home/jenkins/agent
+    tty: true
+    volumeMounts:
+    - mountPath: <span class="org-string">"/root/.m2/repository"</span>
+      name: <span class="org-string">"volume-0"</span>
+      subPath: maven-repo-us-west-2-dev
+      readOnly: false
+    - mountPath: <span class="org-string">"/home/jenkins/agent"</span>
+      name: <span class="org-string">"workspace-volume"</span>
+      readOnly: false
+    workingDir: <span class="org-string">"/home/jenkins/agent"</span>
+  - name: nodejs
+    image: node:13.14.0
+    imagePullPolicy: IfNotPresent
+    command: [<span class="org-string">'cat'</span>]
+    tty: true
+    volumeMounts:
+    - mountPath: <span class="org-string">"/home/jenkins/agent"</span>
+      name: <span class="org-string">"workspace-volume"</span>
+      readOnly: false
+    workingDir: <span class="org-string">"/home/jenkins/agent"</span>
+  - name: dind
+    image: 1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/docker-curl:latest
+    imagePullPolicy: IfNotPresent
+    command: [<span class="org-string">'cat'</span>]
+    tty: true
+    volumeMounts:
+    - mountPath: <span class="org-string">"/home/jenkins/agent"</span>
+      name: <span class="org-string">"workspace-volume"</span>
+      readOnly: false
+    workingDir: <span class="org-string">"/home/jenkins/agent"</span>
+  - name: aws-cli
+    image: public.ecr.aws/aws-cli/aws-cli:latest
+    imagePullPolicy: IfNotPresent
+    command: [<span class="org-string">'cat'</span>]
+    tty: true
+  restartPolicy: <span class="org-string">"Never"</span>
+  volumes:
+  - name: <span class="org-string">"volume-0"</span>
+    emptyDir: {}
+  <span class="org-comment-delimiter">#  </span><span class="org-comment">nfs:
+</span>  <span class="org-comment-delimiter">#    </span><span class="org-comment">path: "/mnt/nfs/maven-repo-singapore-dev"
+</span>  <span class="org-comment-delimiter">#    </span><span class="org-comment">readOnly: false
+</span>  <span class="org-comment-delimiter">#    </span><span class="org-comment">server: "10.2.0.1"
+</span>  - name: <span class="org-string">"workspace-volume"</span>
+    emptyDir:
+      medium: <span class="org-string">""</span>
+<span class="org-string">'''
+        }
+    }
+    stages {
+        stage('</span>Set Build Name<span class="org-string">') {
+            steps {
+              script {
+                  currentBuild.displayName = "#${BUILD_NUMBER} ${BRANCH} by ${env.BUILD_USER}"
+              }
+            }
+        }
+        stage('</span>Checkout Git<span class="org-string">') {
+            steps {
+              checkout([$class: '</span>GitSCM<span class="org-string">', branches: [[name: "${BRANCH}"]], userRemoteConfigs: [[credentialsId: '</span>87d2e959-5740-4114-b9c7-0c42c8492cca<span class="org-string">', url: "${GIT_ADDR}"]]])
+              script {
+                COMMIT_ID = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'</span>%h<span class="org-string">'").trim()
+                TAG = BUILD_NUMBER + '</span>_<span class="org-string">' + ENV + '</span>_<span class="org-string">' + COMMIT_ID
+                println "Current branch is ${BRANCH}, Commit ID is ${COMMIT_ID}, Image TAG is ${TAG}"
+              }
+            }
+        }
+        stage('</span>Build a Maven project<span class="org-string">') {
+            steps {
+              container('</span>nodejs<span class="org-string">') {
+                  sh '</span>echo <span class="org-string">"nameserver 8.8.8.8"</span> &gt;&gt; /etc/resolv.conf<span class="org-string">'
+                  sh """
+                    npm install --unsafe-perm 
+                    npm run build:seasTest
+                    ls dist/*
+                  """
+              }
+          }
+        }
+        stage('</span>Build a Docker Image<span class="org-string">') {
+            steps {
+              container('</span>aws-cli<span class="org-string">') {
+                sh """
+                  export AWS_ACCESS_KEY_ID=000111
+                  export AWS_SECRET_ACCESS_KEY=000111
+                  if ! aws ecr describe-repositories --repository-names overseas/${JOB_BASE_NAME} &amp;&gt;/dev/null; then
+                      echo Create repository
+                      aws ecr create-repository --repository-name overseas/${JOB_BASE_NAME}
+                  fi
+                """
+              }
+              container('</span>dind<span class="org-string">') {
+                  sh '''</span>
+                    wget https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/0.9.0/linux-amd64/docker-credential-ecr-login
+                    chmod +x docker-credential-ecr-login
+                    mv docker-credential-ecr-login /usr/local/bin/docker-credential-ecr-login
+
+                    mkdir -pv ~/.docker/
+                    cat &gt; ~/.docker/config.json &lt;&lt;EOF<span class="org-sh-heredoc">
+{
+    "credHelpers": {
+        "public.ecr.aws": "ecr-login",
+        "111112222222.dkr.ecr.us-west-2.amazonaws.com": "ecr-login"
+    }
+}
+EOF
+</span>
+                    mkdir -pv ~/.aws/
+                    cat &lt;&lt;<span class="org-string">'EOF'</span>&gt; ~/.aws/credentials<span class="org-sh-heredoc">
+[default]
+aws_access_key_id = 000111
+aws_secret_access_key = 000111
+EOF
+</span>                  <span class="org-string">'''
+              }
+              container('</span>dind<span class="org-string">') {
+                sh """
+                docker -H tcp://10.0.11.234:2375 build -t  ${imgurl}:${TAG} -f- . &lt;&lt;'</span>EOF<span class="org-string">'
+FROM public.ecr.aws/nginx/nginx:latest
+LABEL maintainer=ci
+ENV SERVICE_NAME=manage-web SERVICE_PATH=/opt/manage-web
+COPY dist \${SERVICE_PATH}/site
+EXPOSE 80
+WORKDIR \${SERVICE_PATH}
+ENV TZ Asia/Shanghai
+EOF
+"""
+                sh "docker -H tcp://10.0.11.234:2375 tag  ${imgurl}:${TAG}  ${imgurl}:latest"
+              }
+              container('</span>dind<span class="org-string">') {
+                sh """
+                  #docker -H tcp://10.0.11.234:2375 login --username=abc -p 8ql6,yhY registry-vpc.ap-southeast-1.aliyuncs.com
+                  docker -H tcp://10.0.11.234:2375 push ${imgurl}:${TAG}
+                  docker -H tcp://10.0.11.234:2375 push ${imgurl}:latest
+                  docker -H tcp://10.0.11.234:2375 rmi -f ${imgurl}:${TAG} ${imgurl}:latest
+                """
+              }
+            }
+        }
+        stage('</span>Deploy Trigger<span class="org-string">') {
+            agent { label '</span>master<span class="org-string">' }
+            steps {
+              sh "k8s_set_tag_aws_uswest2_dev ${JOB_BASE_NAME} ${TAG}"
+            }
+        }
+        stage("Deploy Status"){
+            agent { label '</span>master<span class="org-string">' }
+            steps {
+              sh "k8s_log_aws_uswest2_dev ${JOB_BASE_NAME}"
+            }
+        }
+    }
+}</span>
+</pre>
+</div>
+
+
+<p>
+脚本式（后端）
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">def <span class="org-variable-name">giturl</span> = <span class="org-string">"git@codeup.git/abcd/w/a.git"</span>
+def <span class="org-variable-name">imgurl</span> = <span class="org-string">"1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/${JOB_BASE_NAME}"</span>
+def <span class="org-variable-name">pkg</span> = <span class="org-string">"a/target/ap.jar"</span>
+def <span class="org-variable-name">pom</span> = <span class="org-string">'pom.xml'</span>
+
+<span class="org-function-name">podTemplate</span>(
+cloud: <span class="org-string">"aws-overseas"</span>,
+yaml: <span class="org-string">"""
+
+apiVersion: v1
+kind: Pod
+spec:
+  #imagePullSecrets:
+  #- name: abcd-hub
+  containers:
+  - name: jnlp
+    image: 1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/jnlp-slave:latest
+    imagePullPolicy: IfNotPresent
+    args: ['\$(JENKINS_SECRET)', '\$(JENKINS_NAME)']
+    workingDir: /home/jenkins/agent
+    tty: true
+    volumeMounts:
+    - mountPath: "</span>/root/.m2/repository<span class="org-string">"
+      name: "</span>volume-0<span class="org-string">"
+      subPath: maven-repo-us-west-2-dev
+      readOnly: false
+    - mountPath: "</span>/home/jenkins/agent<span class="org-string">"
+      name: "</span>workspace-volume<span class="org-string">"
+      readOnly: false
+    workingDir: "</span>/home/jenkins/agent<span class="org-string">"
+  - name: maven
+    image: 1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/maven:3.6-jdk-8-v3
+    imagePullPolicy: IfNotPresent
+    workingDir: /home/jenkins/agent
+    command: ['cat']
+    tty: true
+    volumeMounts:
+    - mountPath: "</span>/root/.m2/repository<span class="org-string">"
+      name: "</span>volume-0<span class="org-string">"
+      subPath: maven-repo-us-west-2-dev
+      readOnly: false
+    - mountPath: "</span>/home/jenkins/agent<span class="org-string">"
+      name: "</span>workspace-volume<span class="org-string">"
+      readOnly: false
+    workingDir: "</span>/home/jenkins/agent<span class="org-string">"
+  - name: dind
+    image: 1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/docker-curl:latest
+    imagePullPolicy: IfNotPresent
+    command: ['cat']
+    tty: true
+    volumeMounts:
+    - mountPath: "</span>/root/.m2/repository<span class="org-string">"
+      name: "</span>volume-0<span class="org-string">"
+      subPath: maven-repo-us-west-2-dev
+      readOnly: false
+    - mountPath: "</span>/home/jenkins/agent<span class="org-string">"
+      name: "</span>workspace-volume<span class="org-string">"
+      readOnly: false
+    workingDir: "</span>/home/jenkins/agent<span class="org-string">"
+  - name: aws-cli
+    image: public.ecr.aws/aws-cli/aws-cli:latest
+    imagePullPolicy: IfNotPresent
+    command: ['cat']
+    tty: true
+  restartPolicy: "</span>Never<span class="org-string">"
+  volumes:
+  - name: "</span>volume-0<span class="org-string">"
+    #emptyDir: {}
+    persistentVolumeClaim:
+      claimName: efs-claim-maven
+  #  nfs:
+  #    path: "</span>/mnt/nfs/maven-repo-singapore-dev<span class="org-string">"
+  #    readOnly: false
+  #    server: "</span>10.0.11.234<span class="org-string">"
+  - name: "</span>workspace-volume<span class="org-string">"
+    emptyDir:
+      medium: ""
+"""</span>
+  ) {
+
+  node(POD_LABEL) {
+    stage(<span class="org-string">'Set Build Name'</span>) {
+        script {
+            currentBuild.displayName = <span class="org-string">"#${BUILD_NUMBER} ${branch} by ${env.BUILD_USER}"</span>
+        }
+    }
+    stage(<span class="org-string">'Checkout Git'</span>) {
+        checkout([$<span class="org-variable-name">class</span>: <span class="org-string">'GitSCM'</span>, branches: [[name: <span class="org-string">'${branch}'</span>]], extensions: [[$<span class="org-variable-name">class</span>: <span class="org-string">'CloneOption'</span>, shallow: true]],userRemoteConfigs: [[credentialsId: <span class="org-string">'87d2e959-5740-4114-b9c7-0c42c8492cca'</span>, url: giturl]]])
+    }
+    stage(<span class="org-string">'Build a Maven project'</span>) {
+      container(<span class="org-string">'maven'</span>) {
+          sh <span class="org-string">'echo "nameserver 8.8.8.8" &gt;&gt; /etc/resolv.conf'</span>
+          sh <span class="org-string">'mvn -B -Dmaven.test.skip=true -P overseasdev clean package -f '</span> + pom
+      }
+      container(<span class="org-string">'aws-cli'</span>) {
+              sh <span class="org-string">"""
+                export AWS_ACCESS_KEY_ID=000111
+                export AWS_SECRET_ACCESS_KEY=000111
+                if ! aws ecr describe-repositories --repository-names overseas/${JOB_BASE_NAME} &amp;&gt;/dev/null; then
+                    echo Create repository
+                    aws ecr create-repository --repository-name overseas/${JOB_BASE_NAME}
+                fi
+              """</span>
+      }
+    } 
+    container(<span class="org-string">'dind'</span>) {
+        stage(<span class="org-string">'Build a Docker Image'</span>) {
+            sh <span class="org-string">'''
+              wget https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/0.9.0/linux-amd64/docker-credential-ecr-login
+              chmod +x docker-credential-ecr-login
+              mv docker-credential-ecr-login /usr/local/bin/docker-credential-ecr-login
+
+              mkdir -pv ~/.docker/
+              cat &gt; ~/.docker/config.json &lt;&lt;EOF
+{
+    "credHelpers": {
+        "public.ecr.aws": "ecr-login",
+        "1111222.dkr.ecr.us-west-2.amazonaws.com": "ecr-login"
+    }
+}
+EOF
+
+              mkdir -pv ~/.aws/
+              cat &lt;&lt;'</span>EOF<span class="org-string">'&gt; ~/.aws/credentials
+[default]
+aws_access_key_id = 000111
+aws_secret_access_key = 000111
+EOF
+            '''</span>
+            
+            sh <span class="org-string">'docker -H tcp://10.0.11.234:2375 build -t '</span> + imgurl + <span class="org-string">':${BUILD_NUMBER} -f- .'</span> + <span class="org-string">"""&lt;&lt;EOF
+FROM 1111222.dkr.ecr.us-west-2.amazonaws.com/overseas/openjdk:8-jdk-arthas-start-v8-dev
+COPY """</span> + pkg + <span class="org-string">""" /ROOT.jar
+WORKDIR /
+ENV TZ Asia/Shanghai
+ENTRYPOINT ["</span>java<span class="org-string">","</span>-jar<span class="org-string">"]
+EOF
+
+"""</span>
+            sh <span class="org-string">'docker -H tcp://10.0.11.234:2375 tag '</span> + imgurl + <span class="org-string">':${BUILD_NUMBER} '</span> + imgurl + <span class="org-string">':latest'</span>
+        }
+        stage(<span class="org-string">'Push Docker Image'</span>) {
+            //sh <span class="org-string">'docker -H tcp://10.0.11.234:2375 login --username=abc -p 8ql6,yhY 1111222.dkr.ecr.us-west-2.amazonaws.com'</span>
+            sh <span class="org-string">'docker -H tcp://10.0.11.234:2375 push '</span> + imgurl + <span class="org-string">':${BUILD_NUMBER}'</span>
+            sh <span class="org-string">'docker -H tcp://10.0.11.234:2375 push '</span> + imgurl + <span class="org-string">':latest'</span>
+            sh <span class="org-string">'docker -H tcp://10.0.11.234:2375 rmi -f '</span> + imgurl + <span class="org-string">':${BUILD_NUMBER} '</span> + imgurl + <span class="org-string">':latest'</span>
+        }
+    }
+  }
+}
+node{
+    stage(<span class="org-string">'Deploy Trigger'</span>) {
+        sh <span class="org-string">'k8s_set_tag_aws_uswest2_dev ${JOB_BASE_NAME} ${BUILD_NUMBER}'</span>
+        }
+    stage(<span class="org-string">"Deploy Status"</span>){
+        sh <span class="org-string">'k8s_log_aws_uswest2_dev ${JOB_BASE_NAME}'</span>
+    }
+}
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /usr/bin/k8s_set_tag_aws_uswest2_dev<span class="org-sh-heredoc">
+job_name=$1
+build_num=$2
+repo_url=111222.dkr.ecr.us-west-2.amazonaws.com/overseas/
+img_url=$repo_url$job_name
+
+kubectl --kubeconfig /mnt/jenkins/config_aws_uswest2_dev  -n dev1 get deploy ${job_name}
+if [ $? -eq 0 ]; then
+    kubectl --kubeconfig /mnt/jenkins/config_aws_uswest2_dev  -n dev1 set image deploy ${job_name} ${job_name}=$img_url:$build_num
+else
+    ## &#26032;&#24314;&#36164;&#28304; &#31471;&#21475;&#38543;&#26426;&#65292;&#19981;&#22909;&#22788;&#29702;&#12290;
+    kubectl --kubeconfig /mnt/jenkins/config_aws_uswest2_dev  -n dev1 set image deploy ${job_name} ${job_name}=$img_url:$build_num
+fi
+EOF
+</span>
+cat &lt;&lt;\EOF&gt; /usr/bin/k8s_log_aws_uswest2_dev<span class="org-sh-heredoc">
+job_name=$1
+config="-n dev1 --kubeconfig /mnt/jenkins/config_aws_uswest2_dev"
+pod_name=$(kubectl ${config} get pod --sort-by=.metadata.creationTimestamp -l app=${job_name}|tail -1|awk '{print $1}')
+# &#26816;&#27979;pod&#21551;&#21160;&#21518;&#20877;&#33719;&#21462;log
+while true; do
+kubectl ${config} get pod $pod_name 2&gt;/dev/null |grep -q Running 
+  if [ $? -eq 0 ];then
+      echo $pod_name "is running"
+      break 
+  fi
+  echo $pod_name "waiting to running"
+  sleep 1
+done
+kubectl ${config} logs -f $pod_name &amp;
+#jenkins&#26080;&#38656;&#33258;&#24049;&#35299;&#20915;&#23376;&#36827;&#31243;&#38382;&#39064;
+#pid=$!
+while true; do
+  restarts=$(kubectl $config get pod $pod_name 2&gt;/dev/null|grep -v NAME|awk '{print $4}')
+  if [ $restarts -gt 0 ];then
+      #kill $pid
+      exit 1
+  fi
+  kubectl $config rollout status deployment $job_name --watch=false 2&gt;/dev/null|grep -q successfully
+  if [ $? -eq 0 ];then
+      #kill $pid
+      exit 0
+  fi
+  sleep 1
+done
+EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:74C71FF9-58FE-4C6A-AE12-82AD71974B88" class="outline-2">
+<h2 id="h:74C71FF9-58FE-4C6A-AE12-82AD71974B88"><a href="#h:74C71FF9-58FE-4C6A-AE12-82AD71974B88">jenkins-cd-and-argocd-cd</a></h2>
+<div class="outline-text-2" id="text-h:74C71FF9-58FE-4C6A-AE12-82AD71974B88">
+<p>
+jenkins ci + argocd cd + lark 通知
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">def <span class="org-variable-name">V_GIT_URL</span> = <span class="org-string">'git@gitlab.xx.com:business/gateway.git'</span>
+
+pipeline {
+    agent any
+    tools {
+        jdk <span class="org-string">'jdk 17'</span>
+        maven <span class="org-string">'maven 3.9'</span>
+    }
+    options {
+        withBuildUser()
+    }
+    environment {
+        <span class="org-variable-name">BUSINESS</span> = <span class="org-string">"rl"</span>
+        <span class="org-variable-name">DEPLOY_ENV</span> = <span class="org-string">"dev"</span>
+        
+        <span class="org-variable-name">jobname</span> = <span class="org-string">"${JOB_BASE_NAME}"</span>
+        <span class="org-variable-name">OPS_GIT_URL</span> = <span class="org-string">'git@gitlab.xx.com:gitops/ops-deploy.git'</span>
+        <span class="org-variable-name">OPS_PATH</span> = <span class="org-string">"ops-deploy/${BUSINESS}/${jobname}/overlays/${DEPLOY_ENV}"</span>
+        <span class="org-variable-name">image_url</span>=<span class="org-string">"public.ecr.aws/xxx/${jobname}:v${BUILD_NUMBER}"</span>
+
+        <span class="org-variable-name">ARGO_APP</span> = <span class="org-string">"${jobname}"</span> + <span class="org-string">"-${DEPLOY_ENV}"</span>
+        <span class="org-variable-name">ARGOCD_SERVER</span>   = <span class="org-string">'argocd.xxx.com:80'</span>
+        <span class="org-variable-name">GITOPS_SHA</span> = <span class="org-string">'HEAD'</span>
+    }
+
+
+    stages {
+       stage(<span class="org-string">'&#21024;&#38500;&#24037;&#20316;&#30446;&#24405;'</span>) {
+            steps {
+                // deleteDir()
+                <span class="org-builtin">echo</span> <span class="org-string">'no delete'</span>
+           }
+        }
+        
+        stage(<span class="org-string">'&#25289;&#21462;&#20195;&#30721;'</span>) {
+            when {
+                not {
+                    environment name: <span class="org-string">'GIT_BRANCH'</span>, value: <span class="org-string">''</span>
+                }
+            }
+            options {
+                retry(2)
+                // timeout(<span class="org-builtin">time</span>: 30, unit: <span class="org-string">'SECONDS'</span>)
+            }
+            steps {
+                script {
+                    currentBuild.displayName = <span class="org-string">"#${BUILD_NUMBER} ${GIT_BRANCH} by ${env.BUILD_USER}"</span>
+
+                    <span class="org-builtin">echo</span> <span class="org-string">"&#24320;&#22987;&#25289;&#21462; ${GIT_BRANCH} &#20998;&#25903;&#20195;&#30721;"</span>
+                    // sh <span class="org-string">"git clone -b ${GIT_BRANCH} ${V_GIT_URL} ."</span>
+                    git branch: env.GIT_BRANCH, credentialsId: <span class="org-string">'git-ci'</span>, url: V_GIT_URL
+                }
+            }
+        }
+
+        stage(<span class="org-string">'mvn&#32534;&#35793;&#26500;&#24314;'</span>) {
+            steps {
+                script {
+                    <span class="org-builtin">echo</span> <span class="org-string">"&#24320;&#22987;&#25171;&#21253;api-doc&#24212;&#29992;"</span>
+                    sh <span class="org-string">"mvn clean install"</span>
+                }
+            }
+        }
+
+        stage(<span class="org-string">'&#30331;&#24405;AWS ECR Public'</span>) {
+            steps {
+                script {
+                    sh <span class="org-string">"""
+                        aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/xxx
+                    """</span>
+                }
+            }
+        }
+        
+        stage(<span class="org-string">'&#26500;&#24314;Docker&#38236;&#20687;&#21450;&#25512;&#36865;&#38236;&#20687;'</span>) {
+            steps {
+                script {
+                    sh <span class="org-string">"""
+                    cat &gt; Dockerfile &lt;&lt; 'EOF'
+FROM bellsoft/liberica-openjdk-rocky:17.0.16-cds
+WORKDIR /app
+COPY ./target/gateway.jar /app/app.jar
+CMD ["</span>java<span class="org-string">", "</span>-jar<span class="org-string">", "</span>app.jar<span class="org-string">", "</span>--spring.profiles.active=test<span class="org-string">"]
+EXPOSE 8081
+EOF
+                    ls -al
+                    docker build -t ${image_url} .
+                    docker push ${image_url}
+                    """</span>
+                }
+            }
+        }
+
+        stage(<span class="org-string">'&#29983;&#25104;&#37096;&#32626;deployment&#28165;&#21333;'</span>) {
+            steps {
+                script {
+                  //configFileProvider([configFile(fileId: <span class="org-string">'eks-config'</span>, targetLocation: <span class="org-string">"eks-config"</span>)]){
+                  //    sh <span class="org-string">"""
+                  //    /root/bin/kubectl --kubeconfig=/root/.kube/config-dev set image deployment/${jobname} ${jobname}=${image_url}
+                  //    """</span>
+                  //} 
+                  dir(<span class="org-string">"ops-deploy"</span>) {
+                    // &#19981;&#26174;&#31034;&#25552;&#20132;&#21382;&#21490;
+                    git branch: <span class="org-string">'main'</span>,  changelog: false, poll: false, credentialsId: <span class="org-string">'git-argocd'</span>, url: OPS_GIT_URL
+                  }
+                  dir(OPS_PATH) {
+                    withCredentials([sshUserPrivateKey(credentialsId: <span class="org-string">'git-argocd'</span>, keyFileVariable: <span class="org-string">'PK'</span>)]) {
+                      sh <span class="org-string">"""
+                      ls -l
+                      yq '.images[0].newTag = "</span>v<span class="org-string">" + strenv(BUILD_NUMBER)' kustomization.yaml 
+                      git status
+                      yq -i '.images[0].newTag = "</span>v<span class="org-string">" + strenv(BUILD_NUMBER)' kustomization.yaml
+                      git status
+                      GIT_SSH_COMMAND="</span>ssh -i $<span class="org-variable-name">PK</span><span class="org-string">" git pull origin main
+                      git add kustomization.yaml
+                      git commit -m "</span>Ci:update: ${<span class="org-variable-name">BUSINESS</span>}-Dev ${<span class="org-variable-name">jobname</span>} image: ${<span class="org-variable-name">image_url</span>}<span class="org-string">"
+                      GIT_SSH_COMMAND="</span>ssh -i $<span class="org-variable-name">PK</span><span class="org-string">" git push  origin HEAD:main
+                      """</span>
+                    }
+                  }
+                }
+            }
+        }
+
+        stage(<span class="org-string">'Argo CD Deploy'</span>) {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: <span class="org-string">'argocd-token'</span>,
+                        variable: <span class="org-string">'ARGOCD_AUTH_TOKEN'</span>
+                    )
+                ]) {
+                    sh <span class="org-string">'''
+                        echo "$ARGOCD_AUTH_TOKEN"
+                        argocd app sync "$ARGO_APP" \
+                          --server "$ARGOCD_SERVER" \
+                          --grpc-web \
+                          --plaintext \
+                          --auth-token "$ARGOCD_AUTH_TOKEN" \
+                          --revision "$GITOPS_SHA" \
+                          --timeout 600
+
+                        argocd app wait "$ARGO_APP" \
+                          --server "$ARGOCD_SERVER" \
+                          --grpc-web \
+                          --plaintext \
+                          --auth-token "$ARGOCD_AUTH_TOKEN" \
+                          --sync \
+                          --health \
+                          --operation \
+                          --timeout 600
+                    '''</span>
+                }
+            }
+        }
+
+    }
+    post {
+        success {
+            script {
+                notifyLark(<span class="org-string">'SUCCESS'</span>)
+            }
+        }
+
+        failure {
+            script {
+                notifyLark(<span class="org-string">'FAILURE'</span>)
+            }
+        }
+
+        aborted {
+            script {
+                notifyLark(<span class="org-string">'ABORTED'</span>)
+            }
+        }
+    }
+}
+
+import groovy.json.JsonOutput
+def notifyLark(String result) {
+    def <span class="org-variable-name">success</span> = <span class="org-variable-name">result</span> == <span class="org-string">'SUCCESS'</span>
+    def <span class="org-variable-name">title</span> = success ? <span class="org-string">'&#9989; Argo CD &#21457;&#24067;&#25104;&#21151;'</span> : <span class="org-string">'&#10060; Argo CD &#21457;&#24067;&#22833;&#36133;'</span>
+    def <span class="org-variable-name">color</span> = success ? <span class="org-string">'green'</span> : <span class="org-string">'red'</span>
+
+    withCredentials([
+        string(
+            credentialsId: <span class="org-string">'lark-release-webhook'</span>,
+            variable: <span class="org-string">'LARK_WEBHOOK'</span>
+        )
+    ]) {
+        def <span class="org-variable-name">payload</span> = JsonOutput.toJson([
+            msg_type: <span class="org-string">'interactive'</span>,
+            card: [
+                header: [
+                    template: color,
+                    title: [
+                        tag    : <span class="org-string">'plain_text'</span>,
+                        content: title
+                    ]
+                ],
+                elements: [
+                    [
+                        tag: <span class="org-string">'markdown'</span>,
+                        content: <span class="org-string">"""\
+**&#39033;&#30446;&#65306;** ${BUSINESS ?: 'unknown'}
+**&#24212;&#29992;&#65306;** ${ARGO_APP ?: 'unknown'}
+**&#29615;&#22659;&#65306;** ${DEPLOY_ENV ?: 'unknown'}
+**GitOps SHA&#65306;**  `${env.GITOPS_SHA ?: 'unknown'}`
+**&#26500;&#24314;&#20219;&#21153;&#65306;** ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.BUILD_USER}
+**&#21457;&#24067;&#32467;&#26524;&#65306;** ${result}
+**&#35814;&#24773;&#65306;** [&#26597;&#30475; Jenkins &#26500;&#24314;](${env.BUILD_URL})
+"""</span>.stripIndent()
+                    ]
+                ]
+            ]
+        ])
+
+        writeFile file: <span class="org-string">'lark-message.json'</span>, text: payload
+
+        sh <span class="org-string">'''
+            curl --fail-with-body \
+              --silent \
+              --show-error \
+              --request POST \
+              --header '</span>Content-Type: application/json<span class="org-string">' \
+              --data @lark-message.json \
+              "$LARK_WEBHOOK"
+        '''</span>
+    }
+}
+</pre>
+</div>
+</div>
+<div id="outline-container-h:8C88FA85-A3B0-4960-B42F-527E92284191" class="outline-3">
+<h3 id="h:8C88FA85-A3B0-4960-B42F-527E92284191"><a href="#h:8C88FA85-A3B0-4960-B42F-527E92284191">回溯脚本</a></h3>
+<div class="outline-text-3" id="text-h:8C88FA85-A3B0-4960-B42F-527E92284191">
+<div class="org-src-container">
+<pre class="src src-shell">pipeline {
+    agent any
+    options {
+        withBuildUser()
+        timestamps()
+    }
+    parameters {
+        string(name: <span class="org-string">'BUSINESS'</span>, defaultValue: <span class="org-string">"rl"</span>, description: <span class="org-string">'&#39033;&#30446;&#21517;&#31216;&#65292;&#20363;&#22914; rl'</span>, trim: true)
+        string(name: <span class="org-string">'DEPLOY_ENV'</span>, defaultValue: <span class="org-string">"dev"</span>, description: <span class="org-string">'&#29615;&#22659;&#65292;&#20363;&#22914; dev, prod'</span>, trim: true)
+        string(name: <span class="org-string">'SERVICE_NAME'</span>, defaultValue: <span class="org-string">"pc-web"</span>, description: <span class="org-string">'&#26381;&#21153;&#21517;&#31216;&#65292;&#20363;&#22914; pc-web'</span>, trim: true)
+        string(name: <span class="org-string">'ROLLBACK_TAG'</span>, defaultValue: <span class="org-string">"v32"</span>, description: <span class="org-string">'&#35201;&#22238;&#28378;&#30340;&#30446;&#26631;&#38236;&#20687;TAG&#65292;&#20363;&#22914; v32'</span>, trim: true)
+        booleanParam(name: <span class="org-string">'SKIP_ECR_CHECK'</span>, defaultValue: false, description: <span class="org-string">'&#36339;&#36807;ECR Public&#38236;&#20687;&#23384;&#22312;&#26657;&#39564;&#65288;&#24212;&#24613;&#21246;&#36873;&#65289;'</span>)
+        booleanParam(name: <span class="org-string">'SKIP_ARGO_SYNC'</span>, defaultValue: false, description: <span class="org-string">'&#20165;&#25552;&#20132;Git&#65292;&#19981;&#35302;&#21457;ArgoCD&#21516;&#27493;&#65288;&#35843;&#35797;&#29992;&#65289;'</span>)
+    }
+    environment {
+        <span class="org-variable-name">AWS_CREDS</span> = credentials(<span class="org-string">'aws-ecr-cred'</span>)
+        <span class="org-variable-name">GIT_USER</span> = <span class="org-string">"rollback-ci"</span>
+        <span class="org-variable-name">GIT_EMAIL</span> = <span class="org-string">"rollback-ci@xxx.com"</span>
+        <span class="org-variable-name">OPS_GIT_URL</span> = <span class="org-string">'git@gitlab.xx.com:gitops/ops-deploy.git'</span>
+
+        <span class="org-variable-name">ARGO_APP</span> = <span class="org-string">"${SERVICE_NAME}-${DEPLOY_ENV}"</span>
+        <span class="org-variable-name">ARGOCD_SERVER</span>   = <span class="org-string">'argocd.xxx.com:80'</span>
+        <span class="org-variable-name">GITOPS_SHA</span> = <span class="org-string">'HEAD'</span>
+
+        <span class="org-variable-name">KUSTOMIZE_FILE</span> = <span class="org-string">"./${BUSINESS}/${SERVICE_NAME}/overlays/${DEPLOY_ENV}/kustomization.yaml"</span>
+        <span class="org-variable-name">ECR_PUBLIC_REPO_URI</span> = <span class="org-string">"public.ecr.aws/xxx/${SERVICE_NAME}"</span>
+        <span class="org-variable-name">GIT_COMMIT_MSG</span> = <span class="org-string">"rollback ${params.SERVICE_NAME} to image tag ${ROLLBACK_TAG}"</span>
+    }
+    stages {
+        stage(<span class="org-string">'0. &#36755;&#20837;&#21512;&#27861;&#24615;&#26657;&#39564;'</span>) {
+            steps {
+                script { currentBuild.displayName = <span class="org-string">"#${BUILD_NUMBER} ${SERVICE_NAME}:ROLLBACK_TAG by ${env.BUILD_USER}"</span> }
+
+                sh <span class="org-string">'''
+                if [ -z "${SERVICE_NAME}" ] || [ -z "${ROLLBACK_TAG}" ] || [ -z "${BUSINESS}" ] || [ -z "${DEPLOY_ENV}" ]; then
+                    echo "&#10060; SERVICE_NAME / ROLLBACK_TAG / BUSINESS / DEPLOY_ENV &#19981;&#33021;&#20026;&#31354;"
+                    exit 1
+                fi
+                echo """&#9989; &#21442;&#25968;&#26657;&#39564;&#36890;&#36807;
+&#26381;&#21153;: ${SERVICE_NAME}
+&#30446;&#26631;&#22238;&#28378;TAG: ${ROLLBACK_TAG}
+ECR Public&#20179;&#24211;: ${ECR_PUBLIC_REPO_URI}
+Kustomize&#25991;&#20214;: ${KUSTOMIZE_FILE}
+                """
+                '''</span>
+            }
+        }
+        stage(<span class="org-string">'1. &#38236;&#20687; Tag &#23384;&#22312;&#26657;&#39564;'</span>) {
+            when {
+                expression { !params.SKIP_ECR_CHECK }
+            }
+            steps {
+                withCredentials([string(credentialsId: <span class="org-string">'aws-ecr-cred'</span>, variable: <span class="org-string">'AWS_CREDS'</span>)]) {
+                    sh <span class="org-string">'''
+                    export AWS_ACCESS_KEY_ID=$(echo ${AWS_CREDS} | cut -d'</span>;<span class="org-string">' -f1)
+                    export AWS_SECRET_ACCESS_KEY=$(echo ${AWS_CREDS} | cut -d'</span>;<span class="org-string">' -f2)
+                    # ECR Public region&#22266;&#23450; us-east-1
+                    ECR_PUBLIC_REPO_NAME=${ECR_PUBLIC_REPO_URI#public.ecr.aws/}
+                    ECR_PUBLIC_REPO_NAME=${ECR_PUBLIC_REPO_NAME#*/}
+                    echo "&#26816;&#26597; ECR Public &#38236;&#20687; ${ECR_PUBLIC_REPO_URI}:${ROLLBACK_TAG}"
+                    aws ecr-public describe-images \
+                        --region us-east-1 \
+                        --repository-name ${ECR_PUBLIC_REPO_NAME} \
+                        --image-ids imageTag=${ROLLBACK_TAG}
+                    if [ $? -eq 0 ]; then
+                        echo "&#9989; ECR Public&#38236;&#20687;tag ${ROLLBACK_TAG} &#23384;&#22312;"
+                    else
+                        echo "&#10060; ECR Public&#38236;&#20687;tag ${ROLLBACK_TAG} &#19981;&#23384;&#22312;&#65281;&#32456;&#27490;&#22238;&#28378;"
+                        exit 1
+                    fi
+                    '''</span>
+                }
+            }
+        }
+        stage(<span class="org-string">'2. Checkout &#37096;&#32626;&#20179;&#24211;'</span>) {
+            steps {
+                git branch: <span class="org-string">'main'</span>, credentialsId: <span class="org-string">'git-argocd'</span>, url: OPS_GIT_URL
+
+                sh <span class="org-string">'''
+                if [ ! -f "${KUSTOMIZE_FILE}" ]; then
+                    echo "&#10060; kustomization.yaml &#25991;&#20214; ${KUSTOMIZE_FILE} &#19981;&#23384;&#22312;&#65292;&#35831;&#26816;&#26597;&#36335;&#24452;&#65281;"
+                    exit 1
+                fi
+                '''</span>
+            }
+        }
+        stage(<span class="org-string">'3. &#26356;&#26032; newTag'</span>) {
+            steps {
+                sh <span class="org-string">"""
+                # &#33719;&#21462;&#24403;&#21069;&#37197;&#32622;&#37324;&#30340; newTag
+                CURRENT_TAG=\$(yq eval '.images[] | select(.name == strenv(ECR_PUBLIC_REPO_URI)) | .newTag' ${KUSTOMIZE_FILE})
+                echo "</span>&#24403;&#21069;kustomize&#20869;newTag: <span class="org-string">\$</span>{<span class="org-variable-name">CURRENT_TAG</span>}<span class="org-string">"
+                echo "</span>&#30446;&#26631;&#22238;&#28378;TAG: ${<span class="org-variable-name">ROLLBACK_TAG</span>}<span class="org-string">"
+                # &#22791;&#20221;&#21407;&#25991;&#20214;
+                cp ${KUSTOMIZE_FILE} ${KUSTOMIZE_FILE}.bak
+                # yq v4 &#20462;&#25913;&#21305;&#37197; name &#30340; images &#26465;&#30446; newTag
+                yq eval '.images[] |= (select(.name == strenv(ECR_PUBLIC_REPO_URI)) | .newTag = strenv(ROLLBACK_TAG))' -i ${KUSTOMIZE_FILE}
+                echo "</span>===== <span class="org-variable-name">&#20462;&#25913;&#21069;&#21518;&#23545;&#27604;</span> =====
+&#26087; newTag: <span class="org-string">\$</span>{<span class="org-variable-name">CURRENT_TAG</span>}
+&#26032; newTag: <span class="org-string">\$</span>(yq eval <span class="org-string">'.images[] | select(.name == strenv(ECR_PUBLIC_REPO_URI)) | .newTag'</span> ${<span class="org-variable-name">KUSTOMIZE_FILE</span>})
+========================<span class="org-string">"
+                # yaml&#35821;&#27861;&#26657;&#39564;
+                yq eval ${KUSTOMIZE_FILE} &gt; /dev/null
+                rm -f ${KUSTOMIZE_FILE}.bak
+                """</span>
+            }
+        }
+        stage(<span class="org-string">'4. &#20154;&#24037;&#30830;&#35748;&#22238;&#28378;&#25805;&#20316;'</span>) {
+            steps {
+                script {
+                    def <span class="org-variable-name">currentTag</span> = sh(
+                        script: <span class="org-string">"""
+                        yq eval '.images[] | select(.name == strenv(ECR_PUBLIC_REPO_URI)) | .newTag' ${KUSTOMIZE_FILE}
+                        """</span>,
+                        returnStdout: true
+                    ).trim() // &#21435;&#25481;&#26411;&#23614;&#25442;&#34892;&#31526;
+
+                    input message: <span class="org-string">"""
+&#9888;&#65039; &#22238;&#28378;&#30830;&#35748;&#65288;Kustomize + ECR Public&#65289;
+&gt; &#128274; &#20165; jasper / abc / def &#29992;&#25143;&#21487;&#20197;&#23457;&#25209;&#26412;&#27425;&#22238;&#28378;&#65281;
+
+&#26381;&#21153;&#65306;${SERVICE_NAME}
+&#24403;&#21069;&#37197;&#32622;&#38236;&#20687;TAG&#65306;${currentTag}
+&#30446;&#26631;&#22238;&#28378;&#38236;&#20687;TAG&#65306;${ROLLBACK_TAG}
+ECR Public&#20179;&#24211;&#65306;${ECR_PUBLIC_REPO_URI}
+Kustomize&#25991;&#20214;&#65306;${KUSTOMIZE_FILE}
+ArgoCD App&#65306;${ARGO_APP}
+
+&#30830;&#35748;&#25552;&#20132;Git&#24182;&#25191;&#34892;&#22238;&#28378;&#21527;&#65311;
+"""</span>,
+                    ok: <span class="org-string">"&#30830;&#35748;&#25191;&#34892;&#22238;&#28378;"</span>,
+                    submitter: <span class="org-string">'jasper,bx,lemon'</span>
+                }
+            }
+        }
+        stage(<span class="org-string">'5. Git&#25552;&#20132;&#24182;&#25512;&#36865;ops-deploy'</span>) {
+            steps {
+                script {
+                    withCredentials([sshUserPrivateKey(credentialsId: <span class="org-string">'git-argocd'</span>, keyFileVariable: <span class="org-string">'PK'</span>)]) {
+                      sh <span class="org-string">"""
+                      ls -l
+                      git status
+                      git config user.name ${GIT_USER}
+                      git config user.email ${GIT_EMAIL}
+                      GIT_SSH_COMMAND="</span>ssh -i $<span class="org-variable-name">PK</span><span class="org-string">" git pull origin main
+                      git add ${KUSTOMIZE_FILE}
+                      git commit -m "</span>${<span class="org-variable-name">GIT_COMMIT_MSG</span>}<span class="org-string">"
+                      GIT_SSH_COMMAND="</span>ssh -i $<span class="org-variable-name">PK</span><span class="org-string">" git push origin HEAD:main
+                      echo "</span>&#9989; Git&#25512;&#36865;&#23436;&#25104;<span class="org-string">"
+                      """</span>
+                    }
+                }
+            }
+        }
+        stage(<span class="org-string">'6. ArgoCD &#21516;&#27493;&#24182;&#31561;&#24453;&#20581;&#24247;'</span>) {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: <span class="org-string">'argocd-token'</span>,
+                        variable: <span class="org-string">'ARGOCD_AUTH_TOKEN'</span>
+                    )
+                ]) {
+                    sh <span class="org-string">'''
+                        echo "$ARGOCD_AUTH_TOKEN"
+                        argocd app sync "$ARGO_APP" \
+                          --server "$ARGOCD_SERVER" \
+                          --grpc-web \
+                          --plaintext \
+                          --auth-token "$ARGOCD_AUTH_TOKEN" \
+                          --revision "$GITOPS_SHA" \
+                          --timeout 300
+
+                        argocd app wait "$ARGO_APP" \
+                          --server "$ARGOCD_SERVER" \
+                          --grpc-web \
+                          --plaintext \
+                          --auth-token "$ARGOCD_AUTH_TOKEN" \
+                          --sync \
+                          --health \
+                          --operation \
+                          --timeout 300
+
+                        echo "&#9989; ArgoCD&#21516;&#27493;&#23436;&#25104;&#65292;&#24212;&#29992;&#20581;&#24247;"
+                    '''</span>
+                }
+            }
+        }
+
+    }
+    post {
+        success {
+            <span class="org-builtin">echo</span> <span class="org-string">"&#127881; &#22238;&#28378;&#20219;&#21153;&#25191;&#34892;&#25104;&#21151;&#65281;&#26381;&#21153; ${SERVICE_NAME} &#24050;&#22238;&#28378;&#33267;&#38236;&#20687;tag ${ROLLBACK_TAG}"</span>
+            script { notifyLark(<span class="org-string">'SUCCESS'</span>) }
+        }
+        failure {
+            <span class="org-builtin">echo</span> <span class="org-string">"&#10060; &#22238;&#28378;&#20219;&#21153;&#22833;&#36133;&#65292;&#35831;&#26816;&#26597;&#26085;&#24535;&#65281;&#26381;&#21153; ${SERVICE_NAME}"</span>
+            script { notifyLark(<span class="org-string">'FAILURE'</span>) }
+        }
+        aborted {
+            <span class="org-builtin">echo</span> <span class="org-string">"&#9888;&#65039; &#22238;&#28378;&#20219;&#21153;&#34987;&#21462;&#28040;&#25110;&#32773;&#38750;&#25480;&#26435;&#29992;&#25143;&#25298;&#32477;&#23457;&#25209;"</span>
+            script { notifyLark(<span class="org-string">'ABORTED'</span>) }
+        }
+        <span class="org-builtin">always</span> {
+            cleanWs()
+        }
+    }
+}
+
+import groovy.json.JsonOutput
+def notifyLark(String result) {
+    def <span class="org-variable-name">success</span> = <span class="org-variable-name">result</span> == <span class="org-string">'SUCCESS'</span>
+    def <span class="org-variable-name">title</span> = success ? <span class="org-string">'&#9989; Argo CD &#22238;&#28378;&#25104;&#21151;'</span> : <span class="org-string">'&#10060; Argo CD &#22238;&#28378;&#22833;&#36133;'</span>
+    def <span class="org-variable-name">color</span> = success ? <span class="org-string">'green'</span> : <span class="org-string">'red'</span>
+
+    withCredentials([
+        string(
+            credentialsId: <span class="org-string">'lark-release-webhook'</span>,
+            variable: <span class="org-string">'LARK_WEBHOOK'</span>
+        )
+    ]) {
+        def <span class="org-variable-name">payload</span> = JsonOutput.toJson([
+            msg_type: <span class="org-string">'interactive'</span>,
+            card: [
+                header: [
+                    template: color,
+                    title: [
+                        tag    : <span class="org-string">'plain_text'</span>,
+                        content: title
+                    ]
+                ],
+                elements: [
+                    [
+                        tag: <span class="org-string">'markdown'</span>,
+                        content: <span class="org-string">"""\
+**&#26381;   &#21153;&#65306;** ${SERVICE_NAME}.${DEPLOY_ENV ?: 'unknown'}.${BUSINESS ?: 'unknown'}
+**&#22238;&#28378;TAG&#65306;** ${ROLLBACK_TAG ?: 'unknown'}
+**&#26500;&#24314;&#20219;&#21153;&#65306;** ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.BUILD_USER}
+**&#21457;&#24067;&#32467;&#26524;&#65306;** ${result}
+**&#35814;&#24773;&#65306;** [&#26597;&#30475; Jenkins &#26500;&#24314;](${env.BUILD_URL})
+"""</span>.stripIndent()
+                    ]
+                ]
+            ]
+        ])
+
+        writeFile file: <span class="org-string">'lark-message.json'</span>, text: payload
+
+        sh <span class="org-string">'''
+            curl --fail-with-body \
+              --silent \
+              --show-error \
+              --request POST \
+              --header '</span>Content-Type: application/json<span class="org-string">' \
+              --data @lark-message.json \
+              "$LARK_WEBHOOK"
+        '''</span>
+    }
+}
+
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:a2fdf4ea-e67d-475e-89eb-cca950178eab" class="outline-2">
+<h2 id="h:a2fdf4ea-e67d-475e-89eb-cca950178eab"><a href="#h:a2fdf4ea-e67d-475e-89eb-cca950178eab">服务发布更新减少耗时方案</a></h2>
+<div class="outline-text-2" id="text-h:a2fdf4ea-e67d-475e-89eb-cca950178eab">
+<p>
+maven构建速度： <a href="https://springdoc.cn/maven-fast-build/#google_vignette">https://springdoc.cn/maven-fast-build/#google_vignette</a>
+</p>
+
+
+<p>
+构建工具优化-maven
+</p>
+
+<p>
+0.构建耗时
+</p>
+
+<p>
+pom.xml
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;build&gt;
+    &lt;plugins&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-profiler-plugin&lt;/artifactId&gt;
+            &lt;version&gt;1.7&lt;/version&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;
+</pre>
+</div>
+
+<p>
+执行
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">cdp-server
+</span>mvn -B -Dmaven.test.skip=true -Dprofile -P &lt;env&gt; clean package -f pom.xml
+<span class="org-comment-delimiter">#</span><span class="org-comment">cat profiler
+</span>cat .profiler/xxx.html
+</pre>
+</div>
+
+<p>
+构建耗时：1m09s
+</p>
+
+<p>
+1.参数优化(无效果)
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">export MAVEN_OPTS=-Xms4096m -Xmx4096m
+</span><span class="org-builtin">export</span> <span class="org-variable-name">MAVEN_OPTS</span>=<span class="org-string">'-XX:-TieredCompilation -XX:TieredStopAtLevel=1'</span>
+mvn -T 2C -B -Dmaven.test.skip=true -P &lt;xxx&gt; clean package -f pom.xml
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>export MAVEN_OPTS='-XX:-TieredCompilation -XX:TieredStopAtLevel=1' 禁用默认分层编译</li>
+<li>-B 以批处理(batch)模式运行</li>
+<li>-T 2C 每一个CPU核使用2个线程，逻辑CPU核数. 模块化编译效果更佳 -pl module1,module2 -am</li>
+<li>-Dmaven.test.skip = true 跳过单元测试。使用 -DskipTests 选项跳过测试执行，但仍会编译 test 文件夹</li>
+<li>-Dmaven.compile.fork=true 指明多线程进行编译</li>
+<li>clean 通常情况下，我们建议用户在构建时使用 clean 参数保证构建的正确性。clean 可以删除旧的构建产物，但其实我们大多数时间可能不需要这个参数，只有在某些情况下（比如，更改了类名，或者删除了一些类）才必须使用这个参数，所以，如果某次变更只是修改了一些方法，或者增加了一些类，那么就不需要强制执行 clean 了</li>
+</ul>
+
+<p>
+参数选项参考：
+</p>
+<ul class="org-ul">
+<li>官方 <a href="https://maven.apache.org/ref/3.9.8/maven-embedder/cli.html">https://maven.apache.org/ref/3.9.8/maven-embedder/cli.html</a></li>
+<li>中文 <a href="https://maven.org.cn/ref/3.6.2/maven-embedder/cli.html">https://maven.org.cn/ref/3.6.2/maven-embedder/cli.html</a></li>
+</ul>
+
+<p>
+2.maven子项目mvnd构建（无效果）
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">wget https://downloads.apache.org/maven/mvnd/1.0.1/maven-mvnd-1.0.1-linux-amd64.tar.gz
+
+<span class="org-builtin">export</span> <span class="org-variable-name">PATH</span>=/home/jenkins/agent/maven-mvnd-1.0.1-linux-amd64/bin:$<span class="org-variable-name">PATH</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26500;&#24314;
+</span>mvnd -T 2C -B -Dmaven.test.skip=true -P &lt;xxx&gt; clean package -f pom.xml
+</pre>
+</div>
+
+<p>
+3.增量编译(无效果)
+</p>
+
+<p>
+参考：<a href="https://stackoverflow.com/questions/8918165/does-maven-support-incremental-builds">https://stackoverflow.com/questions/8918165/does-maven-support-incremental-builds</a>
+</p>
+
+<p>
+4.缩小jar包体积
+</p>
+
+<p>
+结论：不推荐。 不好实时跟进各组件依赖关系，维护成本高
+</p>
+
+<p>
+参考文档：
+</p>
+<ul class="org-ul">
+<li><a href="https://www.yeeyi.com/news/details/1830689/">https://www.yeeyi.com/news/details/1830689/</a></li>
+<li><a href="https://www.cnblogs.com/achengmu/p/15160859.html">https://www.cnblogs.com/achengmu/p/15160859.html</a></li>
+</ul>
+
+
+<p>
+deployment 滚动更新
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">shrink</span>=<span class="org-string">'
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 20%
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: NotIn
+                    values:
+                      - virtual-kubelet
+'</span>
+
+<span class="org-variable-name">expand</span>=<span class="org-string">'
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: In
+                    values:
+                      - virtual-kubelet
+'</span>
+
+kubectl patch  deploy server-tmp-eci -o yaml --dry-run=<span class="org-string">'client'</span> --type merge --patch-file &lt;(<span class="org-builtin">echo</span> <span class="org-string">"$expand"</span>)
+
+
+kubectl patch  deploy server-tmp-eci --type merge --patch-file &lt;(<span class="org-builtin">echo</span> <span class="org-string">"$expand"</span>)
+
+kubectl patch  deploy server-tmp-eci --type merge --patch-file &lt;(<span class="org-builtin">echo</span> <span class="org-string">"$shrink"</span>)
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Named Features (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Named Features (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Named Features (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Loading.html" rel="up" title="Loading">
+<link href="Where-Defined.html" rel="next" title="Where Defined">
+<link href="Repeated-Loading.html" rel="prev" title="Repeated Loading">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Named-Features">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Where-Defined.html" accesskey="n" rel="next">符号的定义位置</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Repeated-Loading.html" accesskey="p" rel="prev">重复加载</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Loading.html" accesskey="u" rel="up">加载</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_529f_80fd"><span>16.7 功能<a class="copiable-link" href="#g_t_529f_80fd"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-features"></a>
+<a class="index-entry-id" id="index-requiring-features"></a>
+<a class="index-entry-id" id="index-providing-features"></a>
+
+<p><code class="code">provide</code> 和 <code class="code">require</code> 是 <code class="code">autoload</code> 之外的另一种自动加载文件的方式。它们基于命名的 <em class="dfn">功能（feature）</em> 工作。自动加载由调用特定函数触发，而功能则是在其他程序首次按名称请求时被加载。
+</p>
+<p>功能名是一个符号，代表一组函数、变量等的集合。定义它们的文件应当 <em class="dfn">提供（provide）</em> 该功能。使用这些功能的其他程序可以通过 <em class="dfn">需求（require）</em> 该功能来确保其已被定义。如果文件尚未加载，这会加载对应的定义文件。
+</p>
+<a class="index-entry-id" id="index-load-error-with-require"></a>
+<p>要需求某个功能存在，以功能名作为参数调用 <code class="code">require</code>。
+<code class="code">require</code> 会检查全局变量 <code class="code">features</code>，判断所需功能是否已经提供。
+如果没有，它会从对应的文件加载该功能。
+该文件应当在顶层调用 <code class="code">provide</code>，将该功能加入 <code class="code">features</code>；
+如果没有这样做，<code class="code">require</code> 会发出错误信号。
+</p>
+<p>例如，在 <samp class="file">idlwave.el</samp> 中，<code class="code">idlwave-complete-filename</code> 的定义包含如下代码：
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun idlwave-complete-filename ()
+  &quot;Use the comint stuff to complete a file name.&quot;
+   (require 'comint)
+   (let* ((comint-file-name-chars &quot;~/A-Za-z0-9+@:_.$#%={}\\-&quot;)
+          (comint-completion-addsuffix nil)
+          ...)
+       (comint-dynamic-complete-filename)))
+</pre></div>
+
+<p>表达式 <code class="code">(require 'comint)</code> 会在尚未加载时加载 <samp class="file">comint.el</samp> 文件，确保 <code class="code">comint-dynamic-complete-filename</code> 已被定义。
+功能通常以提供它的文件命名，因此 <code class="code">require</code> 不需要指定文件名。
+（注意，<code class="code">require</code> 语句必须放在 <code class="code">let</code> 体之外，这一点很重要。
+在变量被 let 绑定期间加载库可能产生意外后果，即变量在 let 退出后会变为未绑定。）
+</p>
+<p><samp class="file">comint.el</samp> 文件包含如下顶层表达式：
+</p>
+<div class="example">
+<pre class="example-preformatted">(provide 'comint)
+</pre></div>
+
+<p>这会将 <code class="code">comint</code> 加入全局的 <code class="code">features</code> 列表，此后 <code class="code">(require 'comint)</code> 就知道无需执行任何操作。
+</p>
+<a class="index-entry-id" id="index-byte_002dcompiling-require"></a>
+<p>当 <code class="code">require</code> 在文件顶层使用时，它不仅在加载时生效，在对该文件进行字节编译时也会生效（see <a class="pxref" href="Byte-Compilation.html">字节编译</a>）。
+这是为了应对被需求的包中包含字节编译器必须知晓的宏的情况。
+这也可以避免字节编译器对由 <code class="code">require</code> 加载的文件中定义的函数和变量发出警告。
+</p>
+<p>虽然顶层的 <code class="code">require</code> 调用会在字节编译期间执行，但 <code class="code">provide</code> 调用不会。
+因此，你可以通过先写 <code class="code">provide</code>、再对同一功能写 <code class="code">require</code>，确保定义文件在字节编译前已被加载，如下例所示。
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(provide 'my-feature)  ; <span class="r">Ignored by byte compiler,</span>
+                       ;   <span class="r">evaluated by <code class="code">load</code>.</span>
+(require 'my-feature)  ; <span class="r">Evaluated by byte compiler.</span>
+</pre></div></div>
+
+<p>编译器忽略 <code class="code">provide</code>，然后通过加载对应文件来处理 <code class="code">require</code>。
+加载文件时会执行 <code class="code">provide</code> 调用，因此后续的 <code class="code">require</code> 在文件加载时不执行任何操作。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-provide"><span class="category-def">Function: </span><span><strong class="def-name">provide</strong> <var class="def-var-arguments">feature &amp;optional subfeatures</var><a class="copiable-link" href="#index-provide"> &para;</a></span></dt>
+<dd><p>该函数宣告 <var class="var">feature</var> 已加载或正在加载到当前 Emacs 会话中。
+这意味着与 <var class="var">feature</var> 相关的功能已经或将要可供其他 Lisp 程序使用。
+</p>
+<p>调用 <code class="code">provide</code> 的直接效果是：如果 <var class="var">feature</var> 不在 <code class="code">features</code> 列表中，则将其添加到列表前端，并执行所有等待该功能的 <code class="code">eval-after-load</code> 代码（see <a class="pxref" href="Hooks-for-Loading.html">加载相关钩子</a>）。
+参数 <var class="var">feature</var> 必须是一个符号。
+<code class="code">provide</code> 返回 <var class="var">feature</var>。
+</p>
+<p>如果提供了 <var class="var">subfeatures</var>，它应当是一个符号列表，表示此版本 <var class="var">feature</var> 提供的一组特定子功能。
+你可以使用 <code class="code">featurep</code> 检查某个子功能是否存在。
+子功能的设计意图是：当一个包（对应一个 <var class="var">feature</var>）足够复杂，需要为其不同部分或功能分别命名时使用，这些部分可能加载或未加载，可能存在或不存在于某个版本中。
+see <a class="pxref" href="Network-Feature-Testing.html">网络功能可用性测试</a> 提供了一个示例。
+</p>
+<div class="example">
+<pre class="example-preformatted">features
+     &rArr; (bar bish)
+
+(provide 'foo)
+     &rArr; foo
+features
+     &rArr; (foo bar bish)
+</pre></div>
+
+<p>当加载文件以满足自动加载需求，且因执行文件内容出错而中断时，加载过程中产生的所有函数定义或 <code class="code">provide</code> 调用都会被撤销。See <a class="xref" href="Autoload.html">自动加载</a>。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-require"><span class="category-def">Function: </span><span><strong class="def-name">require</strong> <var class="def-var-arguments">feature &amp;optional filename noerror</var><a class="copiable-link" href="#index-require"> &para;</a></span></dt>
+<dd><p>该函数检查 <var class="var">feature</var> 是否已存在于当前 Emacs 会话中（通过 <code class="code">(featurep <var class="var">feature</var>)</code> 实现；详见下文）。参数 <var class="var">feature</var> 必须是一个符号。
+</p>
+<p>如果该功能不存在，则 <code class="code">require</code> 会通过 <code class="code">load</code> 加载 <var class="var">filename</var> 文件。若未提供 <var class="var">filename</var>，则将符号 <var class="var">feature</var> 的名称作为要加载的基础文件名。
+但在此情况下，<code class="code">require</code> 要求文件必须带有 &lsquo;<samp class="samp">.el</samp>&rsquo; 或 &lsquo;<samp class="samp">.elc</samp>&rsquo; 后缀（可附加压缩后缀）；仅以 <var class="var">feature</var> 为名的文件不会被使用。
+（变量 <code class="code">load-suffixes</code> 规定了确切的 Lisp 文件后缀要求。）
+</p>
+<p>如果 <var class="var">noerror</var> 为非 <code class="code">nil</code> 值，则会抑制文件实际加载过程中产生的错误。此时若文件加载失败，<code class="code">require</code> 返回 <code class="code">nil</code>。
+默认情况下，<code class="code">require</code> 返回 <var class="var">feature</var>。
+</p>
+<p>如果文件加载成功但未提供 <var class="var">feature</var>，<code class="code">require</code> 会针对缺失的功能发出错误信号。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-require_002dwith_002dcheck"><span class="category-def">Function: </span><span><strong class="def-name">require-with-check</strong> <var class="def-var-arguments">feature &amp;optional filename noerror</var><a class="copiable-link" href="#index-require_002dwith_002dcheck"> &para;</a></span></dt>
+<dd><p>该函数的行为与 <code class="code">require</code> 类似，但存在一个例外情况：当 <var class="var">feature</var> 已加载时（即已存在于 <code class="code">features</code> 列表中；详见下文）。
+若 <var class="var">feature</var> 已加载，该函数会检查提供此功能的文件是否与 <var class="var">filename</var> 不同；若不同，默认会发出错误信号。
+如果可选参数 <var class="var">noerror</var> 的值为 <code class="code">reload</code>，函数不会报错，而是强制重新加载 <var class="var">filename</var>；
+若 <var class="var">noerror</var> 为其他非 <code class="code">nil</code> 值，函数会发出警告，提示 <var class="var">feature</var> 已由另一个文件提供。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-featurep"><span class="category-def">Function: </span><span><strong class="def-name">featurep</strong> <var class="def-var-arguments">feature &amp;optional subfeature</var><a class="copiable-link" href="#index-featurep"> &para;</a></span></dt>
+<dd><p>如果 <var class="var">feature</var> 已在当前 Emacs 会话中被提供（即 <var class="var">feature</var> 是 <code class="code">features</code> 的成员），该函数返回 <code class="code">t</code>。
+若 <var class="var">subfeature</var> 为非 <code class="code">nil</code> 值，则仅当该子功能也被提供时（即 <var class="var">subfeature</var> 是 <var class="var">feature</var> 符号的 <code class="code">subfeature</code> 属性的成员），函数才返回 <code class="code">t</code>。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-features-1"><span class="category-def">Variable: </span><span><strong class="def-name">features</strong><a class="copiable-link" href="#index-features-1"> &para;</a></span></dt>
+<dd><p>该变量的值是一个符号列表，代表当前 Emacs 会话中已加载的功能。列表中的每个符号都是通过调用 <code class="code">provide</code> 加入的。
+<code class="code">features</code> 列表中元素的顺序无实际意义。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-loading-and-configuring-features"></a>
+<p><code class="code">use-package</code> 宏提供了一种便捷的方式来加载功能并配置其使用方式。
+它既能像 <code class="code">require</code> 一样需求某个功能，又能指定功能实际加载时要运行的代码（类似加载时钩子；see <a class="pxref" href="Hooks-for-Loading.html">加载相关钩子</a>）。
+<code class="code">use-package</code> 的声明式语法使其在用户初始化文件中使用起来格外简便。
+</p>
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-use_002dpackage"><span class="category-def">Macro: </span><span><strong class="def-name">use-package</strong> <var class="def-var-arguments">feature &amp;rest args</var><a class="copiable-link" href="#index-use_002dpackage"> &para;</a></span></dt>
+<dd><p>该宏指定如何加载命名为 <var class="var">feature</var> 的功能，以及如何配置和自定义其使用方式。参数 <var class="var">args</var> 为若干键值对。
+其中重要的关键字及其取值如下：
+</p>
+<dl class="table">
+<dt><code class="code">:init <var class="var">forms</var></code></dt>
+<dd><p>指定在加载 <var class="var">feature</var> 之前要执行的 <var class="var">forms</var>（表单）。
+</p>
+</dd>
+<dt><code class="code">:config <var class="var">forms</var></code></dt>
+<dd><p>指定在加载 <var class="var">feature</var> 之后要执行的 <var class="var">forms</var>（表单）。
+</p>
+</dd>
+<dt><code class="code">:defer <var class="var">condition</var></code></dt>
+<dd><p>若 <var class="var">condition</var> 为非 <code class="code">nil</code> 值，表示延迟加载 <var class="var">feature</var>，直到首次使用该功能的任意自动加载命令或变量时才加载。
+若 <var class="var">condition</var> 为数字 <var class="var">n</var>，表示在空闲 <var class="var">n</var> 秒后加载 <var class="var">feature</var>。
+</p>
+</dd>
+<dt><code class="code">:commands <var class="var">commands</var>&hellip;</code></dt>
+<dd><p>指定要为 <var class="var">feature</var> 自动加载的命令。
+</p>
+</dd>
+<dt><code class="code">:bind <var class="var">keybindings</var>&hellip;</code></dt>
+<dd><p>指定 <var class="var">feature</var> 相关命令的 <var class="var">keybindings</var>（按键绑定）。每个绑定的格式为：
+</p>
+<div class="example lisp">
+<pre class="lisp-preformatted">(<var class="var">key-sequence</var> . <var class="var">command</var>)
+</pre></div>
+<p>or
+</p><div class="example lisp">
+<pre class="lisp-preformatted">(:map <var class="var">keymap</var> (<var class="var">key-sequence</var> . <var class="var">command</var>))
+</pre></div>
+
+<p>其中 <var class="var">key-sequence</var>（按键序列）的格式需符合 <code class="code">kbd</code> 宏的要求（see <a class="pxref" href="Key-Sequences.html">按键序列</a>）。
+</p></dd>
+</dl>
+
+<p>关于 <code class="code">use-package</code> 的更多细节，参见 <cite class="cite"><a data-manual="use-package" href="https://www.gnu.org/software/emacs/manual/html_node/use-package/index.html#Top">use-package 用户手册</a></cite>。
+</p></dd></dl>
+
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Where-Defined.html">符号的定义位置</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Repeated-Loading.html">重复加载</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Loading.html">加载</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Recursive Editing (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Recursive Editing (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Recursive Editing (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Command-Loop.html" rel="up" title="Command Loop">
+<link href="Disabling-Commands.html" rel="next" title="Disabling Commands">
+<link href="Prefix-Command-Arguments.html" rel="prev" title="Prefix Command Arguments">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+kbd.kbd {font-style: oblique}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Recursive-Editing">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Disabling-Commands.html" accesskey="n" rel="next">禁用命令</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Prefix-Command-Arguments.html" accesskey="p" rel="prev">前缀命令参数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Command-Loop.html" accesskey="u" rel="up">命令循环</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_9012_5f52_7f16_8f91"><span>22.13 递归编辑<a class="copiable-link" href="#g_t_9012_5f52_7f16_8f91"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-recursive-command-loop"></a>
+<a class="index-entry-id" id="index-recursive-editing-level"></a>
+<a class="index-entry-id" id="index-command-loop_002c-recursive"></a>
+
+<p>Emacs 启动时会自动进入命令循环。
+这一顶层命令循环调用永不退出；只要 Emacs 运行，
+它就会持续运行。Lisp 程序也可调用命令循环。
+由于这会导致命令循环被多次激活，我们称之为
+<em class="dfn">递归编辑(recursive editing)</em>。递归编辑层级的作用是挂起调用它的
+任意命令，并允许用户在恢复该命令前执行任意编辑操作。
+</p>
+<p>递归编辑期间可用的命令与顶层编辑循环中
+可用的命令相同，且均在按键映射中定义。
+仅有少数特殊命令能退出递归编辑层级；
+其他命令执行完毕后会返回递归编辑层级。
+（退出用的特殊命令始终可用，但无递归编辑
+进行时它们不执行任何操作。）
+</p>
+<p>所有命令循环（包括递归循环）均会设置通用错误
+处理程序，因此命令循环中运行的命令若出错，
+不会导致循环退出。
+</p>
+<a class="index-entry-id" id="index-minibuffer-input"></a>
+<p>迷你缓冲区输入是一种特殊的递归编辑。
+它有一些特殊处理，例如启用迷你缓冲区和
+迷你缓冲区窗口的显示，但数量比你预想的少。
+部分按键在迷你缓冲区中的行为不同，但这仅因
+迷你缓冲区的本地映射；若切换窗口，仍会获得
+常规的 Emacs 命令。
+</p>
+<a class="index-entry-id" id="index-throw-example"></a>
+<a class="index-entry-id" id="index-exit"></a>
+<a class="index-entry-id" id="index-exit-recursive-editing"></a>
+<a class="index-entry-id" id="index-aborting"></a>
+<p>调用 <code class="code">recursive-edit</code> 函数可进入递归编辑层级。
+该函数包含命令循环；同时会调用带 <code class="code">exit</code> 标签的
+<code class="code">catch</code>，因此可通过向 <code class="code">exit</code> 抛出值
+退出递归编辑层级（see <a class="pxref" href="Catch-and-Throw.html">显式非局部退出：<code class="code">catch</code> 和 <code class="code">throw</code></a>）。
+抛出 <code class="code">t</code> 值会使 <code class="code">recursive-edit</code> 退出，
+控制权返回上一层命令循环。这一操作称为
+<em class="dfn">中止(aborting)</em>，可通过 <kbd class="kbd">C-]</kbd>（<code class="code">abort-recursive-edit</code>）
+完成。类似地，抛出字符串值会使 <code class="code">recursive-edit</code>
+触发错误，并打印该字符串作为提示信息。
+若抛出函数，<code class="code">recursive-edit</code> 会在返回前无参调用该函数。
+抛出其他任意值会使 <code class="code">recursive-edit</code> 正常返回至
+调用它的函数。命令 <kbd class="kbd">C-M-c</kbd>（<code class="code">exit-recursive-edit</code>）
+即实现此功能。
+</p>
+<p>除使用迷你缓冲区的场景外，大多数应用不应使用
+递归编辑。通常，临时将当前缓冲区的主模式切换为
+专用主模式（并定义返回原模式的命令）会更便于用户操作。
+（Rmail 中的 <kbd class="kbd">e</kbd> 命令即采用此技术。）
+或者，若需让用户递归编辑不同文本，可创建并选中
+一个专用模式的新缓冲区。在该模式中定义完成处理
+并返回原缓冲区的命令。（Rmail 中的 <kbd class="kbd">m</kbd> 命令
+即采用此方式。）
+</p>
+<p>递归编辑在调试中十分有用。你可在函数定义中插入
+<code class="code">debug</code> 调用作为断点，以便函数执行到此处时
+查看运行环境。<code class="code">debug</code> 会调用递归编辑，
+同时提供调试器的其他功能。
+</p>
+<p>递归编辑层级也用于 <code class="code">query-replace</code> 中键入
+<kbd class="kbd">C-r</kbd> 或使用 <kbd class="kbd">C-x q</kbd>（<code class="code">kbd-macro-query</code>）时。
+</p>
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-recursive_002dedit"><span class="category-def">Command: </span><span><strong class="def-name">recursive-edit</strong><a class="copiable-link" href="#index-recursive_002dedit"> &para;</a></span></dt>
+<dd><a class="index-entry-id" id="index-suspend-evaluation"></a>
+<p>该函数调用编辑器命令循环。Emacs 初始化时会自动
+调用它，让用户开始编辑。从 Lisp 程序中调用时，
+它会进入递归编辑层级。
+</p>
+<p>若当前缓冲区与选中窗口的缓冲区不同，
+<code class="code">recursive-edit</code> 会保存并恢复当前缓冲区。
+否则，若切换缓冲区，<code class="code">recursive-edit</code> 返回后，
+切换后的缓冲区将成为当前缓冲区。
+</p>
+<p>以下示例中，函数 <code class="code">simple-rec</code> 先将光标前移一个单词，
+再进入递归编辑，并在回显区打印提示信息。
+用户可执行任意编辑操作，然后键入 <kbd class="kbd">C-M-c</kbd>
+退出并继续执行 <code class="code">simple-rec</code>。
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun simple-rec ()
+  (forward-word 1)
+  (message &quot;Recursive edit in progress&quot;)
+  (recursive-edit)
+  (forward-word 1))
+     &rArr; simple-rec
+(simple-rec)
+     &rArr; nil
+</pre></div>
+</dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-exit_002drecursive_002dedit"><span class="category-def">Command: </span><span><strong class="def-name">exit-recursive-edit</strong><a class="copiable-link" href="#index-exit_002drecursive_002dedit"> &para;</a></span></dt>
+<dd><p>该函数退出最内层的递归编辑（包括迷你缓冲区输入）。
+其实现等效于 <code class="code">(throw 'exit nil)</code>。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-abort_002drecursive_002dedit"><span class="category-def">Command: </span><span><strong class="def-name">abort-recursive-edit</strong><a class="copiable-link" href="#index-abort_002drecursive_002dedit"> &para;</a></span></dt>
+<dd><p>该函数在退出递归编辑后触发 <code class="code">quit</code>，从而中止
+请求最内层递归编辑的命令（包括迷你缓冲区输入）。
+其实现等效于 <code class="code">(throw 'exit t)</code>。
+See <a class="xref" href="Quitting.html">退出</a>。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-top_002dlevel"><span class="category-def">Command: </span><span><strong class="def-name">top-level</strong><a class="copiable-link" href="#index-top_002dlevel"> &para;</a></span></dt>
+<dd><p>该函数退出所有递归编辑层级；它无返回值，
+会直接跳出所有计算过程，返回至主命令循环。
+</p></dd></dl>
+
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-recursion_002ddepth"><span class="category-def">Function: </span><span><strong class="def-name">recursion-depth</strong><a class="copiable-link" href="#index-recursion_002ddepth"> &para;</a></span></dt>
+<dd><p>该函数返回当前递归编辑的深度。无递归编辑激活时，
+返回 0。
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Disabling-Commands.html">禁用命令</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Prefix-Command-Arguments.html">前缀命令参数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Command-Loop.html">命令循环</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

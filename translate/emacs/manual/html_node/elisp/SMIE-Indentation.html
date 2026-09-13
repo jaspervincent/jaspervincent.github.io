@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>SMIE Indentation (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="SMIE Indentation (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="SMIE Indentation (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="SMIE.html" rel="up" title="SMIE">
+<link href="SMIE-Indentation-Helpers.html" rel="next" title="SMIE Indentation Helpers">
+<link href="SMIE-Tricks.html" rel="prev" title="SMIE Tricks">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsubsection-level-extent" id="SMIE-Indentation">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="SMIE-Indentation-Helpers.html" accesskey="n" rel="next">缩进规则辅助函数</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="SMIE-Tricks.html" accesskey="p" rel="prev">适配简易解析器</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="SMIE.html" accesskey="u" rel="up">简易缩进引擎（SMIE）</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsubsection" id="g_t_6307_5b9a_7f29_8fdb_89c4_5219"><span>24.8.1.6 指定缩进规则<a class="copiable-link" href="#g_t_6307_5b9a_7f29_8fdb_89c4_5219"> &para;</a></span></h4>
+<a class="index-entry-id" id="index-indentation-rules_002c-SMIE"></a>
+
+<p>基于提供的语法，SMIE 无需额外配置即可实现自动缩进。
+但在实际使用中，这种默认缩进风格往往不够理想，
+你通常需要在多种场景下对其进行微调。
+</p>
+<p>SMIE 缩进的设计理念是：缩进规则应尽可能**局部化**。
+为此，它引入了 <em class="emph">虚拟缩进</em> 的概念，
+即某一程序位置若位于行首时应具有的缩进量。
+当然，如果该位置确实在行首，其虚拟缩进就是当前缩进值；
+否则 SMIE 会通过缩进算法计算该位置的虚拟缩进。
+</p>
+<p>在实际使用中，某程序点的虚拟缩进不必与在其前插入换行后的缩进完全一致。
+举个例子，C 语言中 <code class="code">{</code> 之后的 SMIE 缩进规则并不关心该 <code class="code">{</code> 是单独占一行，还是位于上一行末尾。
+这些不同情况会由 <code class="code">{</code> 之前的缩进规则统一处理。
+</p>
+<p>另一个重要概念是 <em class="emph">父节点(parent)</em>：
+一个标记的 <em class="emph">父节点</em>，是包裹它的最近语法结构的起始标记。
+例如，<code class="code">else</code> 的父节点是其所属的 <code class="code">if</code>，
+而 <code class="code">if</code> 的父节点则是外层语法结构的起始标记。
+命令 <code class="code">backward-sexp</code> 可从一个标记跳转到其父节点，但有几点注意事项：
+对于 <em class="emph">起始标记(openers)</em> （开启一个结构的标记，如 <code class="code">if</code>），
+需要将光标置于标记之前；
+对其他标记则需将光标置于标记之后。
+若父节点是当前标记的 <em class="emph">起始标记(opener)</em>，<code class="code">backward-sexp</code> 会将光标停在父节点之前，
+否则停在父节点之后。
+</p>
+<p>SMIE 缩进规则通过一个函数指定，该函数接收两个参数
+<var class="var">method</var> 和 <var class="var">arg</var>，其中 <var class="var">arg</var> 的含义与函数返回值由 <var class="var">method</var> 决定。
+</p>
+<p><var class="var">method</var> 可取以下值：
+</p><ul class="itemize mark-bullet">
+<li><code class="code">:after</code>：此时 <var class="var">arg</var> 为一个标记，函数应返回在 <var class="var">arg</var> 之后进行缩进所用的偏移量 <var class="var">offset</var>。
+</li><li><code class="code">:before</code>：此时 <var class="var">arg</var> 为一个标记，函数应返回缩进 <var class="var">arg</var> 自身所用的偏移量 <var class="var">offset</var>。
+</li><li><code class="code">:elem</code>：函数应返回缩进函数参数所用的偏移量（若 <var class="var">arg</var> 为符号 <code class="code">arg</code>），
+或基础缩进步长（若 <var class="var">arg</var> 为符号 <code class="code">basic</code>）。
+</li><li><code class="code">:list-intro</code>：此时 <var class="var">arg</var> 为一个标记，若该标记后跟随一组表达式列表（无分隔符）而非单个表达式，
+函数应返回非 <code class="code">nil</code>。
+</li></ul>
+
+<p>当 <var class="var">arg</var> 为标记时，函数被调用时光标位于该标记之前。
+返回值为 <code class="code">nil</code> 始终表示回退到默认行为，
+因此函数对不处理的参数应返回 <code class="code">nil</code>。
+</p>
+<p><var class="var">offset</var> 可取以下值：
+</p><ul class="itemize mark-bullet">
+<li><code class="code">nil</code>：使用默认缩进规则。
+</li><li><code class="code">(column . <var class="var">column</var>)</code>：缩进至指定列 <var class="var">column</var>。
+</li><li><var class="var">number</var>：相对基准标记偏移 <var class="var">number</var> 列；
+对 <code class="code">:after</code> 而言基准是当前标记，对 <code class="code">:before</code> 而言基准是其父节点。
+</li></ul>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="SMIE-Indentation-Helpers.html">缩进规则辅助函数</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="SMIE-Tricks.html">适配简易解析器</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="SMIE.html">简易缩进引擎（SMIE）</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

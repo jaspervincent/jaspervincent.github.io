@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>OClosures (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="OClosures (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="OClosures (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Functions.html" rel="up" title="Functions">
+<link href="Advising-Functions.html" rel="next" title="Advising Functions">
+<link href="Closures.html" rel="prev" title="Closures">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="OClosures">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Advising-Functions.html" accesskey="n" rel="next">为 Emacs Lisp 函数添加建议</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Closures.html" accesskey="p" rel="prev">闭包</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Functions.html" accesskey="u" rel="up">函数</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5f00_653e_5f0f_95ed_5305"><span>13.11 开放式闭包<a class="copiable-link" href="#g_t_5f00_653e_5f0f_95ed_5305"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-oclosures"></a>
+<a class="index-entry-id" id="index-open-closures"></a>
+
+<p>传统上，函数是不透明对象，除了被调用之外，不提供其他功能。（Emacs Lisp 函数并非完全不透明，因为你可以从中提取一些信息，例如文档字符串、参数列表或交互规范，但它们在很大程度上仍然是不透明的。）这通常是我们所需要的，但偶尔我们需要函数对外暴露更多关于自身的信息。
+</p>
+<p><em class="dfn">开放式闭包</em>（Open closures），简称 <em class="dfn">OClosures</em>，是一类携带额外类型信息、并以槽位（slots）形式暴露自身部分信息的函数对象，你可以通过访问器函数来读取这些槽位。
+</p>
+<p>开放式闭包的定义分为两步：首先使用 <code class="code">oclosure-define</code>，通过指定该类型开放式闭包所包含的槽位，来定义一种新的 OClosure 类型；然后使用 <code class="code">oclosure-lambda</code> 创建指定类型的 OClosure 对象。
+</p>
+<p>假设我们想要定义键盘宏 —— 即能重新执行一系列按键事件的交互式函数（see <a class="pxref" href="Keyboard-Macros.html">键盘宏</a>）。你可以通过普通函数实现，示例如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun kbd-macro (key-sequence)
+  (lambda (&amp;optional arg)
+    (interactive &quot;P&quot;)
+    (execute-kbd-macro key-sequence arg)))
+</pre></div>
+
+<p>但通过这种方式定义的函数，你无法便捷地从中提取出 <var class="var">key-sequence</var>（按键序列）—— 比如要打印这个序列时就会遇到困难。
+</p>
+<p>我们可以通过开放式闭包解决这个问题，具体步骤如下。首先定义我们的键盘宏类型（同时我们决定为该类型新增一个 <code class="code">counter</code> 槽位）：
+</p>
+<div class="example">
+<pre class="example-preformatted">(oclosure-define kbd-macro
+  &quot;Keyboard macro.&quot;
+  keys (counter :mutable t))
+</pre></div>
+
+<p>完成类型定义后，我们即可重写 <code class="code">kbd-macro</code> 函数：
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun kbd-macro (key-sequence)
+  (oclosure-lambda (kbd-macro (keys key-sequence) (counter 0))
+      (&amp;optional arg)
+    (interactive &quot;P&quot;)
+    (execute-kbd-macro keys arg)
+    (setq counter (1+ counter))))
+</pre></div>
+
+<p>可以看到，开放式闭包的 <code class="code">keys</code> 和 <code class="code">counter</code> 槽位，能作为局部变量在该开放式闭包的函数体内部访问。同时，我们现在也能从函数体外部访问这些槽位 —— 例如，用于描述一个键盘宏：
+</p>
+<div class="example">
+<pre class="example-preformatted">(defun describe-kbd-macro (km)
+  (if (not (eq 'kbd-macro (oclosure-type km)))
+      (message &quot;Not a keyboard macro&quot;)
+    (let ((keys    (kbd-macro--keys km))
+          (counter (kbd-macro--counter km)))
+      (message &quot;Keys=%S, called %d times&quot; keys counter))))
+</pre></div>
+
+<p>其中 <code class="code">kbd-macro--keys</code> 和 <code class="code">kbd-macro--counter</code> 是<code class="code">oclosure-define</code> 宏为类型为 <code class="code">kbd-macro</code> 的开放式闭包自动生成的访问器函数。
+</p>
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-oclosure_002ddefine"><span class="category-def">Macro: </span><span><strong class="def-name">oclosure-define</strong> <var class="def-var-arguments">oname &amp;optional docstring &amp;rest slots</var><a class="copiable-link" href="#index-oclosure_002ddefine"> &para;</a></span></dt>
+<dd><p>该宏用于定义一种新的开放式闭包（OClosure）类型，同时为其<var class="var">slots</var>（槽位）生成对应的访问器函数。<var class="var">oname</var> 可以是一个符号（即该新类型的名称），也可以是形如
+<code class="code">(<var class="var">oname</var>&nbsp;.&nbsp;<var class="var">type-props</var>)</code><!-- /@w -->
+的列表 —— 这种情况下，<var class="var">type-props</var> 是该开放式闭包类型的额外属性列表。<var class="var">slots</var> 是一组槽位描述的列表，其中每个槽位可以是一个符号（即槽位名称），也可以是形如
+<code class="code">(<var class="var">slot-name</var>&nbsp;.&nbsp;<var class="var">slot-props</var>)</code><!-- /@w -->
+的结构，其中 <var class="var">slot-props</var> 是对应槽位 <var class="var">slot-name</var> 的属性列表。
+由 <var class="var">type-props</var> 指定的开放式闭包类型属性可包含以下内容：
+</p>
+<dl class="table">
+<dt><code class="code">(:predicate <var class="var">pred-name</var>)</code></dt>
+<dd><p>该属性要求创建一个名为 <var class="var">pred-name</var> 的断言函数（predicate function）。此函数将用于识别类型为 <var class="var">oname</var> 的开放式闭包（OClosure）。若未指定该类型属性，<code class="code">oclosure-define</code> 会为这个断言函数生成一个默认名称。
+</p></dd>
+<dt><code class="code">(:parent <var class="var">otype</var>)</code></dt>
+<dd><p>该属性将开放式闭包类型 <var class="var">otype</var> 设置为类型 <var class="var">oname</var> 的父类型。类型为 <var class="var">oname</var> 的开放式闭包会继承其父类型定义的所有 <var class="var">slots</var>（槽位）。
+</p></dd>
+<dt><code class="code">(:copier <var class="var">copier-name</var> <var class="var">copier-args</var>)</code></dt>
+<dd><p>该属性会触发一个「函数式更新函数」的定义（这类函数也被称为 <em class="dfn">复制器（copier）</em>）。该函数接收一个类型为 <var class="var">oname</var> 的开放式闭包作为第一个参数，返回该闭包的副本 —— 副本中名为 <var class="var">copier-args</var> 的槽位会被修改，取值为调用 <var class="var">copier-name</var> 时传入的对应参数值。
+</p></dd>
+</dl>
+
+<p>对于 <var class="var">slots</var> 中的每一个槽位，<code class="code">oclosure-define</code> 宏都会创建一个名为 <code class="code"><var class="var">oname</var>--<var class="var">slot-name</var></code> 的访问器函数；这些函数可用于读取对应槽位的值。<var class="var">slots</var> 中的槽位定义可指定该槽位的以下属性：
+</p>
+<dl class="table">
+<dt><code class="code">:mutable <var class="var">val</var></code></dt>
+<dd><p>默认情况下，槽位是不可变的；但如果为 <code class="code">:mutable</code> 属性指定非 <code class="code">nil</code> 的值，该槽位将变为可修改状态，例如可通过 <code class="code">setf</code> 函数修改（see <a class="pxref" href="Setting-Generalized-Variables.html"><code class="code">setf</code> 宏</a>）。
+</p></dd>
+<dt><code class="code">:type <var class="var">val-type</var></code></dt>
+<dd><p>该属性用于指定槽位中预期存储的值的类型。
+</p></dd>
+</dl>
+</dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-oclosure_002dlambda"><span class="category-def">Macro: </span><span><strong class="def-name">oclosure-lambda</strong> <var class="def-var-arguments">(type . slots) arglist &amp;rest body</var><a class="copiable-link" href="#index-oclosure_002dlambda"> &para;</a></span></dt>
+<dd><p>该宏用于创建一个类型为 <var class="var">type</var> 的匿名开放式闭包（OClosure），且该类型必须已通过 <code class="code">oclosure-define</code> 定义完成。<var class="var">slots</var> 应为一个列表，其元素格式为 <code class="code">(<var class="var">slot-name</var>&nbsp;<var class="var">expr</var>)</code><!-- /@w -->。运行时，每个 <var class="var">expr</var>（表达式）会按顺序求值，随后创建开放式闭包，并将这些求值结果初始化到对应的槽位中。
+</p>
+<p>当该宏创建的开放式闭包以函数形式被调用时（see <a class="pxref" href="Calling-Functions.html">调用函数</a>），它会按照 <var class="var">arglist</var>（参数列表）接收参数，并执行 <var class="var">body</var>（函数体）中的代码。<var class="var">body</var> 内可直接引用任意槽位的值，就像引用通过静态作用域捕获的局部变量一样。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-oclosure_002dtype"><span class="category-def">Function: </span><span><strong class="def-name">oclosure-type</strong> <var class="def-var-arguments">object</var><a class="copiable-link" href="#index-oclosure_002dtype"> &para;</a></span></dt>
+<dd><p>若 <var class="var">object</var> 是一个开放式闭包（OClosure），该函数会返回其开放式闭包类型（一个符号）；否则返回 <code class="code">nil</code>。
+</p></dd></dl>
+
+<p>另一个与开放式闭包相关的函数是 <code class="code">oclosure-interactive-form</code>，它允许部分类型的开放式闭包动态计算其交互形式（interactive form）。See <a class="xref" href="Using-Interactive.html">oclosure-interactive-form</a>.
+</p>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Advising-Functions.html">为 Emacs Lisp 函数添加建议</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Closures.html">闭包</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Functions.html">函数</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

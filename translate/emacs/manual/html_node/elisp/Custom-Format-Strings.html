@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Custom Format Strings (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Custom Format Strings (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Custom Format Strings (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Strings-and-Characters.html" rel="up" title="Strings and Characters">
+<link href="Case-Conversion.html" rel="next" title="Case Conversion">
+<link href="Formatting-Strings.html" rel="prev" title="Formatting Strings">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Custom-Format-Strings">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Case-Conversion.html" accesskey="n" rel="next">Lisp 中的大小写转换</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Formatting-Strings.html" accesskey="p" rel="prev">格式化字符串</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Strings-and-Characters.html" accesskey="u" rel="up">字符串与字符</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_81ea_5b9a_4e49_683c_5f0f_5b57_7b26_4e32"><span>4.8 自定义格式字符串<a class="copiable-link" href="#g_t_81ea_5b9a_4e49_683c_5f0f_5b57_7b26_4e32"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-custom-format-string"></a>
+<a class="index-entry-id" id="index-custom-_0025_002dsequence-in-format"></a>
+
+<p>有时，让用户和 Lisp 程序都能通过自定义格式控制字符串来控制特定文本的生成方式会很实用。例如，一个格式字符串可以定义如何显示某人的名、姓和电子邮箱地址。使用上一节介绍的 <code class="code">format</code> 函数，该格式字符串可能形如 <code class="code">&quot;%s&nbsp;%s&nbsp;&lt;%s&gt;&quot;</code><!-- /@w -->。但这种方式很快会变得不实用 &mdash; 因为无法直观区分每个格式说明符对应哪一项信息。
+</p>
+<p>针对这类场景，更方便的格式字符串可以写成类似 <code class="code">&quot;%f&nbsp;%l&nbsp;&lt;%e&gt;&quot;</code><!-- /@w --> 这样的形式，其中每个格式字符都带有更明确的语义信息，并且可以很方便地与其他格式字符重新排列，让用户更容易自定义这类格式字符串。
+</p>
+<p>本节介绍的 <code class="code">format-spec</code> 函数实现了与 <code class="code">format</code> 类似的功能，区别在于它可以处理使用任意格式字符的格式控制字符串。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-format_002dspec"><span class="category-def">Function: </span><span><strong class="def-name">format-spec</strong> <var class="def-var-arguments">template spec-alist &amp;optional ignore-missing split</var><a class="copiable-link" href="#index-format_002dspec"> &para;</a></span></dt>
+<dd><p>该函数根据 <var class="var">spec-alist</var> 中指定的转换规则，从格式字符串 <var class="var">template</var> 生成并返回一个字符串。<var class="var">spec-alist</var> 是一个关联列表（alist，see <a class="pxref" href="Association-Lists.html">关联列表</a>），其形式为 <code class="code">(<var class="var">letter</var>&nbsp;.&nbsp;<var class="var">replacement</var>)</code><!-- /@w -->。格式化最终字符串时，<var class="var">template</var> 中每个形如 <code class="code">%<var class="var">letter</var></code> 的格式说明符都会被对应的 <var class="var">replacement</var> 替换。
+</p>
+<p><var class="var">template</var> 中除格式说明符外的其他字符（包括其可能附带的文本属性）会直接复制到输出结果中；格式说明符自身的任何文本属性也会复制到其对应的替换内容上。
+</p>
+<p>使用 alist关联列表 指定转换规则具备以下实用特性：
+</p>
+<ul class="itemize mark-bullet">
+<li>若 <var class="var">spec-alist</var> 中唯一 <var class="var">letter</var> 键的数量多于 <var class="var">template</var> 中唯一格式说明符字符的数量，未被用到的键会被直接忽略；
+</li><li>若 <var class="var">spec-alist</var> 中包含多个同一 <var class="var">letter</var> 的关联项，将使用列表中最靠前的那一项；
+</li><li>如果 <var class="var">template</var> 中同一个格式说明符字符出现多次，那么在 <var class="var">spec‑alist</var> 中找到的同一个 <var class="var">replacement</var>，会作为该字符所有替换操作的依据。
+</li><li><var class="var">template</var> 中格式说明符的顺序无需与 <var class="var">spec-alist</var> 中关联项的顺序对应。
+</li></ul>
+
+<p>替换内容（REPLACEMENT） 也可以是一个无参函数，该函数返回用于替换的字符串。仅当 TEMPLATE 中使用了对应的 字母（LETTER） 时，这个函数才会被调用。例如，这一特性可用于避免在不需要时触发输入提示。
+</p>
+<p>可选参数 <var class="var">ignore-missing</var> 用于指定如何处理 <var class="var">template</var> 中存在但 <var class="var">spec-alist</var> 中未找到的格式说明符字符：
+若为 <code class="code">nil</code> 或省略该参数，函数会抛出错误；
+若为 <code class="code">ignore</code>，这些格式说明符会原样保留在输出中（包括其可能的文本属性）；
+若为 <code class="code">delete</code>，这些格式说明符会从输出中移除；
+其他非-<code class="code">nil</code> 值的处理方式与 <code class="code">ignore</code> 相同，但所有 &lsquo;<samp class="samp">%%</samp>&rsquo; 也会原样保留在输出中。
+</p>
+<p>若可选参数 <var class="var">split</var> 为非-<code class="code">nil</code>，<code class="code">format-spec</code> 不会返回单个字符串，而是根据替换操作的执行位置，将结果拆分为字符串列表。例如：
+</p>
+<div class="example">
+<pre class="example-preformatted">(format-spec &quot;foo %b bar&quot; '((?b . &quot;zot&quot;)) nil t)
+     &rArr; (&quot;foo &quot; &quot;zot&quot; &quot; bar&quot;)
+</pre></div>
+</dd></dl>
+
+<p><code class="code">format-spec</code> 接受的格式说明符语法与 <code class="code">format</code> 类似，但并非完全相同。两种函数中，格式说明符均是以 &lsquo;<samp class="samp">%</samp>&rsquo; 开头、以字母（如 &lsquo;<samp class="samp">s</samp>&rsquo;）结尾的字符序列。
+</p>
+<p>与 <code class="code">format</code> 不同（<code class="code">format</code> 会为固定的格式说明符字符集赋予特定含义），<code class="code">format-spec</code> 接受任意格式说明符字符，且对所有字符一视同仁。例如：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(setq my-site-info
+      (list (cons ?s system-name)
+            (cons ?t (symbol-name system-type))
+            (cons ?c system-configuration)
+            (cons ?v emacs-version)
+            (cons ?e invocation-name)
+            (cons ?p (number-to-string (emacs-pid)))
+            (cons ?a user-mail-address)
+            (cons ?n user-full-name)))
+
+(format-spec &quot;%e %v (%c)&quot; my-site-info)
+     &rArr; &quot;emacs 27.1 (x86_64-pc-linux-gnu)&quot;
+
+(format-spec &quot;%n &lt;%a&gt;&quot; my-site-info)
+     &rArr; &quot;Emacs Developers &lt;emacs-devel@gnu.org&gt;&quot;
+</pre></div></div>
+
+<p>格式说明符中，&lsquo;<samp class="samp">%</samp>&rsquo; 后可紧跟任意数量的以下标志字符，用于修改替换行为的相关特性。
+</p>
+<dl class="table">
+<dt>&lsquo;<samp class="samp">0</samp>&rsquo;</dt>
+<dd><p>该标志会使宽度指定的填充字符从空格变为 &lsquo;<samp class="samp">0</samp>&rsquo;；
+</p>
+</dd>
+<dt>&lsquo;<samp class="samp">-</samp>&rsquo;</dt>
+<dd><p>该标志会使宽度指定的填充字符插入在右侧而非左侧；
+</p>
+</dd>
+<dt>&lsquo;<samp class="samp">&lt;</samp>&rsquo;</dt>
+<dd><p>若指定了宽度和精度，该标志会将替换内容从左侧截断至指定的宽度和精度；
+</p>
+</dd>
+<dt>&lsquo;<samp class="samp">&gt;</samp>&rsquo;</dt>
+<dd><p>若指定了宽度和精度，该标志会将替换内容从右侧截断至指定的宽度和精度；
+</p>
+</dd>
+<dt>&lsquo;<samp class="samp">^</samp>&rsquo;</dt>
+<dd><p>该标志会将替换后的文本转换为大写（see <a class="pxref" href="Case-Conversion.html">Lisp 中的大小写转换</a>）；
+</p>
+</dd>
+<dt>&lsquo;<samp class="samp">_<span class="r"> (underscore)</span></samp>&rsquo;</dt>
+<dd><p>该标志会将替换后的文本转换为小写（see <a class="pxref" href="Case-Conversion.html">Lisp 中的大小写转换</a>）。
+</p></dd>
+</dl>
+
+<p>使用相互矛盾的标志（例如同时指定大小写转换）的结果是未定义的。
+</p>
+<p>与 <code class="code">format</code> 一致，格式说明符中可包含：
+宽度：紧跟在所有标志后的十进制数字；
+精度：紧跟在所有标志和宽度后的、以小数点 &lsquo;<samp class="samp">.</samp>&rsquo; 开头的十进制数字。
+</p>
+<p>若替换内容的字符数少于指定宽度，会在左侧填充字符：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(format-spec &quot;%8a is padded on the left with spaces&quot;
+             '((?a . &quot;alpha&quot;)))
+     &rArr; &quot;   alpha is padded on the left with spaces&quot;
+</pre></div></div>
+
+<p>若替换内容的字符数多于指定精度，会从右侧截断：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(format-spec &quot;%.2a is truncated on the right&quot;
+             '((?a . &quot;alpha&quot;)))
+     &rArr; &quot;al is truncated on the right&quot;
+</pre></div></div>
+
+<p>以下是一个结合了上述多个特性的复杂示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(setq my-battery-info
+      (list (cons ?p &quot;73&quot;)      ; Percentage
+            (cons ?L &quot;Battery&quot;) ; Status
+            (cons ?t &quot;2:23&quot;)    ; Remaining time
+            (cons ?c &quot;24330&quot;)   ; Capacity
+            (cons ?r &quot;10.6&quot;)))  ; Rate of discharge
+
+(format-spec &quot;%&gt;^-3L : %3p%% (%05t left)&quot; my-battery-info)
+     &rArr; &quot;BAT :  73% (02:23 left)&quot;
+
+(format-spec &quot;%&gt;^-3L : %3p%% (%05t left)&quot;
+             (cons (cons ?L &quot;AC&quot;)
+                   my-battery-info))
+     &rArr; &quot;AC  :  73% (02:23 left)&quot;
+</pre></div></div>
+
+<p>如本节示例所示，<code class="code">format-spec</code> 常用于选择性格式化各类不同信息。这一特性在支持用户自定义格式字符串的程序中尤为实用 —— 用户可通过常规语法，按任意期望的顺序，仅格式化程序提供的部分信息。
+</p>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Case-Conversion.html">Lisp 中的大小写转换</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Formatting-Strings.html">格式化字符串</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Strings-and-Characters.html">字符串与字符</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

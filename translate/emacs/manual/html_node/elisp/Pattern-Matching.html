@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Pattern Matching (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Pattern Matching (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Pattern Matching (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Parsing-Program-Source.html" rel="up" title="Parsing Program Source">
+<link href="User_002ddefined-Things.html" rel="next" title="User-defined Things">
+<link href="Accessing-Node-Information.html" rel="prev" title="Accessing Node Information">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Pattern-Matching">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="User_002ddefined-Things.html" accesskey="n" rel="next">用户自定义 &ldquo;对象(Things)&rdquo; 与导航</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Accessing-Node-Information.html" accesskey="p" rel="prev">获取节点信息</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Program-Source.html" accesskey="u" rel="up">解析程序源代码</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5339_914d-tree_002dsitter-_8282_70b9_7684_6a21_5f0f"><span>38.5 匹配 tree-sitter 节点的模式<a class="copiable-link" href="#g_t_5339_914d-tree_002dsitter-_8282_70b9_7684_6a21_5f0f"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-pattern-matching-with-tree_002dsitter-nodes"></a>
+
+<a class="index-entry-id" id="index-capturing_002c-tree_002dsitter-node"></a>
+<p>tree-sitter 允许 Lisp 程序使用一门简洁的声明式语言进行模式匹配。该模式匹配分为两步：首先 tree-sitter 将 <em class="dfn">模式(pattern)</em> 与语法树中的节点进行匹配，然后 <em class="dfn">捕获(captures)</em> 匹配到的指定节点并返回。
+</p>
+<p>我们首先介绍如何编写最基础的查询模式以及如何在模式中捕获节点，接着介绍模式匹配函数，最后讲解更高级的模式语法。
+</p>
+<h3 class="heading" id="g_t_57fa_7840_67e5_8be2_8bed_6cd5"><span>基础查询语法<a class="copiable-link" href="#g_t_57fa_7840_67e5_8be2_8bed_6cd5"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-tree_002dsitter-query-pattern-syntax"></a>
+<a class="index-entry-id" id="index-pattern-syntax_002c-tree_002dsitter-query"></a>
+<a class="index-entry-id" id="index-query_002c-tree_002dsitter"></a>
+<p>一个 <em class="dfn">查询(query)</em> 由多个 <em class="dfn">模式(patterns)</em> 组成。每个模式都是一个匹配语法树中特定节点的 S 表达式。模式的格式为 <code class="code">(<var class="var">type</var>&nbsp;(<var class="var">child</var>&hellip;))</code><!-- /@w -->。
+</p>
+<p>例如，匹配包含 <code class="code">number_literal</code> 子节点的 <code class="code">binary_expression</code> 节点的模式如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">(binary_expression (number_literal))
+</pre></div>
+
+<p>要使用上述查询模式 <em class="dfn">捕获(capture)</em> 节点，只需在需要捕获的节点模式后添加 <code class="code">@<var class="var">capture-name</var></code>。例如：
+</p>
+<div class="example">
+<pre class="example-preformatted">(binary_expression (number_literal) @number-in-exp)
+</pre></div>
+
+<p>该模式会捕获 <code class="code">binary_expression</code> 节点内部的 <code class="code">number_literal</code> 节点，并将捕获名称设为 <code class="code">number-in-exp</code>。
+</p>
+<p>我们也可以捕获 <code class="code">binary_expression</code> 节点本身，例如使用捕获名称 <code class="code">biexp</code>：
+</p>
+<div class="example">
+<pre class="example-preformatted">(binary_expression
+ (number_literal) @number-in-exp) @biexp
+</pre></div>
+
+<h3 class="heading" id="g_t_67e5_8be2_51fd_6570"><span>查询函数<a class="copiable-link" href="#g_t_67e5_8be2_51fd_6570"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-query-functions_002c-tree_002dsitter"></a>
+<p>现在我们来介绍 <em class="dfn">查询函数(query functions)</em>。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dquery_002dcapture"><span class="category-def">Function: </span><span><strong class="def-name">treesit-query-capture</strong> <var class="def-var-arguments">node query &amp;optional beg end node-only</var><a class="copiable-link" href="#index-treesit_002dquery_002dcapture"> &para;</a></span></dt>
+<dd><p>该函数在 <var class="var">node</var> 范围内匹配 <var class="var">query</var> 中的模式。参数 <var class="var">query</var> 可以是 S 表达式、字符串或编译后的查询对象。目前我们重点介绍 S 表达式语法；字符串语法和编译查询将在本节末尾介绍。
+</p>
+<p>参数 <var class="var">node</var> 也可以是解析器或语言符号。传入解析器时使用其根节点，传入语言符号时会在当前缓冲区中查找或创建对应语言的解析器，并使用其根节点。
+</p>
+<p>函数以 alist 形式返回所有捕获的节点，元素格式为 <code class="code">(<var class="var">capture_name</var>&nbsp;.&nbsp;<var class="var">node</var>)</code><!-- /@w -->。如果 <var class="var">node-only</var> 为非 <code class="code">nil</code> 值，则直接返回 <var class="var">node</var> 列表。默认情况下会搜索 <var class="var">node</var> 的全部文本，如果 <var class="var">beg</var> 和 <var class="var">end</var> 均为非 <code class="code">nil</code> 值，则指定函数匹配节点的缓冲区文本区域。任何覆盖范围与 <var class="var">beg</var> 到 <var class="var">end</var> 区域重叠的匹配节点都会被捕获，无需完全包含在该区域内。
+</p>
+<a class="index-entry-id" id="index-treesit_002dquery_002derror"></a>
+<a class="index-entry-id" id="index-treesit_002dquery_002dvalidate"></a>
+<p>如果 <var class="var">query</var> 格式错误，该函数会抛出 <code class="code">treesit-query-error</code> 错误。信号数据包含具体错误描述。你可以使用 <code class="code">treesit-query-validate</code> 验证并调试查询语句。
+</p></dd></dl>
+
+<p>例如，假设 <var class="var">node</var> 的文本为 <code class="code">1 + 2</code>，且 <var class="var">query</var> 为：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(setq query
+      '((binary_expression
+         (number_literal) @number-in-exp) @biexp)
+</pre></div></div>
+
+<p>匹配该查询将返回：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(treesit-query-capture node query)
+    &rArr; ((biexp . <var class="var">&lt;node for &quot;1 + 2&quot;&gt;</var>)
+       (number-in-exp . <var class="var">&lt;node for &quot;1&quot;&gt;</var>)
+       (number-in-exp . <var class="var">&lt;node for &quot;2&quot;&gt;</var>))
+</pre></div></div>
+
+<p>如前所述，<var class="var">query</var> 可以包含多个模式。例如，它可以包含两个顶层模式：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(setq query
+      '((binary_expression) @biexp
+        (number_literal) @number @biexp)
+</pre></div></div>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dquery_002dstring"><span class="category-def">Function: </span><span><strong class="def-name">treesit-query-string</strong> <var class="def-var-arguments">string query language</var><a class="copiable-link" href="#index-treesit_002dquery_002dstring"> &para;</a></span></dt>
+<dd><p>该函数将 <var class="var">string</var> 按照 <var class="var">language</var> 解析，用 <var class="var">query</var> 匹配其根节点，并返回结果。
+</p></dd></dl>
+
+<h3 class="heading" id="g_t_66f4_591a_67e5_8be2_8bed_6cd5"><span>更多查询语法<a class="copiable-link" href="#g_t_66f4_591a_67e5_8be2_8bed_6cd5"> &para;</a></span></h3>
+
+<p>除了节点类型和捕获名称，tree-sitter 的模式语法还可以表示匿名节点、字段名、通配符、量词、分组、选择、锚点和谓词。
+</p>
+<h4 class="subheading" id="g_t_533f_540d_8282_70b9"><span>匿名节点<a class="copiable-link" href="#g_t_533f_540d_8282_70b9"> &para;</a></span></h4>
+
+<p>匿名节点直接用引号包裹书写。匹配（并捕获）关键字 <code class="code">return</code> 的模式如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">&quot;return&quot; @keyword
+</pre></div>
+
+<h4 class="subheading" id="g_t_901a_914d_7b26"><span>通配符<a class="copiable-link" href="#g_t_901a_914d_7b26"> &para;</a></span></h4>
+
+<p>在模式中，&lsquo;<samp class="samp">(_)</samp>&rsquo; 匹配任意具名节点，&lsquo;<samp class="samp">_</samp>&rsquo; 匹配任意具名或匿名节点。例如，捕获 <code class="code">binary_expression</code> 节点的任意具名子节点的模式为：
+</p>
+<div class="example">
+<pre class="example-preformatted">(binary_expression (_) @in-biexp)
+</pre></div>
+
+<h4 class="subheading" id="g_t_5b57_6bb5_540d-1"><span>字段名<a class="copiable-link" href="#g_t_5b57_6bb5_540d-1"> &para;</a></span></h4>
+
+<p>可以捕获拥有特定字段名的子节点。在下方模式中，<code class="code">declarator</code> 和 <code class="code">body</code> 是字段名，通过其后的冒号标识。
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(function_definition
+  declarator: (_) @func-declarator
+  body: (_) @func-body)
+</pre></div></div>
+
+<p>也可以捕获不包含特定字段的节点，例如，没有 <code class="code">body</code> 字段的 <code class="code">function_definition</code>：
+</p>
+<div class="example">
+<pre class="example-preformatted">(function_definition !body) @func-no-body
+</pre></div>
+
+<h4 class="subheading" id="g_t_8282_70b9_91cf_8bcd"><span>节点量词<a class="copiable-link" href="#g_t_8282_70b9_91cf_8bcd"> &para;</a></span></h4>
+
+<a class="index-entry-id" id="index-quantify-node_002c-tree_002dsitter"></a>
+<p>tree-sitter 支持量词操作符 &lsquo;<samp class="samp">:*</samp>&rsquo;、&lsquo;<samp class="samp">:+</samp>&rsquo; 和 &lsquo;<samp class="samp">:?</samp>&rsquo;。它们的含义与正则表达式一致：&lsquo;<samp class="samp">:*</samp>&rsquo; 匹配前面的模式零次或多次，&lsquo;<samp class="samp">:+</samp>&rsquo; 匹配一次或多次，&lsquo;<samp class="samp">:?</samp>&rsquo; 匹配零次或一次。
+</p>
+<p>例如，以下模式匹配包含 <em class="emph">零个或多个</em> <code class="code">long</code> 关键字的 <code class="code">type_declaration</code> 节点：
+</p>
+<div class="example">
+<pre class="example-preformatted">(type_declaration &quot;long&quot; :*) @long-type
+</pre></div>
+
+<p>以下模式匹配可能包含也可能不包含 <code class="code">long</code> 关键字的类型声明：
+</p>
+<div class="example">
+<pre class="example-preformatted">(type_declaration &quot;long&quot; :?) @long-type
+</pre></div>
+
+<h4 class="subheading" id="g_t_5206_7ec4"><span>分组<a class="copiable-link" href="#g_t_5206_7ec4"> &para;</a></span></h4>
+
+<p>与正则表达式中的分组类似，我们可以将多个模式打包为分组，并对分组应用量词操作符。例如，表示以逗号分隔的标识符列表：
+</p>
+<div class="example">
+<pre class="example-preformatted">(identifier) (&quot;,&quot; (identifier)) :*
+</pre></div>
+
+<h4 class="subheading" id="g_t_9009_62e9"><span>选择<a class="copiable-link" href="#g_t_9009_62e9"> &para;</a></span></h4>
+
+<p>同样与正则表达式类似，我们可以在模式中表示 &ldquo;匹配这些模式中的任意一个&rdquo;。语法为使用向量包裹多个模式。例如，捕获 C 语言中的部分关键字：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">[
+  &quot;return&quot;
+  &quot;break&quot;
+  &quot;if&quot;
+  &quot;else&quot;
+] @keyword
+</pre></div></div>
+
+<h4 class="subheading" id="g_t_951a_70b9"><span>锚点<a class="copiable-link" href="#g_t_951a_70b9"> &para;</a></span></h4>
+
+<p>锚点操作符 <code class="code">:anchor</code> 用于强制相邻，即强制两个元素直接相邻。这两个&ldquo;元素(things)&rdquo; 可以是两个节点，也可以是子节点与父节点的边界。例如，捕获第一个子节点、最后一个子节点或两个相邻子节点：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">;; 将子节点与父节点的结束位置锚定
+(compound_expression (_) @last-child :anchor)
+</pre></div><pre class="example-preformatted">
+
+</pre><div class="group"><pre class="example-preformatted">;; 将子节点与父节点的起始位置锚定
+(compound_expression :anchor (_) @first-child)
+</pre></div><pre class="example-preformatted">
+
+</pre><div class="group"><pre class="example-preformatted">;; 锚定两个相邻子节点
+(compound_expression
+ (_) @prev-child
+ :anchor
+ (_) @next-child)
+</pre></div></div>
+
+<p>注意：强制相邻的规则会忽略所有匿名节点。
+</p>
+<h4 class="subheading" id="g_t_8c13_8bcd"><span>谓词<a class="copiable-link" href="#g_t_8c13_8bcd"> &para;</a></span></h4>
+
+<p>可以为模式添加谓词约束。例如，以下模式：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(
+ (array :anchor (_) @first (_) @last :anchor)
+ (:equal @first @last)
+)
+</pre></div></div>
+
+<p>tree-sitter 仅匹配第一个元素与最后一个元素相等的数组。要将谓词附加到模式，需要将它们分组。目前支持三种谓词：<code class="code">:equal</code>、<code class="code">:match</code> 和 <code class="code">:pred</code>。
+</p>
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-_003aequal"><span class="category-def">Predicate: </span><span><strong class="def-name">:equal</strong> <var class="def-var-arguments">arg1 arg2</var><a class="copiable-link" href="#index-_003aequal"> &para;</a></span></dt>
+<dd><p>当 <var class="var">arg1</var> 与 <var class="var">arg2</var> 相等时匹配。参数可以是字符串或捕获名称。捕获名称代表其对应节点在缓冲区中覆盖的文本。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-_003amatch"><span class="category-def">Predicate: </span><span><strong class="def-name">:match</strong> <var class="def-var-arguments">regexp capture-name</var><a class="copiable-link" href="#index-_003amatch"> &para;</a></span></dt>
+<dd><p>当 <var class="var">capture-name</var> 对应节点在缓冲区中覆盖的文本匹配字符串形式的正则表达式 <var class="var">regexp</var> 时匹配。匹配区分大小写。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-_003apred"><span class="category-def">Predicate: </span><span><strong class="def-name">:pred</strong> <var class="def-var-arguments">fn &amp;rest nodes</var><a class="copiable-link" href="#index-_003apred"> &para;</a></span></dt>
+<dd><p>当函数 <var class="var">fn</var> 以 <var class="var">nodes</var> 中的每个节点为参数调用并返回非 <code class="code">nil</code> 值时匹配。该函数执行时，当前缓冲区会设置为被查询节点所属的缓冲区。
+</p></dd></dl>
+
+<p>注意：谓词只能引用同一模式中出现的捕获名称。实际上，引用其他模式中的捕获名称没有实际意义。
+</p>
+<h3 class="heading" id="g_t_5b57_7b26_4e32_6a21_5f0f"><span>字符串模式<a class="copiable-link" href="#g_t_5b57_7b26_4e32_6a21_5f0f"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-tree_002dsitter-patterns-as-strings"></a>
+<a class="index-entry-id" id="index-patterns_002c-tree_002dsitter_002c-in-string-form"></a>
+<p>除了 S 表达式，Emacs 还支持以字符串形式书写 tree-sitter 原生查询语法。其语法与 S 表达式基本一致。例如，以下查询：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(treesit-query-capture
+ node '((addition_expression
+         left: (_) @left
+         &quot;+&quot; @plus-sign
+         right: (_) @right) @addition
+
+         [&quot;return&quot; &quot;break&quot;] @keyword))
+</pre></div></div>
+
+<p>等价于：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(treesit-query-capture
+ node &quot;(addition_expression
+        left: (_) @left
+        \&quot;+\&quot; @plus-sign
+        right: (_) @right) @addition
+
+        [\&quot;return\&quot; \&quot;break\&quot;] @keyword&quot;)
+</pre></div></div>
+
+<p>大多数模式可以直接以字符串形式书写，仅少数需要修改：
+</p>
+<ul class="itemize mark-bullet">
+<li>锚点 <code class="code">:anchor</code> 写作 &lsquo;<samp class="samp">.</samp>&rsquo;。
+</li><li>&lsquo;<samp class="samp">:?</samp>&rsquo; 写作 &lsquo;<samp class="samp">?</samp>&rsquo;。
+</li><li>&lsquo;<samp class="samp">:*</samp>&rsquo; 写作 &lsquo;<samp class="samp">*</samp>&rsquo;。
+</li><li>&lsquo;<samp class="samp">:+</samp>&rsquo; 写作 &lsquo;<samp class="samp">+</samp>&rsquo;。
+</li><li><code class="code">:equal</code>、<code class="code">:match</code> 和 <code class="code">:pred</code> 分别写作 <code class="code">#equal</code>、<code class="code">#match</code> 和 <code class="code">#pred</code>。
+通常，谓词的 &lsquo;<samp class="samp">:</samp>&rsquo; 替换为 &lsquo;<samp class="samp">#</samp>&rsquo;。
+</li></ul>
+
+<p>例如：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">'((
+   (compound_expression :anchor (_) @first (_) :* @rest)
+   (:match &quot;love&quot; @first)
+   ))
+</pre></div></div>
+
+<p>字符串形式为：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">&quot;(
+  (compound_expression . (_) @first (_)* @rest)
+  (#match \&quot;love\&quot; @first)
+  )&quot;
+</pre></div></div>
+
+<h3 class="heading" id="g_t_7f16_8bd1_67e5_8be2"><span>编译查询<a class="copiable-link" href="#g_t_7f16_8bd1_67e5_8be2"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-compiling-tree_002dsitter-queries"></a>
+<a class="index-entry-id" id="index-queries_002c-compiling"></a>
+<p>如果一个查询需要重复使用，尤其是在循环中频繁调用，编译该查询至关重要，因为编译后的查询远快于未编译的版本。编译后的查询可以在所有接受查询参数的地方使用。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dquery_002dcompile"><span class="category-def">Function: </span><span><strong class="def-name">treesit-query-compile</strong> <var class="def-var-arguments">language query</var><a class="copiable-link" href="#index-treesit_002dquery_002dcompile"> &para;</a></span></dt>
+<dd><p>该函数将适用于 <var class="var">language</var> 的 <var class="var">query</var> 编译为编译查询对象并返回。
+</p>
+<p>如果 <var class="var">query</var> 格式错误，该函数会抛出 <code class="code">treesit-query-error</code> 错误。信号数据包含具体错误描述。你可以使用 <code class="code">treesit-query-validate</code> 验证并调试查询语句。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dquery_002dlanguage"><span class="category-def">Function: </span><span><strong class="def-name">treesit-query-language</strong> <var class="def-var-arguments">query</var><a class="copiable-link" href="#index-treesit_002dquery_002dlanguage"> &para;</a></span></dt>
+<dd><p>该函数返回 <var class="var">query</var> 对应的语言。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dquery_002dexpand"><span class="category-def">Function: </span><span><strong class="def-name">treesit-query-expand</strong> <var class="def-var-arguments">query</var><a class="copiable-link" href="#index-treesit_002dquery_002dexpand"> &para;</a></span></dt>
+<dd><p>该函数将 S 表达式格式的 <var class="var">query</var> 转换为字符串格式。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dpattern_002dexpand"><span class="category-def">Function: </span><span><strong class="def-name">treesit-pattern-expand</strong> <var class="def-var-arguments">pattern</var><a class="copiable-link" href="#index-treesit_002dpattern_002dexpand"> &para;</a></span></dt>
+<dd><p>该函数将 S 表达式格式的 <var class="var">pattern</var> 转换为字符串格式。
+</p></dd></dl>
+
+<p>更多细节请阅读 tree-sitter 项目的模式匹配文档，文档地址：
+<a class="uref" href="https://tree-sitter.github.io/tree-sitter/using-parsers#pattern-matching-with-queries">https://tree-sitter.github.io/tree-sitter/using-parsers#pattern-matching-with-queries</a>
+</p>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="User_002ddefined-Things.html">用户自定义 &ldquo;对象(Things)&rdquo; 与导航</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Accessing-Node-Information.html">获取节点信息</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Program-Source.html">解析程序源代码</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

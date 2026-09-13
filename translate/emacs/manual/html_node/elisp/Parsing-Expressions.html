@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Parsing Expressions (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Parsing Expressions (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Parsing Expressions (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Syntax-Tables.html" rel="up" title="Syntax Tables">
+<link href="Syntax-Table-Internals.html" rel="next" title="Syntax Table Internals">
+<link href="Motion-and-Syntax.html" rel="prev" title="Motion and Syntax">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Parsing-Expressions">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Syntax-Table-Internals.html" accesskey="n" rel="next">语法表内部实现</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Motion-and-Syntax.html" accesskey="p" rel="prev">移动与语法</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Syntax-Tables.html" accesskey="u" rel="up">语法表</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_8868_8fbe_5f0f_89e3_6790"><span>36.6 表达式解析<a class="copiable-link" href="#g_t_8868_8fbe_5f0f_89e3_6790"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-parsing-expressions"></a>
+<a class="index-entry-id" id="index-scanning-expressions"></a>
+
+<p>本节介绍用于解析与扫描平衡表达式的函数。
+沿用 Lisp 术语，我们将这类表达式称为<em class="dfn">sexp</em>（符号表达式），尽管这些函数也可用于 Lisp 以外的语言。
+简单来说，sexp 可以是一对平衡的括号结构、一个字符串，或一个符号（即由词构成字符或符号构成字符组成的序列）。
+不过，紧邻表达式的表达式前缀语法分类字符（see <a class="pxref" href="Syntax-Class-Table.html">语法类别表</a>）会被视为表达式的一部分。
+</p>
+<p>语法表控制字符的解释方式，因此这些函数在 Lisp 模式下可处理 Lisp 表达式，在 C 模式下可处理 C 表达式。
+See <a class="xref" href="List-Motion.html">移动遍历平衡表达式</a>，查看用于在平衡表达式间移动的更便捷高层函数。
+</p>
+<p>字符的语法控制解析器状态的切换方式，而非直接描述状态本身。
+例如，字符串定界符会在“字符串内”与“代码内”状态间切换，但字符语法本身并不直接表明其是否位于字符串中。
+例如（注意 15 是通用字符串定界符的语法代码）：
+</p>
+<div class="example">
+<pre class="example-preformatted">(put-text-property 1 9 'syntax-table '(15 . nil))
+</pre></div>
+
+<p>这段代码并不会告诉 Emacs 当前缓冲区前 8 个字符是一个字符串，而是将它们全部标记为字符串定界符。
+结果是 Emacs 会将其视为四个连续的空字符串常量。
+</p>
+
+<ul class="mini-toc">
+<li><a href="Motion-via-Parsing.html" accesskey="1">基于解析的移动命令</a></li>
+<li><a href="Position-Parse.html" accesskey="2">获取位置的解析状态</a></li>
+<li><a href="Parser-State.html" accesskey="3">解析状态</a></li>
+<li><a href="Low_002dLevel-Parsing.html" accesskey="4">底层解析</a></li>
+<li><a href="Control-Parsing.html" accesskey="5">控制解析的参数</a></li>
+</ul>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

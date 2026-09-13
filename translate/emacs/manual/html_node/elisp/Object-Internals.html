@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Object Internals (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Object Internals (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Object Internals (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="GNU-Emacs-Internals.html" rel="up" title="GNU Emacs Internals">
+<link href="C-Integer-Types.html" rel="next" title="C Integer Types">
+<link href="Writing-Dynamic-Modules.html" rel="prev" title="Writing Dynamic Modules">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Object-Internals">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="C-Integer-Types.html" accesskey="n" rel="next">C 整数类型</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Writing-Dynamic-Modules.html" accesskey="p" rel="prev">编写可动态加载的模块</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html" accesskey="u" rel="up">GNU Emacs 内部结构</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5bf9_8c61_5185_90e8_7ed3_6784"><span>E.9 对象内部结构<a class="copiable-link" href="#g_t_5bf9_8c61_5185_90e8_7ed3_6784"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-object-internals"></a>
+
+<p>Emacs Lisp 提供了丰富的数据类型集合。其中一些类型，如 cons 单元、整数和字符串，几乎所有 Lisp 方言都通用。另一些类型，如标记（markers）和缓冲区（buffers），则非常特殊，是提供用 Lisp 编写编辑器命令的基本支持所必需的。为了实现如此多样的对象类型，并提供一种在解释器各子系统之间高效传递对象的方式，存在一组 C 数据结构，以及一种用于表示指向所有这些结构的指针的特殊类型，该类型被称为 <em class="dfn">带标签指针(tagged pointer)</em>。
+</p>
+<p>在 C 语言中，带标签指针是 <code class="code">Lisp_Object</code> 类型的对象。此类的任何已初始化变量始终保存以下基本数据类型之一的值：整数、符号、字符串、cons 单元、浮点数或类向量对象。每种数据类型都有对应的标签值。所有标签均由 <code class="code">enum Lisp_Type</code> 枚举，并放置在 <code class="code">Lisp_Object</code> 的 3 位位域中。其余的位是值本身。整数是直接值（immediate），即直接由这些 <em class="dfn">值位(value bits)</em>表示；而所有其他对象都由指向从堆中分配的对应对象的 C 指针表示。<code class="code">Lisp_Object</code> 的宽度取决于平台和配置：通常等于底层平台指针的宽度（即在 32 位机器上为 32 位，在 64 位机器上为 64 位），但也存在一种特殊配置，其中 <code class="code">Lisp_Object</code> 为 64 位，但所有指针为 32 位。后者的设计初衷是，通过对 <code class="code">Lisp_Object</code> 使用 64 位的 <code class="code">long long</code> 类型，来克服 32 位系统上 Lisp 整数取值范围有限的问题。
+</p>
+<p>以下在 <samp class="file">lisp.h</samp> 中定义的 C 数据结构用于表示整数之外的基本数据类型：
+</p>
+<dl class="table">
+<dt><code class="code">struct Lisp_Cons</code></dt>
+<dd><p>Cons 单元，用于构造列表的对象。
+</p>
+</dd>
+<dt><code class="code">struct Lisp_String</code></dt>
+<dd><p>字符串，用于表示字符序列的基本对象。
+</p>
+</dd>
+<dt><code class="code">struct Lisp_Vector</code></dt>
+<dd><p>数组，一种可通过索引访问的固定大小的 Lisp 对象集合。
+</p>
+</dd>
+<dt><code class="code">struct Lisp_Symbol</code></dt>
+<dd><p>符号，通常用作标识符的唯一命名实体。
+</p>
+</dd>
+<dt><code class="code">struct Lisp_Float</code></dt>
+<dd><p>浮点数值。
+</p></dd>
+</dl>
+
+<p>这些类型是内部类型系统的一等公民。由于标签空间有限，所有其他类型都是 <code class="code">Lisp_Vectorlike</code> 的子类型。类向量子类型由 <code class="code">enum pvec_type</code> 枚举，几乎所有复杂对象（如窗口、缓冲区、框架和进程）都属于此类别。
+</p>
+<p>下面描述 <code class="code">Lisp_Vectorlike</code> 的一些子类型。缓冲区对象代表要显示和编辑的文本。窗口是显示结构的一部分，用于显示缓冲区或作为在同一框架上递归放置其他窗口的容器。（请勿将 Emacs Lisp 窗口对象与用户界面系统（如 X）管理的窗口实体混淆；在 Emacs 术语中，后者称为框架。）最后，进程对象用于管理子进程。
+</p>
+
+<ul class="mini-toc">
+<li><a href="Buffer-Internals.html" accesskey="1">缓冲区内部结构</a></li>
+<li><a href="Window-Internals.html" accesskey="2">窗口内部结构</a></li>
+<li><a href="Process-Internals.html" accesskey="3">进程内部结构</a></li>
+</ul>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

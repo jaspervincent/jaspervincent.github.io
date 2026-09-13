@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Compiling Macros (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Compiling Macros (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Compiling Macros (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Macros.html" rel="up" title="Macros">
+<link href="Defining-Macros.html" rel="next" title="Defining Macros">
+<link href="Expansion.html" rel="prev" title="Expansion">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Compiling-Macros">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Defining-Macros.html" accesskey="n" rel="next">定义宏</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Expansion.html" accesskey="p" rel="prev">宏调用的展开</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Macros.html" accesskey="u" rel="up">宏</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5b8f_4e0e_5b57_8282_7f16_8bd1"><span>14.3 宏与字节编译<a class="copiable-link" href="#g_t_5b8f_4e0e_5b57_8282_7f16_8bd1"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-byte_002dcompiling-macros"></a>
+
+<p>你可能会问：为何我们要大费周章地先为宏计算出展开式，再对展开式求值？为何不让宏体直接生成期望的结果？这背后的原因与编译机制有关。
+</p>
+<p>当待编译的 Lisp 程序中出现宏调用时，Lisp 编译器会像解释器一样调用该宏的定义，并得到对应的展开式。但编译器并不会直接求值这个展开式，而是将其当作直接写在程序里的代码来编译。最终，编译后的代码既能实现宏预期的返回值和副作用，又能以编译代码的完整速度执行。如果让宏体自身直接计算返回值和副作用，这一机制就无法生效 —— 因为这些计算会在编译阶段完成，而这通常没有实际意义。
+</p>
+<p>要让宏调用的编译正常工作，在编译这些宏调用时，对应的宏必须已在 Lisp 中完成定义。编译器提供了一项特殊功能来协助实现这一点：若待编译的文件中包含 <code class="code">defmacro</code> 形式，该宏会被临时定义，并在该文件后续的编译过程中生效。
+</p>
+<p>对文件进行字节编译时，还会执行文件中顶层的所有 <code class="code">require</code> 调用。因此，你可以通过加载（require）定义宏的文件，确保编译期间能获取到必要的宏定义（see <a class="pxref" href="Named-Features.html">功能</a>）。为了避免他人运行编译后的程序时加载这些宏定义文件，可将 <code class="code">require</code> 调用包裹在 <code class="code">eval-when-compile</code> 中（see <a class="pxref" href="Eval-During-Compile.html">编译时求值</a>）。
+</p>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Variable Scoping (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Variable Scoping (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Variable Scoping (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Variables.html" rel="up" title="Variables">
+<link href="Buffer_002dLocal-Variables.html" rel="next" title="Buffer-Local Variables">
+<link href="Watching-Variables.html" rel="prev" title="Watching Variables">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Variable-Scoping">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Buffer_002dLocal-Variables.html" accesskey="n" rel="next">缓冲区局部变量</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Watching-Variables.html" accesskey="p" rel="prev">变量改变时运行函数</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Variables.html" accesskey="u" rel="up">变量</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="Scoping-_53d8_91cf_7ed1_5b9a_7684_4f5c_7528_57df_89c4_5219"><span>12.10 Scoping 变量绑定的作用域规则<a class="copiable-link" href="#Scoping-_53d8_91cf_7ed1_5b9a_7684_4f5c_7528_57df_89c4_5219"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-scoping-rule"></a>
+
+<p>当你为变量创建局部绑定时，该绑定仅在程序的有限区域内生效（see <a class="pxref" href="Local-Variables.html">局部变量</a>）。本节将精确说明其含义。
+</p>
+<a class="index-entry-id" id="index-scope"></a>
+<a class="index-entry-id" id="index-extent"></a>
+<p>每个局部绑定都有确定的 <em class="dfn">作用域（scope）</em> 和 <em class="dfn">存在期（extent）</em>。<em class="dfn">作用域(scope)</em> 指的是该绑定在源代码文本中 <em class="emph">哪些</em> 位置可以被访问。<em class="dfn">存在期(Extent)</em> 指的是在程序执行过程中，该绑定在哪些时刻存在。
+</p>
+<a class="index-entry-id" id="index-lexical-binding"></a>
+<a class="index-entry-id" id="index-lexical-scope"></a>
+<a class="index-entry-id" id="index-static-scope"></a>
+<a class="index-entry-id" id="index-indefinite-extent"></a>
+<p>由于历史原因，Emacs Lisp 存在两种方言，通过缓冲区局部变量 <code class="code">lexical-binding</code> 进行选择。在现代 Emacs Lisp 方言中，局部绑定默认是词法绑定。
+<em class="dfn">词法绑定（lexical binding）</em> 具有 <em class="dfn">词法作用域（lexical scope）</em>，意味着对该变量的任何引用都必须在文本上位于绑定结构内部<a class="footnote" id="DOCF11" href="#FOOT11"><sup>11</sup></a>。它同时具有 <em class="dfn">无限存在期（indefinite extent）</em>，意味着在某些情况下，通过名为 <em class="dfn">闭包（closures）</em> 的对象，即使绑定结构已执行完毕，该绑定仍然可以继续存在。词法作用域通常也被称为 <em class="dfn">静态作用域（static scoping）</em>。
+</p>
+<a class="index-entry-id" id="index-dynamic-binding"></a>
+<a class="index-entry-id" id="index-dynamic-scope"></a>
+<a class="index-entry-id" id="index-dynamic-extent"></a>
+<p>局部绑定也可以是动态绑定：在旧版 Emacs Lisp 方言中一律如此，在现代方言中则作为可选方式。<em class="dfn">动态绑定（dynamic binding）</em> 具有 <em class="dfn">动态作用域（dynamic scope）</em>，意味着程序的任何部分都有可能访问该变量绑定。它同时具有 <em class="dfn">动态存在期（dynamic extent）</em>，意味着该绑定仅在绑定结构（如 <code class="code">let</code> 表达式的体）正在执行时才有效。
+</p>
+<p>旧的仅支持动态绑定的 Emacs Lisp 方言，在缺少方言声明的 Lisp 文件中被加载或求值时，仍然是默认方言。最终，现代方言将会被设为默认。
+所有 Lisp 文件都应当声明所使用的方言，以确保它们在未来仍能正常运行。
+</p>
+<p>下面的小节将更详细地介绍词法绑定和动态绑定，以及如何在 Emacs Lisp 程序中启用词法绑定。
+</p>
+
+<ul class="mini-toc">
+<li><a href="Lexical-Binding.html" accesskey="1">词法绑定</a></li>
+<li><a href="Dynamic-Binding.html" accesskey="2">动态绑定</a></li>
+<li><a href="Dynamic-Binding-Tips.html" accesskey="3">动态绑定的正确使用</a></li>
+<li><a href="Selecting-Lisp-Dialect.html" accesskey="4">选择 Lisp 方言</a></li>
+<li><a href="Converting-to-Lexical-Binding.html" accesskey="5">迁移至词法绑定</a></li>
+</ul>
+</div>
+<div class="footnotes-segment">
+<hr>
+<h4 class="footnotes-heading">Footnotes</h4>
+
+<h5 class="footnote-body-heading"><a id="FOOT11" href="#DOCF11">(11)</a></h5>
+<p>存在一些例外；例如，词法绑定也可以从 Lisp 调试器中访问。</p>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

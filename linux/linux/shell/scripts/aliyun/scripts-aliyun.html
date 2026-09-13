@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-aliyun</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-aliyun</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:f01e25ab-9e10-48ee-b160-8d44a3b37021">OSS</a>
+<ul>
+<li><a href="#h:c1eddc57-f263-401c-85b5-3e251f25e9b9">aliyun-oss文件转换</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Script</a></li>
+</ul>
+<section id="outline-container-h:f01e25ab-9e10-48ee-b160-8d44a3b37021" class="outline-2">
+<h2 id="h:f01e25ab-9e10-48ee-b160-8d44a3b37021"><a href="#h:f01e25ab-9e10-48ee-b160-8d44a3b37021">OSS</a></h2>
+<div class="outline-text-2" id="text-h:f01e25ab-9e10-48ee-b160-8d44a3b37021">
+</div>
+<div id="outline-container-h:c1eddc57-f263-401c-85b5-3e251f25e9b9" class="outline-3">
+<h3 id="h:c1eddc57-f263-401c-85b5-3e251f25e9b9"><a href="#h:c1eddc57-f263-401c-85b5-3e251f25e9b9">aliyun-oss文件转换</a></h3>
+<div class="outline-text-3" id="text-h:c1eddc57-f263-401c-85b5-3e251f25e9b9">
+<p>
+归档文件转换为标准文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">
+<span class="org-comment-delimiter"># </span><span class="org-comment">1. &#36873;&#20986;&#24402;&#26723;&#25991;&#20214;
+</span>cat &lt;&lt;\EOF &gt;archive_invoke.sh <span class="org-sh-heredoc">
+#!/bin/env bash
+[ ! -e tmp ] &amp;&amp; mkdir tmp
+[ ! -e restore ] &amp;&amp; mkdir restore
+[ ! -e set-mata ] &amp;&amp; mkdir set-mata
+rm -f tmp/archive-*
+echo "1 find archive file"
+./ossutil64 ls oss://tope365-result-video | awk ' {if ($6 == "Archive") print $NF}' &gt; archive.txt
+split -l 138000 -d  archive.txt  tmp/archive- --verbose
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#35299;&#20923;&#25991;&#20214;
+</span>cat &lt;&lt;\EOF &gt; restore_invoke.sh <span class="org-sh-heredoc">
+#!/bin/env bash
+[ ! -e tmp ] &amp;&amp; mkdir tmp
+[ ! -e restore ] &amp;&amp; mkdir restore
+[ ! -e set-mata ] &amp;&amp; mkdir set-mata
+&gt;restore-result.log
+for f in tmp/archive-*;do
+    echo $f
+    sh restore.sh $f&amp;
+done
+EOF
+</span>
+cat &lt;&lt;\EOF &gt;restore.sh <span class="org-sh-heredoc">
+#!/bin/env bash
+#&#27599;&#27425;&#24490;&#29615;&#35299;&#20923;&#26102;&#38388;&#24310;&#38271;1&#22825;
+for i in $(seq 1 1)
+do
+    for f in `cat $1`; do
+        echo $f  &gt;&gt; restore-result02.log
+        ./ossutil64 restore $f -f
+    done
+    sleep 60
+done
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. &#36716;&#25442;&#25991;&#20214;
+</span>cat &lt;&lt;\EOF &gt;transition_invoke.sh <span class="org-sh-heredoc">
+#!/bin/env bash
+[ ! -e tmp ] &amp;&amp; mkdir tmp
+[ ! -e restore ] &amp;&amp; mkdir restore
+[ ! -e set-mata ] &amp;&amp; mkdir set-mata
+#rm -f tmp/archive-*
+rm -f restore/restore-*
+rm -f set-mata/set-mata-*
+num=0
+#echo "1 find archive file"
+#./ossutil64 ls oss://tope365-result-video | awk ' {if ($6 == "Archive") print $NF}' &gt; archive.txt
+#split -l 138000 -d  archive.txt  tmp/archive- --verbose
+&gt;setmeta-result.log
+for f in tmp/archive-*;do
+    echo $f
+    sh transition.sh $f&amp;
+done
+EOF
+</span>
+cat&lt;&lt;\EOF &gt; transition.sh <span class="org-sh-heredoc">
+#!/bin/bash
+echo $1 &gt;&gt; setmeta-result.log
+for f in `cat $1`; do
+    ./ossutil64 set-meta $f X-Oss-Storage-Class:Standard --update
+    echo $f &gt;&gt; set-mata/set-mata-${1#*/}
+done
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

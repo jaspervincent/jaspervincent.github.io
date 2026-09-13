@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>运输层</title>
+<meta name="description" content="运输层" />
+<meta name="keywords" content="计算机, 网络" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">运输层</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:A0818864-AC55-4865-9923-BD33DCF15AE4">运输层协议概述</a>
+<ul>
+<li><a href="#h:EB3F053D-2CF7-435A-BCF3-C4E32E6A6E63">进程之间的通信</a></li>
+<li><a href="#h:6B193A03-3D06-45E4-B1FD-5243CB4174F1">运输层的两个主要协议</a></li>
+<li><a href="#h:1FB2B7AC-ECA0-40C8-AE17-E2FEA7D36616">运输层的端口</a></li>
+</ul>
+</li>
+<li><a href="#h:AF860934-F3D6-4590-A2BD-5B04ACA63B4A">用户数据报协议UDP</a>
+<ul>
+<li><a href="#h:D543F996-7CD2-4733-BE31-A37885061D09">UDP概述</a></li>
+<li><a href="#h:1B8EA037-2FA1-4A91-B408-2EC7E372FE28">UDP的首部格式</a></li>
+</ul>
+</li>
+<li><a href="#h:FF3B5DA1-46A6-401D-A941-1820BB096C29">传输控制协议TCP概述</a>
+<ul>
+<li><a href="#h:DF2ECB17-54F7-4D96-B020-077CB8588EA6">TCP最主要的特点</a></li>
+<li><a href="#h:A948B9A4-6C4A-454E-A685-AD3D6DDEBB6C">TCP的连接</a></li>
+</ul>
+</li>
+<li><a href="#h:EE13B25D-122C-44E8-8319-8266FFFFCEBD">可靠传输的工作原理</a>
+<ul>
+<li><a href="#h:5FF5D2CE-09B1-4039-9A74-FD8DCBDAE5A0">停止等待协议</a></li>
+<li><a href="#h:5CF41503-07BA-47E8-86A8-C6177281688A">连续ARQ协议</a></li>
+</ul>
+</li>
+<li><a href="#h:5910AF25-DCDE-4E12-ACBB-7E97B262F7CF">TCP报文段的首部格式</a></li>
+<li><a href="#h:470059FD-C890-48C9-AB9E-1BBE12D387E8">TCP可靠传输的实现</a>
+<ul>
+<li><a href="#h:4C0E013E-5CDE-4B8B-9DC5-9C4AD314089D">以字节为单位的滑动窗口</a></li>
+<li><a href="#h:FCDB62A9-70BA-464F-83A4-B1FD99AD6552">超时重传时间的选择</a></li>
+<li><a href="#h:142995E7-BDD4-4841-9433-C16AA33F62CC">选择确认SACK</a></li>
+</ul>
+</li>
+<li><a href="#h:57C10805-CFBA-42E9-91E9-7CD93F77051A">TCP的流量控制</a>
+<ul>
+<li><a href="#h:02F66A64-D415-4D9F-8201-14856ED3447C">利用滑动窗口实现流量控制</a></li>
+<li><a href="#h:91EC3010-8440-4FCA-B755-C05357F1250A">TCP的传输效率</a></li>
+</ul>
+</li>
+<li><a href="#h:012D9D12-9707-4DDC-B6A8-3416C87B4971">TCP的拥塞控制</a>
+<ul>
+<li><a href="#h:73663ABB-4B61-407C-931D-08BDDA5E30BB">拥塞控制的一般原理</a></li>
+<li><a href="#h:D613E448-08B3-44AE-A252-390F4FED9185">TCP的拥塞控制方法</a></li>
+<li><a href="#h:1BBEC7D9-64F5-4776-BCA9-456589A834C0">主动队列管理AQM</a></li>
+</ul>
+</li>
+<li><a href="#h:128E435F-03DA-45F8-B387-E30E7438839F">TCP的运输连接管理</a>
+<ul>
+<li><a href="#h:15BEE7DE-3BD1-4FFD-82B2-7F09DF4E473F">TCP的连接建立</a></li>
+<li><a href="#h:B1A87D71-7DDB-4CDA-BE45-855DEAF6E7B1">TCP的连接释放</a></li>
+<li><a href="#h:45A69AB3-3C9C-4188-9785-AD89AE177C90">TCP的有限状态机</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Network</a></li>
+</ul>
+<section id="outline-container-h:A0818864-AC55-4865-9923-BD33DCF15AE4" class="outline-2">
+<h2 id="h:A0818864-AC55-4865-9923-BD33DCF15AE4"><a href="#h:A0818864-AC55-4865-9923-BD33DCF15AE4">运输层协议概述</a></h2>
+<div class="outline-text-2" id="text-h:A0818864-AC55-4865-9923-BD33DCF15AE4">
+</div>
+<div id="outline-container-h:EB3F053D-2CF7-435A-BCF3-C4E32E6A6E63" class="outline-3">
+<h3 id="h:EB3F053D-2CF7-435A-BCF3-C4E32E6A6E63"><a href="#h:EB3F053D-2CF7-435A-BCF3-C4E32E6A6E63">进程之间的通信</a></h3>
+<div class="outline-text-3" id="text-h:EB3F053D-2CF7-435A-BCF3-C4E32E6A6E63">
+<p>
+网络层为主机之间提供通信，运输层为应用进程提供端到端的逻辑通信。
+</p>
+
+<p>
+通信的真正端点是主机中的进程，即应用进程之间的通信是端到端的通信。
+</p>
+
+<p>
+运输层的复用和分用
+</p>
+<ul class="org-ul">
+<li>即发送方的不同进程通过不同的端口号使用同一个运输层协议，接收方的运输层则把收到的报文根据端口号分发给不同的进程。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:6B193A03-3D06-45E4-B1FD-5243CB4174F1" class="outline-3">
+<h3 id="h:6B193A03-3D06-45E4-B1FD-5243CB4174F1"><a href="#h:6B193A03-3D06-45E4-B1FD-5243CB4174F1">运输层的两个主要协议</a></h3>
+<div class="outline-text-3" id="text-h:6B193A03-3D06-45E4-B1FD-5243CB4174F1">
+<p>
+运输层的两个主要协议是 传输控制协议 TCP 和 用户数据报协议 UDP，他们都有复用和分用，和检错的功能。
+</p>
+
+<p>
+UDP 的特点：无连接、尽最大努力交付、面向报文、无拥塞控制、支持一对一、一对多、多对一、多对多，首部开销小。
+</p>
+
+<p>
+TCP 的特点：面向连接的、点对点通信、提供可靠传输、全双工通信、面向字节流。
+</p>
+
+<p>
+UDP
+</p>
+<ul class="org-ul">
+<li>接收方的主机收到 UDP 后不需要发出确认。</li>
+</ul>
+
+<p>
+TCP
+</p>
+<ul class="org-ul">
+<li>TCP 传送数居前要建立连接，传送完成后要释放连接。</li>
+<li>TCP 不提供广播或多播服务。</li>
+<li>因为 TCP 的功能较多，所以首部很长，且占用处理器资源。</li>
+</ul>
+
+
+<figure id="orgb4ca00a">
+<img style="aspect-ratio:456/386" decoding="async" loading="lazy" src="./images/m51.webp" alt="m51.webp" width="60%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:1FB2B7AC-ECA0-40C8-AE17-E2FEA7D36616" class="outline-3">
+<h3 id="h:1FB2B7AC-ECA0-40C8-AE17-E2FEA7D36616"><a href="#h:1FB2B7AC-ECA0-40C8-AE17-E2FEA7D36616">运输层的端口</a></h3>
+<div class="outline-text-3" id="text-h:1FB2B7AC-ECA0-40C8-AE17-E2FEA7D36616">
+<p>
+运输层使用 16 位（即两字节）端口号来标志一个端口。端口号用来标志本计算机应用层中的不同进程。不同计算机间的端口没有关联。
+</p>
+
+<p>
+这里的端口是软件端口，作为交互的地址使用，不同于路由器上的硬件端口。
+</p>
+
+<p>
+端口号的分配
+</p>
+<ul class="org-ul">
+<li>运输层的端口号分为服务器端使用的端口号和客户端使用的端口号。</li>
+<li>服务器端的端口号包括 0~49151，其中 0~1023 是熟知端口号（又称系统端口号），剩下的是登记端口号。</li>
+<li>客户端使用的端口号包括 49152~65535。这些端口号是给某个客户进程暂时使用的，通信结束后端口号就要恢复未分配状态。</li>
+</ul>
+
+
+<figure id="org9e4ba52">
+<img style="aspect-ratio:705/89" decoding="async" loading="lazy" src="./images/m52.webp" alt="m52.webp" width="60%">
+
+</figure>
+</div>
+</div>
+</section>
+<section id="outline-container-h:AF860934-F3D6-4590-A2BD-5B04ACA63B4A" class="outline-2">
+<h2 id="h:AF860934-F3D6-4590-A2BD-5B04ACA63B4A"><a href="#h:AF860934-F3D6-4590-A2BD-5B04ACA63B4A">用户数据报协议UDP</a></h2>
+<div class="outline-text-2" id="text-h:AF860934-F3D6-4590-A2BD-5B04ACA63B4A">
+</div>
+<div id="outline-container-h:D543F996-7CD2-4733-BE31-A37885061D09" class="outline-3">
+<h3 id="h:D543F996-7CD2-4733-BE31-A37885061D09"><a href="#h:D543F996-7CD2-4733-BE31-A37885061D09">UDP概述</a></h3>
+<div class="outline-text-3" id="text-h:D543F996-7CD2-4733-BE31-A37885061D09">
+<p>
+UDP 的特点：无连接、尽最大努力交付、面向报文、无拥塞控制、支持一对一、一对多、多对一、多对多，首部开销小。
+</p>
+</div>
+</div>
+<div id="outline-container-h:1B8EA037-2FA1-4A91-B408-2EC7E372FE28" class="outline-3">
+<h3 id="h:1B8EA037-2FA1-4A91-B408-2EC7E372FE28"><a href="#h:1B8EA037-2FA1-4A91-B408-2EC7E372FE28">UDP的首部格式</a></h3>
+<div class="outline-text-3" id="text-h:1B8EA037-2FA1-4A91-B408-2EC7E372FE28">
+<p>
+UDP 的首部总共 8 个字节，只有四个字段：源端口、目的端口、长度、检验和。
+</p>
+
+<p>
+如果接收方发现报文中的目的端口号不对，就丢弃报文，并使用 ICMP 发送“端口不可达”差错报文给发送方。ICMP 的应用 tracert 就是使用了 UDP 报文。
+</p>
+
+<p>
+因为 UDP 的通信之间是无连接的，所以虽然要用到端口号，但是不用套接字（TCP 必须要在套接字之间建立连接）。
+</p>
+
+<p>
+UDP 的检验和用来检验整个 UDP 报文的差错。
+</p>
+
+<p>
+UDP 的差错检验方法是各个 4 字节段的反码求和，和作为检验和序列放入检验和字段。检验时对数据报各个 4 字节段反码求和，若每一位都是 1 则无错。
+</p>
+
+<p>
+这种差错检验方法的检错能力不强，但是处理起来快。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:FF3B5DA1-46A6-401D-A941-1820BB096C29" class="outline-2">
+<h2 id="h:FF3B5DA1-46A6-401D-A941-1820BB096C29"><a href="#h:FF3B5DA1-46A6-401D-A941-1820BB096C29">传输控制协议TCP概述</a></h2>
+<div class="outline-text-2" id="text-h:FF3B5DA1-46A6-401D-A941-1820BB096C29">
+</div>
+<div id="outline-container-h:DF2ECB17-54F7-4D96-B020-077CB8588EA6" class="outline-3">
+<h3 id="h:DF2ECB17-54F7-4D96-B020-077CB8588EA6"><a href="#h:DF2ECB17-54F7-4D96-B020-077CB8588EA6">TCP最主要的特点</a></h3>
+<div class="outline-text-3" id="text-h:DF2ECB17-54F7-4D96-B020-077CB8588EA6">
+<p>
+TCP 的特点：面向连接的、点对点通信、提供可靠传输、全双工通信、面向字节流。
+</p>
+<ul class="org-ul">
+<li>面向连接：使用 TCP 前要先建立连接，通信完后要释放连接。</li>
+<li>点对点通信。</li>
+<li>可靠传输：无差错、不丢失、无重复、按序到达。</li>
+<li>全双工通信：TCP 的两端都设有发送缓存和接收缓存。发送时，应用程序把数据放到 TCP 的发送缓存后，TCP 在合适的时候把数据发送出去。接收时，TCP 把收到的数据放入接收缓存，应用进程合适时读取缓存中的数据。</li>
+<li>面向字节流：流是流入到进程或从进程流出的字节序列。TCP 把应用进程交下来的数据看成一串无结构的字节流。</li>
+</ul>
+
+
+<p>
+TCP 的报文长度是根据接收窗口和网络拥塞程度决定。如果应用进程一次往发送缓存中放了很长的数据，那 TCP 可能会把它划分为多个短的数据块发送，如果应用进程一次只发来一个字节，TCP 也可以等积累足够多的字节后再把它们构成报文段发出去。
+</p>
+
+
+<figure id="orgc980884">
+<img style="aspect-ratio:580/319" decoding="async" loading="lazy" src="./images/m53.webp" alt="m53.webp" width="60%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:A948B9A4-6C4A-454E-A685-AD3D6DDEBB6C" class="outline-3">
+<h3 id="h:A948B9A4-6C4A-454E-A685-AD3D6DDEBB6C"><a href="#h:A948B9A4-6C4A-454E-A685-AD3D6DDEBB6C">TCP的连接</a></h3>
+<div class="outline-text-3" id="text-h:A948B9A4-6C4A-454E-A685-AD3D6DDEBB6C">
+<p>
+IP 地址加上端口号称为套接字，套接字就是 TCP 连接的端点。
+</p>
+
+<p>
+套接字不是应用进程，也不是端口。
+</p>
+
+<p>
+套接字的格式： IP地址：端口号（如 192.168.100.2：80）
+</p>
+
+<p>
+每一条 TCP 连接唯一地被它地两个端点的套接字所确定。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:EE13B25D-122C-44E8-8319-8266FFFFCEBD" class="outline-2">
+<h2 id="h:EE13B25D-122C-44E8-8319-8266FFFFCEBD"><a href="#h:EE13B25D-122C-44E8-8319-8266FFFFCEBD">可靠传输的工作原理</a></h2>
+<div class="outline-text-2" id="text-h:EE13B25D-122C-44E8-8319-8266FFFFCEBD">
+</div>
+<div id="outline-container-h:5FF5D2CE-09B1-4039-9A74-FD8DCBDAE5A0" class="outline-3">
+<h3 id="h:5FF5D2CE-09B1-4039-9A74-FD8DCBDAE5A0"><a href="#h:5FF5D2CE-09B1-4039-9A74-FD8DCBDAE5A0">停止等待协议</a></h3>
+<div class="outline-text-3" id="text-h:5FF5D2CE-09B1-4039-9A74-FD8DCBDAE5A0">
+<p>
+停止等待协议用来在不可靠的传输网络上实现可靠通信。
+</p>
+
+<p>
+原理：每发送完一个分组就停止发送，等待对方的确认，收到确认后再发送下一个分组。分组需要进行编号。
+</p>
+
+<p>
+出现差错
+</p>
+<ul class="org-ul">
+<li>如果发送方发送的数据在传输过程丢失了，或者到达了接收方但是报文内容出了差错，那么接收方都不会发送任何信息。这时发送方超时没有收到确认，就会进行重传。</li>
+<li>超时重传是超过一定时间没收到确认就要重传刚发送过的分组。实现方式是每发送完一个分组就设置一个超时计时器，重传时间比平均往返时间长一些，这又称自动重传请求 ARQ。</li>
+<li>这里要注意：
+<ul class="org-ul">
+<li>发送方在发送完一个分组后，必须暂时保留已发送的分组的副本，以在超时重传时使用，只有收到相应的确认后才能清除保留的副本（对照发送缓存和发送窗口的后沿来理解）</li>
+<li>分组和确认分组都需要进行编号，以明确是哪个分组收到了确认，哪个没有收到（对照 TCP 报文首部中的序号和确认号来理解）。</li>
+<li>超时计时器的重传时间要比平均往返时间长一些，具体重传时间设为多少是一个很复杂的问题。</li>
+</ul></li>
+</ul>
+
+<p>
+确认丢失和确认迟到
+</p>
+<ul class="org-ul">
+<li>如果接收方发送给发送方的确认丢失或迟到了，那么发送方超时未收到确认，也会进行重传。而接收方收到重传的报文后，会丢弃这个重复的报文，并向发送方发送确认。发送方收到了重复的确认会直接丢弃。</li>
+<li>若对方收到重复分组，就丢弃该分组，同时还要发送确认。接收方收到重复的确认后不做任何操作。</li>
+</ul>
+
+<p>
+提高信道利用率
+</p>
+<ul class="org-ul">
+<li>停止等待协议的信道利用率很低，为了提高效率，采用了流水线传输方式，这用到了连续 ARQ 协议和滑动窗口协议</li>
+<li>流水线传输就是发送方可以连续发送多个分组，而不必每发完一个分组都要停下来等待对方的确认。</li>
+</ul>
+
+
+<figure id="orgf9f9207">
+<img style="aspect-ratio:498/151" decoding="async" loading="lazy" src="./images/m54.webp" alt="m54.webp" width="60%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:5CF41503-07BA-47E8-86A8-C6177281688A" class="outline-3">
+<h3 id="h:5CF41503-07BA-47E8-86A8-C6177281688A"><a href="#h:5CF41503-07BA-47E8-86A8-C6177281688A">连续ARQ协议</a></h3>
+<div class="outline-text-3" id="text-h:5CF41503-07BA-47E8-86A8-C6177281688A">
+<p>
+连续 ARQ 协议用来提高利用率，它规定：
+</p>
+<ul class="org-ul">
+<li>发送方维持一个发送窗口，凡位于发送窗口内的分组都可以连续发送出去，而不需要等待对方确认。发送方每收到一个确认，就根据确认号将发送窗口向前滑动一定距离。</li>
+<li>接收方采用累积确认：不必对收到的分组逐个发送确认，而是只需对按序到达的最后一个分组发送确认，表明这个分组以前的所有分组都正确收到。</li>
+</ul>
+
+<p>
+由上可见，连续 ARQ 协议是在滑动窗口上实现的。滑动窗口协议是 TCP 协议的精髓。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:5910AF25-DCDE-4E12-ACBB-7E97B262F7CF" class="outline-2">
+<h2 id="h:5910AF25-DCDE-4E12-ACBB-7E97B262F7CF"><a href="#h:5910AF25-DCDE-4E12-ACBB-7E97B262F7CF">TCP报文段的首部格式</a></h2>
+<div class="outline-text-2" id="text-h:5910AF25-DCDE-4E12-ACBB-7E97B262F7CF">
+<p>
+TCP 传输的数据单元是报文段，一个 TCP 报文段分为首部和数据两部分。
+</p>
+
+<p>
+TCP 报文段首部的前 20 个字节是固定的，后面有 4N 个字节是按需增加的选项。
+</p>
+
+
+<figure id="orgf47a0c4">
+<img style="aspect-ratio:580/430" decoding="async" loading="lazy" src="./images/m55.webp" alt="m55.webp" width="60%">
+
+</figure>
+
+<p>
+首部各字段的作用：
+</p>
+<ul class="org-ul">
+<li>序号：在一个 TCP 连接中传送的字节流中的每一个字节都要按顺序编号。首部中的序号字段存储本报文段发送的数据（是数据，不包含首部）的第一个字节的序号。序号字段只有 32 位，序号值不能超过 2^32。
+<ul class="org-ul">
+<li>理解：数据部分的每个字节都会占用一个序号。</li>
+</ul></li>
+<li>确认号：首部中的确认号是期望收到对方下一个报文端的第一个数据字节的序号。若确认号为 N，表明到 N-1 为止的数据都已正确收到。</li>
+<li>数据偏移：数据部分距报文起始点的偏移，实际等于首部长度。首部长度在 20~60 字节之间。</li>
+<li>保留。保留为今后使用。</li>
+<li>6个控制位：
+<ul class="org-ul">
+<li>紧急 URG：当 URG=1，此报文段需要尽快传送，优先级高。</li>
+<li>确认 ACK：当 ACK=1，确认号字段有效。连接建立后的所有报文段都必须令 ACK=1。</li>
+<li>推送 PSH：当 PSH=1，接收方收到报文后尽快交付应用进程，而非等缓存满了再交付。</li>
+<li>复位 RST：当 RST=1，表明 TCP 连接中出现严重差错，需要释放连接再重新建立连接。</li>
+<li>同步 SYN：当 SYN=1，表明这个一个连接报文。如果 ACK=0 则是连接请求报文，如果 ACK=1 表明这是连接接受报文。</li>
+<li>终止 FIN：当 FIN=1，表明发送方已发送完数据，并要求释放连接。</li>
+</ul></li>
+<li>窗口：窗口指的是发送本报文段的一方的接收窗口。首部中的窗口字段指出了从本报文段中的确认号算起，当前允许对方发送的数据量（以字节为单位）。</li>
+<li>检验和：检验整个数据报。</li>
+<li>紧急指针，当 URG=1 时才有意义，指出本报文段中的紧急数据的字节数。即使在窗口为 0 时也可以发送紧急数据。</li>
+<li>选项：长度可变，最长 40 字节。选项有最大报文段长度 MSS、窗口扩大选项、时间戳选项、选择确认选项等。</li>
+</ul>
+
+
+<p>
+最大报文段长度 MSS
+</p>
+<ul class="org-ul">
+<li>最大报文段长度 MSS 是每一个 TCP 报文段中的数据字段的最大长度，而不是整个 TCP 报文段的最大长度。</li>
+<li>MSS 并不是一个标准固定值，而是可以由连接双方各自确定的值，且两个传送方向可以有不同的 MSS 值。MSS 的值可能达到几千字节。</li>
+<li>连接建立时，双方都把自己支持的 MSS 写入这个选项字段中，以后就按照这个值传送数据。</li>
+<li>如果未填写这一选项，那么 MSS 的默认值是 536 字节长。</li>
+</ul>
+
+
+<p>
+窗口扩大选项
+</p>
+<ul class="org-ul">
+<li>TCP 中窗口字段长度是 16 位，因此最大的窗口大小是 64K 字节。但是对于卫星网络，因为传播时延和带宽都很大，为了获得高吞吐率就需要更大的窗口。</li>
+</ul>
+
+
+<p>
+时间戳选项
+</p>
+<ul class="org-ul">
+<li>时间戳选项字段中包括时间戳值字段和时间戳回送回答字段。</li>
+<li>时间戳选项用来计算往返时间 RTT。发送方把发送报文时的时间放入时间戳字段，接收方在确认该报文时把时间戳字段值复制到它的时间戳回送回答字段中。这样发送方收到确认报文后就可以计算出 RTT 来。</li>
+<li>另一方面时间戳选项还可以用来防止序号绕回，因为 TCP 序号字段只有 32 位，序号值不能超过 2^32，所以可能出现具有相同序号的报文段，时间戳可以用来区分这样的报文段。</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:470059FD-C890-48C9-AB9E-1BBE12D387E8" class="outline-2">
+<h2 id="h:470059FD-C890-48C9-AB9E-1BBE12D387E8"><a href="#h:470059FD-C890-48C9-AB9E-1BBE12D387E8">TCP可靠传输的实现</a></h2>
+<div class="outline-text-2" id="text-h:470059FD-C890-48C9-AB9E-1BBE12D387E8">
+</div>
+<div id="outline-container-h:4C0E013E-5CDE-4B8B-9DC5-9C4AD314089D" class="outline-3">
+<h3 id="h:4C0E013E-5CDE-4B8B-9DC5-9C4AD314089D"><a href="#h:4C0E013E-5CDE-4B8B-9DC5-9C4AD314089D">以字节为单位的滑动窗口</a></h3>
+<div class="outline-text-3" id="text-h:4C0E013E-5CDE-4B8B-9DC5-9C4AD314089D">
+<p>
+滑动窗口是以字节为单位的，每个字节都有序号。
+</p>
+
+
+<figure id="org274fcab">
+<img style="aspect-ratio:564/196" decoding="async" loading="lazy" src="./images/m56.webp" alt="m56.webp" width="60%">
+
+</figure>
+
+<p>
+TCP 使用滑动窗口机制。发送窗口里的序号表示允许发送的序号，发送窗口后沿的后面部分表示已发送且已收到了确认，发送窗口前沿的前面部分表示不允许发送。发送窗口的前沿会不断向前移动（也可能不动或后移），发送窗口的后沿可能不动（没有收到新的确认）也可能前移（收到了新的确认），不可能后移。
+</p>
+
+<p>
+接收方会把接收窗口的值放到窗口字段中发给发送方，发送窗口的大小不能超过接收方传来的报文首部中的窗口字段值。
+</p>
+
+<p>
+接收方发回的确认号是自己按序收到的数据的最高序号加1。
+</p>
+
+<p>
+发送方会根据接收方发来的确认号和窗口字段来构造自己的发送窗口，确认号决定了发送窗口的后沿，窗口字段值和拥塞窗口共同决定发送窗口的大小。
+</p>
+
+<p>
+发送窗口中的数据是可以直接连续发送出去的，所以发送窗口越大，可能获得的传输效率越高。
+</p>
+
+<p>
+<b>一个使用滑动窗口进行可靠传输的例子</b>
+</p>
+
+<p>
+A 为发送方，B 为接收方。
+</p>
+
+<p>
+例子的开始时，A 根据 B 发来的窗口值（20）和确认号（31）构建了自己的发送窗口，如上图所示。此时发送窗口内的数据都是允许发送但尚未发送的数据。
+</p>
+
+<p>
+现在 A 发送了 11 个字节的数据（序号 31-41），如下图所示。此时发送窗口内的数据包含已发送但未收到确认（P1~P2）的数据和允许发送但尚未发送的数据（P2~P3）两部分。
+</p>
+
+<p>
+这时发送窗口的状态需要三个指针来描述：P1 指向发送窗口的后沿，P2 指向允许发送但尚未发送的第一个字节，P3 指向发送窗口的前沿外即将进入发送窗口的字节。P2~P3 之间的部分又称可用窗口。
+</p>
+
+<p>
+然后 B 收到了序号为 32，33 的数据，但是没有收到序号为 31 的数据，因为 B 只对按序收到的数据中的最高序号进行确认，所以此时 B 发送给 A 的确认报文段中确认号仍为 31。
+</p>
+
+
+<figure id="orgf7855d3">
+<img style="aspect-ratio:601/279" decoding="async" loading="lazy" src="./images/m57.webp" alt="m57.webp" width="60%">
+
+</figure>
+
+<p>
+接下来 B 收到了序号为 31 的数据，并把 31~33 的数据交付给应用进程，然后删除了这些数据。B 的接收窗口也向前移动了 3 个序号，同时给 A 发送确认号为 34 的确认报文。
+</p>
+
+<p>
+A 收到确认号为 33 的报文后，也将发送窗口向前滑动了 3 个序号，此时发送窗口大小没变，但是可用窗口变大了。
+</p>
+
+
+
+<figure id="org486d2e4">
+<img style="aspect-ratio:579/245" decoding="async" loading="lazy" src="./images/m58.webp" alt="m58.webp" width="60%">
+
+</figure>
+
+<p>
+接下来 A 继续把可用窗口中的数据发送完后，P2 指针向前移动和 P3 重合，此时 A 的可用窗口已减小到 0，要暂时停止发送，等待收到确认。
+</p>
+
+<p>
+如果 A 超时未收到确认报文，就重传这部分数据，直到收到 B 的确认报文为止。
+</p>
+
+
+<figure id="org53f8a25">
+<img style="aspect-ratio:583/159" decoding="async" loading="lazy" src="./images/m59.webp" alt="m59.webp" width="60%">
+
+</figure>
+
+<p>
+发送缓存
+</p>
+<ul class="org-ul">
+<li>发送方维持一个发送缓存，其中存放
+<ul class="org-ul">
+<li>准备发送的数据。</li>
+<li>已经发送但尚未收到确认的数据。</li>
+</ul></li>
+<li>发送窗口是发送缓存的一部分。已被确认的的数据会被从发送缓存中删除，因此发送缓存和发送窗口的后沿是重合的。</li>
+<li>应用进程向发送缓存写入数据时不能太快，否则填满发送缓冲后就没有存放数据的空间了。</li>
+<li>实际发送/接收缓存和窗口中的字节数是非常大的。</li>
+</ul>
+
+
+<p>
+接收缓存
+</p>
+<ul class="org-ul">
+<li>接收方维持一个接收缓存，用来存放：
+<ul class="org-ul">
+<li>按序到达的、尚未被接收应用程序读取的数据。</li>
+<li>未按序到达的数据。</li>
+</ul></li>
+<li>接收窗口是接收缓存的一部分。如果应用程序来不及读取收到的数据，接收缓存就会被填满，使接收窗口减小到 0，反之接收窗口会增大，但最大不能超过接收缓存的大小。</li>
+<li>TCP 没有明确规定如何处理未按序到达的数据，但通常是先临时存放在接收窗口中，等字节流中缺少的字节到达后，再交付给上层的应用进程。</li>
+</ul>
+
+
+<p>
+累积确认
+</p>
+<ul class="org-ul">
+<li>TCP 要求接收方必须有累积确认的功能，这样可以减小传输开销。</li>
+<li>接收方可以在合适的时候发送确认，也可以在自己有数据要发送时把确认信息捎带上。</li>
+<li>但是注意接收方不能过分推迟发送确认，以避免发送方产生不必要的重传。如果收到一连串具有最大长度的报文段，则必须每隔一个报文段就发送一个确认。</li>
+<li>TCP 的通信是全双工通信。通信中每一方都在发送和接收报文段，因此每一方都有自己的发送窗口和接收窗口。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:FCDB62A9-70BA-464F-83A4-B1FD99AD6552" class="outline-3">
+<h3 id="h:FCDB62A9-70BA-464F-83A4-B1FD99AD6552"><a href="#h:FCDB62A9-70BA-464F-83A4-B1FD99AD6552">超时重传时间的选择</a></h3>
+<div class="outline-text-3" id="text-h:FCDB62A9-70BA-464F-83A4-B1FD99AD6552">
+<p>
+重传时间的选择是 TCP 最复杂的问题之一。
+</p>
+
+<p>
+因为 TCP 的报文可能只在一个高速局域网中传送，也可能要经过多个低速率的网络，所以重传时间不能设为固定值。
+</p>
+
+<p>
+TCP 采用了一种自适应算法，它依据往返时间 RTT 来设置超时重传时间。
+</p>
+
+<p>
+TCP 保留了一个 历史 RTT 的加权平均结果 RTTs。
+</p>
+
+<p>
+RTTs 的计算方式：新的 RTTs = (1-a)*旧的 RTTs + a*新的RTT。a 建议取 0.125。
+</p>
+
+<p>
+超时重传时间 RTO 比 RTTs 略大：RTO = RTTs + 4*RTTd。
+</p>
+
+<p>
+RTTd 是 RTT 的偏差的加权平均值：新的 RTTd = (1-b)*旧的 RTTd + b*|RTTs - 新的RTT|。b 建议取 0.25。
+</p>
+
+<p>
+具体实现
+</p>
+<ul class="org-ul">
+<li>要解决当报文重传的特殊情况。</li>
+<li>实现方式：报文段每重传一次，就把 RTO 增加一倍，当不重传了，就继续使用上述公式计算 RTO。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:142995E7-BDD4-4841-9433-C16AA33F62CC" class="outline-3">
+<h3 id="h:142995E7-BDD4-4841-9433-C16AA33F62CC"><a href="#h:142995E7-BDD4-4841-9433-C16AA33F62CC">选择确认SACK</a></h3>
+<div class="outline-text-3" id="text-h:142995E7-BDD4-4841-9433-C16AA33F62CC">
+<p>
+当报文未按序到达（到达的字节不连续，一段一段的），发送方需要重传收到的确认号之后的所有报文，而有些确认号之后的不连续的报文实际上已经到了，全部重传会浪费资源。选择确认用来解决这种情况。
+</p>
+
+<p>
+首部的选项中可以有选择确认 SACK 字段。SACK 使用两个字节块分别指明一个连续字段的开始位置和长度。最多可以指出 4 个连续字节块的边界情况。
+</p>
+
+<p>
+SACK 应用不多。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:57C10805-CFBA-42E9-91E9-7CD93F77051A" class="outline-2">
+<h2 id="h:57C10805-CFBA-42E9-91E9-7CD93F77051A"><a href="#h:57C10805-CFBA-42E9-91E9-7CD93F77051A">TCP的流量控制</a></h2>
+<div class="outline-text-2" id="text-h:57C10805-CFBA-42E9-91E9-7CD93F77051A">
+<p>
+流量控制是为了让发送方的发送速率不要太快，要让接收方来得及接收。
+</p>
+</div>
+<div id="outline-container-h:02F66A64-D415-4D9F-8201-14856ED3447C" class="outline-3">
+<h3 id="h:02F66A64-D415-4D9F-8201-14856ED3447C"><a href="#h:02F66A64-D415-4D9F-8201-14856ED3447C">利用滑动窗口实现流量控制</a></h3>
+<div class="outline-text-3" id="text-h:02F66A64-D415-4D9F-8201-14856ED3447C">
+<p>
+流量控制是通过滑动窗口实现的。接收方会把接收窗口的大小放到给发送方的报文的窗口字段中。
+</p>
+
+<p>
+发送方的发送窗口不能超过接收方给出的窗口字段的数值。
+</p>
+
+<p>
+死锁
+</p>
+<ul class="org-ul">
+<li>当接收方的接收窗口减小到 0，发送方停止发送数据后。过了一段时间 B 的接收窗口恢复了一些，但是它发给发送方的报文丢失了，然后 A 就会一直等待 B 发送的非零窗口的通知，而 B 也一直等待 A 发送的数据，这时就进入了死锁状态。</li>
+<li>死锁的解决：TCP 每一个连接都设有一个持续计时器。只要 TCP 连接的一方收到对方的零窗口通知，就启动持续计时器。若持续计时器的时间到期，就发送一个零窗口探测报文段，对方则在返回这个探测报文段的确认报文时给出窗口值。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:91EC3010-8440-4FCA-B755-C05357F1250A" class="outline-3">
+<h3 id="h:91EC3010-8440-4FCA-B755-C05357F1250A"><a href="#h:91EC3010-8440-4FCA-B755-C05357F1250A">TCP的传输效率</a></h3>
+<div class="outline-text-3" id="text-h:91EC3010-8440-4FCA-B755-C05357F1250A">
+<p>
+应用进程把数据传送到 TCP 的发送缓存后，剩下的发送任务就交给 TCP 来完成了。
+</p>
+
+<p>
+Nagle 算法
+</p>
+<ul class="org-ul">
+<li>TCP 的实现中广泛使用了 Nagle 算法：
+<ol class="org-ol">
+<li>发送方先把到达发送缓存的第一个数据字节发送出去，收到确认后，再把发送缓存中剩下的数据组装成报文段发送。</li>
+<li>收到前一个报文段的确认后再发送下一个报文段。</li>
+<li>当缓存中的数据达到发送窗口的一半大小或报文段最大长度后，就立即发送一个报文段。</li>
+</ol></li>
+<li>Nagle 算法用来避免发送方发送很小的报文段。</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:012D9D12-9707-4DDC-B6A8-3416C87B4971" class="outline-2">
+<h2 id="h:012D9D12-9707-4DDC-B6A8-3416C87B4971"><a href="#h:012D9D12-9707-4DDC-B6A8-3416C87B4971">TCP的拥塞控制</a></h2>
+<div class="outline-text-2" id="text-h:012D9D12-9707-4DDC-B6A8-3416C87B4971">
+</div>
+<div id="outline-container-h:73663ABB-4B61-407C-931D-08BDDA5E30BB" class="outline-3">
+<h3 id="h:73663ABB-4B61-407C-931D-08BDDA5E30BB"><a href="#h:73663ABB-4B61-407C-931D-08BDDA5E30BB">拥塞控制的一般原理</a></h3>
+<div class="outline-text-3" id="text-h:73663ABB-4B61-407C-931D-08BDDA5E30BB">
+<p>
+拥塞就是当前对网络中某一资源的需求超过了该资源所能提供的可用部分，网络性能变坏。
+</p>
+
+<p>
+概括而言拥塞的条件就是：对资源的需求 &gt; 可用资源。
+</p>
+
+<p>
+网络拥塞的成因往往十分复杂，并拥塞常常趋于恶化。比如因为网络拥塞有报文未能按时到达，那么发送方就会超时重传使更多的分组进入网络，加剧网络拥塞。
+</p>
+
+<p>
+拥塞控制就是防止过多的数据注入到网络中，使网络中的路由器或链路不致过载。
+</p>
+
+<p>
+流量控制是端到端的问题，是接收端抑制发送端发送数据的速率。拥塞控制是全局性的问题，涉及到所有的主机、路由器及相关因素。
+</p>
+
+<p>
+TCP 连接的端点只要迟迟收不到对方的确认信息，就猜想网络中某处可能出现了拥塞。
+</p>
+
+
+<figure id="org975230b">
+<img style="aspect-ratio:395/192" decoding="async" loading="lazy" src="./images/m510.webp" alt="m510.webp" width="60%">
+
+</figure>
+
+<p>
+上图中横坐标代表单位时间内输入到网络中的分组数，纵坐标代表单位时间内从网络输出的分组数。
+</p>
+
+<p>
+拥塞控制很复杂。网络拥塞的指标有：被丢弃的分组数，平均队列长度、超时重传的分组数、平均分组时延等。
+</p>
+</div>
+</div>
+<div id="outline-container-h:D613E448-08B3-44AE-A252-390F4FED9185" class="outline-3">
+<h3 id="h:D613E448-08B3-44AE-A252-390F4FED9185"><a href="#h:D613E448-08B3-44AE-A252-390F4FED9185">TCP的拥塞控制方法</a></h3>
+<div class="outline-text-3" id="text-h:D613E448-08B3-44AE-A252-390F4FED9185">
+<p>
+TCP 的拥塞控制采取了慢开始、拥塞避免、快重传、快恢复四种算法。
+</p>
+
+<p>
+这种方法是基于窗口的拥塞控制。发送方维持一个拥塞窗口，并让自己的发送窗口等于拥塞窗口（实际上发送窗口取拥塞窗口和接收窗口中的较小者）。
+</p>
+
+<p>
+控制拥塞窗口的原则是：只要网络中没有出现拥塞，就把拥塞窗口增大一些；但只要网络出现拥塞或可能出现了拥塞，就把拥塞窗口减小一些。
+</p>
+
+<p>
+判断网络拥塞的依据是出现超时。当出现拥塞就使拥塞窗口减小，反之增大。
+</p>
+
+
+<p>
+慢开始
+</p>
+<ul class="org-ul">
+<li>初始拥塞窗口很小，然后由小到大逐渐增大发送窗口。</li>
+<li>初始拥塞窗口一般不超过 2-4 个 SMSS（发送方最大报文段）长度。每收到一个新的确认后，就增加一次拥塞窗口。</li>
+<li>使用慢开始算法，每经过一个传输轮次，拥塞窗口 cwnd 就会加倍。</li>
+</ul>
+
+<p>
+拥塞避免
+</p>
+<ul class="org-ul">
+<li>拥塞避免算法是让拥塞窗口缓慢地增大，不像慢开始那样加倍增长。</li>
+<li>当 cwnd 大于一个界限值时，就使用拥塞避免算法，小于时就使用慢开始算法。</li>
+<li>当出现超时，拥塞窗口就恢复初始值重新进行慢开始，且界限值减半。</li>
+</ul>
+
+
+
+<figure id="org6cb46eb">
+<img style="aspect-ratio:605/206" decoding="async" loading="lazy" src="./images/m511.webp" alt="m511.webp" width="60%">
+
+</figure>
+
+<p>
+快重传
+</p>
+<ul class="org-ul">
+<li>快重传要求当接收方收到报文段后立即发送确认。</li>
+<li>当接收方收到的报文段出现丢失，它后面不论收到什么报文段，发回的确认号都是对失序之前的那个报文段的确认。</li>
+<li>当发送方连续收到 3 个对同一报文段的重复确认（表明下一个报文段未收到），就立即重传下一个报文段，这样就可以避免超时。</li>
+<li>这是为了避免出现超时，使发送方误判为网络拥塞。</li>
+</ul>
+
+<p>
+快恢复
+</p>
+<ul class="org-ul">
+<li>对于一般的超时，界限值减半，拥塞窗口直接置为初始值；对于快重传情况下，界限值减半，拥塞窗口设置为和界限值一样，以实现快恢复。</li>
+</ul>
+
+
+
+<figure id="org9d19b89">
+<img style="aspect-ratio:602/344" decoding="async" loading="lazy" src="./images/m512.webp" alt="m512.webp" width="60%">
+
+</figure>
+
+<p>
+发送方的发送窗口实际设置为接收方窗口 rwnd 和拥塞窗口 cwnd 中较小的一个。
+</p>
+</div>
+</div>
+<div id="outline-container-h:1BBEC7D9-64F5-4776-BCA9-456589A834C0" class="outline-3">
+<h3 id="h:1BBEC7D9-64F5-4776-BCA9-456589A834C0"><a href="#h:1BBEC7D9-64F5-4776-BCA9-456589A834C0">主动队列管理AQM</a></h3>
+<div class="outline-text-3" id="text-h:1BBEC7D9-64F5-4776-BCA9-456589A834C0">
+<p>
+在网络层，路由器可以通过采用主动队列管理 AQM 来减少网络拥塞的发生。
+</p>
+
+<p>
+主动队列管理就是路由器采取的一种分组丢弃策略。
+</p>
+
+<p>
+路由器的队列中的分组是先进先出，在队列满了之后到达的分组就直接丢弃。
+</p>
+
+<p>
+主动队列管理就是在队列长度还未满时就丢弃后面的分组。但是具体丢弃策略尚未标准化。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:128E435F-03DA-45F8-B387-E30E7438839F" class="outline-2">
+<h2 id="h:128E435F-03DA-45F8-B387-E30E7438839F"><a href="#h:128E435F-03DA-45F8-B387-E30E7438839F">TCP的运输连接管理</a></h2>
+<div class="outline-text-2" id="text-h:128E435F-03DA-45F8-B387-E30E7438839F">
+<p>
+TCP 连接有三个阶段：连接建立、数据传送、连接释放。
+</p>
+
+<p>
+主动发起 TCP 连接的应用进程是客户，另一方是服务器。
+</p>
+
+<p>
+TCP 的连接开始前客户和服务器都会创建一个传输控制块 TCB，其中存储如 TCP 连接表、指向发送/接收缓存的指针、指向重传队列的指针等。连接释放后删除。
+</p>
+</div>
+<div id="outline-container-h:15BEE7DE-3BD1-4FFD-82B2-7F09DF4E473F" class="outline-3">
+<h3 id="h:15BEE7DE-3BD1-4FFD-82B2-7F09DF4E473F"><a href="#h:15BEE7DE-3BD1-4FFD-82B2-7F09DF4E473F">TCP的连接建立</a></h3>
+<div class="outline-text-3" id="text-h:15BEE7DE-3BD1-4FFD-82B2-7F09DF4E473F">
+<p>
+TCP 的连接采用三次握手机制：服务器要确认客户的连接请求，客户要对服务器的确认进行确认。
+</p>
+
+
+<figure id="orga60bd05">
+<img style="aspect-ratio:525/336" decoding="async" loading="lazy" src="./images/m513.webp" alt="m513.webp" width="60%">
+
+</figure>
+
+<p>
+连接请求报文和连接接受报文段都不能携带数据，但是都消耗一个序号。
+</p>
+
+<p>
+第三个 ACK 报文段可以携带数据也可以不携带，若不携带则不消耗序号（即下一个报文序号和此报文序号相同）。
+</p>
+
+<p>
+SYN-SENT 表示同步已发送状态，SYN-RCVD 表示同步收到状态，ESTABLISHED 表示已连接状态。
+</p>
+
+<p>
+TCP 有如下规定：
+</p>
+<ul class="org-ul">
+<li>SYN = 1 的报文段都不能携带数据，但要消耗掉一个序号。所以三次握手中前两个报文都不能携带数据。</li>
+<li>ACK = 1 的报文段如果不携带数据则不消耗序号。</li>
+</ul>
+
+
+<p>
+三报文握手中的第二个报文，也就是服务器发给客户的 SYN 报文也可以拆分成两个报文段，一个确认报文段（ACK = 1, ack = x+1）和一个同步报文段（SYN = 1, seq = y），那样就是四报文握手了。 
+</p>
+
+<p>
+采用三报文握手是为了解决客户发送的连接请求报文中途滞留发生重传的情况。当发生重传情况，客户可能连续发送了两个连接请求，而服务器也会回复两个连接接受，此时发送端通过最后一个确认报文保证只建立一个连接。
+</p>
+
+<p>
+如果不采用三报文握手，那么只要服务器发出确认，新的连接就建立了。
+</p>
+</div>
+</div>
+<div id="outline-container-h:B1A87D71-7DDB-4CDA-BE45-855DEAF6E7B1" class="outline-3">
+<h3 id="h:B1A87D71-7DDB-4CDA-BE45-855DEAF6E7B1"><a href="#h:B1A87D71-7DDB-4CDA-BE45-855DEAF6E7B1">TCP的连接释放</a></h3>
+<div class="outline-text-3" id="text-h:B1A87D71-7DDB-4CDA-BE45-855DEAF6E7B1">
+<p>
+TCP 的连接释放采用四次挥手机制。任何一方都可以在数据传送结束后发出连接释放的通知，等待对方确认后进入半关闭状态。当另一方也没有数据发送后，则发送连接释放通知，对方确认后完全关闭 TCP 连接。
+</p>
+
+
+<figure id="org59b9a86">
+<img style="aspect-ratio:544/395" decoding="async" loading="lazy" src="./images/m514.webp" alt="m514.webp" width="60%">
+
+</figure>
+
+<p>
+上图中客户发起了连接释放报文(FIN=1)，此时不再传送数据。但是服务器可能还要传送数据，因此在发送一个 ACK 报文后，如果有数据传送还要继续发送完。
+</p>
+
+<p>
+当服务器发送完数据，就发送连接释放报文，接着客户端对此确认，服务器收到确认后彻底关闭连接。
+</p>
+
+<p>
+TCP 规定：FIN 报文即使不携带数据，也要消耗一个序号。
+</p>
+
+<p>
+四次挥手的详细流程
+</p>
+<ul class="org-ul">
+<li>A 向 B 发送连接释放报文（FIN 报文）后进入 FIN-WAIT-1（终止等待1）状态。</li>
+<li>B 收到连接释放报文后立即发出确认，然后 B 就进入了 CLOSE-WAIT（关闭等待）状态。TCP 服务器进程这时要通知高层应用进程，从 A 到 B 方向的连接已经释放了，TCP 连接实际上已经是半关闭状态。</li>
+<li>A 收到 B 的确认后，就进入 FIN-WAIT-2（终止等待2）状态，等待 B 发出的连接释放报文段。</li>
+<li>B 在发送确认报文后，如果没有数据要发送，应用进程就通知 TCP 释放连接，这时 B 会发送连接释放报文（FIN 报文）。如果 B 还要发送数据，就等发送完数据后再发送连接释放报文。这之后 B 进入 LAST-ACK（最后确认）状态</li>
+<li>A 收到 B 的连接释放报文后，要再发送一个确认报文段（ACK 报文），然后进入 TIME-WAIT（时间等待）状态。A 会在这一状态保持 2MSL 的时间（这里有一个时间等待计时器），之后进入 CLOSED 状态。</li>
+<li>B 收到 A 的确认报文后也会进入 CLOSED 状态。B 会比 A 更早地结束连接。</li>
+</ul>
+
+<p>
+MSL 含义是最长报文段寿命，RFC 标注建议是 2 分钟，实际一般小于等于 2 分钟，因此 TIME-WAIT 的时长一般小于等于 4 分钟。
+</p>
+
+<p>
+TIME-WAIT 状态的意义
+</p>
+<ul class="org-ul">
+<li>保证 A 发送的最后一个 ACK 报文段能够到达 B。这个 ACK 报文段可能丢失，当 B 没有收到 A 的 ACK 报文，会超时重传它之前发送的连接释放报文，这样 A 就能在 2MSL 时间内收到 B 重传的 FIN 报文，然后 A 重传 ACK 报文，并重新启动 2MSL 计时器。
+<ul class="org-ul">
+<li>如果没有 TIME-WAIT 状态，而是发完 ACK 报文后就立即释放连接，就无法收到 B 重传的 FIN 报文段，这样 B 就无法正常进入 CLOSED 状态。</li>
+</ul></li>
+<li>防止已失效的报文遗留到下一个连接中，经过 2MSL 在关闭连接可以使本连接产生的所有报文都从网络中消失。</li>
+</ul>
+
+<p>
+保活计时器
+</p>
+<ul class="org-ul">
+<li>保活计时器：TCP 还会设置一个保活计时器。如果客户发生故障，服务器不再收到客户发来地数据，可以通过保活计时器来避免服务器白白等待。</li>
+<li>保活计时器的工作方式：服务器每收到一次客户的数据，就重新设置保活计时器，通常是 2 小时。如果 2h 每收到客户数据，服务器就发送一个探测报文段，之后每隔 75s 发送一次。如果连续发送 10 个探测报文后客户仍没有响应，服务器就认为客户端出了故障，关闭当前的 TCP 连接。</li>
+</ul>
+
+<p>
+TIME_WAIT
+</p>
+<ul class="org-ul">
+<li>客户端在发送最后一个确认报文后不能直接进入 CLOSED 状态，要等待 2MSL 的时间（一般小于2分钟）。这是为了保证它发送的确认报文能够到达服务器。如果未能及时到达，服务器会超时重传连接释放报文，客户就会重新发送确认，并重新计时。另外也是保证本次连接产生的所有报文都从网络中消失。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:45A69AB3-3C9C-4188-9785-AD89AE177C90" class="outline-3">
+<h3 id="h:45A69AB3-3C9C-4188-9785-AD89AE177C90"><a href="#h:45A69AB3-3C9C-4188-9785-AD89AE177C90">TCP的有限状态机</a></h3>
+<div class="outline-text-3" id="text-h:45A69AB3-3C9C-4188-9785-AD89AE177C90">
+<p>
+下面的状态机中虚线表示的是服务器进程的状态变迁，实线表示的是客户进程的状态变迁。
+</p>
+
+
+<figure id="org34a6e90">
+<img style="aspect-ratio:515/615" decoding="async" loading="lazy" src="./images/m515.webp" alt="m515.webp" width="60%">
+
+</figure>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,3001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Linux用户组和权限管理</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Linux用户组和权限管理</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:e915acc0-0239-4ab4-9831-f2cce014045d">Linux安全模型</a>
+<ul>
+<li><a href="#h:c0023fbf-6a3e-433a-a038-88c399718419">用户</a></li>
+<li><a href="#h:41c17e50-33a9-4511-934f-160182c34abb">用户组</a></li>
+<li><a href="#h:0605796a-9698-4317-8541-fa8234256894">用户和组的关系</a></li>
+<li><a href="#h:bbe30fb4-91f8-431f-bbc9-07cc42f24990">安全上下文</a></li>
+</ul>
+</li>
+<li><a href="#h:baaedeff-8558-4968-baf3-907ad8d723b8">用户和组的配置文件</a>
+<ul>
+<li><a href="#h:2ed3f31a-8067-4f62-8ca0-631383761665">用户和组的主要配置文件</a></li>
+<li><a href="#h:d90ee329-fed1-44c2-b2d2-2284745fc7b1">passwd文件格式</a></li>
+<li><a href="#h:d4e15c54-9cce-4c26-b08c-e24c1c847c8c">shadow文件格式</a></li>
+<li><a href="#h:5aa21057-0d30-481e-9500-c51d8fa946bf">group文件格式</a></li>
+<li><a href="#h:4d9724ea-9157-49e7-a354-6ea1230a3ca5">gshdow文件格式</a></li>
+<li><a href="#h:47e2d5d3-8379-4bf7-9609-b327e693d276">文件操作</a></li>
+</ul>
+</li>
+<li><a href="#h:fd709d98-1d23-4d68-bbbc-2d0aeb9e4332">用户和组管理命令</a>
+<ul>
+<li><a href="#h:acf9dc75-e1ac-4844-a609-5fa1e976cae6">用户创建 useradd</a>
+<ul>
+<li><a href="#h:10b86d25-e5f9-4772-bfae-dbac2d61c0dc">用户默认值设定</a></li>
+</ul>
+</li>
+<li><a href="#h:690a6fde-d52d-4ffb-b064-ab829a1037a0">用户属性修改 usermod</a></li>
+<li><a href="#h:aefe51ef-0960-47c8-a58a-7d2f73278e56">删除用户 userdel</a></li>
+<li><a href="#h:f55c6304-45af-40ec-a012-e5216dcb61f3">查看用户相关的ID信息 id</a></li>
+<li><a href="#h:525611b9-2b08-449c-bc70-40f7b430edcc">切换用户或以其他用户身份执行命令 su</a></li>
+<li><a href="#h:4d206d46-cea6-4219-a556-08ccad9491af">设置密码 passwd</a></li>
+<li><a href="#h:0577cca3-7a19-46d2-93c4-09e6a4367e6b">修改用户密码策略 chage</a></li>
+<li><a href="#h:da620709-ddce-423c-bade-42ded8138086">用户相关的其它命令 chfn chsh finger</a></li>
+<li><a href="#h:51cb7201-6606-4d39-b6f5-e9f00b845b01">创建组 groupadd</a></li>
+<li><a href="#h:e2cf5394-7a1c-4058-b015-27635e5dfced">修改组 groupmod</a></li>
+<li><a href="#h:4e400a21-806b-47f0-911c-2e20aa79fbbf">组删除 groupdel</a></li>
+<li><a href="#h:ba939e6d-9aa0-437b-97ad-1e36561b5480">更改组密码 gpasswd</a></li>
+<li><a href="#h:3e337a2b-940f-4956-829e-b3b60d64bf23">临时切换主组 newgrp</a></li>
+<li><a href="#h:89fe19e0-d9f9-4c18-a837-4d47ddfd0ab7">更改和查看组成员 groupmems groups</a></li>
+<li><a href="#h:6f33a3e5-8d40-486b-8391-d31fd08fff66">练习</a></li>
+</ul>
+</li>
+<li><a href="#h:717ca5d6-3f12-4aaf-a071-d220213e7bcd">文件权限管理</a>
+<ul>
+<li><a href="#h:c03bffd3-93fb-4444-9ee4-80a51b53eeb6">文件所有者和属组属性操作</a>
+<ul>
+<li><a href="#h:5d121906-50cf-4247-b75b-d7ae22dae843">设置文件的所有者chown</a></li>
+<li><a href="#h:526e1246-d8c0-4dd3-8674-d34ff8c1c6c0">设置文件的属组信息chgrp</a></li>
+</ul>
+</li>
+<li><a href="#h:f56a80bd-bbf3-4548-ac91-e7c42cd10025">文件权限</a>
+<ul>
+<li><a href="#h:43f348a7-46fe-44f9-90bc-3d1b8308e014">文件权限说明</a></li>
+<li><a href="#h:d38390ea-e6f9-4c27-a295-dbbaa18699c0">修改文件权限chmod</a></li>
+</ul>
+</li>
+<li><a href="#h:07a79a95-5a80-4e90-b00b-41fc214367dc">新建文件和目录的默认权限 umask</a></li>
+<li><a href="#h:6dc21724-7544-4254-a0af-47d8411695ce">Linux文件系统上的特殊权限</a>
+<ul>
+<li><a href="#h:87770dd2-108c-4d25-9f03-5680f54b0ca0">特殊权限SUID</a></li>
+<li><a href="#h:fd5ec574-1a60-431f-8b30-300f97a72b5e">特殊权限SGID</a></li>
+<li><a href="#h:b90a7343-f978-4f94-adf4-2fb4af9bd766">特殊权限 Sticky 位</a></li>
+<li><a href="#h:356cd941-2023-4a9b-aa57-7aa2cac89bb7">特殊权限数字法</a></li>
+</ul>
+</li>
+<li><a href="#h:c95c19f3-3417-499d-a3b6-7794ec1d88ab">设定文件特殊属性 chattr lsattr</a></li>
+<li><a href="#h:7b182dba-2068-493b-a368-b272aac2e1d2">访问控制列表</a>
+<ul>
+<li><a href="#h:36c90aae-7ef1-45f0-99d3-994f817ac25f">ACL权限功能</a></li>
+<li><a href="#h:185a4f6c-53ce-433a-ae9b-926d5cd7967e">ACL相关命令 setfacl getfacl</a></li>
+</ul>
+</li>
+<li><a href="#h:b5f88181-e59b-4852-96ca-56ee7892a553">备份和还原ACL</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a></li>
+</ul>
+
+
+<p>
+Linux用户组和权限管理
+</p>
+
+<p>
+内容概述
+</p>
+
+<ul class="org-ul">
+<li>Linux的安全模型</li>
+<li>用户和组相关文件</li>
+<li>用户和组管理命令</li>
+<li>理解并设置文件权限</li>
+<li>默认权限</li>
+<li>特殊权限</li>
+<li>文件访问控制列表</li>
+</ul>
+<section id="outline-container-h:e915acc0-0239-4ab4-9831-f2cce014045d" class="outline-2">
+<h2 id="h:e915acc0-0239-4ab4-9831-f2cce014045d"><a href="#h:e915acc0-0239-4ab4-9831-f2cce014045d">Linux安全模型</a></h2>
+<div class="outline-text-2" id="text-h:e915acc0-0239-4ab4-9831-f2cce014045d">
+<p>
+资源分派：
+</p>
+
+<ul class="org-ul">
+<li>Authentication：认证，验证用户身份</li>
+<li>Authorization：授权，不同的用户设置不同权限</li>
+<li>Accouting|Audition：审计</li>
+</ul>
+
+<p>
+当用户登录成功时，系统会自动分配令牌token，包括：用户标识和组成员等信息
+</p>
+</div>
+<div id="outline-container-h:c0023fbf-6a3e-433a-a038-88c399718419" class="outline-3">
+<h3 id="h:c0023fbf-6a3e-433a-a038-88c399718419"><a href="#h:c0023fbf-6a3e-433a-a038-88c399718419">用户</a></h3>
+<div class="outline-text-3" id="text-h:c0023fbf-6a3e-433a-a038-88c399718419">
+<p>
+Linux中每个用户是通过User Id （UID）来唯一标识的
+</p>
+
+<ul class="org-ul">
+<li>管理员：root, 0</li>
+<li>普通用户：1-60000 自动分配
+<ul class="org-ul">
+<li><p>
+系统用户：1-499 （CentOS 6以前）, 1-999 （CentOS 7以后）
+</p>
+
+<p>
+对守护进程获取资源进行权限分配
+</p></li>
+
+<li><p>
+登录用户：500+ （CentOS6以前）, 1000+（CentOS7以后）
+</p>
+
+<p>
+给用户进行交互式登录使用
+</p></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:41c17e50-33a9-4511-934f-160182c34abb" class="outline-3">
+<h3 id="h:41c17e50-33a9-4511-934f-160182c34abb"><a href="#h:41c17e50-33a9-4511-934f-160182c34abb">用户组</a></h3>
+<div class="outline-text-3" id="text-h:41c17e50-33a9-4511-934f-160182c34abb">
+<p>
+Linux中可以将一个或多个用户加入用户组中，用户组是通过Group ID（GID）来
+唯一标识的。
+</p>
+
+<ul class="org-ul">
+<li>管理员组：root, 0</li>
+<li>普通组：
+<ul class="org-ul">
+<li>系统组：1-499（CentOS 6以前）, 1-999（CentOS7以后）,
+对守护进程获取资源进行权限分配</li>
+<li>普通组：500+（CentOS 6以前）, 1000+（CentOS7以后）, 给用户使用</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:0605796a-9698-4317-8541-fa8234256894" class="outline-3">
+<h3 id="h:0605796a-9698-4317-8541-fa8234256894"><a href="#h:0605796a-9698-4317-8541-fa8234256894">用户和组的关系</a></h3>
+<div class="outline-text-3" id="text-h:0605796a-9698-4317-8541-fa8234256894">
+<ul class="org-ul">
+<li>用户的主要组(primary group)：用户必须属于一个且只有一个主组，默认创
+建用户时会自动创建和用户名同名的组，做为用户的主要组，由于此组中只有
+一个用户，又称为私有组</li>
+
+<li>用户的附加组(supplementary group)：一个用户可以属于零个或多个辅助组，
+附属组</li>
+</ul>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#id postfix
+<span class="org-variable-name">uid</span>=89(postfix) <span class="org-variable-name">gid</span>=89(postfix) <span class="org-variable-name">groups</span>=89(postfix),12(mail)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:bbe30fb4-91f8-431f-bbc9-07cc42f24990" class="outline-3">
+<h3 id="h:bbe30fb4-91f8-431f-bbc9-07cc42f24990"><a href="#h:bbe30fb4-91f8-431f-bbc9-07cc42f24990">安全上下文</a></h3>
+<div class="outline-text-3" id="text-h:bbe30fb4-91f8-431f-bbc9-07cc42f24990">
+<p>
+Linux安全上下文Context：运行中的程序，即进程(process)，以进程发起者的
+身份运行，进程所能够访问资源的权限取决于进程的运行者的身份
+</p>
+
+<p>
+比如：分别以root 和wang 的身份运行 /bin/cat /etc/shadow，得到的结果是
+不同的，资源能否能被访问，是由运行者的身份决定，非程序本身
+</p>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[wang@centos8 ~]$<span class="org-variable-name">cat</span> /etc/shadow
+cat: /etc/shadow: Permission denied
+[root@centos8 ~]#cat /etc/shadow
+root:$<span class="org-variable-name">6</span>$<span class="org-variable-name">zsrWEC56PrKifAEz</span>$<span class="org-variable-name">hylCuGySe</span>.H6l6O2MRvbtqy/VZgnZbau.y57dE85.YHq03MTJVV4UvQ
+VIDcYA1IJzbgpWE0vTU.BtPHLbNBNn0:18246:0:99999:7:::
+bin:*:18027:0:99999:7:::
+daemon:*:18027:0:99999:7:::
+adm:*:18027:0:99999:7:::
+lp:*:18027:0:99999:7:::
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:baaedeff-8558-4968-baf3-907ad8d723b8" class="outline-2">
+<h2 id="h:baaedeff-8558-4968-baf3-907ad8d723b8"><a href="#h:baaedeff-8558-4968-baf3-907ad8d723b8">用户和组的配置文件</a></h2>
+<div class="outline-text-2" id="text-h:baaedeff-8558-4968-baf3-907ad8d723b8">
+</div>
+<div id="outline-container-h:2ed3f31a-8067-4f62-8ca0-631383761665" class="outline-3">
+<h3 id="h:2ed3f31a-8067-4f62-8ca0-631383761665"><a href="#h:2ed3f31a-8067-4f62-8ca0-631383761665">用户和组的主要配置文件</a></h3>
+<div class="outline-text-3" id="text-h:2ed3f31a-8067-4f62-8ca0-631383761665">
+<ul class="org-ul">
+<li>/etc/passwd：用户及其属性信息(名称、UID、主组ID等）</li>
+<li>/etc/shadow：用户密码及其相关属性</li>
+<li>/etc/group：组及其属性信息</li>
+<li>/etc/gshadow：组密码及其相关属性</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:d90ee329-fed1-44c2-b2d2-2284745fc7b1" class="outline-3">
+<h3 id="h:d90ee329-fed1-44c2-b2d2-2284745fc7b1"><a href="#h:d90ee329-fed1-44c2-b2d2-2284745fc7b1">passwd文件格式</a></h3>
+<div class="outline-text-3" id="text-h:d90ee329-fed1-44c2-b2d2-2284745fc7b1">
+<div class="org-src-container">
+<pre class="src src-sh">root@debian:~# whatis passwd
+<span class="org-function-name">passwd</span> (1)           - change user password
+<span class="org-function-name">passwd</span> (1ssl)        - OpenSSL application commands
+<span class="org-function-name">passwd</span> (5)           - the password file
+root@debian:~# man 5 passwd 
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">name:password:UID:GID:GECOS:directory:shell
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>login name：登录用名（xu）</li>
+<li><p>
+passwd：密码 (x); 占位符 <code>x</code> 表示密码存在/etc/shadow中；
+</p>
+
+<p>
+如果是 <code>!</code> 说明此用户不能用密码登录；
+</p>
+
+<p>
+或者是 <code>*</code> 号; 细节 <code>man 5 passwd</code> ; <code>man pwconv(密码转换)</code>
+</p></li>
+
+<li>UID：用户身份编号 (从 1000 开始)</li>
+<li>GID：登录默认所在组编号 (1000)</li>
+<li>GECOS：用户全名或注释</li>
+<li>home directory：用户主目录 (/home/wang)</li>
+<li>shell：用户默认使用shell (/bin/bash)</li>
+</ol>
+
+<p>
+范例：查看passwd文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">root@debian:~# getent passwd  <span class="org-comment-delimiter">#</span><span class="org-comment">&#31561;&#20215;&#20110;cat /etc/passwd
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#25351;&#23450;&#29992;&#25143;&#23494;&#30721;&#25991;&#20214;&#26684;&#24335;
+</span>root@debian:~# getent passwd  jasper
+jasper:x:1000:1000:jasper,,,:/home/jasper:/bin/bash
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d4e15c54-9cce-4c26-b08c-e24c1c847c8c" class="outline-3">
+<h3 id="h:d4e15c54-9cce-4c26-b08c-e24c1c847c8c"><a href="#h:d4e15c54-9cce-4c26-b08c-e24c1c847c8c">shadow文件格式</a></h3>
+<div class="outline-text-3" id="text-h:d4e15c54-9cce-4c26-b08c-e24c1c847c8c">
+<p>
+文档参考
+</p>
+<ul class="org-ul">
+<li><a href="https://manpages.ubuntu.com/manpages/questing/en/man5/shadow.5.html">shadow(5)</a></li>
+<li><a href="https://manpages.ubuntu.com/manpages/questing/en/man5/crypt.5.html">crypt(5)</a> 密码构成</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">username:password:last_change:min_change:max_change:warm:failed_expire:expiration:reserved
+<span class="org-function-name">&#26684;&#24335;</span>(&#20061;&#27573;):&#29992;&#25143;&#21517;:&#21152;&#23494;&#30340;&#23494;&#30721;:&#26368;&#36817;&#19968;&#27425;&#20462;&#25913;&#23494;&#30721;&#30340;&#26102;&#38388;:&#26368;&#30701;&#20351;&#29992;&#26399;&#38480;:&#26368;&#38271;&#20351;&#29992;&#26399;&#38480;:&#35686;&#21578;&#26399;&#27573;:&#23494;&#30721;&#31105;&#29992;&#26399;:&#36807;&#26399;&#26399;&#38480;:&#20445;&#30041;&#23383;&#27573; 
+
+root:$<span class="org-variable-name">1</span>$<span class="org-variable-name">HDHf2v4i</span>$<span class="org-variable-name">LMo</span>.xGHfxQDOf8e043C.g/:16779:0:99999:7:::
+jasper:$<span class="org-variable-name">y</span>$<span class="org-variable-name">j9T</span>$<span class="org-variable-name">yLnadhKD4TsirYRzUbhe1</span>.$<span class="org-variable-name">bIlBO3iWembE4sAm4LeIwk0QylqrSQCmYaEbeIyKV3</span>.:19964:0:99999:7:::
+bin:*:19964:0:99999:7:::
+tss:!:19964::::::
+tss:!!:19964::::::
+
+
+username       <span class="org-comment-delimiter"># </span><span class="org-comment">&#30331;&#24405;&#29992;&#21517;
+</span>password       <span class="org-comment-delimiter"># </span><span class="org-comment">&#21152;&#23494;&#30340;&#23494;&#30721;&#12290;&#19968;&#33324;&#29992;sha512&#21152;&#23494;
+</span>last_change    <span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#36817;&#19968;&#27425;&#20462;&#25913;&#23494;&#30721;&#30340;&#26102;&#38388;&#12290;&#20174;1970&#24180;1&#26376;1&#26085;(Unix&#20803;&#24180;)&#36215;&#21040;&#23494;&#30721;&#26368;&#36817;&#19968;&#27425;&#34987;&#26356;&#25913;&#30340;&#22825;&#25968;
+</span>
+  &#22914;16779&#65292;&#34920;&#31034;&#20043;&#21518;&#31532;16779&#22825;&#65292;
+  &#20351;&#29992; date -d <span class="org-string">'1970-01-01 16779 days'</span> &#26597;&#30475;&#24403;&#22825;&#20462;&#25913;&#30340;&#26085;&#26399;
+
+min_change     <span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#30701;&#20351;&#29992;&#26399;&#38480;&#12290;&#23494;&#30721;&#20877;&#36807;&#20960;&#22825;&#21487;&#20197;&#34987;&#21464;&#26356;&#65288;0&#34920;&#31034;&#38543;&#26102;&#21487;&#34987;&#21464;&#26356;&#65289;
+</span>max_change     <span class="org-comment-delimiter"># </span><span class="org-comment">&#26368;&#38271;&#20351;&#29992;&#26399;&#38480;&#12290;&#23494;&#30721;&#20877;&#36807;&#20960;&#22825;&#24517;&#39035;&#34987;&#21464;&#26356;&#65288;99999&#34920;&#31034;&#27704;&#19981;&#36807;&#26399;&#65289;
+</span>warm           <span class="org-comment-delimiter"># </span><span class="org-comment">&#35686;&#21578;&#26399;&#27573;&#12290;&#23494;&#30721;&#36807;&#26399;&#21069;&#20960;&#22825;&#31995;&#32479;&#25552;&#37266;&#29992;&#25143;&#65288;&#40664;&#35748;&#20026;&#19968;&#21608;&#65289;
+</span>failed_expire  <span class="org-comment-delimiter"># </span><span class="org-comment">&#23494;&#30721;&#31105;&#29992;&#26399;&#12290;&#23494;&#30721;&#36807;&#26399;&#20960;&#22825;&#21518;&#24080;&#21495;&#20250;&#34987;&#38145;&#23450;
+</span>expiration     <span class="org-comment-delimiter"># </span><span class="org-comment">&#36807;&#26399;&#26399;&#38480;&#12290;&#20174;1970&#24180;1&#26376;1&#26085;&#31639;&#36215;&#65292;&#22810;&#23569;&#22825;&#21518;&#24080;&#21495;&#22833;&#25928;&#12290;
+</span>   
+  &#19981;&#21516;&#20110;&#23494;&#30721;&#36807;&#26399;&#65307;&#36134;&#25143;&#36807;&#26399;&#26102;&#65292;&#29992;&#25143;&#23558;&#19981;&#34987;&#20801;&#35768;&#30331;&#24405;&#65307;&#23494;&#30721;&#36807;&#26399;&#26102;&#65292;&#29992;&#25143;&#23558;&#19981;&#34987;&#20801;&#35768;&#20351;&#29992;&#20854;&#23494;&#30721;&#30331;&#24405;&#12290;
+   
+reserved       <span class="org-comment-delimiter"># </span><span class="org-comment">&#20445;&#30041;&#23383;&#27573;</span>
+</pre>
+</div>
+
+
+<p>
+用户密码段说明：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#29305;&#27530;&#20540;:
+</span>* (&#26143;&#21495;)       <span class="org-comment-delimiter">#</span><span class="org-comment">&#34920;&#31034;&#35813;&#36134;&#25143;&#34987;&#31105;&#29992;&#65288;&#36890;&#24120;&#29992;&#20110;&#31995;&#32479;&#26381;&#21153;&#36134;&#25143;&#65292;&#31105;&#27490;&#30331;&#24405;&#65289;&#12290;&#23494;&#30721;&#30331;&#24405;&#26080;&#25928;&#65292;&#20294;&#20854;&#20182;&#26041;&#24335;&#65288;&#22914; SSH &#23494;&#38053;&#65289;&#21487;&#33021;&#20801;&#35768;&#12290;
+</span><span class="org-negation-char">!</span> (&#21497;&#21495;)       <span class="org-comment-delimiter">#</span><span class="org-comment">&#20063;&#34920;&#31034;&#36134;&#25143;&#34987;&#38145;&#23450;&#25110;&#23494;&#30721;&#34987;&#31105;&#29992;&#12290;&#25928;&#26524;&#31867;&#20284; *&#12290;
+</span><span class="org-negation-char">!</span>! (&#20004;&#20010;&#21497;&#21495;)  <span class="org-comment-delimiter">#</span><span class="org-comment">&#34920;&#31034;&#20174;&#26410;&#35774;&#32622;&#36807;&#23494;&#30721;&#65288;&#24120;&#35265;&#20110;&#26032;&#21019;&#24314;&#20294;&#23578;&#26410;&#35774;&#32622;&#23494;&#30721;&#30340;&#36134;&#25143;&#65289;&#12290;&#23494;&#30721;&#30331;&#24405;&#26080;&#25928;&#12290;
+</span>&#31354;             <span class="org-comment-delimiter">#</span><span class="org-comment">&#26497;&#20854;&#21361;&#38505;&#65281;&#34920;&#31034;&#35813;&#36134;&#25143;&#27809;&#26377;&#23494;&#30721;&#12290;&#20219;&#20309;&#30693;&#36947;&#29992;&#25143;&#21517;&#30340;&#20154;&#37117;&#21487;&#20197;&#30452;&#25509;&#30331;&#24405;&#12290;&#24212;&#32477;&#23545;&#36991;&#20813;&#12290;
+</span>
+
+&#26684;&#24335;: 
+$<span class="org-variable-name">id</span>$<span class="org-variable-name">salt</span>$<span class="org-variable-name">hashed</span>
+
+&#20197;$<span class="org-variable-name">&#20998;&#38548;</span>&#65292;$<span class="org-variable-name">&#25968;&#23383;</span>$<span class="org-variable-name">&#38543;&#26426;&#25968;</span>$<span class="org-variable-name">&#21152;&#23494;&#21518;&#30340;&#23494;&#30721;&#20018;</span>&#65307;&#31532;3&#20010; $ &#20998;&#38548;&#30340;&#25165;&#26159;&#30495;&#27491;&#30340;&#23494;&#30721;&#20018;&#65307;
+
+$<span class="org-variable-name">id</span>$  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26631;&#35782;&#20351;&#29992;&#30340;&#21152;&#23494;&#31639;&#27861;&#12290;&#24120;&#35265;&#30340;&#26377;&#65306;
+</span>- $<span class="org-variable-name">1</span>$        <span class="org-comment-delimiter"># </span><span class="org-comment">MD5 (&#24050;&#36807;&#26102;&#65292;&#19981;&#23433;&#20840;)
+</span>- $<span class="org-variable-name">sha1a</span>$, $<span class="org-variable-name">2</span>b$, $<span class="org-variable-name">2</span>y$ <span class="org-comment-delimiter"># </span><span class="org-comment">Blowfish / bcrypt
+</span>- $<span class="org-variable-name">5</span>$        <span class="org-comment-delimiter"># </span><span class="org-comment">SHA-256
+</span>- $<span class="org-variable-name">6</span>$        <span class="org-comment-delimiter"># </span><span class="org-comment">SHA-512
+</span>- $<span class="org-variable-name">y</span>$, $<span class="org-variable-name">gy</span>$  <span class="org-comment-delimiter"># </span><span class="org-comment">Yescrypt &#24403;&#21069;&#25512;&#33616;&#12290;&#36739;&#26032;&#65292;&#26356;&#24378;&#65292;&#25269;&#24481;&#23494;&#30721;&#29468;&#27979;&#25915;&#20987;)
+</span>
+$<span class="org-variable-name">salt</span>$  <span class="org-comment-delimiter"># </span><span class="org-comment">&#19968;&#20010;&#38543;&#26426;&#29983;&#25104;&#30340;&#23383;&#31526;&#20018;&#65288;&#36890;&#24120; 8-16 &#23383;&#31526;&#65289;&#65292;&#29992;&#20110;&#22686;&#21152;&#23494;&#30721;&#21704;&#24076;&#30340;&#22797;&#26434;&#24615;&#65292;&#38450;&#27490;&#24425;&#34425;&#34920;&#25915;&#20987;&#12290;
+</span>
+$<span class="org-variable-name">hashed</span> <span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#29992;&#25143;&#36755;&#20837;&#30340;&#23494;&#30721;&#19982;&#30416;&#20540;&#32467;&#21512;&#21518;&#65292;&#36890;&#36807;&#25351;&#23450;&#31639;&#27861;&#35745;&#31639;&#20986;&#30340;&#21152;&#23494;&#21704;&#24076;&#20540;&#12290;</span>
+</pre>
+</div>
+
+<p>
+真正实现密码比对是这样的
+</p>
+<ul class="org-ul">
+<li>如，用户使用密码为hello，加入了随机数如12345678，生成一个加密字串hello12345678</li>
+<li>在用户登录时，输入 hello 密码，这时计算算法会把记录的数(在 /etc/shadow中记录 )提取出来被在 hello 后面计算下并生成加密字串hello12345678，最后再进行来原密码比较。</li>
+</ul>
+
+<p>
+更改密码加密算法：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">authconfig  --passalgo=sha256 --update
+</pre>
+</div>
+
+<p>
+密码的安全策略：
+</p>
+
+<ul class="org-ul">
+<li>足够长</li>
+<li>使用数字、大写字母、小写字母及特殊字符中至少3种</li>
+<li>使用随机密码</li>
+<li><p>
+定期更换,不要使用最近曾经使用过的密码 范例：生成随机密码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#tr -dc <span class="org-string">'[:alnum:]'</span> &lt; /dev/urandom | head -c 12
+sFg6C8g5FAfe[root@centos8 ~]#openssl rand -base64 9
+hvMkPmAyIrXMQInt
+</pre>
+</div>
+
+<p>
+生成随机密码：<a href="https://suijimimashengcheng.51240.com/">https://suijimimashengcheng.51240.com/</a>
+</p></li>
+</ul>
+
+<p>
+生成加密密码的方式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">md5&#21152;&#23494;
+</span>openssl  passwd  -1  -salt <span class="org-sh-quoted-exec">`openssl rand -hex 4`</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992;16&#36827;&#21046;&#38543;&#26426;&#24403;&#20316;&#8220;&#20304;&#26009;
+</span>Password: 
+$<span class="org-variable-name">1</span>$<span class="org-variable-name">fc43df06</span>$<span class="org-variable-name">iZPo9xnH5IrvkDvICWe0X1</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">sha512  &#23494;&#30721;123456
+</span>openssl passwd -6 -salt <span class="org-sh-quoted-exec">`openssl rand -hex 4`</span> 123456
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992;grub-crypt&#21629;&#20196;&#65292;&#20250;&#25552;&#31034;&#36755;&#20986;&#23494;&#30721;&#65306;
+</span>grub-crypt --sha-512
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">python&#65292;&#21516;&#26679;&#20063;&#20250;&#25552;&#31034;&#36755;&#20986;&#23494;&#30721;
+</span><span class="org-builtin">echo</span> <span class="org-string">'import crypt,getpass; print crypt.crypt(getpass.getpass(), "$1$8_CHARACTER_SALT_HERE")'</span> | python -
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;sha512&#21152;&#23494;&#23494;&#30721;
+</span>python -c <span class="org-string">'import crypt,getpass;pw="me";print(crypt.crypt(pw))'</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">perl
+</span>perl -e <span class="org-string">'print crypt("1234abcdefg",q($1$password)),"\n"'</span>
+&#24403;&#20351;&#29992;&#29305;&#27530;&#23383;&#31526;&#26102;&#65292;&#20363;&#22914;@$<span class="org-variable-name">&#31526;&#26102;&#38656;&#35201;&#22312;&#21069;&#38754;&#21152;&#19978;</span><span class="org-string">\&#65292;</span>&#20363;&#65306;<span class="org-string">\@\$</span>&#65292;&#21542;&#21017;&#21152;&#23494;&#23383;&#31526;&#20018;&#20250;&#38169;&#35823;
+&#20854;&#20013;1234abcdefg&#20026;&#35201;&#32473;&#29992;&#25143;&#35774;&#32622;&#30340;&#23494;&#30721;&#65292;$<span class="org-variable-name">1</span>$<span class="org-variable-name">password&#23383;&#31526;&#20018;&#26159;&#33258;&#23450;&#20041;&#23383;&#31526;&#20018;</span>&#65292;shadow&#37324;&#19968;&#33324;&#29992;$<span class="org-variable-name">1</span>$<span class="org-variable-name">&#21518;&#38754;&#36319;8&#20010;&#23383;&#31526;&#36825;&#31181;&#26684;&#24335;</span>&#12290;
+</pre>
+</div>
+
+
+<p>
+范例：查看debian用户密码信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"> &gt;_ tail -2 /etc/shadow
+jasper:$<span class="org-variable-name">y</span>$<span class="org-variable-name">j9T</span>$<span class="org-variable-name">yLnadhKD4TsirYRzUbhe1</span>.$<span class="org-variable-name">bIlBO3iWembE4sAm4LeIwk0QylqrSQCmYaEbeIyKV3</span>.:19964:0:99999:7:::
+
+date -d <span class="org-string">"1970-01-01 + 19964 days"</span> +<span class="org-string">"%Y-%m-%d"</span>
+awk -F: <span class="org-string">'$1=="jasper"{print $3}'</span> /etc/shadow | xargs -I {} date -d <span class="org-string">"1970-01-01 + {} days"</span> +<span class="org-string">"%Y-%m-%d"</span>
+chage -l jasper | grep <span class="org-string">"Last password change"</span>
+
+
+ &gt;_ date -d <span class="org-string">"1970-01-01 + 19964 days"</span> +<span class="org-string">"%Y-%m-%d"</span>
+2024-08-29
+[ 0  ~ ] []
+ &gt;_ awk -F: <span class="org-string">'$1=="jasper"{print $3}'</span> /etc/shadow | xargs -I {} date -d <span class="org-string">"1970-01-01 + {} days"</span> +<span class="org-string">"%Y-%m-%d"</span>
+2024-08-29
+[ 0  ~ ] []
+ &gt;_ chage -l jasper | grep <span class="org-string">"Last password change"</span>
+Last password change                    : Aug 29, 2024
+[ 0  ~ ] []
+ &gt;_ getent passwd jasper
+jasper:x:1000:1000:jasper,,,:/home/jasper:/bin/bash
+[ 0  ~ ] []
+ &gt;_ getent shadow jasper
+jasper:$<span class="org-variable-name">y</span>$<span class="org-variable-name">j9T</span>$<span class="org-variable-name">yLnadhKD4TsirYRzUbhe1</span>.$<span class="org-variable-name">bIlBO3iWembE4sAm4LeIwk0QylqrSQCmYaEbeIyKV3</span>.:19964:0:99999:7:::
+[ 0  ~ ] []
+ &gt;_ getent passwd root  
+root:x:0:0:root:/root:/bin/bash
+[ 0  ~ ] []
+ &gt;_ getent shadow root
+root:$<span class="org-variable-name">y</span>$<span class="org-variable-name">j9T</span>$<span class="org-variable-name">0</span>fiRIRLrGrz/2sSQNf4Rq0$<span class="org-variable-name">czMcQ7vst6FnquPCG2uYcc0mmt3QPBNLf010riR0Lt0</span>:20229:0:99999:7:::
+</pre>
+</div>
+
+<p>
+安全攻防: hashcat、Hydra、John the ripper
+</p>
+</div>
+</div>
+<div id="outline-container-h:5aa21057-0d30-481e-9500-c51d8fa946bf" class="outline-3">
+<h3 id="h:5aa21057-0d30-481e-9500-c51d8fa946bf"><a href="#h:5aa21057-0d30-481e-9500-c51d8fa946bf">group文件格式</a></h3>
+<div class="outline-text-3" id="text-h:5aa21057-0d30-481e-9500-c51d8fa946bf">
+<p>
+格式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">group_name:password:GID:user_list
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>群组名称：就是群组名称</li>
+<li>群组密码：通常不需要设定，占位符x，密码是被记录在/etc/gshadow</li>
+<li>GID：就是群组的 ID 以当前组为附加组的用户列表(分隔符为逗号)</li>
+</ol>
+
+<p>
+范例：   
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">distro:x:5000:gentoo
+~]# id gentoo
+<span class="org-variable-name">uid</span>=4001(gentoo) <span class="org-variable-name">gid</span>=4001(gentoo) <span class="org-variable-name">&#32452;</span>=4001(gentoo),5000(distro),5001(peguin)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4d9724ea-9157-49e7-a354-6ea1230a3ca5" class="outline-3">
+<h3 id="h:4d9724ea-9157-49e7-a354-6ea1230a3ca5"><a href="#h:4d9724ea-9157-49e7-a354-6ea1230a3ca5">gshdow文件格式</a></h3>
+<div class="outline-text-3" id="text-h:4d9724ea-9157-49e7-a354-6ea1230a3ca5">
+<p>
+格式：group name:encrypted password:administrators:members
+</p>
+
+<ol class="org-ol">
+<li>群组名称：就是群的名称</li>
+<li>群组密码：以！开头表示无合法密码，所以无用户组管理员。*表示系统用户组</li>
+<li>组管理员列表：组管理员的列表，更改组密码和成员</li>
+<li>以当前组为附加组的用户列表：多个用户间用逗号分隔</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:47e2d5d3-8379-4bf7-9609-b327e693d276" class="outline-3">
+<h3 id="h:47e2d5d3-8379-4bf7-9609-b327e693d276"><a href="#h:47e2d5d3-8379-4bf7-9609-b327e693d276">文件操作</a></h3>
+<div class="outline-text-3" id="text-h:47e2d5d3-8379-4bf7-9609-b327e693d276">
+<ul class="org-ul">
+<li>vipw和vigr</li>
+<li>pwck和grpck</li>
+</ul>
+
+<p>
+用户健康状态审计：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# pwck
+user <span class="org-string">'ftp'</span>: directory <span class="org-string">'/var/ftp'</span> does not exist
+user <span class="org-string">'gentoo'</span>: directory <span class="org-string">'/var/tmp/gentoo'</span> does not exist
+user <span class="org-string">'fedora'</span>: program <span class="org-string">'/bin/tcsh'</span> does not exist
+pwck: no changes
+
+[root@node01 ~]# grpck
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:fd709d98-1d23-4d68-bbbc-2d0aeb9e4332" class="outline-2">
+<h2 id="h:fd709d98-1d23-4d68-bbbc-2d0aeb9e4332"><a href="#h:fd709d98-1d23-4d68-bbbc-2d0aeb9e4332">用户和组管理命令</a></h2>
+<div class="outline-text-2" id="text-h:fd709d98-1d23-4d68-bbbc-2d0aeb9e4332">
+<p>
+用户管理命令
+</p>
+<ul class="org-ul">
+<li>useradd</li>
+<li>usermod</li>
+<li>userdel</li>
+</ul>
+
+<p>
+组帐号维护命令
+</p>
+<ul class="org-ul">
+<li>groupadd</li>
+<li>groupmod</li>
+<li>groupdel</li>
+</ul>
+
+<p>
+范例：用户和用户组常用命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@proxy ~]# rpm -q --scripts postfix
+preinstall scriptlet (using /bin/sh):
+<span class="org-comment-delimiter"># </span><span class="org-comment">Add user and groups if necessary
+</span>/usr/sbin/groupadd -g 90 -r postdrop 2&gt;/dev/null
+/usr/sbin/groupadd -g 89 -r postfix 2&gt;/dev/null
+/usr/sbin/groupadd -g 12 -r mail 2&gt;/dev/null
+/usr/sbin/useradd -d /var/spool/postfix -s /sbin/nologin -g postfix -G mail -M -r -u 89 postfix 2&gt;/dev/null
+<span class="org-keyword">exit</span> 0
+</pre>
+</div>
+</div>
+<div id="outline-container-h:acf9dc75-e1ac-4844-a609-5fa1e976cae6" class="outline-3">
+<h3 id="h:acf9dc75-e1ac-4844-a609-5fa1e976cae6"><a href="#h:acf9dc75-e1ac-4844-a609-5fa1e976cae6">用户创建 useradd</a></h3>
+<div class="outline-text-3" id="text-h:acf9dc75-e1ac-4844-a609-5fa1e976cae6">
+<p>
+useradd 命令可以创建新的Linux用户 格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">useradd [options] LOGIN
+</pre>
+</div>
+
+<p>
+常见选项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-u  UID                            <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#29992;&#25143;id
+</span>-o                                    <span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#21512;-u &#36873;&#39033;&#65292;&#19981;&#26816;&#26597;UID&#30340;&#21807;&#19968;&#24615;
+</span>-g GID                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#26126;&#29992;&#25143;&#25152;&#23646;&#22522;&#26412;&#32452;&#65292;&#21487;&#20026;&#32452;&#21517;&#65292;&#20063;&#21487;&#20197;GID.&#27492;&#32452;&#35201;&#20107;&#20808;&#23384;&#22312;
+</span>-c <span class="org-string">"COMMENT"</span>               <span class="org-comment-delimiter">#</span><span class="org-comment">&#29992;&#25143;&#30340;&#27880;&#37322;&#20449;&#24687;
+</span>-d HOME_DIR                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20197;&#25351;&#23450;&#30340;&#36335;&#24452;(&#19981;&#23384;&#22312;)&#20026;&#23478;&#30446;&#24405;&#12290;&#36890;&#36807;&#22797;&#21046;/etc/skel&#27492;&#30446;&#24405;&#24182;&#37325;&#21629;&#21517;&#23454;&#29616;&#65307;&#25351;&#23450;&#30340;&#23478;&#30446;&#24405;&#36335;&#24452;&#22914;&#26524;&#23454;&#29616;&#23384;&#22312;&#65292;&#21017;&#19981;&#20250;&#20026;&#29992;&#25143;&#22797;&#21046;&#29615;&#22659;&#37197;&#32622;&#25991;&#20214;&#65307;
+</span>-s SHELL                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#26126;&#29992;&#25143;&#30340;&#40664;&#35748;shell&#31243;&#24207;&#65292;&#21487;&#29992;&#21015;&#34920;&#22312;/etc/shells&#25991;&#20214;&#20013;&#12290;&#20063;&#21487;&#20197;&#19981;&#25351;&#26126;&#37324;&#38754;&#30340;shell&#65292;&#20294;&#26159;&#22312;&#23433;&#20840;&#26816;&#26597;&#26102;&#21487;&#33021;&#20250;&#25253;&#38169;&#12290;
+</span>-G GROUP1[,GROUP2,...]   <span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#29992;&#25143;&#25351;&#26126;&#38468;&#21152;&#32452;&#65292;&#32452;&#39035;&#20107;&#20808;&#23384;&#22312;
+</span>-N                                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#19981;&#21019;&#24314;&#31169;&#29992;&#32452;&#20570;&#20027;&#32452;&#65292;&#20351;&#29992;users&#32452;&#20570;&#20027;&#32452;
+</span>-r                                    <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#31995;&#32479;&#29992;&#25143; CentOS 6&#20043;&#21069;: ID&lt;500&#65292;CentOS 7&#20197;&#21518;: ID&lt;1000
+</span>-m                                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#23478;&#30446;&#24405;&#65292;&#29992;&#20110;&#31995;&#32479;&#29992;&#25143;
+</span>-M                                 <span class="org-comment-delimiter">#</span><span class="org-comment">&#19981;&#21019;&#24314;&#23478;&#30446;&#24405;&#65292;&#29992;&#20110;&#38750;&#31995;&#32479;&#29992;&#25143;
+</span>-f,--inactive                    <span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#25913;&#38750;&#27963;&#21160;&#26399;&#38480;&#22825;&#25968;&#12290;0 &#34920;&#31034;&#31435;&#21363;&#31105;&#27490;&#65292;-1 &#34920;&#31034;&#27704;&#19981;&#36807;&#26399;&#12290;
+</span>-p                                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#36755;&#20837;&#21152;&#23494;&#21475;&#20196;</span>
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">useradd -r -u 48 -g apache -s /sbin/nologin -d /var/www -c <span class="org-string">"Apache"</span> apache
+</pre>
+</div>
+
+<p>
+在Debian系统中，使用 useradd 命令创建用户时，默认不会自动创建家目录。这是Debian/Ubuntu系统与其他Linux发行版的一个区别。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26041;&#27861;1 &#20351;&#29992; -m &#21442;&#25968;&#21019;&#24314;&#29992;&#25143;&#24182;&#21019;&#24314;&#23478;&#30446;&#24405;
+</span>useradd -m -s /bin/bash git
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26041;&#27861;2 &#20351;&#29992; adduser &#21629;&#20196;&#65288;&#25512;&#33616;&#65289;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">adduser &#21629;&#20196;&#20250;&#20132;&#20114;&#24335;&#22320;&#35774;&#32622;&#23494;&#30721;&#24182;&#33258;&#21160;&#21019;&#24314;&#23478;&#30446;&#24405;
+</span>adduser git
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#24050;&#23384;&#22312;&#30340;git&#29992;&#25143;&#21019;&#24314;&#23478;&#30446;&#24405;
+</span>mkdir /home/git
+chown git:git /home/git
+chmod 700 /home/git
+cp -r /etc/skel/. /home/git/ <span class="org-comment-delimiter">#</span><span class="org-comment">&#22797;&#21046;&#40664;&#35748;&#30340;&#37197;&#32622;&#25991;&#20214;
+</span>chown -R git:git /home/git/
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#29992;&#25143;&#20449;&#24687;
+</span>id git
+finger git
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#23478;&#30446;&#24405;&#35774;&#32622;
+</span>getent passwd git
+</pre>
+</div>
+</div>
+<div id="outline-container-h:10b86d25-e5f9-4772-bfae-dbac2d61c0dc" class="outline-4">
+<h4 id="h:10b86d25-e5f9-4772-bfae-dbac2d61c0dc"><a href="#h:10b86d25-e5f9-4772-bfae-dbac2d61c0dc">用户默认值设定</a></h4>
+<div class="outline-text-4" id="text-h:10b86d25-e5f9-4772-bfae-dbac2d61c0dc">
+<p>
+useradd 命令默认值设定由/etc/default/useradd定义
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#cat /etc/default/useradd
+<span class="org-comment-delimiter"># </span><span class="org-comment">useradd defaults file
+</span><span class="org-variable-name">GROUP</span>=100
+<span class="org-variable-name">HOME</span>=/home
+<span class="org-variable-name">INACTIVE</span>=-1   <span class="org-comment-delimiter">#</span><span class="org-comment">&#23545;&#24212;/etc/shadow&#25991;&#20214;&#31532;7&#21015;&#65292;&#21363;&#29992;&#25143;&#23494;&#30721;&#36807;&#26399;&#30340;&#23485;&#38480;&#26399;
+</span><span class="org-variable-name">EXPIRE</span>=     <span class="org-comment-delimiter">#</span><span class="org-comment">&#23545;&#24212;/etc/shadow&#25991;&#20214;&#31532;8&#21015;&#65292;&#21363;&#29992;&#25143;&#24080;&#21495;&#30340;&#26377;&#25928;&#26399;
+</span><span class="org-variable-name">SHELL</span>=/bin/bash
+<span class="org-variable-name">SKEL</span>=/etc/skel
+<span class="org-variable-name">CREATE_MAIL_SPOOL</span>=yes
+</pre>
+</div>
+
+<p>
+显示或更改默认设置
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">useradd -D <span class="org-comment-delimiter"># </span><span class="org-comment">&#26174;&#31034;&#21019;&#24314;&#29992;&#25143;&#30340;&#40664;&#35748;&#37197;&#32622; &#25110; cat /etc/default/useradd &#32467;&#26524;&#19968;&#26679;
+</span>
+useradd &#8211;D -s SHELL <span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#23436;&#31995;&#32479;&#40664;&#35748;&#28155;&#21152;&#29992;&#25143;&#30340; shell
+</span>useradd &#8211;D &#8211;b BASE_DIR
+useradd &#8211;D &#8211;g GROUP
+</pre>
+</div>
+
+<p>
+新建用户的相关文件
+</p>
+
+<ul class="org-ul">
+<li>/etc/default/useradd</li>
+<li>/etc/skel/*</li>
+<li>/etc/login.defs</li>
+</ul>
+
+<p>
+<b>useradd -D：显示创建用户的默认配置</b>
+</p>
+
+<p>
+其实在修改/etc/default/useradd
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# useradd -D
+<span class="org-variable-name">GROUP</span>=100   
+<span class="org-variable-name">HOME</span>=/home
+<span class="org-variable-name">INACTIVE</span>=-1  &#38750;&#27963;&#21160;&#26399;&#38480;&#20026;&#31105;&#29992;&#65292;&#23485;&#38480;&#26399;
+<span class="org-variable-name">EXPIRE</span>=         &#36807;&#21435;&#26399;&#38480;9999
+<span class="org-variable-name">SHELL</span>=/bin/bash
+<span class="org-variable-name">SKEL</span>=/etc/skel
+<span class="org-variable-name">CREATE_MAIL_SPOOL</span>=yes &#35201;&#19981;&#35201;&#21019;&#24314;&#37038;&#20214;&#32531;&#23384;&#24207;&#21015;&#65292;/var/spool/mail/&#30446;&#24405;&#21019;&#24314;
+</pre>
+</div>
+
+<p>
+解释：
+</p>
+<ul class="org-ul">
+<li>GROUP : 创建用户时要给它添加一个同名的私有组 ，默认 100</li>
+<li>HOME : 用户创建时尤其是系统组时要不要创建一个家目录，如果创建，家目
+录所在的位置。默认在 /home 目录，即在 /home 目录下创建一个各用户同名
+的目录。</li>
+<li>INACTIVE : 非活动期限。默认 -1 表示禁用</li>
+<li>EXPIRE : 过去期限，没有时间则表示为永不过期，默认为99999</li>
+<li>SHELL : 指明用户使用的 shell 类型，默认 /bin/bash</li>
+<li>SKEL : 复制用户骨架信息的位置，默认位置为/etc/skel</li>
+<li>CREATE_MAIL_SPOOL : 是否给用户创建邮件缓存序列，默认 yes，表示每创建
+一个用户会在 <i>var/spool/mail</i> 目录创建用户专用的邮箱</li>
+</ul>
+
+
+<p>
+注意：创建用户时的诸多默认设定配置文件为/etc/login.defs
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# egrep -v <span class="org-string">'^$|^#'</span> /etc/login.defs
+MAIL_DIR        /var/spool/mail  &#37038;&#20214;&#38431;&#21015;&#30446;&#24405;
+PASS_MAX_DAYS   99999     &#23494;&#30721;&#26368;&#22823;&#20351;&#29992;&#22825;&#25968;&#65292;99999&#22522;&#26412;&#34920;&#31034;&#27704;&#36828;
+PASS_MIN_DAYS   0         &#23494;&#30721;&#26368;&#23567;&#20351;&#29992;&#22825;&#25968;
+PASS_MIN_LEN    5           &#23494;&#30721;&#26368;&#23567;&#38271;&#24230;
+PASS_WARN_AGE   7       &#23494;&#30721;&#36807;&#26399;&#35686;&#21578;&#26085;&#26399;
+UID_MIN                   1000        &#26222;&#36890;&#29992;&#25143;&#26368;&#23567; ID &#21495;
+UID_MAX                 60000     &#26222;&#36890;&#29992;&#26368;&#22823; ID &#21495;
+SYS_UID_MIN               201    &#31995;&#32479;&#29992;&#25143;&#26368;&#23567;ID&#21495;
+SYS_UID_MAX               999   &#31995;&#32479;&#29992;&#25143;&#26368;&#22823; ID &#21495;
+GID_MIN         1000         &#26368;&#23567;&#29992;&#25143;&#32452;ID&#21495;
+GID_MAX         60000       &#26368;&#22823;&#29992;&#25143;&#32452;ID&#21495;
+CREATE_HOME     yes       &#21019;&#24314;&#23478;&#30446;&#24405;
+UMASK           077      &#40664;&#35748;&#36974;&#32617;&#30721;
+USERGROUPS_ENAB yes     &#21024;&#38500;&#29992;&#25143;&#26159;&#22914;&#26524;&#20854;&#32452;&#27809;&#26377;&#29992;&#25143;&#19968;&#24182;&#21024;&#38500;
+ENCRYPT_METHOD SHA512   &#20351;&#29992;&#39069;&#21152;&#23494;&#31639;&#27861;&#20026;SHA512  
+</pre>
+</div>
+
+<p>
+复制小技巧
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">. &#21253;&#21547;&#38544;&#34255;&#25991;&#20214;&#65292; * &#19981;&#21253;&#21547;&#38544;&#34255;&#25991;&#20214;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22797;&#21046;&#30446;&#24405;&#19979;&#30340;&#38544;&#34255;&#25991;&#20214;
+</span>cp  /etc/skel/.[^.]* /home/test
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22797;&#21046;&#30446;&#24405;&#19979;&#30340;&#25152;&#26377;&#25991;&#20214;
+</span>cp -r /etc/skel/. /home/test
+cp -r /etc/skel /home/test
+</pre>
+</div>
+
+<p>
+批量修改用户口令
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">echo</span> username:passwd | chpasswd
+</pre>
+</div>
+
+<p>
+批量创建用户
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">newusers passwd &#26684;&#24335;&#25991;&#20214; 
+</pre>
+</div>
+
+<p>
+范例: CentOS 6 创建并指定基于sha512的用户密码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#26041;&#27861; 1&#65306;
+[root@centos6 ~]#grub-crypt --help
+Usage: grub-crypt [OPTION]...
+Encrypt a password.
+&#160;-h, --help &#160;&#160;&#160;&#160;&#160;&#160;Print this message and exit
+&#160;-v, --version &#160;&#160;&#160;&#160;&#160;Print the version information and exit
+&#160;--md5 &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;Use MD5 to encrypt the password
+&#160;--sha-256 &#160;&#160;&#160;&#160;&#160;&#160;&#160;Use SHA-256 to encrypt the password
+&#160;--sha-512 &#160;&#160;&#160;&#160;&#160;&#160;&#160;Use SHA-512 to encrypt the password (default)
+Report bugs to <a href="mailto:bug-grub%40gnu.org">&lt;bug-grub@gnu.org&gt;</a>.
+EOF
+
+[root@centos6 ~]#grub-crypt --sha-512
+Password:
+Retype password:
+$<span class="org-variable-name">6</span>$<span class="org-variable-name">v9A2</span>/xUNwAWwEmHN$<span class="org-variable-name">q7Wz</span>.uscsV/8J5Gss3KslX8hKXOoaP3hDpOBWeBfMQHVIRZiwHUUkii84cvQWIMnvtnXYsdVHuLO4KhOiSOMh/
+
+[root@centos6 ~]#useradd -p <span class="org-string">'$6$v9A2/xUNwAWwEmHN$q7Wz.uscsV/8J5Gss3KslX8hKXOoaP3hDpOBWeBfMQHVIRZiwHUUkii84cvQWIMnvtnXYsdVHuLO4KhOiSOMh/'</span> test
+
+[root@centos6 ~]#getent shadow test
+test:$<span class="org-variable-name">6</span>$<span class="org-variable-name">v9A2</span>/xUNwAWwEmHN$<span class="org-variable-name">q7Wz</span>.uscsV/8J5Gss3KslX8hKXOoaP3hDpOBWeBfMQHVIRZiwHUUkii84cvQWIMnvtnXYsdVHuLO4KhOiSOMh/:18459:0:99999:7:::
+
+&#26041;&#27861;2&#65306;
+useradd -p <span class="org-sh-quoted-exec">`echo meu | openssl passwd -6 -salt ARZrof3ZBlFLYESn -stdin`</span> zhang 
+</pre>
+</div>
+
+<p>
+范例: 利用Python程序在CentOS7 生成sha512加密密码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos7 ~]#python -c <span class="org-string">'import crypt,getpass;pw="me";print(crypt.crypt(pw))'</span>
+$<span class="org-variable-name">6</span>$<span class="org-variable-name">pt2FMf6YqKea3mh</span>$.7Hkslg17uI.Wu7tVVtkzrwktXrOC8DxcMFC4JO1igrqR7VAi87H5PHOuLTUEjl7eJqKUhMT1e9ixojn1
+</pre>
+</div>
+
+<p>
+范例: CentOS8 生成sha512加密密码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#openssl passwd -6 me
+$<span class="org-variable-name">6</span>$<span class="org-variable-name">UOyYOao</span>.iM2.rPnM$<span class="org-variable-name">jCpTehqh5e234fXcDzkDMddthpKNL3scOZjTHh9fXds8Eu6gNdEQqLMQgOboipZ08mnz2V</span>.
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:690a6fde-d52d-4ffb-b064-ab829a1037a0" class="outline-3">
+<h3 id="h:690a6fde-d52d-4ffb-b064-ab829a1037a0"><a href="#h:690a6fde-d52d-4ffb-b064-ab829a1037a0">用户属性修改 usermod</a></h3>
+<div class="outline-text-3" id="text-h:690a6fde-d52d-4ffb-b064-ab829a1037a0">
+<p>
+usermod 命令可以修改用户属性 格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">usermod [OPTION] login
+</pre>
+</div>
+
+<p>
+常见选项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-u UID                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;UID
+</span>-g GID                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#20027;&#32452;,&#27880;&#24847;&#35813;&#20107;&#20808;&#23384;&#22312;
+</span>-G GROUP1[,GROUP2,...[,GROUPN]]]  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#38468;&#21152;&#32452;&#65292;&#21407;&#26469;&#30340;&#38468;&#21152;&#32452;&#23558;&#20250;&#34987;&#35206;&#30422;&#65307;&#33509;&#20445;&#30041;&#21407;&#26377;&#65292;&#21017;&#35201;&#21516;&#26102;&#20351;&#29992;-a&#36873;&#39033;
+</span>-s SHELL                <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#30340;&#40664;&#35748;SHELL
+</span>-c <span class="org-string">'COMMENT'</span>      <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#30340;&#27880;&#37322;&#20449;&#24687;
+</span>-d HOME               <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#23478;&#30446;&#24405;&#19981;&#20250;&#33258;&#21160;&#21019;&#24314;&#65307;&#33509;&#35201;&#21019;&#24314;&#26032;&#23478;&#30446;&#24405;&#24182;&#31227;&#21160;&#21407;&#23478;&#25968;&#25454;&#65292;&#21516;&#26102;&#20351;&#29992;-m&#36873;&#39033;
+</span>-l login_name:        <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#30340;&#21517;&#23383;
+</span>-L                           <span class="org-comment-delimiter">#</span><span class="org-comment">lock&#25351;&#23450;&#29992;&#25143;,&#22312;/etc/shadow &#23494;&#30721;&#26639;&#30340;&#22686;&#21152; !
+</span>-U                          <span class="org-comment-delimiter">#</span><span class="org-comment">unlock&#25351;&#23450;&#29992;&#25143;,&#23558; /etc/shadow &#23494;&#30721;&#26639;&#30340; ! &#25343;&#25481;
+</span>-e YYYY-MM-DD    <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#26126;&#29992;&#25143;&#36134;&#21495;&#36807;&#26399;&#26085;&#26399;
+</span>-f INACTIVE            <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#23450;&#38750;&#27963;&#21160;&#26399;&#38480;&#65292;&#21363;&#23485;&#38480;&#26399;
+</span>-m, --move-home  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21482;&#33021;&#19982;-d&#36873;&#39033;&#19968;&#21516;&#20351;&#29992;&#65292;&#29992;&#20110;&#23558;&#21407;&#26469;&#30340;&#23478;&#30446;&#24405;&#31227;&#21160;&#20026;&#26032;&#30340;&#23478;&#30446;&#24405;&#65307;
+</span>-p                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#26126;&#23494;&#30721;</span>
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#28165;&#31354;&#29992;&#25143;&#30340;&#38468;&#21152;&#32452;
+</span>usermod -G <span class="org-string">''</span> wang
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">bobo &#28155;&#21152;&#21040; wheel &#32452;&#20013;
+</span>sudo usermod -aG wheel bobo
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26356;&#25913;bobo&#30340;&#32452;&#20026;g1,g2,g3
+</span>usermod -G g1,g2,g3 bobo
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#38145;&#23450;&#29992;&#25143;
+</span>usermod -L &#29992;&#25143;&#21517;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:aefe51ef-0960-47c8-a58a-7d2f73278e56" class="outline-3">
+<h3 id="h:aefe51ef-0960-47c8-a58a-7d2f73278e56"><a href="#h:aefe51ef-0960-47c8-a58a-7d2f73278e56">删除用户 userdel</a></h3>
+<div class="outline-text-3" id="text-h:aefe51ef-0960-47c8-a58a-7d2f73278e56">
+<p>
+userdel 可删除Linux 用户 格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">userdel [OPTION]... Login
+
+&#24120;&#35265;&#36873;&#39033;&#65306;
+-f, --force     <span class="org-comment-delimiter">#</span><span class="org-comment">&#24378;&#21046;
+</span>-r, --remove <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#29992;&#25143;&#23478;&#30446;&#24405;&#21644;&#37038;&#31665;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f55c6304-45af-40ec-a012-e5216dcb61f3" class="outline-3">
+<h3 id="h:f55c6304-45af-40ec-a012-e5216dcb61f3"><a href="#h:f55c6304-45af-40ec-a012-e5216dcb61f3">查看用户相关的ID信息 id</a></h3>
+<div class="outline-text-3" id="text-h:f55c6304-45af-40ec-a012-e5216dcb61f3">
+<p>
+id 命令可以查看用户的UID，GID等信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">id [OPTION]... [USER]
+
+&#24120;&#35265;&#36873;&#39033;&#65306;
+-u  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;UID
+</span>-g  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;GID
+</span>-G  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#29992;&#25143;&#25152;&#23646;&#30340;&#32452;&#30340;ID
+</span>-n  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#21517;&#31216;&#65292;&#38656;&#37197;&#21512;ugG&#20351;&#29992;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:525611b9-2b08-449c-bc70-40f7b430edcc" class="outline-3">
+<h3 id="h:525611b9-2b08-449c-bc70-40f7b430edcc"><a href="#h:525611b9-2b08-449c-bc70-40f7b430edcc">切换用户或以其他用户身份执行命令 su</a></h3>
+<div class="outline-text-3" id="text-h:525611b9-2b08-449c-bc70-40f7b430edcc">
+<p>
+su: 即 switch user，命令可以切换用户身份，并且以指定用户的身份执行命令
+格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">su [options...] [-] [user [args...]]
+
+&#24120;&#35265;&#36873;&#39033;&#65306;
+-l --login                               <span class="org-comment-delimiter">#</span><span class="org-comment">su -l UserName &#30456;&#24403;&#20110; su - UserName
+</span>-s                                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;SHELL
+</span>-c, --command &lt;command&gt; <span class="org-comment-delimiter">#</span><span class="org-comment">pass a single command to the shell with -c</span>
+</pre>
+</div>
+
+<p>
+切换用户的方式：
+</p>
+
+<ul class="org-ul">
+<li>su UserName：非登录式切换，即不会读取目标用户的配置文件，不改变当前工作目录，即不完全切换</li>
+<li>su - UserName：登录式切换，会读取目标用户的配置文件，切换至自已的家目录，即完全切换</li>
+</ul>
+
+<p>
+说明：root su至其他用户无须密码；非root用户切换时需要密码
+</p>
+
+<p>
+注意：su 切换新用户后，使用 exit 退回至旧的用户，而不要再用 su切换至旧
+用户，否则会生成很多的bash子进程，环境可能会混乱。
+</p>
+
+<p>
+换个身份执行命令：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">su [-] UserName -c <span class="org-string">'COMMAND'</span>
+</pre>
+</div>
+
+<p>
+切换用户并给定一个bash
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">su - docker -s <span class="org-string">'/bin/bash'</span>
+</pre>
+</div>
+
+<p>
+范例：用户不可登录的方法
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#su -s /sbin/nologin wang
+This account is currently not available.
+[root@centos8 ~]#whoami
+root
+
+[root@centos8 ~]#su -s /bin/false wang <span class="org-comment-delimiter"># </span><span class="org-comment">&#19981;&#25253;&#38169;
+</span>[root@centos8 ~]#whoami
+root
+</pre>
+</div>
+
+
+<p>
+范例：切换用户执行命令
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[wang@centos8 ~]$<span class="org-variable-name">su</span> - root -c <span class="org-string">"getent shadow"</span>
+
+[root@middle-ware ~]# su - admin -c <span class="org-string">'touch a.txt'</span>
+[root@middle-ware ~]# ll ~admin
+total 0
+-rw-rw-r-- 1 admin admin 0 Dec 26 01:00 a.txt
+</pre>
+</div>
+
+<p>
+范例：切换用户指定SHELL
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#su bin
+This account is currently not available.
+[root@centos8 ~]#su -s /bin/bash bin
+bash-4.4$ whoami
+bin
+bash-4.4$
+[root@centos8 ~]#getent passwd tss
+tss:x:59:59:Account used by the trousers package to sandbox the tcsd
+daemon:/dev/null:/sbin/nologin
+
+[root@centos8 ~]#su - -s /bin/bash tss
+Last login: Fri Mar 27 09:46:43 CST 2020 on pts/0
+su: warning: cannot change directory to /dev/null: Not a directory
+-bash: /dev/null/.bash_profile: Not a directory
+[tss@centos8 root]$<span class="org-variable-name">pwd</span>
+/root
+[tss@centos8 root]$<span class="org-variable-name">whoami</span>
+tss
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4d206d46-cea6-4219-a556-08ccad9491af" class="outline-3">
+<h3 id="h:4d206d46-cea6-4219-a556-08ccad9491af"><a href="#h:4d206d46-cea6-4219-a556-08ccad9491af">设置密码 passwd</a></h3>
+<div class="outline-text-3" id="text-h:4d206d46-cea6-4219-a556-08ccad9491af">
+
+<figure id="org039e2a6">
+<img style="aspect-ratio:675/246" decoding="async" loading="lazy" src="./images/image-20210215223043542.webp" alt="image-20210215223043542.webp" width="50%">
+
+</figure>
+
+<p>
+passwd 可以修改用户密码 格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">passwd [OPTIONS] UserName
+
+1) passwd&#65306;&#20462;&#25913;&#29992;&#25143;&#33258;&#24049;&#30340;&#23494;&#30721;&#65307;
+2) passwd USERNAME&#65306;&#20462;&#25913;&#25351;&#23450;&#29992;&#25143;&#30340;&#23494;&#30721;&#65292;&#20294;&#20165;root&#26377;&#27492;&#26435;&#38480;&#65307;
+</pre>
+</div>
+
+<p>
+常用选项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-d                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#25351;&#23450;&#29992;&#25143;&#23494;&#30721;
+</span>-l                        <span class="org-comment-delimiter">#</span><span class="org-comment">&#38145;&#23450;&#25351;&#23450;&#29992;&#25143;&#12290;&#19981;&#33021;&#30331;&#24405;  /etc/shadow &#31532;&#20108;&#27573;&#20986;&#29616;2&#20010;&#24863;&#21497;&#21495;
+</span>-u                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#35299;&#38145;&#25351;&#23450;&#29992;&#25143;
+</span>-e                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#24378;&#21046;&#29992;&#25143;&#19979;&#27425;&#30331;&#24405;&#20462;&#25913;&#23494;&#30721;
+</span>-f                        <span class="org-comment-delimiter">#</span><span class="org-comment">&#24378;&#21046;&#25805;&#20316;
+</span>-n mindays         <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#26368;&#30701;&#20351;&#29992;&#26399;&#38480;
+</span>-x maxdays         <span class="org-comment-delimiter">#</span><span class="org-comment">&#26368;&#22823;&#20351;&#29992;&#26399;&#38480;
+</span>-w warndays       <span class="org-comment-delimiter">#</span><span class="org-comment">&#25552;&#21069;&#22810;&#23569;&#22825;&#24320;&#22987;&#35686;&#21578;
+</span>-i inactivedays    <span class="org-comment-delimiter">#</span><span class="org-comment">&#38750;&#27963;&#21160;&#26399;&#38480;
+</span>-S                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#29992;&#25143;&#29366;&#24577;
+</span>--stdin               <span class="org-comment-delimiter">#</span><span class="org-comment">&#20174;&#26631;&#20934;&#36755;&#20837;&#25509;&#25910;&#29992;&#25143;&#23494;&#30721;,Ubuntu&#26080;&#27492;&#36873;&#39033;</span>
+</pre>
+</div>
+
+<p>
+范例：非交互式修改用户密码
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">echo</span> <span class="org-string">"PASSWORD"</span> | passwd --stdin USERNAME
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36866;&#29992;&#20110;&#32418;&#24125;&#31995;&#21015;&#30340;Linux&#29256;&#26412;
+</span>[root@centos8 ~]#echo <span class="org-string">'123456'</span> | passwd --stdin me
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#27492;&#26041;&#24335;&#26356;&#36890;&#29992;&#65292;&#36866;&#29992;&#20110;&#21508;&#31181;Linux&#29256;&#26412;&#65292;&#22914;:ubuntu
+</span>[root@centos8 ~]#echo -e <span class="org-string">'123456\n123456'</span> | passwd me
+</pre>
+</div>
+
+<p>
+范例: Ubuntu 非交互式修改用户密码
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@ubuntu1804 ~]#echo wang:centos |chpasswd
+[root@ubuntu1804 ~]#passwd wang &lt;&lt;EOF<span class="org-sh-heredoc">
+&gt; centos
+&gt; centos
+&gt; EOF
+
+[root@ubuntu1804 ~]#echo -e '123456\123456' | passwd wang</span>
+</pre>
+</div>
+
+<p>
+范例：设置用户下次必须更改密码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#useradd wang
+[root@centos8 ~]#echo 123456 | passwd --stdin wang
+Changing password for user wang.
+passwd: all authentication tokens updated successfully.
+
+[root@centos8 ~]#getent shadow wang
+wang:$<span class="org-variable-name">6</span>$<span class="org-variable-name">4</span>f78ko7hJ4fcMvIH$<span class="org-variable-name">lpbOkFfziDBLT</span>.8XBCi8c/N7wysDAejN5H9Fgxkt99HRDLTEosO43CK
+Yi2XSSVHxAK568Olj3C5bwfNExlves/:18348:0:99999:7:::
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24378;&#21046;&#19979;&#27425;&#30331;&#24405;&#20462;&#25913;&#23494;&#30721;
+</span>[root@centos8 ~]#passwd -e wang
+Expiring password for user wang.
+passwd: Success
+[root@centos8 ~]#getent shadow wang
+wang:$<span class="org-variable-name">6</span>$<span class="org-variable-name">4</span>f78ko7hJ4fcMvIH$<span class="org-variable-name">lpbOkFfziDBLT</span>.8XBCi8c/N7wysDAejN5H9Fgxkt99HRDLTEosO43CK
+Yi2XSSVHxAK568Olj3C5bwfNExlves/:0:0:99999:7:::
+
+[root@centos8 ~]#su - admin
+Last login: Fri Mar 27 09:55:27 CST 2020 on pts/0
+[cici@centos8 ~]$<span class="org-variable-name">su</span> - wang
+Password:
+You are required to change your password immediately (administrator enforced)
+Current password:
+New password:
+BAD PASSWORD: The password is shorter than 8 characters
+New password:
+BAD PASSWORD: The password fails the dictionary check - it is too
+simplistic/systematic
+su: Have exhausted maximum number of retries for service
+
+[cici@centos8 ~]$<span class="org-variable-name">su</span> - wang
+Password:
+You are required to change your password immediately (administrator enforced)
+Current password:
+New password:
+Retype new password:
+Last login: Fri Mar 27 10:01:20 CST 2020 on pts/0
+Last failed login: Fri Mar 27 10:02:37 CST 2020 on pts/0
+There was 1 failed login attempt since the last successful login.
+[wang@centos8 ~]$<span class="org-variable-name">exit</span>
+<span class="org-keyword">logout</span>
+[cici@centos8 ~]$<span class="org-variable-name">exit</span>
+<span class="org-keyword">logout</span>
+[cici@centos8 ~]#getent shadow wang
+wang:$<span class="org-variable-name">6</span>$<span class="org-variable-name">TX0iLjF52ByHh1zH</span>$<span class="org-variable-name">g</span>.WI4LNfauuwgnxpRhd7ePqFKHZ85YU3r6Lh2S0PWRXWGjGlDVtomLW
+qpdiWrT.vwqD/Wzok.kzQhUHc8UCs91:18348:0:99999:7:::
+</pre>
+</div>
+
+<p>
+范例：-d : 清除用户密码串；
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# useradd docker
+[root@node01 ~]# echo <span class="org-string">'123456'</span> | passwd --stdin docker
+[root@node01 ~]# tail /etc/shadow
+docker:$<span class="org-variable-name">6</span>$<span class="org-variable-name">G6nWXI99</span>$<span class="org-variable-name">0</span>x0tH.fh2RO1Vl0nbRZBWI6yK.M6csr5EnovKWOqRm.NLd10pw/0PCFqiCvBWA/yWW2La00oZS.lWWjQqjDA30:17550:0:99999:7:::
+
+[root@node01 ~]# passwd -d docker
+[root@node01 ~]# tail /etc/shadow
+docker::17550:0:99999:7:::
+</pre>
+</div>
+
+<p>
+范例：-l, -u : 锁定和解锁用户； 不能登录 /etc/shadow 第二段出现2个感叹号
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# useradd -c <span class="org-string">"Fedora Core"</span> -s /bin/tcsh fedora <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#29992;&#25143;fedora,&#20854;&#27880;&#37322;&#20449;&#24687;&#20026;"Fedora Core",&#40664;&#35748;shell&#20026;/bin/tcsh
+</span>
+[root@node01 ~]# passwd -l fedora
+[root@node01 ~]# tail -1 /etc/shadow
+fedora:!!:17549:0:99999:7:::
+
+[root@node01 ~]# passwd  -S fedora <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#29992;&#25143;&#29366;&#24577;
+</span>fedora LK 2018-01-18 0 99999 7 -1 (Password locked.)
+
+[root@node01 ~]# passwd -uf fedora <span class="org-comment-delimiter"># </span><span class="org-comment">&#35299;&#38145;&#29992;&#25143;
+</span>[root@node01 ~]# passwd  -S fedora
+fedora NP 2018-01-18 0 99999 7 -1 (Empty password.)
+[root@node01 ~]# tail -1 /etc/shadow
+fedora::17549:0:99999:7:::
+</pre>
+</div>
+
+<p>
+linux系统锁定一个用户账号，方法有很多：
+</p>
+<ol class="org-ol">
+<li>以Root登陆，删除用户userdel -r 用户名；</li>
+<li>以Root登陆，锁定用户usermod -L 用户名；</li>
+<li>以Root登陆，不给用户交互式的shell ： usermod -s sbin/nonlogin； 以上三种最简单。</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:0577cca3-7a19-46d2-93c4-09e6a4367e6b" class="outline-3">
+<h3 id="h:0577cca3-7a19-46d2-93c4-09e6a4367e6b"><a href="#h:0577cca3-7a19-46d2-93c4-09e6a4367e6b">修改用户密码策略 chage</a></h3>
+<div class="outline-text-3" id="text-h:0577cca3-7a19-46d2-93c4-09e6a4367e6b">
+<p>
+chage 可以修改用户密码策略 格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chage [OPTION]... LOGIN
+
+&#24120;&#35265;&#36873;&#39033;&#65306;
+-d LAST_DAY                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#25913;&#23494;&#30721;&#30340;&#26102;&#38388;
+</span>-m --mindays MIN_DAYS      <span class="org-comment-delimiter">#</span><span class="org-comment">&#26368;&#30701;&#20351;&#29992;&#26102;&#38388;
+</span>-M --maxdays MAX_DAYS     <span class="org-comment-delimiter">#</span><span class="org-comment">&#26368;&#38271;&#20351;&#29992;&#26102;&#38388;
+</span>-W --warndays WARN_DAYS  <span class="org-comment-delimiter">#</span><span class="org-comment">&#35686;&#21578;&#26102;&#38388;
+</span>-I --inactive INACTIVE            <span class="org-comment-delimiter">#</span><span class="org-comment">&#23494;&#30721;&#36807;&#26399;&#21518;&#30340;&#23485;&#38480;&#26399;
+</span>-E --expiredate EXPIRE_DATE <span class="org-comment-delimiter">#</span><span class="org-comment">&#29992;&#25143;&#30340;&#26377;&#25928;&#26399;
+</span>-l                                           <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#23494;&#30721;&#31574;&#30053;</span>
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#chage -m 3 -M 42 -W 14 -I 7 -E 2020-10-10 wang
+[root@centos8 ~]#chage -l wang
+Last password change : Dec 18, 2019
+
+Password expires : Jan 29, 2020
+Password inactive : Feb 05, 2020
+Account expires : Oct 10, 2020
+Minimum number of days between password change : 3
+Maximum number of days between password change : 42
+Number of days of warning before password expires : 14
+[root@centos8 ~]#getent shadow wang
+wang:$<span class="org-variable-name">6</span>$<span class="org-variable-name">82</span>L7A37XJgzKTegH$<span class="org-variable-name">lFzqrMHmFwW740U32bvWHUuakPDKOiULE</span>/CxcyDzSe1qi1X2ALulDw1
+WYrhd2wE00.lWO0im5//7biyV.juk5.:18248:3:42:14:7:18545:
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#19979;&#19968;&#27425;&#30331;&#24405;&#24378;&#21046;&#37325;&#35774;&#23494;&#30721;
+</span>[root@centos8 ~]#chage -d 0 wang
+[root@centos8 ~]#getent shadow wang
+wang:$<span class="org-variable-name">6</span>$<span class="org-variable-name">82</span>L7A37XJgzKTegH$<span class="org-variable-name">lFzqrMHmFwW740U32bvWHUuakPDKOiULE</span>/CxcyDzSe1qi1X2ALulDw1
+WYrhd2wE00.lWO0im5//7biyV.juk5.:0:3:42:14:7:18545:
+[root@centos8 ~]#chage -l wang
+Last password change : password must be changed
+Password expires : password must be changed
+Password inactive : password must be changed
+Account expires : Oct 10, 2020
+Minimum number of days between password change : 3
+Maximum number of days between password change : 42
+Number of days of warning before password expires : 14
+[root@centos8 ~]#getent shadow wang
+wang:$<span class="org-variable-name">6</span>$<span class="org-variable-name">82</span>L7A37XJgzKTegH$<span class="org-variable-name">lFzqrMHmFwW740U32bvWHUuakPDKOiULE</span>/CxcyDzSe1qi1X2ALulDw1
+WYrhd2wE00.lWO0im5//7biyV.juk5.:0:3:42:14:7:18545:
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:da620709-ddce-423c-bade-42ded8138086" class="outline-3">
+<h3 id="h:da620709-ddce-423c-bade-42ded8138086"><a href="#h:da620709-ddce-423c-bade-42ded8138086">用户相关的其它命令 chfn chsh finger</a></h3>
+<div class="outline-text-3" id="text-h:da620709-ddce-423c-bade-42ded8138086">
+<ul class="org-ul">
+<li>chfn 指定个人信息</li>
+<li>chsh 指定shell，相当于usermod -s</li>
+<li>finger 可看用户个人信息</li>
+</ul>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos7 ~]#chfn cici
+Changing finger information for cici.
+Name [cici]: zcici
+Office []:it
+Office Phone []: 10000
+Home Phone []: 11111
+Finger information changed.
+[root@centos7 ~]#finger cici
+Login: cici      Name: zcici
+Directory: /home/cici        Shell: /bin/bash
+Office: it, x1-0000 Home Phone: x1-1111
+Never logged in.
+No mail.
+No Plan.
+[root@centos7 ~]#getent passwd cici
+cici:x:1000:1000:zcici,it,10000,11111:/home/cici:/bin/bash
+[root@centos7 ~]#chsh -s /bin/csh cici
+Changing shell for cici.
+Shell changed.
+[root@centos7 ~]#getent passwd cici
+cici:x:1000:1000:wangsicong,wanda,10000,11111:/home/cici:/bin/csh
+[root@centos7 ~]#usermod -s /bin/bash cici
+[root@centos7 ~]#getent passwd cici
+cici:x:1000:1000:wangsicong,wanda,10000,11111:/home/cici:/bin/bash
+</pre>
+</div>
+
+<p>
+范例: 修改用户使用不可登录的shell类型
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#getent passwd cici
+cici:x:1000:1000:zcici,IT,110,119,:/home/cici:/bin/bash
+[root@centos8 ~]#chsh -s /sbin/nologin cici
+Changing shell for cici.
+chsh: Warning: <span class="org-string">"/sbin/nologin"</span> is not listed<span class="org-keyword"> in</span> /etc/shells.
+Shell changed.
+[root@centos8 ~]#su - cici
+This account is currently not available.
+[root@centos8 ~]#chsh -s /bin/false cici
+Changing shell for cici.
+chsh: Warning: <span class="org-string">"/bin/false"</span> is not listed<span class="org-keyword"> in</span> /etc/shells.
+Shell changed.
+[root@centos8 ~]#su - cici
+[root@centos8 ~]#id
+<span class="org-variable-name">uid</span>=0(root) <span class="org-variable-name">gid</span>=0(root) <span class="org-variable-name">groups</span>=0(root)
+[root@centos8 ~]#chsh -s /bin/bash cici
+Changing shell for cici.
+Shell changed.
+[root@centos8 ~]#su - cici
+[cici@centos8 ~]$
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:51cb7201-6606-4d39-b6f5-e9f00b845b01" class="outline-3">
+<h3 id="h:51cb7201-6606-4d39-b6f5-e9f00b845b01"><a href="#h:51cb7201-6606-4d39-b6f5-e9f00b845b01">创建组 groupadd</a></h3>
+<div class="outline-text-3" id="text-h:51cb7201-6606-4d39-b6f5-e9f00b845b01">
+<p>
+groupadd实现创建组 格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">groupadd [OPTION]... group_name
+</pre>
+</div>
+
+<p>
+常见选项：
+</p>
+<pre class="example" id="org1076312">
+-g GID 指明GID号；[GID_MIN, GID_MAX]
+-r 创建系统组，CentOS 6之前: ID&lt;500，CentOS 7以后: ID&lt;1000 范例:
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# groupadd -g 2000 grp1 <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#32452;ID
+</span>[root@node01 ~]# groupadd testgrp2  <span class="org-comment-delimiter">#</span><span class="org-comment">&#19981;&#21152; -g &#36873;&#39033;&#65292;&#40664;&#35748;&#26159;&#19978;&#19968;&#20010;&#32452; GID+1
+</span>[root@node01 ~]# tail -2 /etc/group
+grp1:x:2000:
+testgrp2:x:2001:
+[root@node01 ~]# groupadd -r -g 306 mariadb  <span class="org-comment-delimiter">#</span><span class="org-comment">&#32452;&#21512;&#20351;&#29992; -r -g &#65292;&#21019;&#24314;&#31995;&#32479;&#32452;&#24182;&#25351;&#23450;GID </span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e2cf5394-7a1c-4058-b015-27635e5dfced" class="outline-3">
+<h3 id="h:e2cf5394-7a1c-4058-b015-27635e5dfced"><a href="#h:e2cf5394-7a1c-4058-b015-27635e5dfced">修改组 groupmod</a></h3>
+<div class="outline-text-3" id="text-h:e2cf5394-7a1c-4058-b015-27635e5dfced">
+<p>
+groupmod 组属性修改
+</p>
+
+<p>
+格式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">groupmod [OPTION]... group
+
+&#24120;&#35265;&#36873;&#39033;&#65306;
+-n group_name  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#21517;&#23383;
+</span>-g GID                <span class="org-comment-delimiter">#</span><span class="org-comment">&#26032;&#30340;GID</span>
+</pre>
+</div>
+
+<p>
+如，将系统组 mariadb 的 GID 为306 改为 GID 为 702
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# groupadd -r -g 306 mariadb
+[root@node01 ~]# groupmod -g 702 mariadb
+[root@node01 ~]# tail -2 /etc/group
+testgrp2:x:2001:
+mariadb:x:702:
+</pre>
+</div>
+
+<p>
+如，将组 mariadb 重命名为 perconaserver
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# groupmod -n perconaserver mariadb
+[root@node01 ~]# tail -2 /etc/group
+testgrp2:x:2001:
+perconaserver:x:702:
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4e400a21-806b-47f0-911c-2e20aa79fbbf" class="outline-3">
+<h3 id="h:4e400a21-806b-47f0-911c-2e20aa79fbbf"><a href="#h:4e400a21-806b-47f0-911c-2e20aa79fbbf">组删除 groupdel</a></h3>
+<div class="outline-text-3" id="text-h:4e400a21-806b-47f0-911c-2e20aa79fbbf">
+<p>
+groupdel 可以删除组 格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">groupdel [options] GROUP
+</pre>
+</div>
+
+<p>
+常见选项： -f, &#x2013;force 强制删除，即使是用户的主组也强制删除组
+</p>
+</div>
+</div>
+<div id="outline-container-h:ba939e6d-9aa0-437b-97ad-1e36561b5480" class="outline-3">
+<h3 id="h:ba939e6d-9aa0-437b-97ad-1e36561b5480"><a href="#h:ba939e6d-9aa0-437b-97ad-1e36561b5480">更改组密码 gpasswd</a></h3>
+<div class="outline-text-3" id="text-h:ba939e6d-9aa0-437b-97ad-1e36561b5480">
+<p>
+gpasswd命令，可以更改组密码，也可以修改附加组的成员关系
+</p>
+
+<p>
+用户临时切换到不属于自己的附属组的其他组时候要通过组密码验证
+</p>
+
+<p>
+无密码的组不能被任何用户切换，仅能被组所包含的用户切换
+</p>
+
+<p>
+格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">gpasswd [OPTION] GROUP
+</pre>
+</div>
+
+<p>
+常见选项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-a user &#23558;user&#28155;&#21152;&#33267;&#25351;&#23450;&#32452;&#20013;
+-d user &#20174;&#25351;&#23450;&#38468;&#21152;&#32452;&#20013;&#31227;&#38500;&#29992;&#25143;user
+-A user1,user2,... &#35774;&#32622;&#26377;&#31649;&#29702;&#26435;&#38480;&#30340;&#29992;&#25143;&#21015;&#34920;
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#22686;&#21152;&#32452;&#25104;&#21592;
+</span>[root@centos8 ~]#groupadd admins
+[root@centos8 ~]#id wang
+<span class="org-variable-name">uid</span>=1000(wang) <span class="org-variable-name">gid</span>=1000(wang) <span class="org-variable-name">groups</span>=1000(wang)
+[root@centos8 ~]#gpasswd -a wang admins
+Adding user wang to group admins
+[root@centos8 ~]#id wang
+<span class="org-variable-name">uid</span>=1000(wang) <span class="org-variable-name">gid</span>=1000(wang) <span class="org-variable-name">groups</span>=1000(wang),1002(admins)
+[root@centos8 ~]#groups wang
+wang : wang admins
+[root@centos8 ~]#getent group admins
+admins:x:1002:wang
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#32452;&#25104;&#21592;
+</span>[root@centos8 ~]#gpasswd -d wang admins
+Removing user wang from group admins
+[root@centos8 ~]#groups wang
+wang : wang
+[root@centos8 ~]#id wang
+<span class="org-variable-name">uid</span>=1000(wang) <span class="org-variable-name">gid</span>=1000(wang) <span class="org-variable-name">groups</span>=1000(wang)
+[root@centos8 ~]#getent group admins
+admins:x:1002:
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# groupadd mygrp  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#32452;
+</span>[root@node01 ~]# cat /etc/gshadow | grep mygrp <span class="org-comment-delimiter"># </span><span class="org-comment">&#19968;&#33324;&#21019;&#24314;&#30340;&#32452;&#37117;&#26159;&#27809;&#26377;&#23494;&#30721;&#30340;
+</span>mygrp:!::archlinux
+[root@node01 ~]# gpasswd mygrp   <span class="org-comment-delimiter">#</span><span class="org-comment">&#32473;&#32452; mygrp &#35774;&#23450;&#23494;&#30721;
+</span>
+[root@node01 ~]# useradd docker <span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314; docker &#29992;&#25143;
+</span>[root@node01 ~]# su - docker <span class="org-comment-delimiter">#</span><span class="org-comment">su  -  USER&#21629;&#20196;&#20999;&#25442;&#21040;&#29992;&#25143;&#29615;&#22659;
+</span>[docker@node01 ~]$ id
+<span class="org-variable-name">uid</span>=1001(docker) <span class="org-variable-name">gid</span>=2002(docker) <span class="org-variable-name">groups</span>=2002(docker)
+
+[docker@node01 ~]$ newgrp mygrp <span class="org-comment-delimiter">#</span><span class="org-comment">&#20020;&#26102;&#20999;&#25442;&#29992;&#25143;&#30340;&#22522;&#26412;&#32452;&#65292;&#22914;&#26524;&#32452;&#35774;&#23450;&#20102;&#23494;&#30721;&#38656;&#35201;&#36755;&#20837;&#23494;&#30721;
+</span>Password:
+[docker@node01 ~]$ id
+<span class="org-variable-name">uid</span>=1001(docker) <span class="org-variable-name">gid</span>=1001(mygrp) <span class="org-variable-name">groups</span>=1001(mygrp),2002(docker)
+[docker@node01 ~]$ exit <span class="org-comment-delimiter">#</span><span class="org-comment">&#36864;&#20986;&#20020;&#26102;&#22522;&#26412;&#32452;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3e337a2b-940f-4956-829e-b3b60d64bf23" class="outline-3">
+<h3 id="h:3e337a2b-940f-4956-829e-b3b60d64bf23"><a href="#h:3e337a2b-940f-4956-829e-b3b60d64bf23">临时切换主组 newgrp</a></h3>
+<div class="outline-text-3" id="text-h:3e337a2b-940f-4956-829e-b3b60d64bf23">
+<p>
+newgrp 命令可以临时切换主组， 如果用户本不属于此组，则需要组密码
+</p>
+
+<p>
+格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">newgrp</span> [-] [group]
+</pre>
+</div>
+
+<p>
+如果使用 <code>-</code> 选项，可以初始化用户环境
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#gpasswd root
+Changing the password for group root
+New Password:
+Re-enter new password:
+[root@centos8 ~]#getent gshadow root
+root:$<span class="org-variable-name">6</span>$<span class="org-variable-name">UKK78gqOvw</span>/Ug$<span class="org-variable-name">exBe4gHUYzSj</span>/Gip0YkXII8RkPca7QGVto6Ws5SFd6lhxxklCsfKqiv1qy
+EQZOfGK2WbR7/I.A2.7j1SUGuB91::
+
+[cici@centos8 ~]$<span class="org-variable-name">newgrp</span> root
+Password:
+[cici@centos8 ~]$<span class="org-variable-name">id</span>
+<span class="org-variable-name">uid</span>=1000(cici) <span class="org-variable-name">gid</span>=0(root) <span class="org-variable-name">groups</span>=0(root),1000(cici)
+[cici@centos8 ~]$<span class="org-variable-name">getent</span> passwd cici
+cici:x:1000:1000:zcici,IT,110,119,:/home/cici:/bin/bash
+[cici@centos8 ~]$<span class="org-variable-name">touch</span> wang1.txt
+[cici@centos8 ~]$<span class="org-variable-name">ll</span>
+total 0
+-rw-r--r-- 1 cici root 0 Dec 18 09:38 wang1.txt
+[cici@centos8 ~]$<span class="org-variable-name">exit</span>
+<span class="org-keyword">exit</span>
+[cici@centos8 ~]$<span class="org-variable-name">id</span>
+<span class="org-variable-name">uid</span>=1000(cici) <span class="org-variable-name">gid</span>=1000(cici) <span class="org-variable-name">groups</span>=1000(cici)
+[cici@centos8 ~]$<span class="org-variable-name">touch</span> wang2.txt
+[cici@centos8 ~]$<span class="org-variable-name">ll</span>
+total 0
+-rw-r--r-- 1 cici root 0 Dec 18 09:38 wang1.txt
+-rw-rw-r-- 1 cici cici 0 Dec 18 09:38 wang2.txt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:89fe19e0-d9f9-4c18-a837-4d47ddfd0ab7" class="outline-3">
+<h3 id="h:89fe19e0-d9f9-4c18-a837-4d47ddfd0ab7"><a href="#h:89fe19e0-d9f9-4c18-a837-4d47ddfd0ab7">更改和查看组成员 groupmems groups</a></h3>
+<div class="outline-text-3" id="text-h:89fe19e0-d9f9-4c18-a837-4d47ddfd0ab7">
+<p>
+groupmems 可以管理附加组的成员关系 格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">groupmems [options] [action]
+
+&#24120;&#35265;&#36873;&#39033;&#65306;
+-g, --group groupname <span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#25913;&#20026;&#25351;&#23450;&#32452; (&#21482;&#26377;root)
+</span>-a, --add username      <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#29992;&#25143;&#21152;&#20837;&#32452;
+</span>-d, --delete username <span class="org-comment-delimiter">#</span><span class="org-comment">&#20174;&#32452;&#20013;&#21024;&#38500;&#29992;&#25143;
+</span>-p, --purge                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20174;&#32452;&#20013;&#28165;&#38500;&#25152;&#26377;&#25104;&#21592;
+</span>-l, --list                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#32452;&#25104;&#21592;&#21015;&#34920;</span>
+</pre>
+</div>
+
+<p>
+groups 可查看用户组关系 格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">groups [OPTION].[USERNAME]...
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#groupmems -l -g admins
+[root@centos8 ~]#groupmems -a cici -g admins
+[root@centos8 ~]#id cici
+<span class="org-variable-name">uid</span>=1001(cici) <span class="org-variable-name">gid</span>=1001(cici) <span class="org-variable-name">groups</span>=1001(cici),1002(admins)
+[root@centos8 ~]#groupmems -l -g admins
+cici
+[root@centos8 ~]#groupmems -a wang -g admins
+[root@centos8 ~]#groupmems -l -g admins
+cici wang
+[root@centos8 ~]#groupmems -d wang -g admins
+[root@centos8 ~]#groups wang
+wang : wang admins
+[root@centos8 ~]#groupmems -l -g admins
+cici
+[root@centos8 ~]#groupmems -p -g admins
+[root@centos8 ~]#groupmems -l -g admins
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6f33a3e5-8d40-486b-8391-d31fd08fff66" class="outline-3">
+<h3 id="h:6f33a3e5-8d40-486b-8391-d31fd08fff66"><a href="#h:6f33a3e5-8d40-486b-8391-d31fd08fff66">练习</a></h3>
+<div class="outline-text-3" id="text-h:6f33a3e5-8d40-486b-8391-d31fd08fff66">
+<ol class="org-ol">
+<li>创建用户gentoo，附加组为bin和root，默认shell为/bin/csh，注释信息为”Gentoo
+Distribution”</li>
+<li>创建下面的用户、组和组成员关系 名字为webs 的组 用户nginx，使用webs
+作为附加组 用户varnish，使用webs 作为附加组
+用户mysql，不可交互登录系统，且不是webs
+的成员，nginx，varnish，mysql密码都是123456</li>
+</ol>
+</div>
+</div>
+</section>
+<section id="outline-container-h:717ca5d6-3f12-4aaf-a071-d220213e7bcd" class="outline-2">
+<h2 id="h:717ca5d6-3f12-4aaf-a071-d220213e7bcd"><a href="#h:717ca5d6-3f12-4aaf-a071-d220213e7bcd">文件权限管理</a></h2>
+<div class="outline-text-2" id="text-h:717ca5d6-3f12-4aaf-a071-d220213e7bcd">
+</div>
+<div id="outline-container-h:c03bffd3-93fb-4444-9ee4-80a51b53eeb6" class="outline-3">
+<h3 id="h:c03bffd3-93fb-4444-9ee4-80a51b53eeb6"><a href="#h:c03bffd3-93fb-4444-9ee4-80a51b53eeb6">文件所有者和属组属性操作</a></h3>
+<div class="outline-text-3" id="text-h:c03bffd3-93fb-4444-9ee4-80a51b53eeb6">
+
+<figure id="org75fefe3">
+<img style="aspect-ratio:683/157" decoding="async" loading="lazy" src="./images/image-20210215223117180.webp" alt="image-20210215223117180.webp" width="50%">
+
+</figure>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# ls -l
+-rw-r--r--. 1 root root 30499 Dec 8 12:04 Xorg.0.log
+</pre>
+</div>
+</div>
+<div id="outline-container-h:5d121906-50cf-4247-b75b-d7ae22dae843" class="outline-4">
+<h4 id="h:5d121906-50cf-4247-b75b-d7ae22dae843"><a href="#h:5d121906-50cf-4247-b75b-d7ae22dae843">设置文件的所有者chown</a></h4>
+<div class="outline-text-4" id="text-h:5d121906-50cf-4247-b75b-d7ae22dae843">
+<p>
+chown 命令可以修改文件的属主，也可以修改文件属组 格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chown [OPTION]... [OWNER][:[GROUP]] FILE...
+chown [OPTION]... --reference=RFILE FILE...
+</pre>
+</div>
+
+<p>
+用法说明：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">OWNER                <span class="org-comment-delimiter">#</span><span class="org-comment">&#21482;&#20462;&#25913;&#25152;&#26377;&#32773;
+</span>OWNER:GROUP    <span class="org-comment-delimiter">#</span><span class="org-comment">&#21516;&#26102;&#20462;&#25913;&#25152;&#26377;&#32773;&#21644;&#23646;&#32452;&#65292;&#20882;&#21495;&#20063;&#21487;&#29992; . &#26367;&#25442;
+</span>:GROUP                <span class="org-comment-delimiter">#</span><span class="org-comment">&#21482;&#20462;&#25913;&#23646;&#32452;&#65292;&#20882;&#21495;&#20063;&#21487;&#29992; . &#26367;&#25442;
+</span>--reference=RFILE <span class="org-comment-delimiter">#</span><span class="org-comment">&#21442;&#32771;&#25351;&#23450;&#30340;&#30340;&#23646;&#24615;&#65292;&#26469;&#20462;&#25913; 
+</span>-R                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#36882;&#24402;&#65292;&#27492;&#36873;&#39033;&#24910;&#29992;&#65292;&#38750;&#24120;&#21361;&#38505;&#65281;</span>
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#cp /etc/fstab f1.txt
+[root@centos8 data]#pwd
+/data
+[root@centos8 data]#ll
+-rw-r--r-- 1 root root 709 Dec 18 10:13 f1.txt
+[root@centos8 data]#chown wang f1.txt
+[root@centos8 data]#ll
+-rw-r--r-- 1 wang root 709 Dec 18 10:13 f1.txt
+[root@centos8 data]#chown :admins f1.txt
+[root@centos8 data]#ll f1.txt
+-rw-r--r-- 1 wang admins 709 Dec 18 10:13 f1.txt
+
+[root@centos8 data]#chown root.bin f1.txt
+[root@centos8 data]#ll
+-rw-r--r-- 1 root bin 709 Dec 18 10:13 f1.txt
+
+[root@centos8 data]#chown wang:admins f1.txt
+[root@centos8 data]#ll
+-rw-r--r-- 1 wang admins 709 Dec 18 10:13 f1.txt
+
+[root@centos8 data]#cp /etc/issue f2.txt
+[root@centos8 data]#ll
+-rw-r--r-- 1 wang admins 709 Dec 18 10:13 f1.txt
+-rw-r--r-- 1 root root 23 Dec 18 10:15 f2.txt
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21442;&#32771;&#25351;&#23450;&#30340;&#30340;&#23646;&#24615;&#65292;&#26469;&#20462;&#25913; 
+</span>[root@centos8 data]#chown --reference=f1.txt f2.txt
+[root@centos8 data]#ll
+-rw-r--r-- 1 wang admins 709 Dec 18 10:13 f1.txt
+-rw-r--r-- 1 wang admins 23 Dec 18 10:15 f2.txt
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#chown -R wang.admins /data/
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:526e1246-d8c0-4dd3-8674-d34ff8c1c6c0" class="outline-4">
+<h4 id="h:526e1246-d8c0-4dd3-8674-d34ff8c1c6c0"><a href="#h:526e1246-d8c0-4dd3-8674-d34ff8c1c6c0">设置文件的属组信息chgrp</a></h4>
+<div class="outline-text-4" id="text-h:526e1246-d8c0-4dd3-8674-d34ff8c1c6c0">
+<p>
+chgrp 命令可以只修改文件的属组 跟 chown 用户用法是一样的，功能上主要记
+chown 就好。
+</p>
+
+<p>
+格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chgrp [OPTION]... GROUP FILE...
+chgrp [OPTION]... --reference=RFILE FILE...
+</pre>
+</div>
+
+<p>
+-R 递归 范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#ll f1.txt
+-rw-r--r-- 1 wang root 709 Dec 18 10:13 f1.txt
+[root@centos8 data]#chgrp admins f1.txt
+[root@centos8 data]#ll f1.txt
+-rw-r--r-- 1 wang admins 709 Dec 18 10:13 f1.txt
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f56a80bd-bbf3-4548-ac91-e7c42cd10025" class="outline-3">
+<h3 id="h:f56a80bd-bbf3-4548-ac91-e7c42cd10025"><a href="#h:f56a80bd-bbf3-4548-ac91-e7c42cd10025">文件权限</a></h3>
+<div class="outline-text-3" id="text-h:f56a80bd-bbf3-4548-ac91-e7c42cd10025">
+
+<figure id="org6d0b1da">
+<img style="aspect-ratio:508/114" decoding="async" loading="lazy" src="./images/image-20210215223129361.webp" alt="image-20210215223129361.webp" width="50%">
+
+</figure>
+
+<p>
+第1列，文件类型和文件权限信息
+</p>
+<pre class="example" id="org8205889">
+-：文件类型，-,d,b,c,l,s,p
+rw-：左3位，文件属主的权限
+r--：中3位，文件属组的权限；
+r--：右3位，其他用户（非属主、属组）的权限
+</pre>
+</div>
+<div id="outline-container-h:43f348a7-46fe-44f9-90bc-3d1b8308e014" class="outline-4">
+<h4 id="h:43f348a7-46fe-44f9-90bc-3d1b8308e014"><a href="#h:43f348a7-46fe-44f9-90bc-3d1b8308e014">文件权限说明</a></h4>
+<div class="outline-text-4" id="text-h:43f348a7-46fe-44f9-90bc-3d1b8308e014">
+<p>
+文件的权限主要针对三类对象进行定义
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">owner &#23646;&#20027;, u
+group &#23646;&#32452;, g
+other &#20854;&#20182;, o
+</pre>
+</div>
+
+<p>
+注意：用户的最终权限，是从左向右进行顺序匹配，即，所有者，所属组，其他
+人，一旦匹配权限立即生效，不再向右查看其权限
+</p>
+
+<p>
+每个文件针对每类访问者都定义了三种常用权限
+</p>
+
+<p>
+每个文件针对每类访问者都定义了三种权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">r</span>  Readable
+w Writable
+x  eXcutable
+</pre>
+</div>
+
+<p>
+<b>对文件的权限：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">r</span>   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#20351;&#29992;&#25991;&#20214;&#26597;&#30475;&#31867;&#24037;&#20855;&#65292;&#27604;&#22914;&#65306;cat&#65292;&#21487;&#20197;&#33719;&#21462;&#20854;&#20869;&#23481;
+</span>w  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#20462;&#25913;&#20854;&#20869;&#23481;
+</span>x   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#20197;&#25226;&#27492;&#25991;&#20214;&#25552;&#35831;&#20869;&#26680;&#21551;&#21160;&#20026;&#19968;&#20010;&#36827;&#31243;&#65292;&#21363;&#21487;&#20197;&#25191;&#34892;&#65288;&#36816;&#34892;&#65289;&#27492;&#25991;&#20214;&#65288;&#27492;&#25991;&#20214;&#30340;&#20869;&#23481;&#24517;&#39035;&#26159;&#21487;&#25191;&#34892;&#65289;
+</span>
+&#25991;&#20214;&#26435;&#38480;&#24120;&#29992;&#32452;&#21512;
+---  0
+<span class="org-builtin">r</span>     4
+r-x  5
+rw  6
+rwx 7
+</pre>
+</div>
+
+<p>
+<b>对目录的权限：</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">r</span> &#21487;&#20197;&#20351;&#29992;ls&#26597;&#30475;&#27492;&#30446;&#24405;&#20013;&#25991;&#20214;&#21015;&#34920;
+w &#21487;&#22312;&#27492;&#30446;&#24405;&#20013;&#21019;&#24314;&#25991;&#20214;&#65292;&#20063;&#21487;&#21024;&#38500;&#27492;&#30446;&#24405;&#20013;&#30340;&#25991;&#20214;&#65292;&#32780;&#21644;&#27492;&#34987;&#21024;&#38500;&#30340;&#25991;&#20214;&#30340;&#26435;&#38480;&#26080;&#20851;
+x &#21487;&#20197;cd&#36827;&#20837;&#27492;&#30446;&#24405;&#65292;&#21487;&#20197;&#20351;&#29992;ls -l&#26597;&#30475;&#27492;&#30446;&#24405;&#20013;&#25991;&#20214;&#20803;&#25968;&#25454;&#65288;&#39035;&#37197;&#21512;r&#26435;&#38480;&#65289;&#65292;&#23646;&#20110;&#30446;&#24405;&#30340;&#21487;&#35775;&#38382;&#30340;&#26368;&#23567;&#26435;&#38480;
+X &#21482;&#32473;&#30446;&#24405;x&#26435;&#38480;&#65292;&#19981;&#32473;&#26080;&#25191;&#34892;&#26435;&#38480;&#30340;&#25991;&#20214;x&#26435;&#38480;
+
+&#30446;&#24405;&#26435;&#38480;&#24120;&#29992;&#32452;&#21512;
+-  &#19981;&#33021;&#35775;&#38382;&#30446;&#24405;
+r-x &#21482;&#35835;&#30446;&#24405;
+rwx &#21487;&#35835;&#20889;&#30446;&#24405;
+</pre>
+</div>
+
+<p>
+<b>数学法的权限</b>
+</p>
+
+
+<figure id="org856bd4c">
+<img style="aspect-ratio:656/132" decoding="async" loading="lazy" src="./images/image-20210215223157347.webp" alt="image-20210215223157347.webp" width="50%">
+
+</figure>
+
+<p>
+八进制数字
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">--- 000 0
+--x 001 1
+-w- 010 2
+-wx 011 3
+r-- 100 4
+r-x 101 5
+rw- 110 6
+rwx 111 7
+</pre>
+</div>
+
+<p>
+例如：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">rw-r----- 640
+rwxr-xr-x 755
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d38390ea-e6f9-4c27-a295-dbbaa18699c0" class="outline-4">
+<h4 id="h:d38390ea-e6f9-4c27-a295-dbbaa18699c0"><a href="#h:d38390ea-e6f9-4c27-a295-dbbaa18699c0">修改文件权限chmod</a></h4>
+<div class="outline-text-4" id="text-h:d38390ea-e6f9-4c27-a295-dbbaa18699c0">
+<p>
+格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod [OPTION]... MODE[,MODE]... FILE...
+chmod [OPTION]... OCTAL-MODE FILE...
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21442;&#32771;RFILE&#25991;&#20214;&#30340;&#26435;&#38480;&#65292;&#23558;FILE&#30340;&#20462;&#25913;&#20026;&#21516;RFILE
+</span>chmod [OPTION]... --reference=RFILE FILE...
+
+-R: &#36882;&#24402;&#20462;&#25913;&#26435;&#38480;
+</pre>
+</div>
+
+<p>
+说明：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">1.&#27169;&#24335;&#27861;
+</span>MODE&#65306;who opt permission
+who:u,g,o,a
+opt:+,-,=
+permission:r,w,x
+
+&#20462;&#25913;&#25351;&#23450;&#19968;&#31867;&#29992;&#25143;&#30340;&#25152;&#26377;&#26435;&#38480;
+<span class="org-variable-name">u</span>= <span class="org-variable-name">g</span>= <span class="org-variable-name">o</span>= <span class="org-variable-name">ug</span>= <span class="org-variable-name">a</span>= <span class="org-variable-name">u</span>=,<span class="org-variable-name">g</span>=
+&#20462;&#25913;&#25351;&#23450;&#19968;&#31867;&#29992;&#25143;&#26576;&#20010;&#25110;&#26576;&#20010;&#26435;&#38480;
+u+ u- g+ g- o+ o- a+ a- + -
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">2&#25968;&#23383;&#30340;&#34920;&#31034;&#26041;&#27861;&#65306;
+</span>8bites &#20108;&#36827;&#21046;&#34920;&#31034;&#26435;&#38480;&#30340;&#32452;&#21512;&#26426;&#21046;
+--- 000 0
+r-- 100 4
+-w- 010 2
+--x  001 1
+</pre>
+</div>
+
+<p>
+如果是软连接文件，修改的是软链接对应的文件。
+</p>
+
+<p>
+范例: 设置 X 权限
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#ll dir
+total 8
+-rw-r--r-- 1 root root 709 Dec 18 11:09 f1.txt
+-rwxr--r-- 1 root root 709 Dec 18 11:09 f2.txt
+drw-r--r-- 2 root root 6 Dec 18 11:15 subdir
+[root@centos8 data]#ll -d dir
+drwxr-xr-- 3 root root 48 Dec 18 11:15 dir
+[root@centos8 data]#chmod -R a+X dir
+[root@centos8 data]#ll -d dir
+drwxr-xr-x 3 root root 48 Dec 18 11:15 dir
+[root@centos8 data]#ll dir
+total 8
+-rw-r--r-- 1 root root 709 Dec 18 11:09 f1.txt
+-rwxr-xr-x 1 root root 709 Dec 18 11:09 f2.txt
+drwxr-xr-x 2 root root 6 Dec 18 11:15 subdir
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod u+wx,g-r,<span class="org-variable-name">o</span>=rx file
+chmod -R g+rwX /testdir
+chmod 600 file
+</pre>
+</div>
+
+<p>
+文件644， 目录755
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">chmod 644 -R ./
+find ./ -type d -print|xargs chmod 755;
+</pre>
+</div>
+
+<p>
+<b>范例：面试题</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#25191;&#34892; cp /etc/issue /data/dir &#25152;&#38656;&#35201;&#30340;&#26368;&#23567;&#26435;&#38480;&#65311;
+/bin/cp     &#38656;&#35201;x&#26435;&#38480;
+/etc/         &#38656;&#35201;x&#26435;&#38480;
+/etc/issue &#38656;&#35201;r &#26435;&#38480;
+/data        &#38656;&#35201;x&#26435;&#38480;
+/data/dir  &#38656;&#35201;w,x &#26435;&#38480;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:07a79a95-5a80-4e90-b00b-41fc214367dc" class="outline-3">
+<h3 id="h:07a79a95-5a80-4e90-b00b-41fc214367dc"><a href="#h:07a79a95-5a80-4e90-b00b-41fc214367dc">新建文件和目录的默认权限 umask</a></h3>
+<div class="outline-text-3" id="text-h:07a79a95-5a80-4e90-b00b-41fc214367dc">
+<p>
+umask 的值可以用来保留在创建文件权限
+</p>
+
+<p>
+文件的权限反向掩码，遮罩码；遮罩码也是权限位
+</p>
+
+<p>
+umask能实现创建文件和目录时，计算出文件的默认权限；
+</p>
+
+<p>
+(1)umask：查看当前umask
+</p>
+
+<p>
+系统默认为：0022表示特殊权限、所有者权限、所有组权限、其他人权限
+</p>
+
+<p>
+更改默认设置位置：/etc/login.defs
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node1 ~]# cat /etc/login.defs
+UMASK           077
+</pre>
+</div>
+
+<p>
+实现方式：
+</p>
+
+<ul class="org-ul">
+<li>新建文件的默认权限: 666-umask，如果所得结果某位存在执行（奇数）权限，则将其权限+1,偶数不变</li>
+<li>新建目录的默认权限: 777-umask</li>
+</ul>
+
+<p>
+非特权用户umask默认是 002
+</p>
+
+<p>
+root的umask 默认是 022
+</p>
+
+<p>
+umask算法
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">666  123
+
+110110110
+001010011  mask
+110100100
+644
+</pre>
+</div>
+
+<p>
+查看umask
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">umask</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#27169;&#24335;&#26041;&#24335;&#26174;&#31034;
+</span><span class="org-builtin">umask</span> &#8211;S
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36755;&#20986;&#21487;&#34987;&#35843;&#29992;
+</span><span class="org-builtin">umask</span> &#8211;p
+</pre>
+</div>
+
+<p>
+修改umask
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">umask</span> <span class="org-comment-delimiter">#</span>
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">umask</span> 002
+<span class="org-builtin">umask</span> <span class="org-variable-name">u</span>=rw,<span class="org-variable-name">g</span>=r,<span class="org-variable-name">o</span>=
+</pre>
+</div>
+
+<p>
+持久保存umask
+</p>
+
+<ul class="org-ul">
+<li>全局设置： /etc/bashrc</li>
+<li>用户设置：~/.bashrc</li>
+</ul>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#umask
+0022
+[root@centos8 ~]#umask -S
+<span class="org-variable-name">u</span>=rwx,<span class="org-variable-name">g</span>=rx,<span class="org-variable-name">o</span>=rx
+[root@centos8 ~]#umask -p
+<span class="org-builtin">umask</span> 0022
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#umask
+0022
+[root@centos8 ~]#( <span class="org-builtin">umask</span> 666; touch /data/f1.txt )
+[root@centos8 ~]#umask
+0022
+[root@centos8 ~]#ll /data/f1.txt
+---------- 1 root root 0 Mar 27 14:55 /data/f1.txt
+</pre>
+</div>
+
+<p>
+练习
+</p>
+
+<ol class="org-ol">
+<li>当用户docker对/testdir 目录无执行权限时，意味着无法做哪些操作？</li>
+<li>当用户mongodb对/testdir 目录无读权限时，意味着无法做哪些操作？</li>
+<li>当用户redis 对/testdir
+目录无写权限时，该目录下的只读文件file1是否可修改和删除？</li>
+<li>当用户zabbix对/testdir
+目录有写和执行权限时，该目录下的只读文件file1是否可修改和删除？</li>
+<li>复制/etc/fstab文件到/var/tmp下，设置文件所有者为tomcat读写权限，所
+属组为apps组有读写权限，其他人无权限</li>
+<li>误删除了用户git的家目录，请重建并恢复该用户家目录及相应的权限属性</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:6dc21724-7544-4254-a0af-47d8411695ce" class="outline-3">
+<h3 id="h:6dc21724-7544-4254-a0af-47d8411695ce"><a href="#h:6dc21724-7544-4254-a0af-47d8411695ce">Linux文件系统上的特殊权限</a></h3>
+<div class="outline-text-3" id="text-h:6dc21724-7544-4254-a0af-47d8411695ce">
+<p>
+前面介绍了三种常见的权限：r, w, x 还有三种特殊权限：SUID, SGID, Sticky
+</p>
+
+<p>
+特殊权限：
+</p>
+<ul class="org-ul">
+<li>SUID 作用于二进制可执行程序文件上，用户执行此程序将继承此程序的所有者的权限</li>
+<li><p>
+SGID
+</p>
+
+<p>
+作用于二进制可执行文件上，用户将继承此程序所有组的权限
+</p>
+
+<p>
+作用于目录上，此目录中新建的文件的所属组将自动从此目录继承
+</p></li>
+<li>STICKY 粘滞位，作用于目录上，此目录中的文件只能由所有者自己来删除(root除外)</li>
+</ul>
+
+
+<figure id="org3f78b64">
+<img style="aspect-ratio:588/235" decoding="async" loading="lazy" src="./images/image-20210215225046748.webp" alt="image-20210215225046748.webp" width="50%">
+
+</figure>
+</div>
+<div id="outline-container-h:87770dd2-108c-4d25-9f03-5680f54b0ca0" class="outline-4">
+<h4 id="h:87770dd2-108c-4d25-9f03-5680f54b0ca0"><a href="#h:87770dd2-108c-4d25-9f03-5680f54b0ca0">特殊权限SUID</a></h4>
+<div class="outline-text-4" id="text-h:87770dd2-108c-4d25-9f03-5680f54b0ca0">
+<p>
+前提：进程有属主和属组；文件有属主和属组
+</p>
+
+<ol class="org-ol">
+<li>任何一个可执行程序文件能不能启动为进程,取决发起者对程序文件是否拥有
+执行权限</li>
+<li>启动为进程之后，其进程的属主为发起者,进程的属组为发起者所属的组</li>
+<li>进程访问文件时的权限，取决于进程的发起者
+<ol class="org-ol">
+<li>进程的发起者，同文件的属主：则应用文件属主权限</li>
+<li>进程的发起者，属于文件属组；则应用文件属组权限</li>
+<li>应用文件“其它”权限</li>
+</ol></li>
+</ol>
+
+<p>
+二进制的可执行文件上SUID权限功能：
+</p>
+
+<ul class="org-ul">
+<li>任何一个可执行程序文件能不能启动为进程：取决发起者对程序文件是否拥有
+执行权限</li>
+<li>启动为进程之后，其进程的属主为原程序文件的属主</li>
+<li>SUID只对二进制可执行程序有效</li>
+<li>SUID设置在目录上无意义</li>
+</ul>
+
+<p>
+SUID权限设定：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod u+s FILE... <span class="org-comment-delimiter">#</span><span class="org-comment">&#28155;&#21152;
+</span>chmod 4xxx FILE
+chmod u-s FILE... <span class="org-comment-delimiter">#</span><span class="org-comment">&#21435;&#25481;</span>
+</pre>
+</div>
+
+<p>
+属主无执行权限显示大S
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ls -l /usr/bin/passwd
+-rwsr-xr-x. 1 root root 34928 May 11 2019 /usr/bin/passwd
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:fd5ec574-1a60-431f-8b30-300f97a72b5e" class="outline-4">
+<h4 id="h:fd5ec574-1a60-431f-8b30-300f97a72b5e"><a href="#h:fd5ec574-1a60-431f-8b30-300f97a72b5e">特殊权限SGID</a></h4>
+<div class="outline-text-4" id="text-h:fd5ec574-1a60-431f-8b30-300f97a72b5e">
+<p>
+二进制的可执行文件上SGID权限功能：
+</p>
+
+<ul class="org-ul">
+<li>任何一个可执行程序文件能不能启动为进程：取决发起者对程序文件是否拥有
+执行权限</li>
+<li>启动为进程之后，其进程的属组为原程序文件的属组</li>
+</ul>
+
+<p>
+SGID权限设定：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod g+s FILE...
+chmod 2xxx FILE
+chmod g-s FILE...
+</pre>
+</div>
+
+<p>
+目录上的SGID权限功能：
+</p>
+
+<p>
+默认情况下，用户创建文件时，其属组为此用户所属的主组，一旦某目录被设定
+了SGID，则对此目录有
+</p>
+
+<p>
+写权限的用户在此目录中创建的文件所属的组为此目录的属组，通常用于创建一
+个协作目录
+</p>
+
+<p>
+SGID权限设定：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod g+s DIR...
+chmod 2xxx DIR
+chmod g-s DIR...
+</pre>
+</div>
+
+<p>
+属组无执行权限显示大S
+</p>
+</div>
+</div>
+<div id="outline-container-h:b90a7343-f978-4f94-adf4-2fb4af9bd766" class="outline-4">
+<h4 id="h:b90a7343-f978-4f94-adf4-2fb4af9bd766"><a href="#h:b90a7343-f978-4f94-adf4-2fb4af9bd766">特殊权限 Sticky 位</a></h4>
+<div class="outline-text-4" id="text-h:b90a7343-f978-4f94-adf4-2fb4af9bd766">
+<p>
+具有写权限的目录通常用户可以删除该目录中的任何文件，无论该文件的权限或
+拥有权
+</p>
+
+<p>
+在目录设置Sticky 位，只有文件的所有者或root可以删除该文件 sticky
+</p>
+
+<p>
+设置在文件上无意义
+</p>
+
+<p>
+Sticky权限设定：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod o+t DIR...
+chmod 1xxx DIR
+chmod o-t DIR...
+</pre>
+</div>
+
+<p>
+其它用户无执行权限显示大T
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ll -d /tmp
+drwxrwxrwt. 15 root root 4096 Dec 12 20:16 /tmp
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[admin@middle-ware ~]$ chmod 0644 a.txt 
+[admin@middle-ware ~]$ ll
+-rw-r--r-- 1 admin admin 0 Dec 26 01:00 a.txt
+
+[admin@middle-ware ~]$ chmod 7644 a.txt 
+[admin@middle-ware ~]$ ll
+-rwSr-Sr-T 1 admin admin 0 Dec 26 01:00 a.txt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:356cd941-2023-4a9b-aa57-7aa2cac89bb7" class="outline-4">
+<h4 id="h:356cd941-2023-4a9b-aa57-7aa2cac89bb7"><a href="#h:356cd941-2023-4a9b-aa57-7aa2cac89bb7">特殊权限数字法</a></h4>
+<div class="outline-text-4" id="text-h:356cd941-2023-4a9b-aa57-7aa2cac89bb7">
+<p>
+SUID SGID STICKY
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">000 0
+001 1
+010 2
+011 3
+100 4
+101 5
+110 6
+111 7
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chmod 4777 /tmp/a.txt
+</pre>
+</div>
+
+<p>
+权限位映射
+</p>
+<pre class="example" id="orga9b558f">
+SUID: user,占据属主的执行权限位
+ s：属主拥有x权限
+ S：属主没有x权限
+SGID: group,占据属组的执行权限位
+ s： group拥有x权限
+ S：group没有x权限
+Sticky: other,占据other的执行权限位
+ t：other拥有x权限
+ T：other没有x权限
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c95c19f3-3417-499d-a3b6-7794ec1d88ab" class="outline-3">
+<h3 id="h:c95c19f3-3417-499d-a3b6-7794ec1d88ab"><a href="#h:c95c19f3-3417-499d-a3b6-7794ec1d88ab">设定文件特殊属性 chattr lsattr</a></h3>
+<div class="outline-text-3" id="text-h:c95c19f3-3417-499d-a3b6-7794ec1d88ab">
+<p>
+设置文件的特殊属性，可以访问 root 用户误操作删除或修改文件
+</p>
+
+<p>
+不能删除，改名，更改
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chattr +i file
+</pre>
+</div>
+
+<p>
+只能追加内容，不能删除，改名
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">chattr +a file
+</pre>
+</div>
+
+<p>
+显示特定属性·
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">lsattr
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#chattr +i dir
+[root@centos8 data]#lsattr dir
+------------------ dir/fstab
+------------------ dir/f1.txt
+[root@centos8 data]#lsattr *
+------------------ dir/fstab
+------------------ dir/f1.txt
+------------------ f11.txt
+------------------ f22.txt
+[root@centos8 data]#ll
+total 8
+drwxr-xr-x 2 root root  33 Dec 18 14:32 dir
+-rw-r--r-- 1 root root 719 Dec 18 14:30 f11.txt
+-rw-r--r-- 1 root root  6 Dec 18 14:30 f22.txt
+[root@centos8 data]#rm -rf dir
+rm: cannot remove <span class="org-string">'dir/fstab'</span>: Operation not permitted
+rm: cannot remove <span class="org-string">'dir/f1.txt'</span>: Operation not permitted
+[root@centos8 data]#lsattr
+------------------ ./f11.txt
+------------------ ./f22.txt
+----i------------- ./dir
+[root@centos8 data]#chattr -i dir
+[root@centos8 data]#lsattr 
+------------------ ./f11.txt
+------------------ ./f22.txt
+------------------ ./dir
+</pre>
+</div>
+
+<p>
+chattr命令的用法：chattr [ -RVf ] [ -v version ] [ mode ] files&#x2026;
+</p>
+
+<p>
+最关键的是在[mode]部分，[mode]部分是由+-=和[ASacDdIijsTtu]
+</p>
+
+<p>
+这些字符组合的。其对应的参数有：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">+  <span class="org-comment-delimiter">#</span><span class="org-comment">&#22312;&#21407;&#26377;&#21442;&#25968;&#35774;&#23450;&#22522;&#30784;&#19978;&#65292;&#36861;&#21152;&#21442;&#25968;&#12290;
+</span>-   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22312;&#21407;&#26377;&#21442;&#25968;&#35774;&#23450;&#22522;&#30784;&#19978;&#65292;&#31227;&#38500;&#21442;&#25968;&#12290;
+</span>=   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#20026;&#25351;&#23450;&#21442;&#25968;&#35774;&#23450;&#12290;
+</span>A   <span class="org-comment-delimiter">#</span><span class="org-comment">&#25991;&#20214;&#25110;&#30446;&#24405;&#30340; atime (access time)&#19981;&#21487;&#34987;&#20462;&#25913;(modified), &#21487;&#20197;&#26377;&#25928;&#39044;&#38450;&#20363;&#22914;&#25163;&#25552;&#30005;&#33041;&#30913;&#30424;I/O&#38169;&#35823;&#30340;&#21457;&#29983;&#12290;
+</span>S   <span class="org-comment-delimiter">#</span><span class="org-comment">&#30828;&#30424;I/O&#21516;&#27493;&#36873;&#39033;&#65292;&#21151;&#33021;&#31867;&#20284;sync&#12290;
+</span>a   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21363;append&#65292;&#35774;&#23450;&#35813;&#21442;&#25968;&#21518;&#65292;&#21482;&#33021;&#21521;&#25991;&#20214;&#20013;&#28155;&#21152;&#25968;&#25454;&#65292;&#32780;&#19981;&#33021;&#21024;&#38500;&#65292;&#22810;&#29992;&#20110;&#26381;&#21153;&#22120;&#26085;&#24535;&#25991;&#20214;&#23433;&#20840;&#65292;&#21482;&#26377;root&#25165;&#33021;&#35774;&#23450;&#36825;&#20010;&#23646;&#24615;&#12290;
+</span>c   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21363;compresse&#65292;&#35774;&#23450;&#25991;&#20214;&#26159;&#21542;&#32463;&#21387;&#32553;&#21518;&#20877;&#23384;&#20648;&#12290;&#35835;&#21462;&#26102;&#38656;&#35201;&#32463;&#36807;&#33258;&#21160;&#35299;&#21387;&#25805;&#20316;&#12290;
+</span>d   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21363;no dump&#65292;&#35774;&#23450;&#25991;&#20214;&#19981;&#33021;&#25104;&#20026;dump&#31243;&#24207;&#30340;&#22791;&#20221;&#30446;&#26631;&#12290;
+</span>i   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#23450;&#25991;&#20214;&#19981;&#33021;&#34987;&#21024;&#38500;&#12289;&#25913;&#21517;&#12289;&#35774;&#23450;&#38142;&#25509;&#20851;&#31995;&#65292;&#21516;&#26102;&#19981;&#33021;&#20889;&#20837;&#25110;&#26032;&#22686;&#20869;&#23481;&#12290;i&#21442;&#25968;&#23545;&#20110;&#25991;&#20214; &#31995;&#32479;&#30340;&#23433;&#20840;&#35774;&#32622;&#26377;&#24456;&#22823;&#24110;&#21161;&#12290;
+</span>j   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21363;journal&#65292;&#35774;&#23450;&#27492;&#21442;&#25968;&#20351;&#24471;&#24403;&#36890;&#36807;mount&#21442;&#25968;&#65306;data=ordered &#25110;&#32773; data=writeback
+</span>&#25346;&#36733;&#30340;&#25991;&#20214;&#31995;&#32479;&#65292;&#25991;&#20214;&#22312;&#20889;&#20837;&#26102;&#20250;&#20808;&#34987;&#35760;&#24405;(&#22312;journal&#20013;)&#12290;
+&#22914;&#26524;filesystem&#34987;&#35774;&#23450;&#21442;&#25968;&#20026; <span class="org-variable-name">data</span>=journal&#65292;&#21017;&#35813;&#21442;&#25968;&#33258;&#21160;&#22833;&#25928;&#12290;
+s  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20445;&#23494;&#24615;&#22320;&#21024;&#38500;&#25991;&#20214;&#25110;&#30446;&#24405;&#65292;&#21363;&#30828;&#30424;&#31354;&#38388;&#34987;&#20840;&#37096;&#25910;&#22238;&#12290;
+</span>u  <span class="org-comment-delimiter">#</span><span class="org-comment">&#19982;s&#30456;&#21453;&#65292;&#24403;&#35774;&#23450;&#20026;u&#26102;&#65292;&#25968;&#25454;&#20869;&#23481;&#20854;&#23454;&#36824;&#23384;&#22312;&#30913;&#30424;&#20013;&#65292;&#21487;&#20197;&#29992;&#20110;undeletion&#12290;</span>
+</pre>
+</div>
+
+<p>
+注：chattr命令修改属性能够提高系统的安全性，但是它并不适合所有的目录。
+chattr命令不能保护/、/dev、/tmp、/var目录。
+</p>
+</div>
+</div>
+<div id="outline-container-h:7b182dba-2068-493b-a368-b272aac2e1d2" class="outline-3">
+<h3 id="h:7b182dba-2068-493b-a368-b272aac2e1d2"><a href="#h:7b182dba-2068-493b-a368-b272aac2e1d2">访问控制列表</a></h3>
+<div class="outline-text-3" id="text-h:7b182dba-2068-493b-a368-b272aac2e1d2">
+</div>
+<div id="outline-container-h:36c90aae-7ef1-45f0-99d3-994f817ac25f" class="outline-4">
+<h4 id="h:36c90aae-7ef1-45f0-99d3-994f817ac25f"><a href="#h:36c90aae-7ef1-45f0-99d3-994f817ac25f">ACL权限功能</a></h4>
+<div class="outline-text-4" id="text-h:36c90aae-7ef1-45f0-99d3-994f817ac25f">
+<p>
+ACL：Access Control List，实现灵活的权限管理
+</p>
+
+<p>
+除了文件的所有者，所属组和其它人，可以对更多的用户设置权限
+</p>
+
+<p>
+CentOS7默认创建的xfs和ext4文件系统具有ACL功能
+</p>
+
+<p>
+CentOS7之前版本，默认手工创建的ext4文件系统无ACL功能,需手动增加
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tune2fs &#8211;o acl /dev/sdb1
+mount &#8211;o acl /dev/sdb1 /mnt/test
+</pre>
+</div>
+
+<p>
+ACL生效顺序：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#25152;&#26377;&#32773;&#65292;&#33258;&#23450;&#20041;&#29992;&#25143;&#65292;&#25152;&#23646;&#32452;|&#33258;&#23450;&#20041;&#32452;&#65292;&#20854;&#20182;&#20154;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:185a4f6c-53ce-433a-ae9b-926d5cd7967e" class="outline-4">
+<h4 id="h:185a4f6c-53ce-433a-ae9b-926d5cd7967e"><a href="#h:185a4f6c-53ce-433a-ae9b-926d5cd7967e">ACL相关命令 setfacl getfacl</a></h4>
+<div class="outline-text-4" id="text-h:185a4f6c-53ce-433a-ae9b-926d5cd7967e">
+<p>
+setfacl 可以设置ACL权限
+</p>
+
+<p>
+getfacl 可查看设置的ACL权限
+</p>
+
+<p>
+setfacl
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-b,--remove-all&#65306;&#21024;&#38500;&#25152;&#26377;&#25193;&#23637;&#30340;acl&#35268;&#21017;&#65292;&#22522;&#26412;&#30340;acl&#35268;&#21017;(&#25152;&#26377;&#32773;&#65292;&#32676;&#32452;&#65292;&#20854;&#20182;&#65289;&#23558;&#34987;&#20445;&#30041;&#12290;
+-k,--remove-default&#65306;&#21024;&#38500;&#32570;&#30465;&#30340;acl&#35268;&#21017;&#12290;&#22914;&#26524;&#27809;&#26377;&#32570;&#30465;&#35268;&#21017;&#65292;&#23558;&#19981;&#25552;&#31034;&#12290;
+-n&#65292;--no-mask&#65306;&#19981;&#35201;&#37325;&#26032;&#35745;&#31639;&#26377;&#25928;&#26435;&#38480;&#12290;setfacl&#40664;&#35748;&#20250;&#37325;&#26032;&#35745;&#31639;ACL mask&#65292;&#38500;&#38750;mask&#34987;&#26126;&#30830;&#30340;&#21046;&#23450;&#12290;
+--mask&#65306;&#37325;&#26032;&#35745;&#31639;&#26377;&#25928;&#26435;&#38480;&#65292;&#21363;&#20351;ACL mask&#34987;&#26126;&#30830;&#25351;&#23450;&#12290;
+-d&#65292;--default&#65306;&#35774;&#23450;&#40664;&#35748;&#30340;acl&#35268;&#21017;&#12290;
+--restore=file&#65306;&#20174;&#25991;&#20214;&#24674;&#22797;&#22791;&#20221;&#30340;acl&#35268;&#21017;&#65288;&#36825;&#20123;&#25991;&#20214;&#21487;&#30001;getfacl -R&#20135;&#29983;&#65289;&#12290;&#36890;&#36807;&#36825;&#31181;&#26426;&#21046;&#21487;&#20197;&#24674;&#22797;&#25972;&#20010;&#30446;&#24405;&#26641;&#30340;acl&#35268;&#21017;&#12290;&#27492;&#21442;&#25968;&#19981;&#33021;&#21644;&#38500;--test&#20197;&#22806;&#30340;&#20219;&#20309;&#21442;&#25968;&#19968;&#21516;&#25191;&#34892;&#12290;
+--test&#65306;&#27979;&#35797;&#27169;&#24335;&#65292;&#19981;&#20250;&#25913;&#21464;&#20219;&#20309;&#25991;&#20214;&#30340;acl&#35268;&#21017;&#65292;&#25805;&#20316;&#21518;&#30340;acl&#35268;&#26684;&#23558;&#34987;&#21015;&#20986;&#12290;
+-R&#65292;--recursive&#65306;&#36882;&#24402;&#30340;&#23545;&#25152;&#26377;&#25991;&#20214;&#21450;&#30446;&#24405;&#36827;&#34892;&#25805;&#20316;&#12290;
+-L&#65292;--logical&#65306;&#36319;&#36394;&#31526;&#21495;&#38142;&#25509;&#65292;&#40664;&#35748;&#24773;&#20917;&#19979;&#21482;&#36319;&#36394;&#31526;&#21495;&#38142;&#25509;&#25991;&#20214;&#65292;&#36339;&#36807;&#31526;&#21495;&#38142;&#25509;&#30446;&#24405;&#12290;
+-P&#65292;--physical&#65306;&#36339;&#36807;&#25152;&#26377;&#31526;&#21495;&#38142;&#25509;&#65292;&#21253;&#25324;&#31526;&#21495;&#38142;&#25509;&#25991;&#20214;&#12290;
+--version&#65306;&#36755;&#20986;setfacl&#30340;&#29256;&#26412;&#21495;&#24182;&#36864;&#20986;&#12290;
+--help&#65306;&#36755;&#20986;&#24110;&#21161;&#20449;&#24687;&#12290;
+--&#65306;&#26631;&#35782;&#21629;&#20196;&#34892;&#21442;&#25968;&#32467;&#26463;&#65292;&#20854;&#21518;&#30340;&#25152;&#26377;&#21442;&#25968;&#37117;&#23558;&#34987;&#35748;&#20026;&#26159;&#25991;&#20214;&#21517;
+-&#65306;&#22914;&#26524;&#25991;&#20214;&#21517;&#26159;-&#65292;&#21017;setfacl&#23558;&#20174;&#26631;&#20934;&#36755;&#20837;&#35835;&#21462;&#25991;&#20214;&#21517;&#12290;
+</pre>
+</div>
+
+<p>
+setfacl命令：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#36171;&#26435;&#32473;&#29992;&#25143;&#65306;
+setfacl -m u:USERNAME:MODE FILE...
+
+&#36171;&#26435;&#32423;&#32452;&#65306;
+setfacl -m g:GROUPNAME:MODE FILE...
+
+&#25764;&#38144;&#36171;&#26435;&#65306;
+setfacl -x u:USERNAME FILE...
+setfacl -x g:GROUPNAME FILE...
+</pre>
+</div>
+
+<p>
+-R 递归操作
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node2 tmp]# setfacl -Rm u:jasper:rwx learngit/
+[root@node2 tmp]# cd learngit/
+[root@node2 learngit]# ll
+total 24
+drwxrwxr-x+ 2 root root 4096 Aug 19 15:48 abc
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#ll f1.txt
+-rw-r--r-- 1 root root 709 Dec 18 14:37 f1.txt
+[root@centos8 data]#setfacl -m u:wang:- f1.txt
+[root@centos8 data]#ll
+total 4
+-rw-r--r--+ 1 root root 709 Dec 18 14:37 f1.txt
+[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:---
+group::r--
+mask::r--
+other::r--
+
+[root@centos8 data]#su wang
+[wang@centos8 data]$<span class="org-variable-name">cat</span> f1.txt
+cat: f1.txt: Permission denied
+[wang@centos8 data]$<span class="org-variable-name">echo</span> xx &gt;&gt; f1.txt
+bash: f1.txt: Permission denied
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+group::r--
+other::r--
+[root@centos8 data]#setfacl -m u:wang:0 f1.txt
+[root@centos8 data]#setfacl -m g:admins:w f1.txt
+[root@centos8 data]#ll f1.txt
+-rw-rw-r--+ 1 root root 718 Dec 18 14:44 f1.txt
+[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:---
+group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+
+[root@centos8 data]#id wang
+<span class="org-variable-name">uid</span>=1000(wang) <span class="org-variable-name">gid</span>=1000(wang) <span class="org-variable-name">groups</span>=1000(wang)
+[root@centos8 data]#id me
+<span class="org-variable-name">uid</span>=1001(me) <span class="org-variable-name">gid</span>=1001(me) <span class="org-variable-name">groups</span>=1001(me)
+[root@centos8 data]#su cici
+[cici@centos8 data]$<span class="org-variable-name">cat</span> f1.txt
+&#12290;&#12290;&#12290;&#21487;&#30475;&#30475;
+[cici@centos8 data]$<span class="org-variable-name">exit</span>
+<span class="org-keyword">exit</span>
+[root@centos8 data]#gpasswd -a me admins
+Adding user me to group admins
+[root@centos8 data]#id me
+<span class="org-variable-name">uid</span>=1001(me) <span class="org-variable-name">gid</span>=1001(me) <span class="org-variable-name">groups</span>=1001(me),1002(admins)
+[root@centos8 data]#su me
+[cici@centos8 data]$<span class="org-variable-name">echo</span> d11&gt;&gt; f1.txt
+[cici@centos8 data]$<span class="org-variable-name">cat</span> f1.txt
+cat: f1.txt: Permission denied
+[cici@centos8 data]$<span class="org-variable-name">exit</span>
+<span class="org-keyword">exit</span>
+
+[root@centos8 data]#su wang
+[wang@centos8 data]$<span class="org-variable-name">cat</span> f1.txt
+cat: f1.txt: Permission denied
+[wang@centos8 data]$<span class="org-variable-name">echo</span> wangdata &gt;&gt; f1.txt
+bash: f1.txt: Permission denied
+[wang@centos8 data]$<span class="org-variable-name">exit</span>
+<span class="org-keyword">exit</span>
+
+[root@centos8 data]#groupmems -a wang -g admins
+[root@centos8 data]#id wang
+<span class="org-variable-name">uid</span>=1000(wang) <span class="org-variable-name">gid</span>=1000(wang) <span class="org-variable-name">groups</span>=1000(wang),1002(admins)
+[root@centos8 data]#su wang
+[wang@centos8 data]$<span class="org-variable-name">getfacl</span> f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:---
+group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+[wang@centos8 data]$<span class="org-variable-name">cat</span> f1.txt
+cat: f1.txt: Permission denied
+[wang@centos8 data]$<span class="org-variable-name">echo</span> wangdata2 &gt;&gt; f1.txt
+bash: f1.txt: Permission denied
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mount -o acl /directory
+getfacl file |directory
+setfacl  -m u:wang:rwx file|directory
+setfacl  -m g:admins:rw file| directory
+setfacl  -x u:wang file |directory
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#28165;&#38500;&#25152;&#26377;ACL&#26435;&#38480;
+</span>setfacl -b file1
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#22797;&#21046;file1&#30340;acl&#26435;&#38480;&#32473;file2
+</span>getfacl file1 | setfacl --set-file=-  file2 
+</pre>
+</div>
+
+<p>
+<b>mask 权限</b>
+</p>
+
+<ul class="org-ul">
+<li>mask只影响除所有者和other的之外的人和组的最大权限</li>
+
+<li>mask需要与用户的权限进行逻辑与运算后，才能变成有限的权限(Effective
+Permission)</li>
+
+<li><p>
+用户或组的设置必须存在于mask权限设定范围内才会生效 范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">setfacl -m mask::rx file
+</pre>
+</div></li>
+</ul>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#ll f1.txt
+-rw-rw-r--+ 1 root root 728 Dec 18 14:51 f1.txt
+[root@centos8 data]#chmod <span class="org-variable-name">g</span>=r f1.txt
+[root@centos8 data]#ll f1.txt
+-rw-r--r--+ 1 root root 728 Dec 18 14:51 f1.txt
+[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:---
+group::r--
+group:admins:-w- <span class="org-comment-delimiter">#</span><span class="org-comment">effective:---
+</span>mask::r--
+other::r--
+
+[root@centos8 data]#setfacl -m mask::rw f1.txt
+[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:---
+group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+
+[root@centos8 data]#setfacl -m u:wang:rwx f1.txt
+[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:rwx
+group::r--
+group:admins:-w-
+mask::rwx
+other::r--
+
+[root@centos8 data]#setfacl -m mask::rw f1.txt
+[root@centos8 data]#getfacl f1.txt
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:rwx <span class="org-comment-delimiter">#</span><span class="org-comment">effective:rw-
+</span>group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+</pre>
+</div>
+
+<p>
+&#x2013;set选项会把原有的ACL项都删除，用新的替代，需要注意的是一定要包含UGO
+的设置，不能象-m一样，只是添加ACL就可以
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">setfacl --set u::rw,u:wang:rw,g::r,o::- file1
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:b5f88181-e59b-4852-96ca-56ee7892a553" class="outline-3">
+<h3 id="h:b5f88181-e59b-4852-96ca-56ee7892a553"><a href="#h:b5f88181-e59b-4852-96ca-56ee7892a553">备份和还原ACL</a></h3>
+<div class="outline-text-3" id="text-h:b5f88181-e59b-4852-96ca-56ee7892a553">
+<p>
+主要的文件操作命令cp和mv都支持ACL，只是cp命令需要加上-p参数。但是tar等
+常见的备份工具是不 会保留目录和文件的ACL信息
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#22791;&#20221;ACL
+</span>getfacl -R /tmp/dir &gt; acl.txt
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#28040;&#38500;ACL&#26435;&#38480;
+</span>setfacl -R -b /tmp/dir
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36824;&#21407;ACL&#26435;&#38480;
+</span>setfacl -R  --set-file=acl.txt /tmp/dir
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36824;&#21407;ACL&#26435;&#38480;
+</span>setfacl --restore acl.txt
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;ACL&#26435;&#38480;
+</span>getfacl -R /tmp/dir
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#getfacl *
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f1.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:rwx <span class="org-comment-delimiter">#</span><span class="org-comment">effective:rw-
+</span>group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f2.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+group::r--
+other::r--
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">file: f3.txt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">owner: root
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">group: root
+</span>user::rw-
+user:wang:rwx <span class="org-comment-delimiter">#</span><span class="org-comment">effective:rw-
+</span>group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+
+[root@centos8 data]#cd
+[root@centos8 ~]#tar cvf data.tar /data/
+tar: Removing leading <span class="org-sh-quoted-exec">`/' from member names
+/data/
+/data/f1.txt
+/data/f2.txt
+/data/f3.txt
+[root@centos8 ~]#tar xvf data.tar -C /opt
+data/
+data/f1.txt
+data/f2.txt
+data/f3.txt
+[root@centos8 ~]#ls /opt
+data
+[root@centos8 ~]#cd /opt/data
+[root@centos8 data]#ll
+total 12
+-rw-rw-r-- 1 root root 728 Dec 18 14:51 f1.txt
+-rw-r--r-- 1 root root 728 Dec 18 15:01 f2.txt
+-rw-rw-r-- 1 root root 728 Dec 18 14:51 f3.txt
+[root@centos8 data]#getfacl -R /data &gt; /root/acl.txt
+getfacl: Removing leading '/' from absolute path names
+[root@centos8 data]#cat /root/acl.txt
+# file: data
+# owner: root
+# group: admins
+user::rwx
+group::rwx
+other::rwx
+# file: data/f1.txt
+# owner: root
+# group: root
+user::rw-
+user:wang:rwx #effective:rw-
+group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+# file: data/f2.txt
+# owner: root
+# group: root
+user::rw-
+group::r--
+other::r--
+# file: data/f3.txt
+# owner: root
+# group: root
+user::rw-
+user:wang:rwx #effective:rw-
+group::r--
+group:admins:-w-
+mask::rw-
+other::r--
+
+[root@centos8 data]#ll /opt/data
+total 12
+-rw-rw-r-- 1 root root 728 Dec 18 14:51 f1.txt
+-rw-r--r-- 1 root root 728 Dec 18 15:01 f2.txt
+-rw-rw-r-- 1 root root 728 Dec 18 14:51 f3.txt
+[root@centos8 data]#cd
+[root@centos8 ~]#setfacl -R --set-file=/root/acl.txt /opt
+[root@centos8 ~]#ll /opt/data/
+total 12
+-rw-rw-r--+ 1 root root 728 Dec 18 14:51 f1.txt
+-rw-rw-r--+ 1 root root 728 Dec 18 15:01 f2.txt
+-rw-rw-r--+ 1 root root 728 Dec 18 14:51 f3.txt
+[root@centos8 ~]#setfacl -b -R /opt/data
+[root@centos8 ~]#ll /opt/data
+total 12
+-rw-r--r-- 1 root root 728 Dec 18 14:51 f1.txt
+-rw-r--r-- 1 root root 728 Dec 18 15:01 f2.txt
+-rw-r--r-- 1 root root 728 Dec 18 14:51 f3.txt
+[root@centos8 ~]#</span>
+</pre>
+</div>
+
+<p>
+练习
+</p>
+
+<ol class="org-ol">
+<li>在/testdir/dir里创建的新文件自动属于webs组，组apps的成员如：tomcat
+能对这些新文件有读写权限，组dbs的成员如：mysql只能对新文件有读权限，
+其它用户（不属于webs,apps,dbs）不能访问这个文件夹</li>
+<li>误将 /bin/chmod 文件的执行权限删除，如何恢复？</li>
+</ol>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 虚拟化基础平台 VMware vSphere</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 虚拟化基础平台 VMware vSphere</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:267c036c-1136-4777-b209-4101324881dc">VMware简介</a>
+<ul>
+<li><a href="#h:67e5dfde-1390-4e49-bb17-d21f3ceac455">VMware 介绍</a></li>
+<li><a href="#h:6907364b-16fa-419b-b4bb-6c06c487e4e9">VMware的主要产品</a></li>
+<li><a href="#h:fb3c0e28-a820-4cb2-a6be-58d3ba4c42c5">架构说明</a></li>
+</ul>
+</li>
+<li><a href="#h:de8f1344-1a9d-4e80-9258-aa95f1f01b61">VMware vSphere</a>
+<ul>
+<li><a href="#h:52ab8592-8a24-4625-864f-0bd22158d5c1">版本选择</a></li>
+<li><a href="#h:c884c1a4-2d06-41bd-bf7a-cac8ac592392">发行版本说明</a></li>
+<li><a href="#h:5d4ac200-1e3a-425f-9835-a200e5d96472">申请使用 VMware vSphere</a></li>
+<li><a href="#h:d1386af4-d05e-4080-8cbb-96b19283d321">开始安装 VMware ESXi</a>
+<ul>
+<li><a href="#h:b30a3c64-7dea-46d0-bd5d-9149ffaf56aa">新建宿主机</a>
+<ul>
+<li><a href="#h:4fb4c2ed-b50c-4f87-8268-91075722be34">开始安装ESXi节点</a></li>
+<li><a href="#h:4ffed500-305d-469a-b964-66cd8201fe1b">配置IP地址</a></li>
+<li><a href="#h:c8f099cf-2384-4693-93e7-e94f216a4edb">登录web管理界面</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:e58a9264-4c21-4e13-8f84-a0516e2323ef">通过web界面在ESXi创建虚拟机</a>
+<ul>
+<li><a href="#h:8fcc7e20-309b-472f-80c2-8567b8794262">ESXi宿主机开启硬件辅助虚拟化</a></li>
+<li><a href="#h:82934356-5023-47b1-b229-375b6bc300d8">准备需要安装系统的ISO镜像</a></li>
+<li><a href="#h:45a790b0-68dc-46cf-9c32-13bd87451678">创建虚拟机</a></li>
+<li><a href="#h:2b332b67-6bf0-4748-aa2b-d71901c7d796">管理虚拟机</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:faa330ed-f973-4df8-a635-24bec145d1bf">安装 VMware vCenter Server</a>
+<ul>
+<li><a href="#h:8885c2f0-8c50-4bd5-ad17-90842c8086da">安装系统的 环境依赖</a></li>
+<li><a href="#h:b75517f0-8ef0-4f18-bef6-d104643e49d3">安装Windows Server</a></li>
+<li><a href="#h:4398742b-c7b1-4a95-83a4-7182bd3b9dd4">安装VMware vCenter Server</a></li>
+</ul>
+</li>
+<li><a href="#h:627b805a-68e4-473f-9ec5-0d91cb05f710">管理 VMware vCenter</a>
+<ul>
+<li><a href="#h:0bcdaccc-65b1-4fd4-a275-ba627e2ce25a">通过浏览器访问VMware vSphere</a></li>
+<li><a href="#h:7a3aff95-e398-4cb8-b217-97fad8f00d97">添加ESXi主机到 VMware vCenter管理</a></li>
+<li><a href="#h:ab718bda-c5ea-4bcf-9c73-1dbbe0342e05">利用 vCenter 管理已有虚拟机</a></li>
+<li><a href="#h:8569058d-4bf5-45b0-9bdf-d7efd5ac23c9">批量管理虚拟机</a></li>
+<li><a href="#h:599cb15c-6483-4e74-9635-484e2689aa27">实现虚拟机迁移</a>
+<ul>
+<li><a href="#h:ba53741f-81cf-4149-81e0-003a5a415e1a">配置vMotion专用网络</a></li>
+<li><a href="#h:4d314781-fa04-4ba8-be14-88ca71204f94">执行虚拟机迁移</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<p>
+TAGS: <a href="../../index.html">Linux</a>
+</p>
+
+
+<p>
+内容概述
+</p>
+<ul class="org-ul">
+<li>VMware 简介</li>
+<li>安装 ESXi</li>
+<li>在 ESXi 创建和管理虚拟机</li>
+<li>安装 Vcenter</li>
+<li>通过 Vcenter 管理 ESXi 主机的虚拟机</li>
+<li>实现跨主机的虚拟机迁移</li>
+</ul>
+<section id="outline-container-h:267c036c-1136-4777-b209-4101324881dc" class="outline-2">
+<h2 id="h:267c036c-1136-4777-b209-4101324881dc"><a href="#h:267c036c-1136-4777-b209-4101324881dc">VMware简介</a></h2>
+<div class="outline-text-2" id="text-h:267c036c-1136-4777-b209-4101324881dc">
+</div>
+<div id="outline-container-h:67e5dfde-1390-4e49-bb17-d21f3ceac455" class="outline-3">
+<h3 id="h:67e5dfde-1390-4e49-bb17-d21f3ceac455"><a href="#h:67e5dfde-1390-4e49-bb17-d21f3ceac455">VMware 介绍</a></h3>
+<div class="outline-text-3" id="text-h:67e5dfde-1390-4e49-bb17-d21f3ceac455">
+<p>
+VMware 公司成立于1998年，2003年存储厂商EMC以6.35亿美元收购了VMware；2015年10月，戴尔宣布以670亿美元收购EMC
+</p>
+
+<p>
+VMware 公司在 2018 财年全年收入79.2亿美元。
+</p>
+
+<p>
+官网：<a href="https://www.vmware.com/cn.html">https://www.vmware.com/cn.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:6907364b-16fa-419b-b4bb-6c06c487e4e9" class="outline-3">
+<h3 id="h:6907364b-16fa-419b-b4bb-6c06c487e4e9"><a href="#h:6907364b-16fa-419b-b4bb-6c06c487e4e9">VMware的主要产品</a></h3>
+<div class="outline-text-3" id="text-h:6907364b-16fa-419b-b4bb-6c06c487e4e9">
+<p>
+Workstation Pro：面向Windows的虚拟化。
+</p>
+
+<p>
+Fusion for Mac：面向Mac的虚拟化。
+</p>
+
+<p>
+ThinApp：是一款无代理应用虚拟化解决方案。是一款便携软件或单文件打包工具，可以把有很多文件
+或者文件夹的程序打包成一个单文件.可以将应用程序封装起来以与 OS 或其他程序独立开；将程序插入
+到 MSI 或 EXE 文件中并部署一个包括注册表键值、DLL、第三方库及 Framework 的虚拟系统环境，而
+无需在底层操作系统中安装的任何的代理或应用,可以避免程序的冲突。
+</p>
+
+<p>
+Horizon：用于管理虚拟桌面 (VDI)、应用和在线服务的领先平台。
+</p>
+
+<p>
+Horizon Cloud：用于托管虚拟桌面和应用的灵活云计算平台。
+</p>
+
+<p>
+NSX for Horizon：一款虚拟桌面基础架构VDI(Virtual Desktop Infrastructure)网络连接解决方案。
+</p>
+
+<p>
+VMware Enterprise PKS：面向多云企业和服务提供商的生产级 Kubernetes。
+</p>
+
+<p>
+VMware vSphere Integrated Containers：用于传统应用和容器化应用的企业级容器基础架构。
+</p>
+
+<p>
+vSAN：经过闪存优化的 vSphere 原生存储，适用于私有云和公有云,即实现存储虚拟化。
+</p>
+
+<p>
+VMware vSphere：业界领先的服务器虚拟化平台，作为基础平台，是云环境的理想之选
+</p>
+
+<p>
+官网链接: <a href="https://www.vmware.com/cn/products/vSphere.html">https://www.vmware.com/cn/products/vSphere.html</a>
+</p>
+
+<blockquote>
+<p>
+VMware 服务器虚拟化第一个产品叫ESX，后来VMware在4版本的时候推出了ESXi，ESXi和ESX的版本最大
+的技术区别是内核的变化，从4版本开始VMware把ESX及ESXi产品统称为vSphere，但是VMware从5版本开
+始以后取消了原来的ESX版本，所以现在来讲的话vSphere就是ESXi，只是两种叫法而已。一般官方文档中以
+称呼vSphere为主。
+</p>
+</blockquote>
+
+
+<figure id="org8dbd21d">
+<img style="aspect-ratio:664/353" decoding="async" loading="lazy" src="./images/img_20240904_230443.webp" alt="img_20240904_230443.webp" width="80%">
+
+</figure>
+
+
+<p>
+VMware vCenter Server：用于管理跨混合云的 vSphere
+</p>
+
+<p>
+虚拟化环境的集中式管理平台，<a href="https://www.vmware.com/cn/products/vcenter-server.html">https://www.vmware.com/cn/products/vcenter-server.html</a>。
+</p>
+</div>
+</div>
+<div id="outline-container-h:fb3c0e28-a820-4cb2-a6be-58d3ba4c42c5" class="outline-3">
+<h3 id="h:fb3c0e28-a820-4cb2-a6be-58d3ba4c42c5"><a href="#h:fb3c0e28-a820-4cb2-a6be-58d3ba4c42c5">架构说明</a></h3>
+<div class="outline-text-3" id="text-h:fb3c0e28-a820-4cb2-a6be-58d3ba4c42c5">
+</div>
+</div>
+</section>
+<section id="outline-container-h:de8f1344-1a9d-4e80-9258-aa95f1f01b61" class="outline-2">
+<h2 id="h:de8f1344-1a9d-4e80-9258-aa95f1f01b61"><a href="#h:de8f1344-1a9d-4e80-9258-aa95f1f01b61">VMware vSphere</a></h2>
+<div class="outline-text-2" id="text-h:de8f1344-1a9d-4e80-9258-aa95f1f01b61">
+<p>
+官方链接 :<a href="https://www.vmware.com/cn/products/vSphere.html">https://www.vmware.com/cn/products/vSphere.html</a>
+</p>
+</div>
+<div id="outline-container-h:52ab8592-8a24-4625-864f-0bd22158d5c1" class="outline-3">
+<h3 id="h:52ab8592-8a24-4625-864f-0bd22158d5c1"><a href="#h:52ab8592-8a24-4625-864f-0bd22158d5c1">版本选择</a></h3>
+<div class="outline-text-3" id="text-h:52ab8592-8a24-4625-864f-0bd22158d5c1">
+<p>
+版本选择选择：5.0 5.5 6.5 6.7 7.0 8.0
+</p>
+<ul class="org-ul">
+<li>standard</li>
+<li>Enterprise</li>
+<li>Enterprise plus</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c884c1a4-2d06-41bd-bf7a-cac8ac592392" class="outline-3">
+<h3 id="h:c884c1a4-2d06-41bd-bf7a-cac8ac592392"><a href="#h:c884c1a4-2d06-41bd-bf7a-cac8ac592392">发行版本说明</a></h3>
+<div class="outline-text-3" id="text-h:c884c1a4-2d06-41bd-bf7a-cac8ac592392">
+<p>
+VMware ESXi 版本和内部版本号历史记录
+</p>
+
+<p>
+参考链接
+<a href="https://blog.csdn.net/z136370204/article/details/97042440">https://blog.csdn.net/z136370204/article/details/97042440</a>
+</p>
+
+
+<p>
+VMware vSphere 6.7 发行说明
+</p>
+
+<p>
+<a href="https://docs.vmware.com/cn/VMware-vSphere/6.7/rn/vsphere-esxi-vcenter-server-67-release-notes.html">https://docs.vmware.com/cn/VMware-vSphere/6.7/rn/vsphere-esxi-vcenter-server-67-release-notes.html</a>
+</p>
+
+<pre class="example" id="org0825948">
+与 vSphere 6.5 所支持的处理器相比较，vSphere 6.7 不再支持以下处理器：
+Xeon 31xx、33xx、34xx Lynnfield 和 Clarkdale、35xx 和 36xx 系列
+Xeon 52xx、54xx、55xx、56xx 系列
+Xeon 65xx 系列
+Xeon 75xx 和 74xx 系列
+i3/i5 Clarkdale 系列
+i7-620LE 处理器系列
+各种 i3/i5/i7
+Nehalem/Bloomfield/Clarksfield、Lynnfield、Clarkdale/Arrandale、Westmere/Gulftown 系列
+AMD Barcelona、Shanghai、Champlain、Rana、Istanbul、Magny-Cours、Lisbon 系列
+Opteron 13xx、23xx、24xx、41xx、61xx、83xx、84xx 系列
+Athlon-II-X2 Champlain、Athlon-II-X3/X4 Rana 系列
+</pre>
+
+<p>
+VMware vSphere 8 发行说明
+</p>
+
+<p>
+<a href="https://docs.vmware.com/cn/VMware-vSphere/8.0/rn/vmware-vsphere-80-release-notes/index.html">https://docs.vmware.com/cn/VMware-vSphere/8.0/rn/vmware-vsphere-80-release-notes/index.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:5d4ac200-1e3a-425f-9835-a200e5d96472" class="outline-3">
+<h3 id="h:5d4ac200-1e3a-425f-9835-a200e5d96472"><a href="#h:5d4ac200-1e3a-425f-9835-a200e5d96472">申请使用 VMware vSphere</a></h3>
+<div class="outline-text-3" id="text-h:5d4ac200-1e3a-425f-9835-a200e5d96472">
+<p>
+需要注册账号并申请试用
+</p>
+
+<p>
+1.注册账号
+</p>
+
+<p>
+<a href="https://my.vmware.com/cn/web/VMware/registration">https://my.vmware.com/cn/web/VMware/registration</a>
+</p>
+
+<p>
+需要到邮箱验证激活自己的帐号
+</p>
+
+<p>
+收到邮件,后激活帐号
+</p>
+
+
+<p>
+2.申请试用VMware vSphere
+</p>
+
+<p>
+默认的帐号不能下载安装包，需要申请试用相应的产品才可以下载
+</p>
+
+<p>
+<a href="https://www.vmware.com/cn/try-VMware.html">https://www.vmware.com/cn/try-VMware.html</a>
+</p>
+
+<p>
+<a href="https://my.vmware.com/cn/group/VMware/evalcenter?p=vSphere-eval-7">https://my.vmware.com/cn/group/VMware/evalcenter?p=vSphere-eval-7</a>
+</p>
+
+<p>
+3.下载VMware vSphere安装程序
+</p>
+
+<p>
+<a href="https://my.vmware.com/cn/group/VMware/home">https://my.vmware.com/cn/group/VMware/home</a>
+</p>
+
+<p>
+<a href="https://my.vmware.com/cn/web/VMware/info/slug/datacenter_cloud_infrastructure/VMware_vSphere/6_7">https://my.vmware.com/cn/web/VMware/info/slug/datacenter_cloud_infrastructure/VMware_vSphere/6_7</a>
+</p>
+
+<p>
+试用申请通过之后就可以下载安装镜像
+</p>
+</div>
+</div>
+<div id="outline-container-h:d1386af4-d05e-4080-8cbb-96b19283d321" class="outline-3">
+<h3 id="h:d1386af4-d05e-4080-8cbb-96b19283d321"><a href="#h:d1386af4-d05e-4080-8cbb-96b19283d321">开始安装 VMware ESXi</a></h3>
+<div class="outline-text-3" id="text-h:d1386af4-d05e-4080-8cbb-96b19283d321">
+<p>
+VMware vSphere 文档：
+<a href="https://docs.vmware.com/cn/VMware-vSphere/index.html">https://docs.vmware.com/cn/VMware-vSphere/index.html</a>
+</p>
+</div>
+<div id="outline-container-h:b30a3c64-7dea-46d0-bd5d-9149ffaf56aa" class="outline-4">
+<h4 id="h:b30a3c64-7dea-46d0-bd5d-9149ffaf56aa"><a href="#h:b30a3c64-7dea-46d0-bd5d-9149ffaf56aa">新建宿主机</a></h4>
+<div class="outline-text-4" id="text-h:b30a3c64-7dea-46d0-bd5d-9149ffaf56aa">
+<p>
+生产环境中宿主机都是物理机,推荐采用较高的硬件配置,如下示例
+</p>
+
+<pre class="example" id="orgbc8695f">
+DELL R740XD
+
+CPU: 2个CPU 每个CPU 12C*2(线程)=24    48c
+内存: 128G内存 8根*16G
+磁盘: 8块600G 15K/RPM RAID10
+双口万光纤以太网卡
+iDRAC(integrated Dell Remote Access Controller)远程控制卡
+
+运行虚拟机: 15个左右虚拟机,每个虚拟机配置: CPU4C 内存8G 硬盘60G
+</pre>
+
+<p>
+本此为实验环境, 用虚拟机实现宿主机
+</p>
+
+<p>
+基于VMware workstation虚拟机运行VMware ESXi，安装两台ESXi服务器，IP地址分别是10.0.0.101和10.0.0.102
+</p>
+
+<pre class="example" id="orga37c93d">
+- 稍后指定操作系统
+- 选择对应的VMware ESXi版本
+- 指定虚拟及名称及路径
+- 指定磁盘文件大小200G
+- 创建完成虚拟机
+- 选择ESXi安装镜像
+- 调整内存大小和CPU个数及开启虚拟化功能.如 8vCPU, 8memory , 勾选虚拟化引擎-硬件辅助虚拟化
+</pre>
+</div>
+<div id="outline-container-h:4fb4c2ed-b50c-4f87-8268-91075722be34" class="outline-5">
+<h5 id="h:4fb4c2ed-b50c-4f87-8268-91075722be34"><a href="#h:4fb4c2ed-b50c-4f87-8268-91075722be34">开始安装ESXi节点</a></h5>
+<div class="outline-text-5" id="text-h:4fb4c2ed-b50c-4f87-8268-91075722be34">
+<pre class="example" id="org5767cb8">
+- 界面中，回车。确认安装
+- 同意协议。按F11同意license
+- 扫描可用硬件
+- 选择硬盘并安装。回车
+- 选择键盘：US default
+- 设置管理员密码
+
+   注意: 密码最少七位，且必须符合密码复杂度要求
+- 开始安装。按F11开始安装
+- 安装过程中
+- 安装完成。回车，重启操作系统。
+</pre>
+</div>
+</div>
+<div id="outline-container-h:4ffed500-305d-469a-b964-66cd8201fe1b" class="outline-5">
+<h5 id="h:4ffed500-305d-469a-b964-66cd8201fe1b"><a href="#h:4ffed500-305d-469a-b964-66cd8201fe1b">配置IP地址</a></h5>
+<div class="outline-text-5" id="text-h:4ffed500-305d-469a-b964-66cd8201fe1b">
+<p>
+第一次重启后,默认为DHCP获取的IP地址,通常会将服务器配置为静态IP地址,
+</p>
+
+<ul class="org-ul">
+<li>默认获取的动态IP,按F2进行登录</li>
+<li>登录服务器。输入root及密码</li>
+<li><p>
+设置静态IP。选中Configure Management Network 进入,再选中IPv4 configuration进行IP配置,回车确定
+</p>
+
+<p>
+默认为通过DHCP获取的IP地址,修改为静态IP地址
+</p>
+
+<p>
+回车进行IP配置
+</p>
+
+<p>
+空格选中Set static IPv4 后,输入指定的IP地址后,回车确定
+</p></li>
+
+<li><p>
+配置DNS
+</p>
+
+<p>
+180.76.76.76    223.6.6.6
+</p>
+
+<p>
+选中 DNS Coniguration 进入下面界面进行DNS 和主机名的配置,完成后回车确定。
+</p></li>
+
+<li><p>
+重启网络服务
+</p>
+
+<p>
+上面界面完成后, 按ESC退出后，再按Y确认重启网络服务
+</p></li>
+
+<li>启用本地登录和ssh服务连接功能
+
+<ul class="org-ul">
+<li>选中 Troubleshoot Options 进行 ssh 服务配置</li>
+
+<li>选中 Enable ESXi shell 回车启用shell，开启本地登录功能</li>
+
+<li>选中 Enable SSH 回车启用 ssh服务,成功后可以看到下面显示</li>
+</ul></li>
+
+<li>本地登录修改ssh服务允许基于密码登录</li>
+</ul>
+
+<p>
+默认无法用密码登录ssh服务,只支持基于key登录, 需要修改配置才可以实现基于密码登录
+</p>
+
+<p>
+按 alt + F1 组合键可以看到下面界面,输入用户密码登录
+</p>
+
+<pre class="example" id="org1c57fb0">
+修改sshd服务的配置文件/etc/ssh/sshd_config
+
+将 PasswordAuthentication 此行，密码验证 no 修改为 yes 并保存
+
+下面一步可选不执行也能生效
+
+执行命令 /etc/init.d/SSH restart 或 services.sh restart 生效
+
+测试 ssh 远程基于密码进行连接
+</pre>
+</div>
+</div>
+<div id="outline-container-h:c8f099cf-2384-4693-93e7-e94f216a4edb" class="outline-5">
+<h5 id="h:c8f099cf-2384-4693-93e7-e94f216a4edb"><a href="#h:c8f099cf-2384-4693-93e7-e94f216a4edb">登录web管理界面</a></h5>
+<div class="outline-text-5" id="text-h:c8f099cf-2384-4693-93e7-e94f216a4edb">
+<p>
+通过浏览器可以单独访问web界面进行单机管理
+</p>
+
+<ul class="org-ul">
+<li>使用浏览器访问 node IP地址.  <a href="https://10.0.0.101">https://10.0.0.101</a></li>
+</ul>
+
+<p>
+注册正式版本： 管理&#x2013;&gt;许可
+</p>
+
+<p>
+web管理界面首页
+</p>
+<ul class="org-ul">
+<li>"虚拟机" 可创建虚拟</li>
+<li>“存储” 可以上传光盘镜像iso文件</li>
+</ul>
+
+<p>
+通过VMware workstation管理ESXi:  VMware workstation 文件&#x2013;连接到服务器：
+</p>
+
+
+<p>
+安装第二台ESXi主机
+</p>
+<ul class="org-ul">
+<li>主机名为 esxi-node2.cici.org</li>
+<li>IP地址: 10.0.0.102</li>
+<li>安装同第一台ESXi主机,过程略</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e58a9264-4c21-4e13-8f84-a0516e2323ef" class="outline-3">
+<h3 id="h:e58a9264-4c21-4e13-8f84-a0516e2323ef"><a href="#h:e58a9264-4c21-4e13-8f84-a0516e2323ef">通过web界面在ESXi创建虚拟机</a></h3>
+<div class="outline-text-3" id="text-h:e58a9264-4c21-4e13-8f84-a0516e2323ef">
+<p>
+注意:安装完虚拟机后,建议将光驱剥离虚拟机,防止迁移的问题
+</p>
+
+<p>
+修改虚拟机的配置,建议关机修改,在线可能会比较慢
+</p>
+</div>
+<div id="outline-container-h:8fcc7e20-309b-472f-80c2-8567b8794262" class="outline-4">
+<h4 id="h:8fcc7e20-309b-472f-80c2-8567b8794262"><a href="#h:8fcc7e20-309b-472f-80c2-8567b8794262">ESXi宿主机开启硬件辅助虚拟化</a></h4>
+<div class="outline-text-4" id="text-h:8fcc7e20-309b-472f-80c2-8567b8794262">
+<p>
+VMware vSphere 必须依赖宿主机开启硬件辅助虚拟化功能，即必须在宿主机的BIOS设置中开启Intel vt-x，如果是AMD CPU则是开启AMD-V。
+</p>
+
+<p>
+开启过程：
+</p>
+</div>
+</div>
+<div id="outline-container-h:82934356-5023-47b1-b229-375b6bc300d8" class="outline-4">
+<h4 id="h:82934356-5023-47b1-b229-375b6bc300d8"><a href="#h:82934356-5023-47b1-b229-375b6bc300d8">准备需要安装系统的ISO镜像</a></h4>
+<div class="outline-text-4" id="text-h:82934356-5023-47b1-b229-375b6bc300d8">
+<p>
+将 ISO文件上传至保存在当前ESXi节点上
+</p>
+
+<p>
+存储&#x2014;数据存储浏览器&#x2014;创建目录
+</p>
+
+<p>
+新建目录后,点上载
+</p>
+
+<p>
+多次上传生产使用的ISO镜像
+</p>
+
+<p>
+上传的ISO文件实际保存在ESXi主机的目录 /vmfs/volumes/datastore1/ISOs中
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@esxi-node1:~] ls /vmfs/volumes/datastore1/ISOs/
+CentOS-7-x86_64-Minimal-2003.iso &#160;CentOS-8.2.2004-x86_64-minimal.iso
+</pre>
+</div>
+
+<p>
+当然，也可以连接一个nfs共享存储，将镜像文件都放到共享存储中。
+</p>
+</div>
+</div>
+<div id="outline-container-h:45a790b0-68dc-46cf-9c32-13bd87451678" class="outline-4">
+<h4 id="h:45a790b0-68dc-46cf-9c32-13bd87451678"><a href="#h:45a790b0-68dc-46cf-9c32-13bd87451678">创建虚拟机</a></h4>
+<div class="outline-text-4" id="text-h:45a790b0-68dc-46cf-9c32-13bd87451678">
+<p>
+通过web界面创建虚拟机的详细过程
+</p>
+
+<ul class="org-ul">
+<li>开始创建虚拟机并选择类型. 虚拟机-&#x2014;新建/注册虚拟机, 按下面显示安装</li>
+
+<li>定义虚拟机名称与版本. 如果安装windows 无需像KVM一样,加载软驱或光盘用来 安装virtIO驱动</li>
+
+<li>定义存储. 默认设置即可</li>
+
+<li>自定义配置. 虚拟机基础信息定义</li>
+
+<li>基础信息配置
+
+<ul class="org-ul">
+<li>硬盘默认即可</li>
+<li>硬盘配置</li>
+<li>磁盘置备说明</li>
+<li>选择ISO镜像</li>
+</ul></li>
+</ul>
+
+<p>
+磁盘置备说明
+</p>
+<pre class="example" id="org8e44ada">
+1、厚置备延迟置零(默认 default)：
+默认的创建格式，创建过程中为虚拟磁盘分配所需空间。创建时不会擦除物理设备上保留的任何数据，没有置
+零操作，当有IO操作时，需要等待清零操作完成后才能完成IO，
+即：分配好空间，执行写操作时才会按需要将其置零。
+
+2、厚置备置零(thick)：
+创建支持群集功能的厚磁盘。在创建时为虚拟磁盘分配所需的空间。并将物理设备上保留的数据置零。创建这
+种格式的磁盘所需的时间可能会比创建其他类型的磁盘长。
+即：分配好空间并置零操作，有IO的时无需等待任何操作直接执行。
+
+3、精简置备（thin）：
+精简配置就是无论磁盘分配多大，实际占用存储大小是现在使用的大小，即用多少算多少。当客户机有输入输
+出的时候，VMkernel首先分配需要的空间并进行清零操作，也就是说如果使用精简配置在有IO的时候需要：
+等待分配空间和清零，这两个步骤完成后才能进行操作，对于IO叫频繁的应用这样性能会有所下降，虽然节省
+了存储空间。
+</pre>
+
+<p>
+磁盘模式说明
+</p>
+
+<pre class="example" id="orge875a40">
+从属:是默认的磁盘模式，它既无特殊性也无特殊要求，只有普通的vmdk磁盘。创建快照后，数据将与磁盘增
+量一起保存，以根据需要添加到现有数据中或删除。
+
+独立-持久:如果经常使用快照功能，则它非常有用。还原快照时，在此模式下它完全不会影响磁盘。这种磁盘
+在数据不需要恢复到初始状态的情况下非常有用，例如系统日志或站点日志，其内容需要保存在当前状态。删
+除快照时切换到此磁盘模式，如果启动或停止VM，数据将保持不变。
+
+独立-非持久:这是一个重做磁盘，这意味着如果在启用“独立–非–持久”模式的情况下启动VM，则所有更改都
+将写入磁盘增量中。以前存在的数据为只读。因此，如果停止或启动虚拟机（不是重启，不影响任何操作），
+或者删除快照，则所有更改都将被放弃。
+
+总而言之，你可以打开和关闭这些模式中的每一个，但是请记住，只有在VM停止后才能这样做。
+</pre>
+
+
+<ul class="org-ul">
+<li>确认完成信息</li>
+</ul>
+
+
+<p>
+开始安装过程.
+</p>
+<pre class="example" id="orgbe360b3">
+- 打开虚拟机电源，开始系统安装：
+- 安装完成
+- 测试虚拟机的网络访问. 登录虚拟机后可以访问外网, 从外网也能访问此虚拟机
+- 安装另一台 ubuntu 虚拟机
+</pre>
+</div>
+</div>
+<div id="outline-container-h:2b332b67-6bf0-4748-aa2b-d71901c7d796" class="outline-4">
+<h4 id="h:2b332b67-6bf0-4748-aa2b-d71901c7d796"><a href="#h:2b332b67-6bf0-4748-aa2b-d71901c7d796">管理虚拟机</a></h4>
+<div class="outline-text-4" id="text-h:2b332b67-6bf0-4748-aa2b-d71901c7d796">
+<p>
+配置IP并测试远程登录，在每台ESXi宿主机分别安装一台虚拟机，IP地址设置为10.0.0.103/104
+</p>
+
+<p>
+<b>配置静态IP</b>
+</p>
+
+<p>
+登录到虚拟机配置网卡名称并设置静态IP地址
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]# cat /etc/default/grub
+<span class="org-variable-name">GRUB_TIMEOUT</span>=5
+<span class="org-variable-name">GRUB_DISTRIBUTOR</span>=<span class="org-string">"$(sed 's, release .*$,,g' /etc/system-release)"</span>
+<span class="org-variable-name">GRUB_DEFAULT</span>=saved
+<span class="org-variable-name">GRUB_DISABLE_SUBMENU</span>=true
+<span class="org-variable-name">GRUB_TERMINAL_OUTPUT</span>=<span class="org-string">"console"</span>
+<span class="org-variable-name">GRUB_CMDLINE_LINUX</span>=<span class="org-string">"crashkernel=auto resume=/dev/mapper/cl-swap rd.lvm.lv=cl/root rd.lvm.lv=cl/swap net.ifnames=0"</span>
+<span class="org-variable-name">GRUB_DISABLE_RECOVERY</span>=<span class="org-string">"true"</span>
+<span class="org-variable-name">GRUB_ENABLE_BLSCFG</span>=true
+
+[root@centos8 ~]# grub2-mkconfig -o /etc/grub2.cfg
+
+[root@centos8 ~]# cat /etc/sysconfig/network-scripts/ifcfg-eth0
+<span class="org-variable-name">TYPE</span>=<span class="org-string">"Ethernet"</span>
+<span class="org-variable-name">BOOTPROTO</span>=<span class="org-string">"static"</span>
+<span class="org-variable-name">NAME</span>=<span class="org-string">"eth0"</span>
+<span class="org-variable-name">DEVICE</span>=<span class="org-string">"eth0"</span>
+<span class="org-variable-name">IPADDR</span>=10.0.0.11
+<span class="org-variable-name">PREFIX</span>=24
+<span class="org-variable-name">GATEWAY</span>=10.0.0.2
+<span class="org-variable-name">DNS1</span>=180.76.76.76
+<span class="org-variable-name">DNS2</span>=223.6.6.6
+<span class="org-variable-name">ONBOOT</span>=<span class="org-string">"yes"</span>
+
+[root@centos8 ~]# systemctl disable --now firewalld
+
+[root@centos8 ~]# vim /etc/selinux/config
+<span class="org-variable-name">SELINUX</span>=disabled
+</pre>
+</div>
+
+<p>
+<b>远程连接虚拟机</b>
+</p>
+
+<p>
+通过配置好的静态IP地址测试是否可以远程连接
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Connecting to 10.0.0.11:22...
+Connection established.
+
+[root@centos8 ~]# hostname -I
+10.0.0.11
+[root@centos8 ~]# ping www.baidu.com -c6
+PING www.a.shifen.com (61.135.185.32) 56(84) bytes of data.
+64 bytes from 61.135.185.32 (61.135.185.32): <span class="org-variable-name">icmp_seq</span>=1 <span class="org-variable-name">ttl</span>=128 <span class="org-variable-name">time</span>=16.1 ms
+</pre>
+</div>
+
+<p>
+<b>将虚拟机的光驱卸载</b>
+</p>
+
+<p>
+关闭虚拟机后,再将虚拟机光驱卸载,以防止后期迁移虚拟机出错
+</p>
+
+<p>
+注意: 关闭虚拟机后再修改配置,否则会很慢
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:faa330ed-f973-4df8-a635-24bec145d1bf" class="outline-2">
+<h2 id="h:faa330ed-f973-4df8-a635-24bec145d1bf"><a href="#h:faa330ed-f973-4df8-a635-24bec145d1bf">安装 VMware vCenter Server</a></h2>
+<div class="outline-text-2" id="text-h:faa330ed-f973-4df8-a635-24bec145d1bf">
+<p>
+安装VMware vSphere vcenter管理程序
+</p>
+</div>
+<div id="outline-container-h:8885c2f0-8c50-4bd5-ad17-90842c8086da" class="outline-3">
+<h3 id="h:8885c2f0-8c50-4bd5-ad17-90842c8086da"><a href="#h:8885c2f0-8c50-4bd5-ad17-90842c8086da">安装系统的 环境依赖</a></h3>
+<div class="outline-text-3" id="text-h:8885c2f0-8c50-4bd5-ad17-90842c8086da">
+<p>
+必须安装在系统版本是Windows Server 2008 SP2(需要打补丁和相关运行时环境)或更高版本，本环境以Windows Server 2016为例。
+</p>
+
+<ul class="org-ul">
+<li>支持的操作系统. 假如操作系统不符合要求，则报错</li>
+
+<li>内存大小符合要求. VMware vSphere需要最小8176MB内存，假如内存大小不符合要求，则报错如下：</li>
+
+<li>系统环境符合安装要求. Windows Server 2008 系统需要安装运行时, Windows Server 2016则无需安装</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:b75517f0-8ef0-4f18-bef6-d104643e49d3" class="outline-3">
+<h3 id="h:b75517f0-8ef0-4f18-bef6-d104643e49d3"><a href="#h:b75517f0-8ef0-4f18-bef6-d104643e49d3">安装Windows Server</a></h3>
+<div class="outline-text-3" id="text-h:b75517f0-8ef0-4f18-bef6-d104643e49d3">
+<p>
+安装windows server 2016以上版本的server系统，并将其内存设置为大于8g。
+</p>
+
+<ul class="org-ul">
+<li>新建Windows Server 宿主机. 调整内存大于8G和CPU个数,挂载window 2016的光盘</li>
+
+<li><p>
+Windows Server 2016安装过程. 打开虚拟机并开始安装Windows Server 2016安装, 任意键从CD或者DVD启动
+</p>
+
+<p>
+Windows Server 2016 Standard 和Datacenter版本比较
+</p>
+
+<p>
+<a href="https://docs.microsoft.com/zh-cn/windows-server/get-started/2016-edition-comparison">https://docs.microsoft.com/zh-cn/windows-server/get-started/2016-edition-comparison</a>
+</p>
+
+<p>
+注意: 选择Datacenter(桌面体验)选项
+</p></li>
+
+<li><p>
+登录并修改配置
+</p>
+
+<p>
+设置用户密码
+</p>
+
+<p>
+登录系统：需要ctrl+alt+delete组合键登录：
+</p>
+
+<p>
+登录后的界面：
+</p>
+
+<p>
+配置静态IP地址：
+</p>
+
+<p>
+建议关闭防火墙: 
+</p>
+
+<p>
+测试网络通信：
+</p>
+
+<p>
+建议对虚拟机做快照，方便后期恢复基础环境。
+</p></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:4398742b-c7b1-4a95-83a4-7182bd3b9dd4" class="outline-3">
+<h3 id="h:4398742b-c7b1-4a95-83a4-7182bd3b9dd4"><a href="#h:4398742b-c7b1-4a95-83a4-7182bd3b9dd4">安装VMware vCenter Server</a></h3>
+<div class="outline-text-3" id="text-h:4398742b-c7b1-4a95-83a4-7182bd3b9dd4">
+<p>
+在windows server 2016安装 VMware vcenter server
+</p>
+
+<ul class="org-ul">
+<li>将光盘换成 vcenter ISO镜像. 挂载光盘镜像 VMware-VIM-all-6.7.0-14367737.iso</li>
+
+<li>通过镜像加载安装程序. 运行autorun程序开始安装</li>
+</ul>
+
+<p>
+安装向导：
+</p>
+<pre class="example" id="org7e4c17c">
+- 开始安装
+- 同意许可
+- 选择嵌入式部署
+- 指定系统名称. 注意,此名称后期无法修改,如果无法解析可以使用IP
+- 系统名称需要配置DNS或hosts文件实现名称的解析. 修改DNS或hosts文件 c:\Windows\System32\drivers\etc\hosts
+- vCenter的管理员密码
+- 使用本地账户登录
+- 使用本地数据库
+- 确保防火墙打开以下端口
+- 确认安装目录
+- 确认安装信息
+- 安装过程中 时间较长
+- 安装完成
+</pre>
+
+<p>
+60天使用权，之后要买许可。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:627b805a-68e4-473f-9ec5-0d91cb05f710" class="outline-2">
+<h2 id="h:627b805a-68e4-473f-9ec5-0d91cb05f710"><a href="#h:627b805a-68e4-473f-9ec5-0d91cb05f710">管理 VMware vCenter</a></h2>
+<div class="outline-text-2" id="text-h:627b805a-68e4-473f-9ec5-0d91cb05f710">
+</div>
+<div id="outline-container-h:0bcdaccc-65b1-4fd4-a275-ba627e2ce25a" class="outline-3">
+<h3 id="h:0bcdaccc-65b1-4fd4-a275-ba627e2ce25a"><a href="#h:0bcdaccc-65b1-4fd4-a275-ba627e2ce25a">通过浏览器访问VMware vSphere</a></h3>
+<div class="outline-text-3" id="text-h:0bcdaccc-65b1-4fd4-a275-ba627e2ce25a">
+<p>
+输入下面地址访问
+</p>
+
+<pre class="example" id="org9aefcaa">
+http://10.0.0.100
+http://vcenter.cici.org #需要配置DNS或hosts解析
+</pre>
+
+<p>
+选择 启动 vSphere Client (HTML5)
+</p>
+
+<p>
+登录用户: administrator@vSphere.local
+</p>
+
+<p>
+密码: 安装时指定
+</p>
+</div>
+</div>
+<div id="outline-container-h:7a3aff95-e398-4cb8-b217-97fad8f00d97" class="outline-3">
+<h3 id="h:7a3aff95-e398-4cb8-b217-97fad8f00d97"><a href="#h:7a3aff95-e398-4cb8-b217-97fad8f00d97">添加ESXi主机到 VMware vCenter管理</a></h3>
+<div class="outline-text-3" id="text-h:7a3aff95-e398-4cb8-b217-97fad8f00d97">
+<p>
+新建数据中心. 右键单击&#x2013;&gt;新建数据中心 &#x2013;&gt; 定义数据中心名称
+</p>
+
+<pre class="example" id="orgc53aa05">
+在数据中心中添加ESXi主机. 将配置好的两台ESXi主机分别添加至vcenter进行统一管理，需要网络必须可以连接。
+- 通过主机 IP添加
+- 连接用户名和密码
+- 信任证书
+- 主机摘要信息
+- 锁定模式. 保持默认的禁用的状态,否则ESXi主机将无法本地登录
+- 定义虚拟机位置
+- 最终主机信息
+- 执行主机添加任务. 等待VCenter 将ESXi 主机添加进来,下面有进度显示
+- 主机中的虚拟机信息. 添加完成后,可以在主机中看到ESXi上面的虚拟机的信息
+</pre>
+
+<p>
+重复上面过程将第二台ESXi添加至数据中心, 过程略
+</p>
+</div>
+</div>
+<div id="outline-container-h:ab718bda-c5ea-4bcf-9c73-1dbbe0342e05" class="outline-3">
+<h3 id="h:ab718bda-c5ea-4bcf-9c73-1dbbe0342e05"><a href="#h:ab718bda-c5ea-4bcf-9c73-1dbbe0342e05">利用 vCenter 管理已有虚拟机</a></h3>
+<div class="outline-text-3" id="text-h:ab718bda-c5ea-4bcf-9c73-1dbbe0342e05">
+<pre class="example" id="org691861e">
+- 确认虚拟机状态. 确认已有的虚拟机是开机状态，否则请单独打开虚拟机电源
+- 启动虚拟机控制台
+- 登录虚拟机控制台窗口
+- 配置虚拟机静态IP
+- 验证网络通信
+- 验证web访问
+</pre>
+
+<p>
+安装web服务如apache或者nginx，并验证是否可以从局域网访问虚拟机,配置web服务器
+</p>
+</div>
+</div>
+<div id="outline-container-h:8569058d-4bf5-45b0-9bdf-d7efd5ac23c9" class="outline-3">
+<h3 id="h:8569058d-4bf5-45b0-9bdf-d7efd5ac23c9"><a href="#h:8569058d-4bf5-45b0-9bdf-d7efd5ac23c9">批量管理虚拟机</a></h3>
+<div class="outline-text-3" id="text-h:8569058d-4bf5-45b0-9bdf-d7efd5ac23c9">
+<p>
+<b>将虚拟机克隆生成新的虚拟机</b>
+</p>
+
+<p>
+基于现在的虚拟机克隆来创建新的虚拟机
+</p>
+
+<p>
+如果跨ESXi主机克隆虚拟机,需要事先将光盘断开连接
+</p>
+
+<p>
+注意:先关闭虚拟机再修改配置
+</p>
+
+<p>
+选择存储
+</p>
+
+<p>
+<b>将虚拟机克隆成模版</b>
+</p>
+
+<p>
+虚拟机右键&#x2013;&gt;虚拟机克隆为模板
+</p>
+
+<p>
+注意: 在克隆前先将虚拟机的IP修改为DHCP,访止IP地址冲突
+</p>
+
+<p>
+<b>基于模版创建虚拟机</b>
+</p>
+
+<p>
+生产中经常利用模版批量创建虚拟机,比手动安装虚拟机可以大大提高效率
+</p>
+
+<p>
+<b>将虚拟机转换为模版</b>
+</p>
+
+<p>
+注意:将虚拟机转换成模版需要先关机虚拟机才能转换
+</p>
+
+<p>
+<b>将模版转换成虚拟机</b>
+</p>
+
+<p>
+注意: 模版转换虚拟机时,必须都在同一台ESXi主机实现,跨主机会失败
+</p>
+
+<p>
+模版转化为虚拟机时,必须模版和虚拟机必须选择在同一个ESXi主机
+</p>
+
+<p>
+<b>将Windows Server 虚拟机转换为模版,并基于它创建新的虚拟机</b>
+</p>
+
+<pre class="example" id="org5a9fc01">
+- 安装 Windows Server 运行sysprep程序删除个性信息 c:\Windows\System32\sysprep\sysprep.exe
+  - 系统清理操作选择“进入系统全新体验”，关机选项选择“关机”
+- 将虚拟机转换为模版
+- 基于模版创建虚拟机
+- 新的虚拟机第一次开机会重新做初始化生成新的主机名和密码等个性信息
+</pre>
+</div>
+</div>
+<div id="outline-container-h:599cb15c-6483-4e74-9635-484e2689aa27" class="outline-3">
+<h3 id="h:599cb15c-6483-4e74-9635-484e2689aa27"><a href="#h:599cb15c-6483-4e74-9635-484e2689aa27">实现虚拟机迁移</a></h3>
+<div class="outline-text-3" id="text-h:599cb15c-6483-4e74-9635-484e2689aa27">
+<p>
+实现将虚拟机在VMware ESXi主机之前修改光盘配置,访止迁移中出现问题
+</p>
+</div>
+<div id="outline-container-h:ba53741f-81cf-4149-81e0-003a5a415e1a" class="outline-4">
+<h4 id="h:ba53741f-81cf-4149-81e0-003a5a415e1a"><a href="#h:ba53741f-81cf-4149-81e0-003a5a415e1a">配置vMotion专用网络</a></h4>
+<div class="outline-text-4" id="text-h:ba53741f-81cf-4149-81e0-003a5a415e1a">
+<p>
+实现虚拟机跨主机迁移前,必须在每个ESXi主机先建vMotion 网络,否则会出现错误
+</p>
+
+<p>
+<b>在第一个ESXi主机添加vMotion网络</b>
+</p>
+
+<pre class="example" id="org4d8fce6">
+添加网络
+- 主机—配置—虚拟交换机—添加网络
+- 或者直接点源ESXi主机,右键添加网络
+
+选择连接类型, 默认
+选择目标设备。选择现有的标准交换机--浏览--选择交换机
+指定端口属性. 在已启用的服务勾选vMotion选项实现虚拟机迁移
+IP地址配置. 指定IP,可以和ESXi主机不在一个网段
+验证最终信息
+</pre>
+
+<p>
+可以在虚拟交换机看到多了一个实现迁移的虚拟交换机网络。
+</p>
+
+<p>
+<b>在第二台ESXi主机也创建vMotion网络</b>
+</p>
+
+<p>
+在第二台主机也重复上面步骤,指定同一网段的IP
+</p>
+
+<p>
+注：各node节点都要添加vMotion网络，IP地址不能冲突
+</p>
+</div>
+</div>
+<div id="outline-container-h:4d314781-fa04-4ba8-be14-88ca71204f94" class="outline-4">
+<h4 id="h:4d314781-fa04-4ba8-be14-88ca71204f94"><a href="#h:4d314781-fa04-4ba8-be14-88ca71204f94">执行虚拟机迁移</a></h4>
+<div class="outline-text-4" id="text-h:4d314781-fa04-4ba8-be14-88ca71204f94">
+<p>
+检测实时迁移丢包情况，ping要迁移的虚拟机ip，观察
+</p>
+
+<p>
+在VMware ESXi主机中，选择要迁移的目标虚拟机，选中后右键单击，然后选择迁移
+</p>
+
+<pre class="example" id="org1d23231">
+- 开始迁移
+- 选择迁移类型. 由于没有使用共享存储，所以要选择更改计算资源和存储。
+- 选择目标主机
+- 选择目标主机存储
+- 选择网络
+- 选择vMotion优先级
+- 最终迁移信息
+</pre>
+
+<pre class="example" id="org30e8e4a">
+- 验证迁移后的虚拟机网络通信是否正常
+- 验证迁移过程的虚拟机网络通信是否正常
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

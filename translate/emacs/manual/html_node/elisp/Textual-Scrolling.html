@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Textual Scrolling (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Textual Scrolling (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Textual Scrolling (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Windows.html" rel="up" title="Windows">
+<link href="Vertical-Scrolling.html" rel="next" title="Vertical Scrolling">
+<link href="Window-Start-and-End.html" rel="prev" title="Window Start and End">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+dt.def-line {font-size: 1rem}
+kbd.kbd {font-style: oblique}
+kbd.key {font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Textual-Scrolling">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Vertical-Scrolling.html" accesskey="n" rel="next">垂直分数滚动</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Window-Start-and-End.html" accesskey="p" rel="prev">窗口起始与结束位置</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Windows.html" accesskey="u" rel="up">Windows</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_6587_672c_6eda_52a8"><span>29.21 文本滚动<a class="copiable-link" href="#g_t_6587_672c_6eda_52a8"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-textual-scrolling"></a>
+<a class="index-entry-id" id="index-scrolling-textually"></a>
+
+<p><em class="dfn">文本滚动（Textual scrolling）</em> 指在窗口内将文本向上或向下移动。
+其实现方式是修改窗口的显示起始位置。
+它也可能会改变 <code class="code">window-point</code> 的值，以保证点（point）保持在屏幕可见范围内（see <a class="pxref" href="Window-Point.html">窗口（window）与点（Point）</a>）。
+</p>
+<p>基础的文本滚动函数是 <code class="code">scroll-up</code>（向前滚动）和 <code class="code">scroll-down</code>（向后滚动）。
+在这些函数名称中，“上”和“下”是相对于窗口而言的缓冲区文本移动方向。
+你可以想象文本写在一长条纸上，滚动命令控制这张纸上下移动。
+因此，如果你正查看缓冲区中部，并反复调用 <code class="code">scroll-down</code>，最终会看到缓冲区开头。
+</p>
+<p>遗憾的是，这有时会造成混淆，因为有些人习惯用相反的理解方式：
+他们想象窗口在静止的文本上移动，因此“向下”命令会带你到缓冲区末尾。
+这种习惯与现代键盘上名为 <kbd class="key">PageDown</kbd> 的按键功能是一致的。
+</p>
+<p>如果当前缓冲区并非选中窗口所显示的缓冲区，文本滚动函数（<code class="code">scroll-other-window</code> 除外）会产生不可预测的结果。See <a class="xref" href="Current-Buffer.html">当前缓冲区</a>。
+</p>
+<p>如果窗口内某一行的高度大于窗口本身高度（例如存在大图片），滚动函数会调整窗口的垂直滚动位置，以滚动显示这部分可见的行。
+Lisp 调用者可以通过将变量 <code class="code">auto-window-vscroll</code> 绑定为 <code class="code">nil</code> 来禁用该功能（see <a class="pxref" href="Vertical-Scrolling.html">垂直分数滚动</a>）。
+</p>
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-scroll_002dup"><span class="category-def">Command: </span><span><strong class="def-name">scroll-up</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-scroll_002dup"> &para;</a></span></dt>
+<dd><p>该函数在选中窗口中向前滚动 <var class="var">count</var> 行文本。
+</p>
+<p>若 <var class="var">count</var> 为负数，则改为向后滚动。
+若 <var class="var">count</var> 为 <code class="code">nil</code>（或省略），滚动距离为窗口主体高度减去 <code class="code">next-screen-context-lines</code> 行。
+</p>
+<p>若选中窗口已无法继续滚动，该函数会抛出错误。
+否则返回 <code class="code">nil</code>。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-scroll_002ddown"><span class="category-def">Command: </span><span><strong class="def-name">scroll-down</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-scroll_002ddown"> &para;</a></span></dt>
+<dd><p>该函数在选中窗口中向后滚动 <var class="var">count</var> 行文本。
+</p>
+<p>若 <var class="var">count</var> 为负数，则改为向前滚动。
+在其他方面，其行为与 <code class="code">scroll-up</code> 一致。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-scroll_002dup_002dcommand"><span class="category-def">Command: </span><span><strong class="def-name">scroll-up-command</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-scroll_002dup_002dcommand"> &para;</a></span></dt>
+<dd><p>行为与 <code class="code">scroll-up</code> 类似，区别在于：若选中窗口已无法继续滚动，且变量 <code class="code">scroll-error-top-bottom</code> 的值为 <code class="code">t</code>，
+则会尝试将点移动到缓冲区末尾。
+若点已在末尾，则抛出错误。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-scroll_002ddown_002dcommand"><span class="category-def">Command: </span><span><strong class="def-name">scroll-down-command</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-scroll_002ddown_002dcommand"> &para;</a></span></dt>
+<dd><p>行为与 <code class="code">scroll-down</code> 类似，区别在于：若选中窗口已无法继续滚动，且变量 <code class="code">scroll-error-top-bottom</code> 的值为 <code class="code">t</code>，
+则会尝试将点移动到缓冲区开头。
+若点已在开头，则抛出错误。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-scroll_002dother_002dwindow"><span class="category-def">Command: </span><span><strong class="def-name">scroll-other-window</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-scroll_002dother_002dwindow"> &para;</a></span></dt>
+<dd><p>该函数将其他窗口中的文本向上滚动 <var class="var">count</var> 行。
+<var class="var">count</var> 为负数或 <code class="code">nil</code> 时的处理方式与 <code class="code">scroll-up</code> 相同。
+</p>
+<p>你可以通过将变量 <code class="code">other-window-scroll-buffer</code> 设置为某个缓冲区，来指定要滚动哪个缓冲区。
+若该缓冲区尚未显示，<code class="code">scroll-other-window</code> 会将其在某个窗口中显示。
+</p>
+<p>当选中窗口为小缓冲区（minibuffer）时，下一个窗口通常是其正上方最左侧的窗口。
+你可以在选中小缓冲区时，通过设置变量 <code class="code">minibuffer-scroll-window</code> 指定另一个要滚动的窗口。
+该变量在选中其他窗口时无效。
+当其非 <code class="code">nil</code> 且小缓冲区被选中时，优先级高于 <code class="code">other-window-scroll-buffer</code>。See <a class="xref" href="Minibuffer-Misc.html#Definition-of-minibuffer_002dscroll_002dwindow">Definition of minibuffer-scroll-window</a>。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-scroll_002dother_002dwindow_002ddown"><span class="category-def">Command: </span><span><strong class="def-name">scroll-other-window-down</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-scroll_002dother_002dwindow_002ddown"> &para;</a></span></dt>
+<dd><p>该函数将其他窗口中的文本向下滚动 <var class="var">count</var> 行。
+<var class="var">count</var> 为负数或 <code class="code">nil</code> 时的处理方式与 <code class="code">scroll-down</code> 相同。
+在其他方面，其行为与 <code class="code">scroll-other-window</code> 一致。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-other_002dwindow_002dscroll_002dbuffer"><span class="category-def">Variable: </span><span><strong class="def-name">other-window-scroll-buffer</strong><a class="copiable-link" href="#index-other_002dwindow_002dscroll_002dbuffer"> &para;</a></span></dt>
+<dd><p>若该变量非 <code class="code">nil</code>，它会告知 <code class="code">scroll-other-window</code> 滚动哪个缓冲区所在的窗口。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002dmargin"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-margin</strong><a class="copiable-link" href="#index-scroll_002dmargin"> &para;</a></span></dt>
+<dd><p>该选项用于设置滚动边距大小，即点与窗口顶部或底部之间保留的最小行数。
+每当点进入到距窗口顶部或底部此行数范围内时，重绘会自动滚动文本（尽可能），
+将点移出边距区域，更靠近窗口中心。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-maximum_002dscroll_002dmargin"><span class="category-def">User Option: </span><span><strong class="def-name">maximum-scroll-margin</strong><a class="copiable-link" href="#index-maximum_002dscroll_002dmargin"> &para;</a></span></dt>
+<dd><p>该变量将 <code class="code">scroll-margin</code> 的实际生效值限制为当前窗口行高的一个比例。
+例如，若当前窗口有 20 行，且 <code class="code">maximum-scroll-margin</code> 为 0.1，
+则无论 <code class="code">scroll-margin</code> 设置多大，滚动边距都不会超过 2 行。
+</p>
+<p><code class="code">maximum-scroll-margin</code> 自身的最大值为 0.5，
+该值可让边距足够大，使光标始终保持在窗口中间行（若窗口行数为偶数，则为中间两行）。
+若设置为更大的值（或 0.0 到 0.5 之外的任意值），则会使用默认值 0.25。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002dconservatively"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-conservatively</strong><a class="copiable-link" href="#index-scroll_002dconservatively"> &para;</a></span></dt>
+<dd><p>该变量控制点移出屏幕（或进入滚动边距）时自动滚动的方式。
+若值为正整数 <var class="var">n</var>，则重绘最多向任意方向滚动 <var class="var">n</var> 行，使点回到正常可见区域。
+这种行为称为 <em class="dfn">保守滚动(conservative scrolling)</em>。
+否则，滚动按常规方式进行，由 <code class="code">scroll-up-aggressively</code> 和 <code class="code">scroll-down-aggressively</code> 等其他变量控制。
+</p>
+<p>默认值为 0，表示不会启用保守滚动。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002ddown_002daggressively"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-down-aggressively</strong><a class="copiable-link" href="#index-scroll_002ddown_002daggressively"> &para;</a></span></dt>
+<dd><p>该变量的值应为 <code class="code">nil</code> 或 0 到 1 之间的小数 <var class="var">f</var>。
+若为小数，则指定向下滚动时点在屏幕上的位置。
+更精确地说，当点位于窗口起始位置上方而导致窗口向下滚动时，
+新的起始位置会让点出现在距窗口顶部 <var class="var">f</var> 比例高度的位置。
+<var class="var">f</var> 越大，滚动越激进。
+</p>
+<p>值为 <code class="code">nil</code> 等价于 0.5，效果是将点居中。
+该变量无论以何种方式设置，都会自动变为缓冲区局部变量。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002dup_002daggressively"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-up-aggressively</strong><a class="copiable-link" href="#index-scroll_002dup_002daggressively"> &para;</a></span></dt>
+<dd><p>与上一变量类似，用于控制向上滚动。
+值 <var class="var">f</var> 指定点距离窗口底部的位置；
+因此与 <code class="code">scroll-down-aggressively</code> 一样，值越大滚动越激进。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002dstep"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-step</strong><a class="copiable-link" href="#index-scroll_002dstep"> &para;</a></span></dt>
+<dd><p>该变量是 <code class="code">scroll-conservatively</code> 的旧版替代方案。
+区别在于：若值为 <var class="var">n</var>，则只允许精确滚动 <var class="var">n</var> 行，不允许更少行数。
+该功能与 <code class="code">scroll-margin</code> 不兼容。
+默认值为 0。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-scroll_002dcommand-property"></a>
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002dpreserve_002dscreen_002dposition"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-preserve-screen-position</strong><a class="copiable-link" href="#index-scroll_002dpreserve_002dscreen_002dposition"> &para;</a></span></dt>
+<dd><p>若该选项为 <code class="code">t</code>，则每当滚动命令使点移出窗口时，
+Emacs 会尝试调整点，使光标保持在窗口中原有的垂直位置，而不是移到窗口边缘。
+</p>
+<p>若值为非 <code class="code">nil</code> 且非 <code class="code">t</code>，则即使滚动命令未让点移出窗口，
+Emacs 也会调整点，使光标保持相同垂直位置。
+</p>
+<p>该选项会影响所有带有非 <code class="code">nil</code> 的 <code class="code">scroll-command</code> 符号属性的滚动命令。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-next_002dscreen_002dcontext_002dlines"><span class="category-def">User Option: </span><span><strong class="def-name">next-screen-context-lines</strong><a class="copiable-link" href="#index-next_002dscreen_002dcontext_002dlines"> &para;</a></span></dt>
+<dd><p>该变量的值为整屏滚动时保留的连续显示行数。
+例如，<code class="code">scroll-up</code> 在参数为 <code class="code">nil</code> 时滚动，会让窗口底部的这几行显示在新窗口顶部。
+默认值为 <code class="code">2</code>。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-scroll_002derror_002dtop_002dbottom"><span class="category-def">User Option: </span><span><strong class="def-name">scroll-error-top-bottom</strong><a class="copiable-link" href="#index-scroll_002derror_002dtop_002dbottom"> &para;</a></span></dt>
+<dd><p>若该选项为 <code class="code">nil</code>（默认），则 <code class="code">scroll-up-command</code> 和 <code class="code">scroll-down-command</code>
+在无法继续滚动时直接抛出错误。
+</p>
+<p>若值为 <code class="code">t</code>，这些命令会改为将点移动到缓冲区开头或末尾（取决于滚动方向）；
+只有当点已在该位置时才抛出错误。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-recenter"><span class="category-def">Command: </span><span><strong class="def-name">recenter</strong> <var class="def-var-arguments">&amp;optional count redisplay</var><a class="copiable-link" href="#index-recenter"> &para;</a></span></dt>
+<dd><a class="index-entry-id" id="index-centering-point"></a>
+<p>该函数滚动选中窗口中的文本，使点显示在窗口内指定的垂直位置。
+它不会改变点相对于文本的位置。
+</p>
+<p>若 <var class="var">count</var> 为非负数，会将含点的行放在距窗口顶部 <var class="var">count</var> 行的位置。
+若 <var class="var">count</var> 为负数，则从窗口底部向上计数，-1 表示窗口最后一个可用行。
+</p>
+<p>若 <var class="var">count</var> 为 <code class="code">nil</code>（或非空列表），<code class="code">recenter</code> 会将含点的行放在窗口中央。
+若 <var class="var">count</var> 为 <code class="code">nil</code> 且 <var class="var">redisplay</var> 非 <code class="code">nil</code>，
+该函数可能会根据 <code class="code">recenter-redisplay</code> 的值重绘框架。
+因此，省略第二个参数可抵消 <code class="code">recenter-redisplay</code> 非空时的效果。
+交互式调用时会为 <var class="var">redisplay</var> 传入非 <code class="code">nil</code>。
+</p>
+<p>当 <code class="code">recenter</code> 被交互式调用时，<var class="var">count</var> 为原始前缀参数。
+因此，输入 <kbd class="kbd">C-u</kbd> 作为前缀会将 <var class="var">count</var> 设为非空列表，
+而输入 <kbd class="kbd">C-u 4</kbd> 会将 <var class="var">count</var> 设为 4，使当前行位于距顶部 4 行的位置。
+</p>
+<p>参数为 0 时，<code class="code">recenter</code> 会将当前行放在窗口顶部。
+命令 <code class="code">recenter-top-bottom</code> 提供了更便捷的实现方式。
+</p></dd></dl>
+
+<a class="index-entry-id" id="index-recenter_002dwindow_002dgroup_002dfunction"></a>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-recenter_002dwindow_002dgroup"><span class="category-def">Function: </span><span><strong class="def-name">recenter-window-group</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-recenter_002dwindow_002dgroup"> &para;</a></span></dt>
+<dd><p>该函数与 <code class="code">recenter</code> 类似，区别在于：若选中窗口属于某个窗口组（see <a class="pxref" href="Selecting-Windows.html#Window-Group">Window Group</a>），
+<code class="code">recenter-window-group</code> 会对整个窗口组进行滚动。
+当缓冲区局部变量 <code class="code">recenter-window-group-function</code> 被设为函数时，该条件生效。
+此时 <code class="code">recenter-window-group</code> 会以 <var class="var">count</var> 为参数调用该函数并返回结果。
+参数 <var class="var">count</var> 的含义与 <code class="code">recenter</code> 中一致，但作用于整个窗口组。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-recenter_002dredisplay"><span class="category-def">User Option: </span><span><strong class="def-name">recenter-redisplay</strong><a class="copiable-link" href="#index-recenter_002dredisplay"> &para;</a></span></dt>
+<dd><p>若该变量非 <code class="code">nil</code>，则在 <code class="code">count</code> 为 <code class="code">nil</code> 且 <code class="code">redisplay</code> 非 <code class="code">nil</code> 时调用 <code class="code">recenter</code> 会重绘框架。
+默认值为 <code class="code">tty</code>，表示仅当框架为终端框架时才重绘。
+</p></dd></dl>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-recenter_002dtop_002dbottom"><span class="category-def">Command: </span><span><strong class="def-name">recenter-top-bottom</strong> <var class="def-var-arguments">&amp;optional count</var><a class="copiable-link" href="#index-recenter_002dtop_002dbottom"> &para;</a></span></dt>
+<dd><p>该命令是 <kbd class="kbd">C-l</kbd> 的默认绑定，行为与 <code class="code">recenter</code> 类似，仅在无参数调用时不同。
+此时，连续调用会按照变量 <code class="code">recenter-positions</code> 定义的循环顺序放置点。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-recenter_002dpositions"><span class="category-def">User Option: </span><span><strong class="def-name">recenter-positions</strong><a class="copiable-link" href="#index-recenter_002dpositions"> &para;</a></span></dt>
+<dd><p>该变量控制无参数调用 <code class="code">recenter-top-bottom</code> 时的行为。
+默认值为 <code class="code">(middle top bottom)</code>，
+表示连续无参数调用会在将点置于窗口中央、顶部、底部之间循环切换。
+</p></dd></dl>
+
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Vertical-Scrolling.html">垂直分数滚动</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Window-Start-and-End.html">窗口起始与结束位置</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Windows.html">Windows</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

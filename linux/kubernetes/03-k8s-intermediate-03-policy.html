@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 进阶篇-准入控制-策略</title>
+<meta name="description" content="计算机原理" />
+<meta name="keywords" content="计算机, 原理, 进制" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 进阶篇-准入控制-策略</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:e91b7e76-44d9-4924-ae5c-6d239fcea8c1">QoS 服务质量</a>
+<ul>
+<li><a href="#h:f092e139-9c82-4ce7-b533-df65159e3014">生产可能性保障</a>
+<ul>
+<li><a href="#h:88111c08-1bc2-4f05-af71-7c63569fa15a">Resources 配置的重要性</a></li>
+<li><a href="#h:bf60c5db-aefa-48b4-a74b-038013c1d609">Resources 也并非万能</a></li>
+</ul>
+</li>
+<li><a href="#h:86032fb8-cf00-43e0-be21-6155f0c1ec3b">服务质量QoS</a></li>
+<li><a href="#h:16be2c8f-a6a5-49be-b3aa-721e4c7ad831">范例</a>
+<ul>
+<li><a href="#h:913928c2-3639-4257-aef7-d7666c6e32b1">实现QoS为Guaranteed的Pod</a></li>
+<li><a href="#h:bd16a182-26d0-405d-b6e9-c32db8b9cbdc">实现QoS为Burstable的Pod</a></li>
+<li><a href="#h:4b37fcb3-bb78-4bcd-aecc-9009d90ee2a0">实现QoS为BestEffort的Pod</a></li>
+<li><a href="#h:fa2d18e4-03d1-4bdc-a27a-563721659db9">java与Qos</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:50b8c8b9-3edd-4805-beed-28cebf6205b9">ResourceQuota 资源配额</a>
+<ul>
+<li><a href="#h:bad92fd6-fb40-4c3d-b931-93fce07193b0">资源配额的重要性</a></li>
+<li><a href="#h:e0756b89-2a94-48f8-9260-5832acfb5a21">ResourceQuota配置</a></li>
+<li><a href="#h:b3ab2ad9-aa9f-48b6-b54d-708c4b817c35">范例-ResourceQuot（对名称空间进行配置、限额）</a>
+<ul>
+<li><a href="#h:982d1e4d-35b3-4d7c-9c69-7de84aa0ffa6">配置内存和 CPU 配额</a>
+<ul>
+<li><a href="#h:32835dd8-fc99-4633-8bbf-8fa4c75de2a1">创建 Pod</a></li>
+</ul>
+</li>
+<li><a href="#h:41f31f2d-eb5b-479b-a43f-f0d85b8d4a94">尝试创建第二个 Pod</a></li>
+<li><a href="#h:ef04c08f-9773-485f-acb0-d540677aefd3">配置命名空间下 Pod 配额</a>
+<ul>
+<li><a href="#h:de337fbb-5078-4385-b3a8-0fcea385cea6">如何配置一个命名空间下可运行的 Pod 个数配额？</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:f9e5eac2-098f-499c-aad0-091a76f593b9">LimitRange 限制范围</a>
+<ul>
+<li><a href="#h:59a21c9e-3508-451e-b429-3493dabda94b">为什么需要 LimitRange</a>
+<ul>
+<li><a href="#h:e5fd0686-08a8-4073-ab85-8b4b09012f0a">只有 ResourceQuota 是不够的</a></li>
+<li><a href="#h:4ae168c5-99a3-46be-9d8e-d56989a860c1">LimitRange做了什么</a></li>
+</ul>
+</li>
+<li><a href="#h:d04a4805-6633-4ccb-a23d-b80b638c0ad2">LimitRange配置</a>
+<ul>
+<li><a href="#h:f1b479c6-9c88-49f0-bc16-da8c3bc8e8e1">LimitRange配置示例：默认的requests和limits</a></li>
+<li><a href="#h:d1c9ad91-4bec-4ad1-be8f-b8029bb70f35">LimitRange配置示例：requests和limits的范围</a></li>
+<li><a href="#h:969b5124-69ee-4182-8520-3ebbecb3b5f1">LimitRange配置示例：限制申请存储空间的大小</a></li>
+</ul>
+</li>
+<li><a href="#h:6fcb0e0d-db18-4aba-9271-4db16883d560">范例-LimitRange 的配置文件：</a></li>
+</ul>
+</li>
+<li><a href="#h:218fe9d5-e6d7-4b5a-baf5-b27123e38519">为 Pod 或容器配置安全上下文</a></li>
+<li><a href="#h:e46b3c85-494c-4f3c-8cbd-eb1cdbeda344">NetworkPolicies 网络策略</a></li>
+<li><a href="#h:8f277d0b-f422-4cf5-9186-e5beb6ce344b">PodDisruptionBudgets 中断预算</a></li>
+<li><a href="#h:431ae0a6-5224-4f19-9d1d-f4e1c6e77594">PodSecurityPolicies 安全策略</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+
+<p>
+高级调度-准入控制-策略
+</p>
+
+<p>
+<a href="https://kubernetes.io/docs/concepts/policy/">https://kubernetes.io/docs/concepts/policy/</a>
+</p>
+<section id="outline-container-h:e91b7e76-44d9-4924-ae5c-6d239fcea8c1" class="outline-2">
+<h2 id="h:e91b7e76-44d9-4924-ae5c-6d239fcea8c1"><a href="#h:e91b7e76-44d9-4924-ae5c-6d239fcea8c1">QoS 服务质量</a></h2>
+<div class="outline-text-2" id="text-h:e91b7e76-44d9-4924-ae5c-6d239fcea8c1">
+<p>
+<a href="https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/">https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/</a>
+</p>
+</div>
+<div id="outline-container-h:f092e139-9c82-4ce7-b533-df65159e3014" class="outline-3">
+<h3 id="h:f092e139-9c82-4ce7-b533-df65159e3014"><a href="#h:f092e139-9c82-4ce7-b533-df65159e3014">生产可能性保障</a></h3>
+<div class="outline-text-3" id="text-h:f092e139-9c82-4ce7-b533-df65159e3014">
+</div>
+<div id="outline-container-h:88111c08-1bc2-4f05-af71-7c63569fa15a" class="outline-4">
+<h4 id="h:88111c08-1bc2-4f05-af71-7c63569fa15a"><a href="#h:88111c08-1bc2-4f05-af71-7c63569fa15a">Resources 配置的重要性</a></h4>
+<div class="outline-text-4" id="text-h:88111c08-1bc2-4f05-af71-7c63569fa15a">
+<p>
+如果 pod 没有配置 resources 资源限制，它是感知不到节点资源限制的，可以随意分配到一个节点上。如果节点上没有资源了，这个 pod 可能被驱逐。oom， cpu  过高。
+</p>
+</div>
+</div>
+<div id="outline-container-h:bf60c5db-aefa-48b4-a74b-038013c1d609" class="outline-4">
+<h4 id="h:bf60c5db-aefa-48b4-a74b-038013c1d609"><a href="#h:bf60c5db-aefa-48b4-a74b-038013c1d609">Resources 也并非万能</a></h4>
+<div class="outline-text-4" id="text-h:bf60c5db-aefa-48b4-a74b-038013c1d609">
+<p>
+node01 4C8G： 
+</p>
+<ul class="org-ul">
+<li>pod1：request 2C4G, limit 2C4G  &#x2013;&gt; 2C3.8G</li>
+<li>pod2：request 1C2G, limit 2C4G  &#x2013;&gt; 2C3G</li>
+<li>pod3：request 1C2G, limit 2C4G  &#x2013;&gt; 1C4G</li>
+</ul>
+
+<p>
+节点上的 pod 运行一段时间资源使用量，可能 OOM
+</p>
+
+<p>
+如果节点上的资源不够了就按 Qos 服务质量来清理 pod。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:86032fb8-cf00-43e0-be21-6155f0c1ec3b" class="outline-3">
+<h3 id="h:86032fb8-cf00-43e0-be21-6155f0c1ec3b"><a href="#h:86032fb8-cf00-43e0-be21-6155f0c1ec3b">服务质量QoS</a></h3>
+<div class="outline-text-3" id="text-h:86032fb8-cf00-43e0-be21-6155f0c1ec3b">
+<ul class="org-ul">
+<li>Guaranteed：最高服务质量，当宿主机内存不够时，会先 kill 掉 QoS 为 BestEffort 和 Burstable的Pod，如果内存还是不够，才会 kill 掉 QoS 为 Guaranteed，该级别 Pod 的资源占用量一般比较明确，即 requests 的 cpu 和 memory 和 limits 的 cpu 和 memory 配置的一致。</li>
+<li>Burstable： 服务质量低于 Guaranteed，当宿主机内存不够时，会先 kill 掉 QoS 为 BestEffort 的 Pod，如果内存还是不够之后就会 kill 掉 QoS 级别为 Burstable 的 Pod，用来保证 QoS 质量为 Guaranteed 的 Pod，该级别 Pod 一般知道最小资源使用量，但是当机器资源充足时，还是想尽可能的使用更多的资源，即 limits 字段的 cpu 和 memory 大于 requests 的 cpu 和 memory 的配置。</li>
+<li>BestEffort：尽力而为，当宿主机内存不够时，首先 kill 的就是该 QoS 的 Pod，用以保证 Burstable 和 Guaranteed 级别的 Pod 正常运行。</li>
+</ul>
+
+<p>
+如果对 pod 资源把握很好，request 和 limit 可以设置成不一样，如 request 100m/100Mi limit 2C/3G 可以让单个节点容纳更多 pod，这会省去部分节点成本。
+</p>
+</div>
+</div>
+<div id="outline-container-h:16be2c8f-a6a5-49be-b3aa-721e4c7ad831" class="outline-3">
+<h3 id="h:16be2c8f-a6a5-49be-b3aa-721e4c7ad831"><a href="#h:16be2c8f-a6a5-49be-b3aa-721e4c7ad831">范例</a></h3>
+<div class="outline-text-3" id="text-h:16be2c8f-a6a5-49be-b3aa-721e4c7ad831">
+</div>
+<div id="outline-container-h:913928c2-3639-4257-aef7-d7666c6e32b1" class="outline-4">
+<h4 id="h:913928c2-3639-4257-aef7-d7666c6e32b1"><a href="#h:913928c2-3639-4257-aef7-d7666c6e32b1">实现QoS为Guaranteed的Pod</a></h4>
+<div class="outline-text-4" id="text-h:913928c2-3639-4257-aef7-d7666c6e32b1">
+<ul class="org-ul">
+<li>Pod中的每个容器必须指定limits.memory和requests.memory，并且两者需要相等；</li>
+<li>Pod中的每个容器必须指定limits.cpu和limits.memory，并且两者需要相等。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:bd16a182-26d0-405d-b6e9-c32db8b9cbdc" class="outline-4">
+<h4 id="h:bd16a182-26d0-405d-b6e9-c32db8b9cbdc"><a href="#h:bd16a182-26d0-405d-b6e9-c32db8b9cbdc">实现QoS为Burstable的Pod</a></h4>
+<div class="outline-text-4" id="text-h:bd16a182-26d0-405d-b6e9-c32db8b9cbdc">
+<ul class="org-ul">
+<li>Pod不符合Guaranteed的配置要求；</li>
+<li>Pod中至少有一个容器配置了requests.cpu或requests.memory。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:4b37fcb3-bb78-4bcd-aecc-9009d90ee2a0" class="outline-4">
+<h4 id="h:4b37fcb3-bb78-4bcd-aecc-9009d90ee2a0"><a href="#h:4b37fcb3-bb78-4bcd-aecc-9009d90ee2a0">实现QoS为BestEffort的Pod</a></h4>
+<div class="outline-text-4" id="text-h:4b37fcb3-bb78-4bcd-aecc-9009d90ee2a0">
+<ul class="org-ul">
+<li>不设置resources参数</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:fa2d18e4-03d1-4bdc-a27a-563721659db9" class="outline-4">
+<h4 id="h:fa2d18e4-03d1-4bdc-a27a-563721659db9"><a href="#h:fa2d18e4-03d1-4bdc-a27a-563721659db9">java与Qos</a></h4>
+<div class="outline-text-4" id="text-h:fa2d18e4-03d1-4bdc-a27a-563721659db9">
+<div class="org-src-container">
+<pre class="src src-sh">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: game
+spec:
+...
+  template:
+    metadata:
+    spec:
+      containers:
+      - args:
+        - -Dfile.encoding=utf-8
+        - -server
+        - -XX:+UnlockExperimentalVMOptions
+        - -XX:+UseG1GC
+        - -XX:+ExitOnOutOfMemoryError
+        - -XX:+HeapDumpOnOutOfMemoryError
+        - -XX:<span class="org-variable-name">InitialRAMPercentage</span>=75.0
+        - -XX:<span class="org-variable-name">MinRAMPercentage</span>=75.0
+        - -XX:<span class="org-variable-name">MaxRAMPercentage</span>=75.0
+        - -XX:<span class="org-variable-name">HeapDumpPath</span>=/opt/app/logs/
+        - -Xloggc:./logs/gc.log
+        - -Dserver.status=WORKING
+        - -jar
+        - rummy-game.jar
+        command:
+        - java
+        resources:
+          limits:
+            cpu: 1
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+</pre>
+</div>
+
+<p>
+在Kubernetes的Pod中，Java程序使用 -XX:InitialRAMPercentage、-XX:MinRAMPercentage 和 -XX:MaxRAMPercentage 参数时，这些参数是基于容器的内存限制（limits）来计算的，而不是基于请求（requests）。
+</p>
+
+<p>
+解释：
+-XX:InitialRAMPercentage：设置JVM启动时的初始堆内存占容器内存限制的百分比。
+-XX:MinRAMPercentage：设置JVM的最小堆内存占容器内存限制的百分比。
+-XX:MaxRAMPercentage：设置JVM的最大堆内存占容器内存限制的百分比.
+</p>
+
+<p>
+具体影响：
+</p>
+
+<p>
+内存限制（limits）：这些参数会根据Pod的内存限制来计算JVM的内存使用。例如，如果Pod的内存限制为2Gi（2048MB），并且设置了 -XX:MaxRAMPercentage=75.0，那么JVM的最大堆内存将被设置为2048MB的75%，即1536MB。
+</p>
+
+<p>
+内存请求（requests）：主要用于Kubernetes的调度和资源分配，但不会直接影响JVM的内存参数设置。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:50b8c8b9-3edd-4805-beed-28cebf6205b9" class="outline-2">
+<h2 id="h:50b8c8b9-3edd-4805-beed-28cebf6205b9"><a href="#h:50b8c8b9-3edd-4805-beed-28cebf6205b9">ResourceQuota 资源配额</a></h2>
+<div class="outline-text-2" id="text-h:50b8c8b9-3edd-4805-beed-28cebf6205b9">
+<p>
+资源配额提供了限制每个命名空间的聚合资源消耗的约束。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/policy/resource-quotas/">https://kubernetes.io/docs/concepts/policy/resource-quotas/</a>
+</p>
+</div>
+<div id="outline-container-h:bad92fd6-fb40-4c3d-b931-93fce07193b0" class="outline-3">
+<h3 id="h:bad92fd6-fb40-4c3d-b931-93fce07193b0"><a href="#h:bad92fd6-fb40-4c3d-b931-93fce07193b0">资源配额的重要性</a></h3>
+<div class="outline-text-3" id="text-h:bad92fd6-fb40-4c3d-b931-93fce07193b0">
+<p>
+管理资源分配情况，避免资源不够和大量废弃资源不回收问题。对名称空间进行配置、限额。
+</p>
+</div>
+</div>
+<div id="outline-container-h:e0756b89-2a94-48f8-9260-5832acfb5a21" class="outline-3">
+<h3 id="h:e0756b89-2a94-48f8-9260-5832acfb5a21"><a href="#h:e0756b89-2a94-48f8-9260-5832acfb5a21">ResourceQuota配置</a></h3>
+<div class="outline-text-3" id="text-h:e0756b89-2a94-48f8-9260-5832acfb5a21">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resource-test
+  labels:
+    app: resourcequota
+spec:
+  hard:
+    pods: 50
+    requests.cpu: 0.5
+    requests.memory: 512Mi
+    limits.cpu: 5
+    limits.memory: 16Gi
+    configmaps: 20
+    requests.storage: 40Gi
+    persistentvolumeclaims: 20
+    replicationcontrollers: 20
+    secrets: 20
+    services: 50
+    services.loadbalancers: "2"
+    services.nodeports: "10"
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>pods：限制最多启动Pod的个数</li>
+<li>requests.cpu：限制最高CPU请求数</li>
+<li>requests.memory：限制最高内存的请求数</li>
+<li>limits.cpu：限制最高CPU的limit上限</li>
+<li>limits.memory：限制最高内存的limit上限</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:b3ab2ad9-aa9f-48b6-b54d-708c4b817c35" class="outline-3">
+<h3 id="h:b3ab2ad9-aa9f-48b6-b54d-708c4b817c35"><a href="#h:b3ab2ad9-aa9f-48b6-b54d-708c4b817c35">范例-ResourceQuot（对名称空间进行配置、限额）</a></h3>
+<div class="outline-text-3" id="text-h:b3ab2ad9-aa9f-48b6-b54d-708c4b817c35">
+</div>
+<div id="outline-container-h:982d1e4d-35b3-4d7c-9c69-7de84aa0ffa6" class="outline-4">
+<h4 id="h:982d1e4d-35b3-4d7c-9c69-7de84aa0ffa6"><a href="#h:982d1e4d-35b3-4d7c-9c69-7de84aa0ffa6">配置内存和 CPU 配额</a></h4>
+<div class="outline-text-4" id="text-h:982d1e4d-35b3-4d7c-9c69-7de84aa0ffa6">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1&#12289;&#21019;&#24314;&#21629;&#21517;&#31354;&#38388;&#65292;&#20197;&#20415;&#26412;&#32451;&#20064;&#20013;&#21019;&#24314;&#30340;&#36164;&#28304;&#21644;&#38598;&#32676;&#30340;&#20854;&#20313;&#37096;&#20998;&#30456;&#38548;&#31163;&#12290;
+</span>[root@k8s-master01 ~]# kubectl create namespace quota-mem-cpu-example
+namespace/quota-mem-cpu-example created
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2&#12289;&#21019;&#24314; ResourceQuota 
+</span>[root@k8s-master01 ~]# vim quota-mem-cpu.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mem-cpu-demo
+spec:
+  hard:
+    requests.cpu: <span class="org-string">"1"</span>
+    requests.memory: 1Gi
+    limits.cpu: <span class="org-string">"2"</span>
+    limits.memory: 2Gi
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3&#12289;&#21019;&#24314; ResourceQuota
+</span>[root@k8s-master01 ~]# kubectl apply -f quota-mem-cpu.yaml -n quota-mem-cpu-example         
+resourcequota/mem-cpu-demo created
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">4&#12289;&#26597;&#30475; ResourceQuota &#35814;&#24773;&#65306;
+</span>[root@k8s-master01 ~]# kubectl get resourcequota mem-cpu-demo --namespace=quota-mem-cpu-example --output=yaml
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36319;&#25105;&#20204;&#37197;&#32622;&#30340;&#19968;&#26679;
+</span>spec:
+  hard:
+    limits.cpu: <span class="org-string">"2"</span>
+    limits.memory: 2Gi
+    requests.cpu: <span class="org-string">"1"</span>
+    requests.memory: 1Gi
+</pre>
+</div>
+
+<p>
+ResourceQuota 在 quota-mem-cpu-example 命名空间中设置了如下要求：
+</p>
+
+<ul class="org-ul">
+<li>每个容器必须有内存请求和限制，以及 CPU 请求和限制。</li>
+<li>所有容器的内存请求总和不能超过1 GiB。</li>
+<li>所有容器的内存限制总和不能超过2 GiB。</li>
+<li>所有容器的 CPU 请求总和不能超过1 cpu。</li>
+<li>所有容器的 CPU 限制总和不能超过2 cpu。</li>
+</ul>
+
+<p>
+也就是在名称空间 quota-mem-cpu-example种创建Pod，必须遵守我们在上面定义的要求
+</p>
+</div>
+<div id="outline-container-h:32835dd8-fc99-4633-8bbf-8fa4c75de2a1" class="outline-5">
+<h5 id="h:32835dd8-fc99-4633-8bbf-8fa4c75de2a1"><a href="#h:32835dd8-fc99-4633-8bbf-8fa4c75de2a1">创建 Pod</a></h5>
+<div class="outline-text-5" id="text-h:32835dd8-fc99-4633-8bbf-8fa4c75de2a1">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; quota-mem-cpu-pod.yaml &lt;&lt; EFO<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quota-mem-cpu-demo
+spec:
+  containers:
+  - name: quota-mem-cpu-demo-ctr
+    image: nginx
+    resources:
+      limits:
+        memory: "800Mi"
+        cpu: "800m"
+      requests:
+        memory: "600Mi"
+        cpu: "400m"
+EFO 
+# create Pod
+kubectl apply -f quota-mem-cpu-pod.yaml --namespace=quota-mem-cpu-example
+
+# &#26597;&#30475;&#37197;&#39069;&#65292;&#33021;&#30475;&#21040;&#29992;&#20102;&#22810;&#23569;
+[root@k8s-master01 ~]# kubectl get resourcequota mem-cpu-demo --namespace=quota-mem-cpu-example --output=yaml
+spec:
+  hard:
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi
+status:
+  hard:
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi
+  used:
+    limits.cpu: 800m
+    limits.memory: 800Mi
+    requests.cpu: 400m
+    requests.memory: 600Mi</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:41f31f2d-eb5b-479b-a43f-f0d85b8d4a94" class="outline-4">
+<h4 id="h:41f31f2d-eb5b-479b-a43f-f0d85b8d4a94"><a href="#h:41f31f2d-eb5b-479b-a43f-f0d85b8d4a94">尝试创建第二个 Pod</a></h4>
+<div class="outline-text-4" id="text-h:41f31f2d-eb5b-479b-a43f-f0d85b8d4a94">
+<div class="org-src-container">
+<pre class="src src-shell">[root@k8s-master01 ~]# cat  quota-mem-cpu-pod-2.yaml    
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quota-mem-cpu-demo-2
+spec:
+  containers:
+  - name: quota-mem-cpu-demo-2-ctr
+    image: redis
+    resources:
+      limits:
+        memory: <span class="org-string">"1Gi"</span>
+        cpu: <span class="org-string">"800m"</span>
+      requests:
+        memory: <span class="org-string">"700Mi"</span>
+        cpu: <span class="org-string">"400m"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23581;&#35797;&#21019;&#24314;        
+</span>[root@k8s-master01 ~]# kubectl apply -f  quota-mem-cpu-pod-2.yaml --namespace=quota-mem-cpu-example
+Error from server (Forbidden): error when creating <span class="org-string">"quota-mem-cpu-pod-2.yaml"</span>: pods <span class="org-string">"quota-mem-cpu-demo-2"</span> is forbidden: exceeded quota: mem-cpu-demo, requested: requests.memory=700Mi, used: requests.memory=600Mi, limited: requests.memory=1Gi
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#31532;&#20108;&#20010; Pod &#19981;&#33021;&#34987;&#21019;&#24314;&#25104;&#21151;&#12290;&#36755;&#20986;&#32467;&#26524;&#26174;&#31034;&#21019;&#24314;&#31532;&#20108;&#20010; Pod &#20250;&#23548;&#33268;&#20869;&#23384;&#35831;&#27714;&#24635;&#37327;&#36229;&#36807;&#20869;&#23384;&#35831;&#27714;&#37197;&#39069;&#12290;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;&#20320;&#30340;&#21629;&#21517;&#31354;&#38388;&#65306;
+</span>kubectl delete namespace quota-mem-cpu-example
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ef04c08f-9773-485f-acb0-d540677aefd3" class="outline-4">
+<h4 id="h:ef04c08f-9773-485f-acb0-d540677aefd3"><a href="#h:ef04c08f-9773-485f-acb0-d540677aefd3">配置命名空间下 Pod 配额</a></h4>
+<div class="outline-text-4" id="text-h:ef04c08f-9773-485f-acb0-d540677aefd3">
+</div>
+<div id="outline-container-h:de337fbb-5078-4385-b3a8-0fcea385cea6" class="outline-5">
+<h5 id="h:de337fbb-5078-4385-b3a8-0fcea385cea6"><a href="#h:de337fbb-5078-4385-b3a8-0fcea385cea6">如何配置一个命名空间下可运行的 Pod 个数配额？</a></h5>
+<div class="outline-text-5" id="text-h:de337fbb-5078-4385-b3a8-0fcea385cea6">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1&#12289;&#21019;&#24314;&#19968;&#20010;&#21629;&#21517;&#31354;&#38388; 
+</span>kubectl create namespace quota-pod-example
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2&#12289;&#21019;&#24314; ResourceQuota&#65292;&#25351;&#23450;&#25913;ns&#21482;&#21487;&#20197;&#21019;&#24314;2&#20010;pod
+</span>apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: pod-demo
+spec:
+  hard:
+    pods: <span class="org-string">"2"</span>
+    
+<span class="org-comment-delimiter"># </span><span class="org-comment">3&#12289;apply ResourceQuota
+</span>kubectl apply -f quota-pod.yaml --namespace=quota-pod-example
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">4&#12289;&#26597;&#30475;&#36164;&#28304;&#37197;&#39069;&#30340;&#35814;&#32454;&#20449;&#24687;&#65306;
+</span>kubectl get resourcequota pod-demo --namespace=quota-pod-example --output=yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">5&#12289;&#21019;&#24314;Deployment&#65292;&#19988;replicas&#26159;3&#65292;&#37027;&#20040;&#32943;&#23450;&#21482;&#26377;2&#20010;Pod&#33021;&#27491;&#24120;&#36816;&#34892;&#65281;&#33258;&#24049;&#21435;&#35797;&#35797;&#21543;
+</span>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-quota-demo
+spec:
+  selector:
+    matchLabels:
+      purpose: quota-demo
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        purpose: quota-demo
+    spec:
+      containers:
+      - name: pod-quota-demo
+        image: nginx
+</pre>
+</div>
+
+<p>
+中文官网文档：<a href="https://kubernetes.io/zh/docs/concepts/policy/limit-range/">https://kubernetes.io/zh/docs/concepts/policy/limit-range/</a>
+</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f9e5eac2-098f-499c-aad0-091a76f593b9" class="outline-2">
+<h2 id="h:f9e5eac2-098f-499c-aad0-091a76f593b9"><a href="#h:f9e5eac2-098f-499c-aad0-091a76f593b9">LimitRange 限制范围</a></h2>
+<div class="outline-text-2" id="text-h:f9e5eac2-098f-499c-aad0-091a76f593b9">
+<p>
+LimitRange 是一种用于限制命名空间中(到容器组或容器的)资源分配的策略。
+</p>
+
+<p>
+官方文档: <a href="https://kubernetes.io/docs/concepts/policy/limit-range/">https://kubernetes.io/docs/concepts/policy/limit-range/</a>
+</p>
+</div>
+<div id="outline-container-h:59a21c9e-3508-451e-b429-3493dabda94b" class="outline-3">
+<h3 id="h:59a21c9e-3508-451e-b429-3493dabda94b"><a href="#h:59a21c9e-3508-451e-b429-3493dabda94b">为什么需要 LimitRange</a></h3>
+<div class="outline-text-3" id="text-h:59a21c9e-3508-451e-b429-3493dabda94b">
+</div>
+<div id="outline-container-h:e5fd0686-08a8-4073-ab85-8b4b09012f0a" class="outline-4">
+<h4 id="h:e5fd0686-08a8-4073-ab85-8b4b09012f0a"><a href="#h:e5fd0686-08a8-4073-ab85-8b4b09012f0a">只有 ResourceQuota 是不够的</a></h4>
+<div class="outline-text-4" id="text-h:e5fd0686-08a8-4073-ab85-8b4b09012f0a">
+
+<figure id="org1383748">
+<img style="aspect-ratio:1524/480" decoding="async" loading="lazy" src="./images/Snipaste_2022-09-28_16-28-45.webp" alt="Snipaste_2022-09-28_16-28-45.webp" width="50%">
+
+</figure>
+
+<p>
+只有 ResourceQuota 限制资源使用量，如果 pod 没有配置 resources 是没用的，永远达不到资源配额。
+</p>
+</div>
+</div>
+<div id="outline-container-h:4ae168c5-99a3-46be-9d8e-d56989a860c1" class="outline-4">
+<h4 id="h:4ae168c5-99a3-46be-9d8e-d56989a860c1"><a href="#h:4ae168c5-99a3-46be-9d8e-d56989a860c1">LimitRange做了什么</a></h4>
+<div class="outline-text-4" id="text-h:4ae168c5-99a3-46be-9d8e-d56989a860c1">
+
+<figure id="orgc002d31">
+<img style="aspect-ratio:1526/524" decoding="async" loading="lazy" src="./images/Snipaste_2022-09-28_16-30-22.webp" alt="Snipaste_2022-09-28_16-30-22.webp" width="50%">
+
+</figure>
+
+<p>
+如果 pod cpu 和内存没限制可以自动添加 LimitRange 的默认值。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d04a4805-6633-4ccb-a23d-b80b638c0ad2" class="outline-3">
+<h3 id="h:d04a4805-6633-4ccb-a23d-b80b638c0ad2"><a href="#h:d04a4805-6633-4ccb-a23d-b80b638c0ad2">LimitRange配置</a></h3>
+<div class="outline-text-3" id="text-h:d04a4805-6633-4ccb-a23d-b80b638c0ad2">
+<p>
+一个 LimitRange（限制范围） 对象提供的限制能够做到：
+</p>
+
+<ul class="org-ul">
+<li>在一个命名空间中实施对每个 Pod 或 Container 最小和最大的资源使用量的限制。</li>
+<li>在一个命名空间中实施对每个 PersistentVolumeClaim 能申请的最小和最大的存储空间大小的限制。</li>
+<li>在一个命名空间中实施对一种资源的申请值和限制值的比值的控制。</li>
+<li>设置一个命名空间中对计算资源的默认申请/限制值，并且自动的在运行时注入到多个 Container 中。</li>
+</ul>
+
+<p>
+对新启动的 pod 生效。不更改 deployment 这类而更改 pod。
+</p>
+</div>
+<div id="outline-container-h:f1b479c6-9c88-49f0-bc16-da8c3bc8e8e1" class="outline-4">
+<h4 id="h:f1b479c6-9c88-49f0-bc16-da8c3bc8e8e1"><a href="#h:f1b479c6-9c88-49f0-bc16-da8c3bc8e8e1">LimitRange配置示例：默认的requests和limits</a></h4>
+<div class="outline-text-4" id="text-h:f1b479c6-9c88-49f0-bc16-da8c3bc8e8e1">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-mem-limit-range
+spec:
+  limits:
+  - default:
+      cpu: 1
+      memory: 512Mi
+    defaultRequest:
+      cpu: 0.5
+      memory: 256Mi
+    type: Container
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>default：默认limits配置</li>
+<li>defaultRequest：默认requests配置</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:d1c9ad91-4bec-4ad1-be8f-b8029bb70f35" class="outline-4">
+<h4 id="h:d1c9ad91-4bec-4ad1-be8f-b8029bb70f35"><a href="#h:d1c9ad91-4bec-4ad1-be8f-b8029bb70f35">LimitRange配置示例：requests和limits的范围</a></h4>
+<div class="outline-text-4" id="text-h:d1c9ad91-4bec-4ad1-be8f-b8029bb70f35">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-mem-min-max-demo-lr
+spec:
+  limits:
+  - max:
+      cpu: "800m"
+      memory: 1Gi
+    min:
+      cpu: "200m"
+      memory: 500Mi
+    type: Container
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>max：内存CPU的最大配置</li>
+<li>min：内存CPU的最小配置</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:969b5124-69ee-4182-8520-3ebbecb3b5f1" class="outline-4">
+<h4 id="h:969b5124-69ee-4182-8520-3ebbecb3b5f1"><a href="#h:969b5124-69ee-4182-8520-3ebbecb3b5f1">LimitRange配置示例：限制申请存储空间的大小</a></h4>
+<div class="outline-text-4" id="text-h:969b5124-69ee-4182-8520-3ebbecb3b5f1">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: storagelimits
+spec:
+  limits:
+  - type: PersistentVolumeClaim
+    max:
+      storage: 2Gi
+    min:
+      storage: 1Gi
+</pre>
+</div>
+<ul class="org-ul">
+<li>max：最大PVC的空间</li>
+<li>min：最小PVC的空间</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6fcb0e0d-db18-4aba-9271-4db16883d560" class="outline-3">
+<h3 id="h:6fcb0e0d-db18-4aba-9271-4db16883d560"><a href="#h:6fcb0e0d-db18-4aba-9271-4db16883d560">范例-LimitRange 的配置文件：</a></h3>
+<div class="outline-text-3" id="text-h:6fcb0e0d-db18-4aba-9271-4db16883d560">
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-min-max-demo-lr
+spec:
+  limits:
+  - max:
+      cpu: "800m"
+    min:
+      cpu: "200m"
+    type: Container
+  - type: PersistentVolumeClaim
+    max:
+      storage: 2Gi
+    min:
+      storage: 1Gi
+#  输出结果显示 CPU 的最小和最大限制符合预期。但需要注意的是，尽管你在 LimitRange 的配置文件中你没有声明默认值，默认值也会被自动创建。
+limits:
+- default:
+    cpu: 800m
+  defaultRequest:
+    cpu: 800m
+  max:
+    cpu: 800m
+  min:
+    cpu: 200m
+  type: Container
+- type: PersistentVolumeClaim
+  max:
+    storage: 2Gi
+  min:
+    storage: 1Gi
+</pre>
+</div>
+
+<p>
+现在不管什么时候在 constraints-cpu-example 命名空间中创建容器，Kubernetes 都会执行下面这些步骤：
+</p>
+
+<ul class="org-ul">
+<li>如果容器没有声明自己的 CPU 请求和限制，将为容器指定默认 CPU 请求和限制。</li>
+<li>核查容器声明的 CPU 请求确保其大于或者等于 200 millicpu。</li>
+<li>核查容器声明的 CPU 限制确保其小于或者等于 800 millicpu。</li>
+</ul>
+
+<p>
+说明：当创建 LimitRange 对象时，你也可以声明大页面和 GPU 的限制。 当这些资源同时声明了 'default' 和 'defaultRequest' 参数时，两个参数值必须相同。
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:218fe9d5-e6d7-4b5a-baf5-b27123e38519" class="outline-2">
+<h2 id="h:218fe9d5-e6d7-4b5a-baf5-b27123e38519"><a href="#h:218fe9d5-e6d7-4b5a-baf5-b27123e38519">为 Pod 或容器配置安全上下文</a></h2>
+<div class="outline-text-2" id="text-h:218fe9d5-e6d7-4b5a-baf5-b27123e38519">
+<p>
+<a href="https://kubernetes.io/zh-cn/docs/concepts/security/cloud-native-security/">https://kubernetes.io/zh-cn/docs/concepts/security/cloud-native-security/</a>
+</p>
+
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/tasks/configure-pod-container/security-context/">为 Pod 或容器配置安全上下文</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; security-context.yaml<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Pod
+metadata:
+  name: security-context-demo
+spec:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 3000
+    fsGroup: 2000
+    supplementalGroups: [4000]
+  volumes:
+  - name: sec-ctx-vol
+    emptyDir: {}
+  containers:
+  - name: sec-ctx-demo
+    image: busybox:1.28
+    command: [ "sh", "-c", "sleep 1h" ]
+    volumeMounts:
+    - name: sec-ctx-vol
+      mountPath: /data/demo
+    securityContext:
+      allowPrivilegeEscalation: false
+EOF
+</span>
+kubectl apply -f https://k8s.io/examples/pods/security/security-context.yaml
+
+kubectl get pod security-context-demo
+kubectl exec -it security-context-demo -- sh
+
+[root@jump tmp]# kubectl  exec -it security-context-demo -- sh
+/ $ ps  <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#36827;&#31243;&#20197;&#29992;&#25143; 1000 &#36816;&#34892;&#65292;&#21363; runAsUser &#25152;&#35774;&#32622;&#30340;&#20540;
+</span>PID   USER     TIME  COMMAND
+    1 1000      0:00 sleep 1h
+   13 1000      0:00 sh
+   19 1000      0:00 ps
+/ $ cd /data/
+/data $ ls -l <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034; /data/demo &#30446;&#24405;&#30340;&#32452; ID &#20026; 2000&#65292;&#21363; fsGroup &#30340;&#35774;&#32622;&#20540;
+</span>total 0
+drwxrwsrwx    2 root     2000             6 Jun 23 13:48 demo
+/data $ cd demo/
+/data/demo $ echo hello &gt; testfile
+/data/demo $ ls -l <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034; testfile &#30340;&#32452; ID &#20026; 2000&#65292;&#20063;&#23601;&#26159; fsGroup &#25152;&#35774;&#32622;&#30340;&#20540;
+</span>total 4
+-rw-r--r--    1 1000     2000             6 Jun 23 13:50 testfile
+/data/demo $ id
+<span class="org-variable-name">uid</span>=1000 <span class="org-variable-name">gid</span>=3000 <span class="org-variable-name">groups</span>=2000,3000,4000
+/data/demo $ exit
+</pre>
+</div>
+
+
+<ul class="org-ul">
+<li><a href="https://github.com/kubernetes/kube-state-metrics">https://github.com/kubernetes/kube-state-metrics</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-sh">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/version: 2.15.0
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-state-metrics
+        app.kubernetes.io/version: 2.15.0
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.15.0
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: http-metrics
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        name: kube-state-metrics
+        ports:
+        - containerPort: 8080
+          name: http-metrics
+        - containerPort: 8081
+          name: telemetry
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: telemetry
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          seccompProfile:
+            <span class="org-builtin">type</span>: RuntimeDefault
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: kube-state-metrics
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:e46b3c85-494c-4f3c-8cbd-eb1cdbeda344" class="outline-2">
+<h2 id="h:e46b3c85-494c-4f3c-8cbd-eb1cdbeda344"><a href="#h:e46b3c85-494c-4f3c-8cbd-eb1cdbeda344">NetworkPolicies 网络策略</a></h2>
+<div class="outline-text-2" id="text-h:e46b3c85-494c-4f3c-8cbd-eb1cdbeda344">
+<p>
+网络策略是允许 pod 组相互通信以及与其他网络端点通信的规范。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">https://kubernetes.io/docs/concepts/services-networking/network-policies/</a>
+</p>
+</div>
+</section>
+<section id="outline-container-h:8f277d0b-f422-4cf5-9186-e5beb6ce344b" class="outline-2">
+<h2 id="h:8f277d0b-f422-4cf5-9186-e5beb6ce344b"><a href="#h:8f277d0b-f422-4cf5-9186-e5beb6ce344b">PodDisruptionBudgets 中断预算</a></h2>
+<div class="outline-text-2" id="text-h:8f277d0b-f422-4cf5-9186-e5beb6ce344b">
+<p>
+Pod 中断预算可让应用程序拥有者为复制的应用程序创建对象，以确保一定数量或百分比的已分配标签 Pod 在任何时候都不会被自愿驱逐。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/tasks/run-application/configure-pdb/">https://kubernetes.io/docs/tasks/run-application/configure-pdb/</a>
+</p>
+</div>
+</section>
+<section id="outline-container-h:431ae0a6-5224-4f19-9d1d-f4e1c6e77594" class="outline-2">
+<h2 id="h:431ae0a6-5224-4f19-9d1d-f4e1c6e77594"><a href="#h:431ae0a6-5224-4f19-9d1d-f4e1c6e77594">PodSecurityPolicies 安全策略</a></h2>
+<div class="outline-text-2" id="text-h:431ae0a6-5224-4f19-9d1d-f4e1c6e77594">
+<p>
+Pod 安全策略允许对 Pod 创建和更新进行精细授权。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/security/pod-security-policy/">https://kubernetes.io/docs/concepts/security/pod-security-policy/</a>
+</p>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

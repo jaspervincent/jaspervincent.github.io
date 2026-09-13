@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Writing Dynamic Modules (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Writing Dynamic Modules (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Writing Dynamic Modules (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="GNU-Emacs-Internals.html" rel="up" title="GNU Emacs Internals">
+<link href="Object-Internals.html" rel="next" title="Object Internals">
+<link href="Writing-Emacs-Primitives.html" rel="prev" title="Writing Emacs Primitives">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+kbd.kbd {font-style: oblique}
+span:hover a.copiable-link {visibility: visible}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Writing-Dynamic-Modules">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Object-Internals.html" accesskey="n" rel="next">对象内部结构</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Writing-Emacs-Primitives.html" accesskey="p" rel="prev">编写 Emacs 原语</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html" accesskey="u" rel="up">GNU Emacs 内部结构</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_7f16_5199_53ef_52a8_6001_52a0_8f7d_7684_6a21_5757"><span>E.8 编写可动态加载的模块<a class="copiable-link" href="#g_t_7f16_5199_53ef_52a8_6001_52a0_8f7d_7684_6a21_5757"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-writing-emacs-modules"></a>
+<a class="index-entry-id" id="index-dynamic-modules_002c-writing"></a>
+
+<a class="index-entry-id" id="index-module-API"></a>
+<p>本节介绍 Emacs 模块 <abbr class="acronym">API</abbr>，以及如何在为 Emacs 编写扩展模块时使用它。模块 <abbr class="acronym">API</abbr> 由 C 编程语言定义，因此本节中的说明与示例均假定模块使用 C 编写。对于其他编程语言，你需要使用相应的绑定、接口与工具来调用 C 代码。
+Emacs C 代码要求使用 C99 或更高版本的编译器（see <a class="pxref" href="C-Dialect.html">C 语言方言</a>），因此本节中的代码示例也遵循该标准。
+</p>
+<p>编写模块并将其集成到 Emacs 中包含以下工作：
+</p>
+<ul class="itemize mark-bullet">
+<li>为模块编写初始化代码。
+
+</li><li>编写一个或多个模块函数。
+
+</li><li>在 Emacs 与你的模块函数之间传递值和对象。
+
+</li><li>处理错误条件与非局部退出。
+</li></ul>
+
+<p>下面的子小节将更详细地介绍这些工作以及 <abbr class="acronym">API</abbr> 本身。
+</p>
+<p>模块编写完成后，根据底层平台的约定将其编译为共享库。然后将该共享库放置在 <code class="code">load-path</code> 所列的目录中（see <a class="pxref" href="Library-Search.html">库搜索</a>），Emacs 便会在其中找到它。
+</p>
+<p>如果你希望验证模块是否符合 Emacs 动态模块 <abbr class="acronym">API</abbr>，可以在启动 Emacs 时使用 <kbd class="kbd">--module-assertions</kbd> 选项。See <a data-manual="emacs" href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Initial-Options.html#Initial-Options">Initial Options</a> in <cite class="cite">The GNU Emacs Manual</cite>。
+</p>
+
+<ul class="mini-toc">
+<li><a href="Module-Initialization.html" accesskey="1">模块初始化代码</a></li>
+<li><a href="Module-Functions.html" accesskey="2">编写模块函数</a></li>
+<li><a href="Module-Values.html" accesskey="3">Lisp 与模块值之间的转换</a></li>
+<li><a href="Module-Misc.html" accesskey="4">模块专用的杂项便捷函数</a></li>
+<li><a href="Module-Nonlocal.html" accesskey="5">模块中的非本地退出</a></li>
+</ul>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 进阶篇-持久化存储</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 进阶篇-持久化存储</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:f5e296f2-9387-4aee-a93c-9d4f02c677aa">k8s基础篇-持久化存储</a>
+<ul>
+<li><a href="#h:39913076-d454-434d-b7bb-655a8c363ff1">Volumes</a>
+<ul>
+<li><a href="#h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20">介绍</a>
+<ul>
+<li><a href="#h:3fe7d4be-da74-427e-aea1-631e22c301e5">背景</a></li>
+<li><a href="#h:4920ad83-8488-4d14-9f8b-f7a27496ad4f">卷的类型</a></li>
+</ul>
+</li>
+<li><a href="#h:6a45e227-9301-410f-9804-7beb787db1f4">emptyDir</a></li>
+<li><a href="#h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed">hostPath 挂载宿主机路径</a>
+<ul>
+<li><a href="#h:f4dab3ff-8da3-4888-b366-989002e14d1a">hostPath 的一些用法有</a></li>
+<li><a href="#h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d">支持类型</a></li>
+</ul>
+</li>
+<li><a href="#h:f6310502-2d5d-401e-b267-ddc3d9aa98cd">挂载 NFS 至容器</a>
+<ul>
+<li><a href="#h:b4772bc2-e804-4b43-8017-b9a7793f08da">安装 nfs 服务</a></li>
+<li><a href="#h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e">volume nfs</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:21925a77-be3e-4920-8d2f-986f018374dc">PV&amp;PVC</a>
+<ul>
+<li><a href="#h:3258d4f5-25ed-49d0-b546-9503f4a9b046">为什么要引入 PV 和 PVC</a></li>
+<li><a href="#h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">PV、PVC图解</a></li>
+<li><a href="#h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc">PV</a>
+<ul>
+<li><a href="#h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e">PV 访问和回收策略</a></li>
+<li><a href="#h:2f1478ee-e718-46bb-ab64-abb56f66454f">文件存储、块存储、对象存储区别</a></li>
+<li><a href="#h:260d5061-2931-479a-91b8-efadfce2c699">创建 NAS  或 NFS 类型的 PV</a></li>
+<li><a href="#h:333e72d4-4ca9-4a89-a427-ee366d7f7243">PV 状态</a></li>
+<li><a href="#h:2f513651-8123-4ed1-8a30-d255db599472">创建 hostPath 类型的 PV</a></li>
+</ul>
+</li>
+<li><a href="#h:5cab6f6a-f294-4a09-baff-40e064b283ff">PVC</a>
+<ul>
+<li><a href="#h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">PVC 如何绑定到 PV</a></li>
+<li><a href="#h:21e372ef-a130-48ac-87de-c41ed8128770">PVC 挂载示例</a></li>
+<li><a href="#h:60831fb1-bac2-4bd4-8b64-7b8419099e65">PVC 创建和挂载处理 Pending 的原因</a></li>
+</ul>
+</li>
+<li><a href="#h:cd448add-22b2-442a-a54c-6bfea0e331ed">改变默认存储类</a></li>
+<li><a href="#h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9">使用NFS做为PVC</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:f5e296f2-9387-4aee-a93c-9d4f02c677aa" class="outline-2">
+<h2 id="h:f5e296f2-9387-4aee-a93c-9d4f02c677aa"><a href="#h:f5e296f2-9387-4aee-a93c-9d4f02c677aa">k8s基础篇-持久化存储</a></h2>
+<div class="outline-text-2" id="text-h:f5e296f2-9387-4aee-a93c-9d4f02c677aa">
+</div>
+<div id="outline-container-h:39913076-d454-434d-b7bb-655a8c363ff1" class="outline-3">
+<h3 id="h:39913076-d454-434d-b7bb-655a8c363ff1"><a href="#h:39913076-d454-434d-b7bb-655a8c363ff1">Volumes</a></h3>
+<div class="outline-text-3" id="text-h:39913076-d454-434d-b7bb-655a8c363ff1">
+</div>
+<div id="outline-container-h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20" class="outline-4">
+<h4 id="h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20"><a href="#h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20">介绍</a></h4>
+<div class="outline-text-4" id="text-h:7ba36a9b-dd22-49c9-b3fd-3525317f6c20">
+<p>
+官方：
+</p>
+
+<p>
+<a href="http://docs.kubernetes.org.cn/429.html">http://docs.kubernetes.org.cn/429.html</a>
+</p>
+
+<p>
+<a href="https://kubernetes.io/zh/docs/concepts/storage/volumes/">https://kubernetes.io/zh/docs/concepts/storage/volumes/</a>
+</p>
+
+<p>
+默认情况下容器中的磁盘文件是非持久化的，对于运行在容器中的应用来说面临两个问题，第一：当容器挂掉 kubelet 将重启启动它时，文件将会丢失；第二：当 Pod 中同时运行多个容器，容器之间需要共享文件时。Kubernetes 的 Volume 解决了这两个问题。
+</p>
+
+<p>
+一些需要持久化数据的程序才会用到 Volumes，或者一些需要共享数据的容器需要 Volumes。
+</p>
+
+<p>
+如
+</p>
+<ul class="org-ul">
+<li>redis-cluster 的 node.conf 的 ip 会变的，不能用 configmap，需要用 volumes 存储。</li>
+<li>日志收集的需要：需要的应用程序的容器里加一个 sidecar，这个容器是一个收集日志的容器，如 filebeat，它通过 volumes 共享应用程序的日志文件目录。</li>
+</ul>
+</div>
+<div id="outline-container-h:3fe7d4be-da74-427e-aea1-631e22c301e5" class="outline-5">
+<h5 id="h:3fe7d4be-da74-427e-aea1-631e22c301e5"><a href="#h:3fe7d4be-da74-427e-aea1-631e22c301e5">背景</a></h5>
+<div class="outline-text-5" id="text-h:3fe7d4be-da74-427e-aea1-631e22c301e5">
+<p>
+在Docker中也有一个 <a href="https://docs.docker.com/userguide/dockervolumes/">docker Volume</a> 的概念 ，Docker的Volume只是磁盘中的一个目录，生命周期不受管理。当然Docker现在也提供Volume将数据持久化存储，但支持功能比较少（例如，对于Docker 1.7，每个容器只允许挂载一个Volume，并且不能将参数传递给Volume）。
+</p>
+
+<p>
+另一方面，Kubernetes Volume具有明确的生命周期 - 与pod相同。因此，Volume的生命周期比Pod中运行的任何容器要持久，在容器重新启动时能可以保留数据，当然，当Pod被删除不存在时，Volume也将消失。注意，Kubernetes支持许多类型的Volume，Pod可以同时使用任意类型/数量的Volume。
+</p>
+
+<p>
+内部实现中，一个Volume只是一个目录，目录中可能有一些数据，pod的容器可以访问这些数据。至于这个目录是如何产生的、支持它的介质、其中的数据内容是什么，这些都由使用的特定Volume类型来决定。
+</p>
+
+<p>
+要使用Volume，pod需要指定Volume的类型和内容（spec.volumes字段），和映射到容器的位置（spec.containers.volumeMounts字段）。
+</p>
+</div>
+</div>
+<div id="outline-container-h:4920ad83-8488-4d14-9f8b-f7a27496ad4f" class="outline-5">
+<h5 id="h:4920ad83-8488-4d14-9f8b-f7a27496ad4f"><a href="#h:4920ad83-8488-4d14-9f8b-f7a27496ad4f">卷的类型</a></h5>
+<div class="outline-text-5" id="text-h:4920ad83-8488-4d14-9f8b-f7a27496ad4f">
+<p>
+Kubernetes支持Volume类型有：
+</p>
+<ul class="org-ul">
+<li>configMap</li>
+<li>secret</li>
+<li>emptyDir</li>
+<li>hostPath</li>
+<li>nfs</li>
+<li>persistentVolumeClaim</li>
+<li>local</li>
+<li>projected</li>
+<li>csi</li>
+<li>iscsi</li>
+<li>rbd</li>
+<li>cephfs</li>
+<li>fc (fibre channel)</li>
+<li>downwardAPI</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:6a45e227-9301-410f-9804-7beb787db1f4" class="outline-4">
+<h4 id="h:6a45e227-9301-410f-9804-7beb787db1f4"><a href="#h:6a45e227-9301-410f-9804-7beb787db1f4">emptyDir</a></h4>
+<div class="outline-text-4" id="text-h:6a45e227-9301-410f-9804-7beb787db1f4">
+<p>
+使用emptyDir，当Pod分配到 Node 上时，将会创建emptyDir，并且只要Node上的Pod一直运行，Volume就会一直存。当Pod（不管任何原因）从Node上被删除时，emptyDir也同时会删除，存储的数据也将永久删除。注：删除容器不影响emptyDir。
+</p>
+
+
+<p>
+默认情况下，emptyDir卷支持节点上的任何介质，可能是SSD、磁盘或网络存储，具体取决于自身的环境。可以将emptyDir.medium字段设置为Memory，让Kubernetes使用tmpfs（内存支持的文件系统），虽然tmpfs非常快，但是tmpfs在节点重启时，数据同样会被清除，并且设置的大小会被计入到Container的内存限制当中。
+</p>
+
+<p>
+示例，直接指定 emptyDir 为{}即可：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /opt
+          name: share-volume
+      - image: busybox
+        name: busybox
+        command: ["/bin/sh", "-c", "sleep 3600"]
+        volumeMounts:
+        - mountPath: /mnt
+          name: share-volume
+      volumes:
+      - name: share-volume
+        emptyDir: {}
+          #medium: Memory
+</pre>
+</div>
+
+<p>
+启动pod，并查看状态
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl apply -f pod_emptydir.yaml
+kubectl get pod -owide
+</pre>
+</div>
+
+<p>
+emptyDir验证
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">[jasper.xu@ip-10-204-9-241 j]$ kubectl  exec -it nginx-785b5bf7-65r4w -c nginx -- bash
+root@nginx-785b5bf7-65r4w:/# df -hT
+Filesystem     Type     Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1 xfs      100G   29G   72G  29% /opt
+
+root@nginx-785b5bf7-65r4w:/# touch /opt/123
+root@nginx-785b5bf7-65r4w:/# exit
+<span class="org-keyword">exit</span>
+
+[jasper.xu@ip-10-204-9-241 j]$ kubectl  exec -it nginx-785b5bf7-65r4w -c busybox -- sh
+/ <span class="org-comment-delimiter"># </span><span class="org-comment">df -hT
+</span>Filesystem           Type            Size      Used Available Use% Mounted on
+/dev/nvme0n1p1       xfs           100.0G     28.6G     71.4G  29% /mnt
+/ <span class="org-comment-delimiter"># </span><span class="org-comment">ls /mnt/
+</span>123
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed" class="outline-4">
+<h4 id="h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed"><a href="#h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed">hostPath 挂载宿主机路径</a></h4>
+<div class="outline-text-4" id="text-h:25ae1f2d-9d30-4f88-9f01-1dcad79a40ed">
+<p>
+hostPath允许挂载Node上的文件系统到Pod里面去。如果Pod需要使用Node上的文件，可以使用hostPath。
+</p>
+
+<p>
+警告：
+</p>
+<ul class="org-ul">
+<li>hostPath 卷存在许多安全风险，最佳做法是尽可能避免使用 HostPath。 当必须使用 hostPath 卷时，它的范围应仅限于所需的文件或目录，并以只读方式挂载。</li>
+<li>如果通过 AdmissionPolicy 限制 hostPath 对特定目录的访问，则必须要求 volumeMounts 使用 readOnly 挂载以使策略生效。</li>
+</ul>
+
+<p>
+示例
+</p>
+</div>
+<div id="outline-container-h:f4dab3ff-8da3-4888-b366-989002e14d1a" class="outline-5">
+<h5 id="h:f4dab3ff-8da3-4888-b366-989002e14d1a"><a href="#h:f4dab3ff-8da3-4888-b366-989002e14d1a">hostPath 的一些用法有</a></h5>
+<div class="outline-text-5" id="text-h:f4dab3ff-8da3-4888-b366-989002e14d1a">
+<ul class="org-ul">
+<li>运行一个需要访问 Docker 引擎内部机制的容器；请使用 hostPath 挂载 /var/lib/docker 路径。</li>
+<li>在容器中运行 cAdvisor 时，以 hostPath 方式挂载 /sys。</li>
+<li>允许 Pod 指定给定的 hostPath 在运行 Pod 之前是否应该存在，是否应该创建以及应该以什么方式存在。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d" class="outline-5">
+<h5 id="h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d"><a href="#h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d">支持类型</a></h5>
+<div class="outline-text-5" id="text-h:e34fbe21-3ac1-4eda-8941-b1d19d5eb52d">
+<p>
+除了必需的 path 属性之外，用户可以选择性地为 hostPath 卷指定 type。支持的 type 值如下：
+</p>
+
+<ul class="org-ul">
+<li>空字符串（默认）用于向后兼容，这意味着在安装 hostPath 卷之前不会执行任何检查。</li>
+<li>DirectoryOrCreate 如果在给定路径上什么都不存在，那么将根据需要创建空目录，权限设置为 0755，具有与 kubelet 相同的组和属主信息。</li>
+<li>Directory         在给定路径上必须存在的目录。</li>
+<li>FileOrCreate   如果在给定路径上什么都不存在，那么将在那里根据需要创建空文件，权限设置为 0644，具有与 kubelet 相同的组和所有权。【前提：文件所在目录必须存在；目录不存在则不能创建文件】</li>
+<li>File                  在给定路径上必须存在的文件。</li>
+<li>Socket            在给定路径上必须存在的 UNIX 套接字。</li>
+<li>CharDevice    在给定路径上必须存在的字符设备。</li>
+<li>BlockDevice   在给定路径上必须存在的块设备。</li>
+</ul>
+
+<p>
+范例： 挂载印度时区
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /etc/localtime
+          name: time
+      volumes:
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+          type: ""
+        name: time
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f6310502-2d5d-401e-b267-ddc3d9aa98cd" class="outline-4">
+<h4 id="h:f6310502-2d5d-401e-b267-ddc3d9aa98cd"><a href="#h:f6310502-2d5d-401e-b267-ddc3d9aa98cd">挂载 NFS 至容器</a></h4>
+<div class="outline-text-4" id="text-h:f6310502-2d5d-401e-b267-ddc3d9aa98cd">
+</div>
+<div id="outline-container-h:b4772bc2-e804-4b43-8017-b9a7793f08da" class="outline-5">
+<h5 id="h:b4772bc2-e804-4b43-8017-b9a7793f08da"><a href="#h:b4772bc2-e804-4b43-8017-b9a7793f08da">安装 nfs 服务</a></h5>
+<div class="outline-text-5" id="text-h:b4772bc2-e804-4b43-8017-b9a7793f08da">
+<p>
+NFS 是Network File System的缩写，即网络文件系统。Kubernetes中通过简单地配置就可以挂载NFS到Pod中，而NFS中的数据是可以永久保存的，同时NFS支持同时写操作。Pod被删除时，Volume被卸载，内容被保留。这就意味着NFS能够允许我们提前对数据进行处理，而且这些数据可以在Pod之间相互传递。
+</p>
+
+<p>
+所有节点
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">yum install nfs-utils -y
+</pre>
+</div>
+
+<p>
+安装nfs服务, node01
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">systemctl start nfs
+sudo systemctl enable nfs
+
+mkdir -p /data/nfs
+
+vim /etc/exports
+/data/nfs 10.4.0.0/24(rw,sync,no_subtree_check,no_root_squash)
+
+exportfs -r
+
+systemctl reload nfs-server
+</pre>
+</div>
+
+<p>
+master01
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">mount -t nfs 192.168.0.204:/data/nfs /mnt/
+<span class="org-builtin">cd</span> /mnt/
+touch 123
+
+unmount /mnt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e" class="outline-5">
+<h5 id="h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e"><a href="#h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e">volume nfs</a></h5>
+<div class="outline-text-5" id="text-h:fe0ed7d8-9de1-4910-a0c8-432dfc44721e">
+<p>
+范例：volume nfs
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /opt
+          name: nfs-volume
+      volumes:
+      - nfs:
+          server: 192.168.0.204
+          path: /data/nfs/test-dp
+        name: nfs-volume
+</pre>
+</div>
+
+<p>
+volumes挂载
+</p>
+
+<p>
+案例<a href="https://www.cnblogs.com/xiajq/p/11395211.html">https://www.cnblogs.com/xiajq/p/11395211.html</a>
+</p>
+
+<p>
+生产环境不用nfs，也不直接用NFS，用PV来连接。可以用云服务商的来存储
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:21925a77-be3e-4920-8d2f-986f018374dc" class="outline-3">
+<h3 id="h:21925a77-be3e-4920-8d2f-986f018374dc"><a href="#h:21925a77-be3e-4920-8d2f-986f018374dc">PV&amp;PVC</a></h3>
+<div class="outline-text-3" id="text-h:21925a77-be3e-4920-8d2f-986f018374dc">
+</div>
+<div id="outline-container-h:3258d4f5-25ed-49d0-b546-9503f4a9b046" class="outline-4">
+<h4 id="h:3258d4f5-25ed-49d0-b546-9503f4a9b046"><a href="#h:3258d4f5-25ed-49d0-b546-9503f4a9b046">为什么要引入 PV 和 PVC</a></h4>
+<div class="outline-text-4" id="text-h:3258d4f5-25ed-49d0-b546-9503f4a9b046">
+<p>
+只有 Volume 无法满足生产需求
+</p>
+
+
+<figure id="org0ad215e">
+<img style="aspect-ratio:1466/594" decoding="async" loading="lazy" src="./images/Snipaste_2022-09-15_22-54-35.webp" alt="Snipaste_2022-09-15_22-54-35.webp" width="50%">
+
+</figure>
+
+<ul class="org-ul">
+<li>当某个数据卷不再被挂载使用时，里面的数据如何处理？</li>
+<li>如果想要实现只读挂载如何处理？</li>
+<li>如果想要只能一个Pod挂载如何处理？</li>
+<li>如何只允许某个Pod使用10G的空间？</li>
+</ul>
+
+<p>
+PersistentVolume：简称PV，是由Kubernetes管理员设置的存储，可以配置Ceph、NFS、GlusterFS等常用存储配置，相对于Volume配置，提供了更多的功能，比如生命周期的管理、大小的限制。PV分为静态和动态（StorageClass）。
+</p>
+
+<p>
+PersistentVolumeClaim：简称PVC，是对存储PV的请求，表示需要什么类型的PV，需要存储的技术人员只需要配置PVC即可使用存储，或者Volume配置PVC的名称即可。
+</p>
+
+<p>
+官方文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">https://kubernetes.io/docs/concepts/storage/persistent-volumes/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:504cfaf4-2ad2-4978-a0c5-07fdded7840f" class="outline-4">
+<h4 id="h:504cfaf4-2ad2-4978-a0c5-07fdded7840f"><a href="#h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">PV、PVC图解</a></h4>
+<div class="outline-text-4" id="text-h:504cfaf4-2ad2-4978-a0c5-07fdded7840f">
+
+<figure id="org61f05c1">
+<img style="aspect-ratio:1918/996" decoding="async" loading="lazy" src="./images/Snipaste_2022-09-15_23-05-56.webp" alt="Snipaste_2022-09-15_23-05-56.webp" width="50%">
+
+</figure>
+
+<p>
+一些概念：
+</p>
+<ul class="org-ul">
+<li>PV： 没有名称空间限制，PV分为静态（手动创建）和动态（StorageClass）</li>
+<li>PVC：绑定名称空间，pod 指定 pvc 的名称进行挂载</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-yaml">spec:
+  template:
+    spec:
+      containers:
+      - name: task-center-job
+        volumeMounts:
+        - name: logs
+          mountPath: /opt/task-center-job/logs
+          subPath: taskcenter/job
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: efs-taskcenter-logs-claim
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc" class="outline-4">
+<h4 id="h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc"><a href="#h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc">PV</a></h4>
+<div class="outline-text-4" id="text-h:df0e4911-c0f3-4b9f-8706-b508f4d0d3fc">
+</div>
+<div id="outline-container-h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e" class="outline-5">
+<h5 id="h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e"><a href="#h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e">PV 访问和回收策略</a></h5>
+<div class="outline-text-5" id="text-h:5ee2e8a9-6541-4f7d-b0e4-d4fb6846a68e">
+<p>
+PV 回收策略：
+</p>
+<ul class="org-ul">
+<li>Retain：保留，该策略允许手动回收资源，当删除PVC时，PV仍然存在，PV被视为已释放，管理员可以手动回收卷。</li>
+<li>Recycle：（已被废弃）回收，如果Volume插件支持，Recycle策略会对卷执行 <code>rm -rf</code> 清理该PV，并使其可用于下一个新的PVC，但是本策略已弃用，旧的版本只有NFS和HostPath支持该策略。</li>
+<li>Delete：删除，如果Volume插件支持，删除PVC时会同时删除PV，动态卷默认为Delete，目前支持Delete的存储后端包括AWS EBS, GCE PD, Azure Disk, or OpenStack Cinder等。</li>
+<li>可以通过persistentVolumeReclaimPolicy: Recycle字段配置</li>
+</ul>
+
+<p>
+PV 回收策略文档：<a href="https://kubernetes.io/zh-cn/docs/concepts/storage/persistent-volumes/#reclaim-policy">https://kubernetes.io/zh-cn/docs/concepts/storage/persistent-volumes/#reclaim-policy</a>
+</p>
+
+
+<p>
+PV 访问策略：
+</p>
+<ul class="org-ul">
+<li>ReadWriteOnce：可以被单节点以读写模式挂载，命令行中可以被缩写为RWO。</li>
+<li>ReadOnlyMany：可以被多个节点以只读模式挂载，命令行中可以被缩写为ROX。</li>
+<li>ReadWriteMany：可以被多个节点以读写模式挂载，命令行中可以被缩写为RWX。</li>
+<li>ReadWriteOncePod ：只允许被单个Pod访问，需要K8s 1.22+以上版本，并且是 CSI 创建的PV才可使用</li>
+</ul>
+
+<p>
+PV 访问策略官方文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes">https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:2f1478ee-e718-46bb-ab64-abb56f66454f" class="outline-5">
+<h5 id="h:2f1478ee-e718-46bb-ab64-abb56f66454f"><a href="#h:2f1478ee-e718-46bb-ab64-abb56f66454f">文件存储、块存储、对象存储区别</a></h5>
+<div class="outline-text-5" id="text-h:2f1478ee-e718-46bb-ab64-abb56f66454f">
+<p>
+存储的分类：
+</p>
+<ul class="org-ul">
+<li>文件存储：一些数据可能需要被多个节点使用，比如用户的头像、用户上传的文件等，实现方式：NFS、NAS、FTP、CephFS等。</li>
+<li>块存储：一些数据只能被一个节点使用，或者是需要将一块裸盘整个挂载使用，比如数据库、Redis等，实现方式：Ceph、GlusterFS、公有云。</li>
+<li>对象存储：由程序代码直接实现的一种存储方式，云原生应用无状态化常用的实现方式，实现方式：一般是符合 S3 协议的云存储，比如AWS的S3存储、Minio、七牛云等。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:260d5061-2931-479a-91b8-efadfce2c699" class="outline-5">
+<h5 id="h:260d5061-2931-479a-91b8-efadfce2c699"><a href="#h:260d5061-2931-479a-91b8-efadfce2c699">创建 NAS  或 NFS 类型的 PV</a></h5>
+<div class="outline-text-5" id="text-h:260d5061-2931-479a-91b8-efadfce2c699">
+<p>
+NFS
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs
+  labels:
+    type: business-a
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: nfs-slow # 这个名字是PVC创建的时候要对应的名字
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /tmp
+    server: 10.103.236.205
+</pre>
+</div>
+
+<p>
+参数说明：
+</p>
+<ul class="org-ul">
+<li>capacity：容量配置</li>
+<li>volumeMode：卷的模式，目前支持Filesystem（文件系统） 和 Block（块），其中Block类型需要后端存储支持，默认为文件系统</li>
+<li>accessModes：该PV的访问模式</li>
+<li>storageClassName：PV的类，一个特定类型的PV只能绑定到特定类别的PVC； storageClassName 值与 PVC 设置相同的 PV 卷 才行，PVC 申领不必一定要请求某个类。如果 PVC 的 storageClassName 属性值设置为 ""， 则被视为要请求的是没有设置存储类的 PV 卷.</li>
+<li>persistentVolumeReclaimPolicy：回收策略</li>
+<li>mountOptions：非必须，新版本中已弃用</li>
+<li>nfs：NFS服务配置，包括以下两个选项
+<ul class="org-ul">
+<li>path：NFS上的共享目录</li>
+<li>server：NFS的IP地址</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:333e72d4-4ca9-4a89-a427-ee366d7f7243" class="outline-5">
+<h5 id="h:333e72d4-4ca9-4a89-a427-ee366d7f7243"><a href="#h:333e72d4-4ca9-4a89-a427-ee366d7f7243">PV 状态</a></h5>
+<div class="outline-text-5" id="text-h:333e72d4-4ca9-4a89-a427-ee366d7f7243">
+<ul class="org-ul">
+<li>Available：可用，没有被PVC绑定的空闲资源。</li>
+<li>Bound：已绑定，已经被PVC绑定。</li>
+<li>Released：已释放，PVC被删除，但是资源还未被重新使用。</li>
+<li>Failed：失败，自动回收失败。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2f513651-8123-4ed1-8a30-d255db599472" class="outline-5">
+<h5 id="h:2f513651-8123-4ed1-8a30-d255db599472"><a href="#h:2f513651-8123-4ed1-8a30-d255db599472">创建 hostPath 类型的 PV</a></h5>
+<div class="outline-text-5" id="text-h:2f513651-8123-4ed1-8a30-d255db599472">
+<div class="org-src-container">
+<pre class="src src-yaml">kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: task-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: hostpath
+  capacity:
+    storage: 10Gi
+  accessModes: - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+</pre>
+</div>
+
+<p>
+说明：
+</p>
+<ul class="org-ul">
+<li>hostPath：hostPath服务配置
+<ul class="org-ul">
+<li>path：宿主机路径</li>
+</ul></li>
+</ul>
+
+<p>
+一般 pod 是不推荐固定到某 1 个节点的。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5cab6f6a-f294-4a09-baff-40e064b283ff" class="outline-4">
+<h4 id="h:5cab6f6a-f294-4a09-baff-40e064b283ff"><a href="#h:5cab6f6a-f294-4a09-baff-40e064b283ff">PVC</a></h4>
+<div class="outline-text-4" id="text-h:5cab6f6a-f294-4a09-baff-40e064b283ff">
+</div>
+<div id="outline-container-h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665" class="outline-5">
+<h5 id="h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665"><a href="#h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">PVC 如何绑定到 PV</a></h5>
+<div class="outline-text-5" id="text-h:3dfce5ee-acbf-4f95-a0a8-81bb2cd93665">
+
+<figure id="org8d28f32">
+<img style="aspect-ratio:1530/952" decoding="async" loading="lazy" src="./images/Snipaste_2022-09-16_10-54-37.webp" alt="Snipaste_2022-09-16_10-54-37.webp" width="50%">
+
+</figure>
+
+
+<ul class="org-ul">
+<li>PVC 的 StorageClassName 没有和 PV 的一致</li>
+<li>PVC 的 accessModes 和 PV 的一致</li>
+<li>设置置<a href="https://kubernetes.io/zh-cn/docs/concepts/overview/working-with-objects/labels/#label-selectors">标签选择算符</a>来进一步过滤卷集合
+<ul class="org-ul">
+<li>matchLabels</li>
+<li>matchExpressions</li>
+</ul></li>
+<li>PV 设置 claimRef 指定某个 PVC</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-yaml">cat &lt;&lt;\EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: dbench-pv-0
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 500Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: dbench-pv-claim
+    namespace: gitlab-test-xcw
+  mountOptions:
+  - hard
+  - nfsvers=3
+  - nolock
+  nfs:
+    path: /nvxa7jnu/tmp-test/gitaly
+    server: 10.22.0.29
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+EOF
+
+#nfs-pvc
+cat &lt;&lt;\EOF |kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dbench-pv-claim
+  namespace: gitlab-test-xcw
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  volumeMode: Filesystem
+  volumeName: dbench-pv-0
+EOF
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:21e372ef-a130-48ac-87de-c41ed8128770" class="outline-5">
+<h5 id="h:21e372ef-a130-48ac-87de-c41ed8128770"><a href="#h:21e372ef-a130-48ac-87de-c41ed8128770">PVC 挂载示例</a></h5>
+<div class="outline-text-5" id="text-h:21e372ef-a130-48ac-87de-c41ed8128770">
+</div>
+<ul class="org-ul">
+<li><a id="h:008c0e74-7084-48af-9553-36c5c47ece03"></a><a href="#h:008c0e74-7084-48af-9553-36c5c47ece03">deployment pvc</a><br>
+<div class="outline-text-6" id="text-h:008c0e74-7084-48af-9553-36c5c47ece03">
+<p>
+创建 PVC
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc-claim   # PVC的名字，可自取
+spec:
+  accessModes:
+    - ReadWriteMany  # 访问策略和 pv 一致
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 2Gi  # 一定要小于等于 pv
+  storageClassName: nfs-slow  #  挂载哪种类型的 pv
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">create PVC
+</span>kubectl create -f  test-pvc.yaml  
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;PVC
+</span>[root@k8s-master01 app]# kubectl get pvc
+NAME      STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+myclaim   Bound    pv0001   5Gi        RWX            nfs-slow       34s
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20877;&#27425;&#26597;&#30475;PV&#65292;&#21487;&#30475;&#21040;&#29366;&#24577;&#24050;&#32463;&#21457;&#29983;&#25913;&#21464;
+</span>[root@k8s-master01 app]# kubectl get pv
+NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM             STORAGECLASS   REASON   AGE
+pv0001   5Gi        RWX            Recycle          Bound    default/myclaim   nfs-slow                13m
+</pre>
+</div>
+
+<p>
+deployment pod 配置 Volumes  使用类型  persistentVolumeClaim
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">cat  nginx.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.15.12
+        name: nginx
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: task-pv-container
+      volumes:
+      - PersistentVolumeClaim:
+          claimNmae: nfs-pvc-claim
+        name: task-pv-storage
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26356;&#25913;&#21518;&#30340;yaml&#65292;&#22312;&#23545;&#24212;&#20301;&#32622;&#21152;&#19978;&#20197;&#19979;&#21442;&#25968;&#35843;&#29992;PVC
+</span>volumeMounts:
+- mountPath: /opt/pvc
+  name: mypd
+
+volumes:
+   - name: mypd
+     persistentVolumeClaim:
+       claimName: myclaim
+       
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#28982;&#21518;&#36827;&#20837;&#23481;&#22120;&#26597;&#30475;&#26159;&#21542;&#25346;&#36733;&#25104;&#21151;
+</span>[root@k8s-master01 app]# kubectl exec -it nginx-5bb6d88dfb-w78k8 -c nginx2 -- bash
+root@nginx-5bb6d88dfb-w78k8:/# df -h
+Filesystem               Size  Used Avail Use% Mounted on
+overlay                   37G  4.3G   33G  12% /
+tmpfs                     64M     0   64M   0% /dev
+tmpfs                    985M     0  985M   0% /sys/fs/cgroup
+/dev/mapper/centos-root   37G  4.3G   33G  12% /mnt
+192.168.1.104:/data/nfs   37G  3.0G   35G   9% /opt/pvc   <span class="org-comment-delimiter"># </span><span class="org-comment">&#36825;&#23601;&#26159;&#21018;&#21018;&#25346;&#36733;&#30340;PVC
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25991;&#20214;&#33021;&#20849;&#20139;
+</span>root@nginx-5bb6d88dfb-w78k8:/opt/pvc# ls 
+pvc  qqq  test
+root@nginx-5bb6d88dfb-w78k8:/opt/pvc# echo 11 &gt; test 
+root@nginx-5bb6d88dfb-w78k8:/opt/pvc# cat test       
+11
+</pre>
+</div>
+</div>
+</li>
+<li><a id="h:44504c73-84af-46f4-9783-883197b69981"></a><a href="#h:44504c73-84af-46f4-9783-883197b69981">statfulset pvc</a><br>
+<div class="outline-text-6" id="text-h:44504c73-84af-46f4-9783-883197b69981">
+<div class="org-src-container">
+<pre class="src src-yaml">cat &gt; nginx-sts.yaml &lt;&lt; EFO
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  #updateStrategy:
+  #  rollingUpdate:
+  #    partition: 0
+  #  type: RollingUpdate
+  selector:
+    matchLabels:
+      app: nginx # 必须匹配 .spec.template.metadata.labels
+  serviceName: "nginx"
+  replicas: 3 # 默认值是 1
+  # minReadySeconds: 10 # 默认值是 0 ，v1.22 版本才有
+  template:
+    metadata:
+      labels:
+        app: nginx # 必须匹配 .spec.selector.matchLabels
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: nginx
+        image: registry.k8s.io/nginx-slim:0.8
+        ports:
+        - containerPort: 80
+          name: web
+        volumeMounts:
+        - name: www
+          mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+  - metadata:
+      name: www
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "nfs-slow"
+      resources:
+        requests:
+          storage: 1Gi
+EFO
+</pre>
+</div>
+
+<p>
+根据 pvc 模板自动创建 pvc
+</p>
+
+<p>
+需要提前准备好与 pvc 相同的类（storageClassName）的 pv。
+</p>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:60831fb1-bac2-4bd4-8b64-7b8419099e65" class="outline-5">
+<h5 id="h:60831fb1-bac2-4bd4-8b64-7b8419099e65"><a href="#h:60831fb1-bac2-4bd4-8b64-7b8419099e65">PVC 创建和挂载处理 Pending 的原因</a></h5>
+<div class="outline-text-5" id="text-h:60831fb1-bac2-4bd4-8b64-7b8419099e65">
+<p>
+创建 PVC 之后，一直绑定不上 PV（Pending）：
+</p>
+<ul class="org-ul">
+<li>PVC 的空间申请大小大于 PV 的大小</li>
+<li>PVC 的 StorageClassName 没有和 PV 的一致</li>
+<li>PVC 的 accessModes 和 PV 的不一致</li>
+</ul>
+
+
+<p>
+创建挂载了 PVC 的 Pod 之后，一直处于 Pending 状态：
+</p>
+<ul class="org-ul">
+<li>PVC 没有被创建成功，或者被创建</li>
+<li>PVC 和 Pod 不在同一个 Namespace</li>
+</ul>
+
+<p>
+删除PVC后, k8s会创建一个用于回收的Pod, 根据PV的回收策略进行pv的回收, 回收完以后PV的状态就会变成可被绑定的状态也就是空闲状态, 其他的Pending状态的PVC如果匹配到了这个PV，他就能和这个PV进行绑定。
+</p>
+
+
+<p>
+PV文档：<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">https://kubernetes.io/docs/concepts/storage/persistent-volumes/</a>
+</p>
+
+<p>
+<a href="https://kubernetes.io/zh/docs/concepts/storage/persistent-volumes/">https://kubernetes.io/zh/docs/concepts/storage/persistent-volumes/</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cd448add-22b2-442a-a54c-6bfea0e331ed" class="outline-4">
+<h4 id="h:cd448add-22b2-442a-a54c-6bfea0e331ed"><a href="#h:cd448add-22b2-442a-a54c-6bfea0e331ed">改变默认存储类</a></h4>
+<div class="outline-text-4" id="text-h:cd448add-22b2-442a-a54c-6bfea0e331ed">
+<p>
+所有未设置 storageClassName 的 PVC 都只能绑定到隶属于默认存储类的 PV 卷。 
+</p>
+
+<p>
+设置默认 StorageClass 的工作是通过将对应 StorageClass 对象的注解 storageclass.kubernetes.io/is-default-class 赋值为 true 来完成的。
+</p>
+
+<p>
+官方参考：<a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/change-default-storage-class/">https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/change-default-storage-class/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9" class="outline-4">
+<h4 id="h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9"><a href="#h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9">使用NFS做为PVC</a></h4>
+<div class="outline-text-4" id="text-h:dad680e5-2a6d-47f7-88cb-63cfe23a8fe9">
+<p>
+安装NFS服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">apt install nfs-server
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#20849;&#20139;&#25968;&#25454;&#30446;&#24405;
+</span>mkdir -pv /data/nfs-share
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25480;&#26435;
+</span>cat &lt;&lt;\EOF &gt;&gt; /etc/exports<span class="org-sh-heredoc">
+/data/nfs-share *(rw,no_root_squash)
+EOF
+</span>
+systemctl restart nfs-server
+</pre>
+</div>
+
+<p>
+部署 NFS驱动
+</p>
+
+<p>
+准备文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; rback.yaml<span class="org-sh-heredoc">
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nfs-client-provisioner-runner
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "update", "patch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-nfs-client-provisioner
+subjects:
+- kind: ServiceAccount
+  name: nfs-client-provisioner
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: nfs-client-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-client-provisioner
+rules:
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-client-provisioner
+subjects:
+- kind: ServiceAccount
+  name: nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: default
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-client-provisioner
+  apiGroup: rbac.authorization.k8s.io
+EOF
+</span>
+cat &lt;&lt;\EOF&gt; deployment.yaml<span class="org-sh-heredoc">
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-client-provisioner
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-client-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccount: nfs-client-provisioner
+      containers:
+        - name: nfs-client-provisioner
+          image: quay.io/external_storage/nfs-client-provisioner:latest
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: fuseim.pri/ifs
+            - name: NFS_SERVER
+              value: 172.17.79.3
+            - name: NFS_PATH
+              value: /data/nfs-share
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: 172.17.79.3
+            path: /data/nfs-share
+EOF
+</span>
+cat &lt;&lt;\EOF&gt; class.yaml<span class="org-sh-heredoc">
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-csi
+provisioner: fuseim.pri/ifs
+reclaimPolicy: Retain #PV&#30340;&#21024;&#38500;&#31574;&#30053;&#65292;&#40664;&#35748;&#20026;delete&#65292;&#21024;&#38500;&#21518;PV&#31435;&#21363;&#21024;&#38500;NFS server&#30340;&#25968;&#25454;
+mountOptions:
+  - noatime #&#35775;&#38382;&#25991;&#20214;&#26102;&#19981;&#26356;&#26032;&#25991;&#20214;inode&#20013;&#30340;&#26102;&#38388;&#25139;
+parameters:
+  archiveOnDelete: "true"  #true&#20026;&#21024;&#38500;pod&#26102;&#20445;&#30041;pod&#25968;&#25454;&#12290;false &#21024;&#38500;&#26102;&#19981;&#20445;&#30041;&#25968;&#25454;
+EOF</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#35282;&#33394;
+</span>kubectl create -f rbac.yaml
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314; ServiceAccount &#21644;&#37096;&#32626; NFS-Client Provisioner
+</span>kubectl create -f deployment.yaml
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314; NFS StorageClass
+</span>kubectl create -f class.yaml
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#39564;&#35777;NFS&#37096;&#32626;&#25104;&#21151;
+</span>kubectl get pod -l <span class="org-variable-name">app</span>=nfs-client-provisioner
+</pre>
+</div>
+
+<p>
+动态创建pvc
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; sts.yaml<span class="org-sh-heredoc">
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nacos
+spec:
+...
+  serviceName: nacos-headless
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: nacos
+...
+    spec:
+      containers:
+        - name: nacos
+          imagePullPolicy: Always
+          image: nacos/nacos-server:latest
+          volumeMounts:
+            - name: data
+              mountPath: /home/nacos/data
+              subPath: data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: nfs-csi
+        accessModes: [ "ReadWriteMany" ]
+        resources:
+          requests:
+            storage: 10Gi
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

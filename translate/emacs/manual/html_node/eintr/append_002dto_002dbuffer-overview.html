@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 本书是 Emacs Lisp 编程入门，面向非程序员读者。
+
+
+随 Emacs 版本 30.2 一同发布。
+
+版权所有 © 1990-1995, 1997, 2001-2025 自由软件基金会。
+
+
+
+可从 https://shop.fsf.org/ 购买纸质版。出版方：
+
+GNU Press,                        https://www.fsf.org/licensing/gnu-press/
+自由软件基金会下属部门                邮箱：sales@fsf.org
+Free Software Foundation, Inc.    电话：+1 (617) 542-5942
+31 Milk Street, # 960789          传真：+1 (617) 542-2652
+Boston, MA 02196 USA
+
+
+ISBN 1-882114-43-4
+
+允许依据自由软件基金会发布的《GNU 自由文档许可证》第1.3版或其更新版本，对本文档进行复制、分发或修改。
+本文档无固定章节，前封面文本为 "A GNU Manual"，后封面文本见下文 (a) 条款。
+许可证副本收录在名为 "GNU Free Documentation License" 的章节中。
+
+(a) 自由软件基金会后封面文本为： "您拥有复制与修改本 GNU 手册的自由。
+从自由软件基金会购买本手册，将助力其开发 GNU 系统并推广软件自由。" -->
+<title>append-to-buffer overview (翻译: Emacs Lisp 编程)</title>
+
+<meta name="description" content="append-to-buffer overview (翻译: Emacs Lisp 编程)">
+<meta name="keywords" content="append-to-buffer overview (翻译: Emacs Lisp 编程)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Intro-index.html" rel="index" title="Intro index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="append_002dto_002dbuffer.html" rel="up" title="append-to-buffer">
+<link href="append-interactive.html" rel="next" title="append interactive">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="unnumberedsubsec-level-extent" id="append_002dto_002dbuffer-overview">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="append-interactive.html" accesskey="n" rel="next"><code class="code">append-to-buffer</code> 的交互式表达式</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="append_002dto_002dbuffer.html" accesskey="u" rel="up"><code class="code">append-to-buffer</code> 的定义</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Intro-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="unnumberedsubsec" id="append_002dto_002dbuffer-_6982_8ff0"><span><code class="code">append-to-buffer</code> 概述<a class="copiable-link" href="#append_002dto_002dbuffer-_6982_8ff0"> &para;</a></span></h4>
+
+<a class="index-entry-id" id="index-insert_002dbuffer_002dsubstring"></a>
+<p><code class="code">append-to-buffer</code> 命令使用 <code class="code">insert-buffer-substring</code> 函数复制区域内容。<code class="code">insert-buffer-substring</code> 的功能可从名称看出：从一个缓冲区取出子串并插入到另一个缓冲区。
+</p>
+<p><code class="code">append-to-buffer</code> 的大部分逻辑都在为 <code class="code">insert-buffer-substring</code> 创造运行条件：代码需要指定文本要写入的目标缓冲区、文本来源与目标窗口，以及要复制的区域范围。
+</p>
+<p>以下是该函数的一种实现方式：
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(defun append-to-buffer (buffer start end)
+  &quot;将区域中的文本追加到指定缓冲区。
+文本会插入到该缓冲区的光标之前。
+</pre></div><pre class="example-preformatted">
+
+</pre><div class="group"><pre class="example-preformatted">从程序中调用时需传入三个参数：
+BUFFER（或缓冲区名）、START 与 END。
+START 与 END 指定当前缓冲区中要复制的部分。&quot;
+  (interactive
+   (list (read-buffer &quot;Append to buffer: &quot; (other-buffer
+                                            (current-buffer) t))
+         (region-beginning) (region-end)))
+</pre></div><div class="group"><pre class="example-preformatted">  (let ((oldbuf (current-buffer)))
+    (save-excursion
+      (let* ((append-to (get-buffer-create buffer))
+             (windows (get-buffer-window-list append-to t t))
+             point)
+        (set-buffer append-to)
+        (setq point (point))
+        (barf-if-buffer-read-only)
+        (insert-buffer-substring oldbuf start end)
+        (dolist (window windows)
+          (when (= (window-point window) point)
+            (set-window-point window (point))))))))
+</pre></div></div>
+
+<p>可以将该函数拆分为一系列填充好的模板来理解。
+</p>
+<p>最外层是函数定义模板。在该函数中，模板（已填充部分内容）如下：
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(defun append-to-buffer (buffer start end)
+  &quot;<var class="var">documentation</var>...&quot;
+  (interactive ...)
+  <var class="var">body</var>...)
+</pre></div></div>
+
+<p>函数第一行包含函数名与三个参数：要复制文本的目标 <code class="code">buffer</code>，以及当前缓冲区中待复制区域的起始 <code class="code">start</code> 与结束 <code class="code">end</code> 位置。
+</p>
+<p>接下来是清晰完整的文档字符串。按照惯例，三个参数使用大写字母以便识别。更完善的是，参数说明顺序与参数列表顺序一致。
+</p>
+<p>注意文档中区分了缓冲区与其名称。（该函数两种形式均可处理。）
+</p>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

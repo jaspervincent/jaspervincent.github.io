@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Progress (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Progress (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Progress (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="The-Echo-Area.html" rel="up" title="The Echo Area">
+<link href="Logging-Messages.html" rel="next" title="Logging Messages">
+<link href="Displaying-Messages.html" rel="prev" title="Displaying Messages">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Progress">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Logging-Messages.html" accesskey="n" rel="next">在 <samp class="file">*Messages*</samp> 中记录信息</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Displaying-Messages.html" accesskey="p" rel="prev">在回显区显示信息</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="The-Echo-Area.html" accesskey="u" rel="up">回显区</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_62a5_544a_64cd_4f5c_6267_884c_8fdb_5ea6"><span>42.4.2 报告操作执行进度<a class="copiable-link" href="#g_t_62a5_544a_64cd_4f5c_6267_884c_8fdb_5ea6"> &para;</a></span></h4>
+<a class="index-entry-id" id="index-progress-reporting"></a>
+
+<p>当某个操作需要较长时间才能完成时，应当向用户告知其执行进度。这样用户可以预估剩余时间，并明确知晓 Emacs 正在繁忙工作而非卡死。实现该功能的简便方式是使用 <em class="dfn">进度报告器(progress reporter)</em>。
+</p>
+<p>以下是一个无实际功能但可正常运行的示例：
+</p>
+<div class="example smallexample">
+<pre class="example-preformatted">(let ((progress-reporter
+       (make-progress-reporter &quot;Collecting mana for Emacs...&quot;
+                               0  500)))
+  (dotimes (k 500)
+    (sit-for 0.01)
+    (progress-reporter-update progress-reporter k))
+  (progress-reporter-done progress-reporter))
+</pre></div>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-make_002dprogress_002dreporter"><span class="category-def">Function: </span><span><strong class="def-name">make-progress-reporter</strong> <var class="def-var-arguments">message &amp;optional min-value max-value current-value min-change min-time</var><a class="copiable-link" href="#index-make_002dprogress_002dreporter"> &para;</a></span></dt>
+<dd><p>该函数创建并返回一个进度报告器对象，该对象将作为下文所列其他函数的参数。其设计思路是预先计算尽可能多的数据，以保证进度报告的高效执行。
+</p>
+<p>后续使用该进度报告器时，它会在回显区显示 <var class="var">message</var>，并在其后附加进度百分比。<var class="var">message</var> 按普通字符串处理。例如若需要其依赖文件名，应在调用该函数前使用 <code class="code">format-message</code> 处理。
+</p>
+<p>参数 <var class="var">min-value</var> 和 <var class="var">max-value</var> 应为数字，分别代表操作的起始与结束状态。例如扫描缓冲区的操作可将其分别设为 <code class="code">point-min</code> 和 <code class="code">point-max</code> 的返回值。<var class="var">max-value</var> 必须大于 <var class="var">min-value</var>。
+</p>
+<p>你也可以将 <var class="var">min-value</var> 和 <var class="var">max-value</var> 设为 <code class="code">nil</code>。此时进度报告器不会显示百分比，而是显示一个 &ldquo;旋转指示器(spinner)&rdquo;，每次更新进度时转动一格。
+</p>
+<p>若 <var class="var">min-value</var> 和 <var class="var">max-value</var> 为数字，可通过参数 <var class="var">current-value</var> 指定初始进度数值；若省略则默认为 <var class="var">min-value</var>。
+</p>
+<p>其余参数控制回显区的更新频率。进度报告器会等待操作至少完成 <var class="var">min-change</var> 百分比后才打印下一条信息，默认值为百分之一。<var class="var">min-time</var> 指定连续打印之间的最小间隔秒数，默认值为 0.2 秒。（部分操作系统对秒级小数的处理精度可能不同。）
+</p>
+<p>该函数会调用 <code class="code">progress-reporter-update</code>，因此第一条信息会立即打印。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-progress_002dreporter_002dupdate"><span class="category-def">Function: </span><span><strong class="def-name">progress-reporter-update</strong> <var class="def-var-arguments">reporter &amp;optional value suffix</var><a class="copiable-link" href="#index-progress_002dreporter_002dupdate"> &para;</a></span></dt>
+<dd><p>该函数负责报告操作进度的核心工作。它显示 <var class="var">reporter</var> 的提示信息，并附加由 <var class="var">value</var> 计算得出的进度百分比。若百分比为零，或根据 <var class="var">min-change</var> 与 <var class="var">min-time</var> 判断足够接近，则不会在输出中显示百分比。
+</p>
+<p><var class="var">reporter</var> 必须是调用 <code class="code">make-progress-reporter</code> 返回的对象。<var class="var">value</var> 指定操作的当前状态，取值必须在传入 <code class="code">make-progress-reporter</code> 的 <var class="var">min-value</var> 与 <var class="var">max-value</var> 之间（包含边界）。例如扫描缓冲区时，<var class="var">value</var> 应为调用 <code class="code">point</code> 的结果。
+</p>
+<p>可选参数 <var class="var">suffix</var> 是一个字符串，显示在 <var class="var">reporter</var> 主提示与进度文本之后。若 <var class="var">reporter</var> 为非数值型报告器，则 <var class="var">value</var> 应为 <code class="code">nil</code>，或作为替代 <var class="var">suffix</var> 的字符串。
+</p>
+<p>该函数遵循 <code class="code">make-progress-reporter</code> 中设置的 <var class="var">min-change</var> 与 <var class="var">min-time</var>，因此不会在每次调用时都输出新信息。它执行效率极高，通常无需刻意减少调用次数：过度优化带来的开销往往得不偿失。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-progress_002dreporter_002dforce_002dupdate"><span class="category-def">Function: </span><span><strong class="def-name">progress-reporter-force-update</strong> <var class="def-var-arguments">reporter &amp;optional value new-message suffix</var><a class="copiable-link" href="#index-progress_002dreporter_002dforce_002dupdate"> &para;</a></span></dt>
+<dd><p>该函数与 <code class="code">progress-reporter-update</code> 类似，但会无条件在回显区打印信息。
+</p>
+<p><var class="var">reporter</var>、<var class="var">value</var> 与 <var class="var">suffix</var> 的含义与 <code class="code">progress-reporter-update</code> 一致。可选参数 <var class="var">new-message</var> 允许修改 <var class="var">reporter</var> 的提示文本。由于该函数始终更新回显区，修改内容会立即呈现给用户。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-progress_002dreporter_002ddone"><span class="category-def">Function: </span><span><strong class="def-name">progress-reporter-done</strong> <var class="def-var-arguments">reporter</var><a class="copiable-link" href="#index-progress_002dreporter_002ddone"> &para;</a></span></dt>
+<dd><p>操作完成时应当调用该函数。它会在回显区显示 <var class="var">reporter</var> 的提示信息，并在末尾添加单词 &lsquo;<samp class="samp">done</samp>&rsquo;。
+</p>
+<p>你应当始终调用该函数，而不要指望 <code class="code">progress-reporter-update</code> 会显示 &lsquo;<samp class="samp">100%</samp>&rsquo;。首先，出于多种合理原因它可能永远不会显示百分百；其次，&lsquo;<samp class="samp">done</samp>&rsquo; 的提示更加明确。
+</p></dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-dotimes_002dwith_002dprogress_002dreporter"><span class="category-def">Macro: </span><span><strong class="def-name">dotimes-with-progress-reporter</strong> <var class="def-var-arguments">(var count [result]) reporter-or-message body&hellip;</var><a class="copiable-link" href="#index-dotimes_002dwith_002dprogress_002dreporter"> &para;</a></span></dt>
+<dd><p>这是一个便捷宏，功能与 <code class="code">dotimes</code> 相同，但会使用上述函数报告循环进度，可减少代码编写量。参数 <var class="var">reporter-or-message</var> 可以是字符串或进度报告器对象。
+</p>
+<p>你可以使用该宏将本节开头的示例改写如下：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(dotimes-with-progress-reporter
+    (k 500)
+    &quot;Collecting some mana for Emacs...&quot;
+  (sit-for 0.01))
+</pre></div></div>
+
+<p>若需要为 <code class="code">make-progress-reporter</code> 指定可选参数，使用报告器对象作为 <var class="var">reporter-or-message</var> 参数会很实用。例如可将上例改写为：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(dotimes-with-progress-reporter
+    (k 500)
+    (make-progress-reporter &quot;Collecting some mana for Emacs...&quot; 0 500 0 1 1.5)
+  (sit-for 0.01))
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-dolist_002dwith_002dprogress_002dreporter"><span class="category-def">Macro: </span><span><strong class="def-name">dolist-with-progress-reporter</strong> <var class="def-var-arguments">(var list [result]) reporter-or-message body&hellip;</var><a class="copiable-link" href="#index-dolist_002dwith_002dprogress_002dreporter"> &para;</a></span></dt>
+<dd><p>这是另一个便捷宏，功能与 <code class="code">dolist</code> 相同，但会使用上述函数报告循环进度。与 <code class="code">dotimes-with-progress-reporter</code> 一样，<code class="code">reporter-or-message</code> 可以是进度报告器或字符串。你可以使用该宏改写之前的示例：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(dolist-with-progress-reporter
+    (k (number-sequence 0 500))
+    &quot;Collecting some mana for Emacs...&quot;
+  (sit-for 0.01))
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-deffn first-defmac-alias-first-deffn def-block">
+<dt class="deffn defmac-alias-deffn def-line" id="index-with_002ddelayed_002dmessage"><span class="category-def">Macro: </span><span><strong class="def-name">with-delayed-message</strong> <var class="def-var-arguments">(timeout message) body&hellip;</var><a class="copiable-link" href="#index-with_002ddelayed_002dmessage"> &para;</a></span></dt>
+<dd><p>有时无法确定操作是否会耗时较长，或实现进度报告器不太方便。这种情况下可以使用该宏。
+</p>
+<div class="example lisp">
+<pre class="lisp-preformatted">(with-delayed-message (2 (format &quot;Gathering data for %s&quot; entry))
+  (setq data (gather-data entry)))
+</pre></div>
+
+<p>在该示例中，若 <var class="var">body</var> 执行时间超过两秒，就会显示提示信息；若耗时更短则不显示。无论哪种情况，<var class="var">body</var> 都会正常执行，宏的返回值为 <var class="var">body</var> 中最后一个表单的结果。
+</p>
+<p><var class="var">message</var> 部分会在 <var class="var">body</var> 之前执行，且无论最终是否显示都会被求值。
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Logging-Messages.html">在 <samp class="file">*Messages*</samp> 中记录信息</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Displaying-Messages.html">在回显区显示信息</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="The-Echo-Area.html">回显区</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

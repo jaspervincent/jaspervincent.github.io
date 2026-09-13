@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Multiline Font Lock (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Multiline Font Lock (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Multiline Font Lock (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Font-Lock-Mode.html" rel="up" title="Font Lock Mode">
+<link href="Parser_002dbased-Font-Lock.html" rel="next" title="Parser-based Font Lock">
+<link href="Syntactic-Font-Lock.html" rel="prev" title="Syntactic Font Lock">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Multiline-Font-Lock">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Parser_002dbased-Font-Lock.html" accesskey="n" rel="next">基于解析器的字体锁定</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Syntactic-Font-Lock.html" accesskey="p" rel="prev">语法字体锁定</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Font-Lock-Mode.html" accesskey="u" rel="up">Font Lock Mode</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_591a_884c_5b57_4f53_9501_5b9a_7ed3_6784"><span>24.7.9 多行字体锁定结构<a class="copiable-link" href="#g_t_591a_884c_5b57_4f53_9501_5b9a_7ed3_6784"> &para;</a></span></h4>
+<a class="index-entry-id" id="index-multiline-font-lock"></a>
+
+<p>通常情况下，<code class="code">font-lock-keywords</code> 中的元素**不应跨行匹配**；
+这种方式无法可靠工作，因为字体锁定一般只扫描缓冲区的一部分，
+可能会错过从扫描起始行边界开始的多行结构。（扫描通常从行首开始。）
+</p>
+<p>让匹配多行结构的元素正常工作包含两个方面：正确的 <em class="emph">识别(identification)</em> 与正确的 <em class="emph">重新高亮(rehighlinghting)</em>。
+前者指字体锁定能够找到所有多行结构；后者指当多行结构被修改时，
+字体锁定能正确重新高亮所有相关文本&mdash;例如，原本属于多行结构的文本不再属于该结构时。
+这两方面紧密相关，通常修复其中一个似乎会让另一个也正常工作。
+但要获得可靠结果，必须显式处理这两方面。
+</p>
+<p>确保正确识别多行结构有三种方法：
+</p>
+<ul class="itemize mark-bullet">
+<li>向 <code class="code">font-lock-extend-region-functions</code> 添加函数，
+由其完成**识别**并扩展扫描范围，使扫描文本不会在多行结构中间开始或结束。
+</li><li>类似地使用钩子 <code class="code">font-lock-fontify-region-function</code> 扩展扫描范围，
+避免扫描在多行结构中间起止。
+</li><li>在多行结构被插入缓冲区时（或插入之后、字体锁定尝试高亮之前的任意时机）
+完成识别，并为其打上 <code class="code">font-lock-multiline</code> 属性，
+指示字体锁定不要在该结构中间起止扫描。
+</li></ul>
+
+<p>实现多行结构重新高亮有若干方法：
+</p>  
+
+<ul class="itemize mark-bullet">
+<li>为该结构添加 <code class="code">font-lock-multiline</code> 属性。
+若结构任意部分被修改，将重新高亮整个结构。
+某些场景下可通过设置变量 <code class="code">font-lock-multiline</code> 自动实现，详见该变量说明。
+</li><li>确保 <code class="code">jit-lock-contextually</code> 已启用并依赖其工作。
+它只会重新高亮修改位置之后的部分，并略有延迟。
+该方式仅在多行结构各部分的高亮**不依赖后续行文本**时有效。
+由于 <code class="code">jit-lock-contextually</code> 默认启用，这是一种很实用的方案。
+</li><li>为结构添加 <code class="code">jit-lock-defer-multiline</code> 属性。
+该方式仅在使用 <code class="code">jit-lock-contextually</code> 时生效，重新高亮同样有延迟，
+但与 <code class="code">font-lock-multiline</code> 类似，可处理高亮依赖后续行的情况。
+</li><li>若某结构的**语法**解析必须作为一个整体完成，
+可在该结构上添加 <code class="code">syntax-multiline</code> 文本属性。
+最常见的场景是：&lsquo;<samp class="samp">FOO</samp>&rsquo; 上应用的语法属性依赖后续文本 &lsquo;<samp class="samp">BAR</samp>&rsquo;；
+通过在整个 &lsquo;<samp class="samp">FOO...BAR</samp>&rsquo; 上添加该属性，可确保 &lsquo;<samp class="samp">BAR</samp>&rsquo; 发生变化时，
+&lsquo;<samp class="samp">FOO</samp>&rsquo; 的语法属性也会重新计算。
+注意：要使其生效，模式需要将 <code class="code">syntax-propertize-multiline</code>
+加入 <code class="code">syntax-propertize-extend-region-functions</code>。
+</li></ul>
+
+
+<ul class="mini-toc">
+<li><a href="Font-Lock-Multiline.html" accesskey="1">字体锁定多行处理</a></li>
+<li><a href="Region-to-Refontify.html" accesskey="2">缓冲区修改后需要高亮的区域</a></li>
+</ul>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

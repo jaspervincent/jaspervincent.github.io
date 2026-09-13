@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Garbage Collection (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Garbage Collection (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Garbage Collection (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="GNU-Emacs-Internals.html" rel="up" title="GNU Emacs Internals">
+<link href="Stack_002dallocated-Objects.html" rel="next" title="Stack-allocated Objects">
+<link href="Pure-Storage.html" rel="prev" title="Pure Storage">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Garbage-Collection">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Stack_002dallocated-Objects.html" accesskey="n" rel="next">栈分配对象</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Pure-Storage.html" accesskey="p" rel="prev">纯净存储</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html" accesskey="u" rel="up">GNU Emacs 内部结构</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5783_573e_56de_6536"><span>E.3 垃圾回收<a class="copiable-link" href="#g_t_5783_573e_56de_6536"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-memory-allocation"></a>
+<p>当程序创建列表或用户定义新函数（例如加载库）时，相关数据会存放在普通存储中。
+若普通存储不足，Emacs 会向操作系统申请更多内存。
+不同类型的 Lisp 对象（如符号、cons 单元、小型向量、标记等）
+会被分隔存放在不同的内存块中。
+（大型向量、长字符串、缓冲区及其他较大的编辑类型对象会单独分配内存块，
+每个对象占用一块；短字符串会打包存入 8KB 块，小型向量则打包存入 4KB 块。）
+</p>
+<a class="index-entry-id" id="index-vector_002dlike-objects_002c-storage"></a>
+<a class="index-entry-id" id="index-storage-of-vector_002dlike-Lisp-objects"></a>
+<p>除基础向量外，标记、覆盖层、缓冲区等许多对象都以类似向量的方式管理。
+对应的 C 语言数据结构包含 <code class="code">union vectorlike_header</code> 字段，
+其 <code class="code">size</code> 成员存储由 <code class="code">enum pvec_type</code> 枚举的子类型，
+同时记录该结构包含多少个 <code class="code">Lisp_Object</code> 字段以及剩余数据大小。
+该信息用于计算对象的内存占用量，并在向量分配代码遍历向量块时使用。
+</p>
+<a class="index-entry-id" id="index-garbage-collection"></a>
+<p>内存使用一段时间后被释放是很常见的情况，
+例如关闭缓冲区或删除指向对象的最后一个指针。
+Emacs 提供 <em class="dfn">垃圾回收器(garbage collector)</em> 以回收这些废弃的存储空间。
+垃圾回收器的核心工作方式是找到并标记所有仍可被 Lisp 程序访问的 Lisp 对象。
+首先，它假定所有符号、其值与关联函数定义，以及当前栈上的所有数据均可访问。
+所有可通过其他可访问对象间接到达的对象同样被视为可访问，
+但该计算采用“保守”策略，因此可能略微高估可访问对象的数量。
+</p>
+<p>标记完成后，所有未标记对象即为垃圾。
+无论 Lisp 程序或用户执行何种操作，都无法再引用这些对象，
+因为已不存在访问它们的路径。
+它们占用的空间可以被安全复用，因为不会再被使用。
+垃圾回收的第二阶段（清除阶段）会安排复用这些空间。
+（但由于标记采用保守策略，并非所有未使用对象都能在单次清除中被保证回收。）
+</p>
+
+<a class="index-entry-id" id="index-free-list"></a>
+<p>清除阶段会将未使用的 cons 单元加入 <em class="dfn">空闲链表(free list)</em> 以备后续分配，
+符号与标记对象同理。它会压缩可访问字符串，减少其占用的 8KB 块数量，
+随后释放其余 8KB 块。向量块中不可访问的向量会被合并，
+形成尽可能大的空闲区域；若某空闲区域占满整个 4KB 块，则直接释放该块。
+否则，该空闲区域会被记录到空闲链表数组中，
+数组中每个条目对应相同大小区域的空闲链表。
+大型向量、缓冲区及其他大型对象会单独分配与释放。
+</p>
+<a class="index-entry-id" id="index-CL-note_002d_002d_002dallocate-more-storage"></a>
+<blockquote class="quotation">
+<p><b class="b">Common Lisp 说明：</b> 与其他 Lisp 不同，GNU Emacs Lisp
+不会在空闲链表为空时调用垃圾回收器。
+相反，它会直接向操作系统申请更多存储空间，
+并继续执行直到已使用 <code class="code">gc-cons-threshold</code> 字节的内存。
+</p>
+<p>这意味着你可以在 Lisp 程序某段代码前显式调用垃圾回收，
+确保该段代码执行期间不会触发回收
+（前提是该段代码不会占用过多内存而被迫触发第二次回收）。
+</p></blockquote>
+
+<dl class="first-deffn def-block">
+<dt class="deffn def-line" id="index-garbage_002dcollect"><span class="category-def">Command: </span><span><strong class="def-name">garbage-collect</strong><a class="copiable-link" href="#index-garbage_002dcollect"> &para;</a></span></dt>
+<dd><p>该命令执行一次垃圾回收，并返回当前内存使用信息。
+（若自上次垃圾回收后已使用超过 <code class="code">gc-cons-threshold</code> 字节的 Lisp 数据，
+垃圾回收也可能自动触发。）
+</p>
+<p><code class="code">garbage-collect</code> 返回一个列表，描述各类型内存使用情况，
+每条记录格式为 &lsquo;<samp class="samp">(<var class="var">name</var> <var class="var">size</var> <var class="var">used</var>)</samp>&rsquo;
+或 &lsquo;<samp class="samp">(<var class="var">name</var> <var class="var">size</var> <var class="var">used</var> <var class="var">free</var>)</samp>&rsquo;。
+其中 <var class="var">name</var> 为表示对象类型的符号，
+<var class="var">size</var> 为单个对象占用字节数，
+<var class="var">used</var> 为堆中存活对象数量，
+可选的 <var class="var">free</var> 为 Emacs 保留以备后续分配的非存活对象数量。
+整体返回结果格式如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">((<code class="code">conses</code> <var class="var">cons-size</var> <var class="var">used-conses</var> <var class="var">free-conses</var>)
+ (<code class="code">symbols</code> <var class="var">symbol-size</var> <var class="var">used-symbols</var> <var class="var">free-symbols</var>)
+ (<code class="code">strings</code> <var class="var">string-size</var> <var class="var">used-strings</var> <var class="var">free-strings</var>)
+ (<code class="code">string-bytes</code> <var class="var">byte-size</var> <var class="var">used-bytes</var>)
+ (<code class="code">vectors</code> <var class="var">vector-size</var> <var class="var">used-vectors</var>)
+ (<code class="code">vector-slots</code> <var class="var">slot-size</var> <var class="var">used-slots</var> <var class="var">free-slots</var>)
+ (<code class="code">floats</code> <var class="var">float-size</var> <var class="var">used-floats</var> <var class="var">free-floats</var>)
+ (<code class="code">intervals</code> <var class="var">interval-size</var> <var class="var">used-intervals</var> <var class="var">free-intervals</var>)
+ (<code class="code">buffers</code> <var class="var">buffer-size</var> <var class="var">used-buffers</var>)
+ (<code class="code">heap</code> <var class="var">unit-size</var> <var class="var">total-size</var> <var class="var">free-size</var>))
+</pre></div>
+
+<p>示例如下：
+</p>
+<div class="example">
+<pre class="example-preformatted">(garbage-collect)
+      &rArr; ((conses 16 49126 8058) (symbols 48 14607 0)
+                 (strings 32 2942 2607)
+                 (string-bytes 1 78607) (vectors 16 7247)
+                 (vector-slots 8 341609 29474) (floats 8 71 102)
+                 (intervals 56 27 26) (buffers 944 8)
+                 (heap 1024 11715 2678))
+</pre></div>
+
+<p>下表为各字段说明。注意最后一项 <code class="code">heap</code> 为可选字段，
+仅当底层 <code class="code">malloc</code> 实现提供 <code class="code">mallinfo</code> 函数时才会出现。
+</p>
+<dl class="table">
+<dt><var class="var">cons-size</var></dt>
+<dd><p>cons 单元的内部大小，即 <code class="code">sizeof (struct Lisp_Cons)</code>。
+</p>
+</dd>
+<dt><var class="var">used-conses</var></dt>
+<dd><p>正在使用的 cons 单元数量。
+</p>
+</dd>
+<dt><var class="var">free-conses</var></dt>
+<dd><p>已从操作系统分配但当前未使用的 cons 单元数量。
+</p>
+</dd>
+<dt><var class="var">symbol-size</var></dt>
+<dd><p>符号的内部大小，即 <code class="code">sizeof (struct Lisp_Symbol)</code>。
+</p>
+</dd>
+<dt><var class="var">used-symbols</var></dt>
+<dd><p>正在使用的符号数量。
+</p>
+</dd>
+<dt><var class="var">free-symbols</var></dt>
+<dd><p>已从操作系统分配但当前未使用的符号数量。
+</p>
+</dd>
+<dt><var class="var">string-size</var></dt>
+<dd><p>字符串头部的内部大小，即 <code class="code">sizeof (struct Lisp_String)</code>。
+</p>
+</dd>
+<dt><var class="var">used-strings</var></dt>
+<dd><p>正在使用的字符串头部数量。
+</p>
+</dd>
+<dt><var class="var">free-strings</var></dt>
+<dd><p>已从操作系统分配但当前未使用的字符串头部数量。
+</p>
+</dd>
+<dt><var class="var">byte-size</var></dt>
+<dd><p>为方便使用而设，等于 <code class="code">sizeof (char)</code>。
+</p>
+</dd>
+<dt><var class="var">used-bytes</var></dt>
+<dd><p>所有字符串数据的总字节大小。
+</p>
+</dd>
+<dt><var class="var">vector-size</var></dt>
+<dd><p>长度为 1 的向量（包含头部）的字节大小。
+</p>
+</dd>
+<dt><var class="var">used-vectors</var></dt>
+<dd><p>从向量块中分配的向量头部数量。
+</p>
+</dd>
+<dt><var class="var">slot-size</var></dt>
+<dd><p>向量槽位的内部大小，始终等于 <code class="code">sizeof (Lisp_Object)</code>。
+</p>
+</dd>
+<dt><var class="var">used-slots</var></dt>
+<dd><p>所有已使用向量中的槽位总数。
+根据平台不同，槽位计数可能包含部分或全部向量头部开销。
+</p>
+</dd>
+<dt><var class="var">free-slots</var></dt>
+<dd><p>所有向量块中的空闲槽位数量。
+</p>
+</dd>
+<dt><var class="var">float-size</var></dt>
+<dd><p>浮点对象的内部大小，即 <code class="code">sizeof (struct Lisp_Float)</code>。
+（请勿与平台原生的 <code class="code">float</code> 或 <code class="code">double</code> 混淆。）
+</p>
+</dd>
+<dt><var class="var">used-floats</var></dt>
+<dd><p>正在使用的浮点数数量。
+</p>
+</dd>
+<dt><var class="var">free-floats</var></dt>
+<dd><p>已从操作系统分配但当前未使用的浮点数数量。
+</p>
+</dd>
+<dt><var class="var">interval-size</var></dt>
+<dd><p>区间对象的内部大小，即 <code class="code">sizeof (struct interval)</code>。
+</p>
+</dd>
+<dt><var class="var">used-intervals</var></dt>
+<dd><p>正在使用的区间数量。
+</p>
+</dd>
+<dt><var class="var">free-intervals</var></dt>
+<dd><p>已从操作系统分配但当前未使用的区间数量。
+</p>
+</dd>
+<dt><var class="var">buffer-size</var></dt>
+<dd><p>缓冲区的内部大小，即 <code class="code">sizeof (struct buffer)</code>。
+（请勿与 <code class="code">buffer-size</code> 函数返回值混淆。）
+</p>
+</dd>
+<dt><var class="var">used-buffers</var></dt>
+<dd><p>正在使用的缓冲区对象数量。
+包含对用户不可见的已关闭缓冲区，
+即 <code class="code">all_buffers</code> 列表中的所有缓冲区。
+</p>
+</dd>
+<dt><var class="var">unit-size</var></dt>
+<dd><p>堆空间计量单位，始终为 1024 字节。
+</p>
+</dd>
+<dt><var class="var">total-size</var></dt>
+<dd><p>堆总大小，以 <var class="var">unit-size</var> 为单位。
+</p>
+</dd>
+<dt><var class="var">free-size</var></dt>
+<dd><p>当前未使用的堆空间，以 <var class="var">unit-size</var> 为单位。
+</p></dd>
+</dl>
+
+<p>若纯净空间发生溢出 (see <a class="pxref" href="Pure-Storage.html">纯净存储</a>)，
+且 Emacs 由现已废弃的 <code class="code">unexec</code> 方式转储生成
+(see <a class="pxref" href="Building-Emacs.html">构建 Emacs</a>)，则 <code class="code">garbage-collect</code> 返回 <code class="code">nil</code>，
+因为该场景下无法执行真正的垃圾回收。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-garbage_002dcollection_002dmessages"><span class="category-def">User Option: </span><span><strong class="def-name">garbage-collection-messages</strong><a class="copiable-link" href="#index-garbage_002dcollection_002dmessages"> &para;</a></span></dt>
+<dd><p>若该变量非 <code class="code">nil</code>，Emacs 会在垃圾回收开始与结束时显示提示信息。
+默认值为 <code class="code">nil</code>。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-post_002dgc_002dhook"><span class="category-def">Variable: </span><span><strong class="def-name">post-gc-hook</strong><a class="copiable-link" href="#index-post_002dgc_002dhook"> &para;</a></span></dt>
+<dd><p>这是垃圾回收结束时运行的普通钩子。
+钩子函数运行期间垃圾回收会被禁止，编写时需格外注意。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-gc_002dcons_002dthreshold"><span class="category-def">User Option: </span><span><strong class="def-name">gc-cons-threshold</strong><a class="copiable-link" href="#index-gc_002dcons_002dthreshold"> &para;</a></span></dt>
+<dd><p>该变量的值表示一次垃圾回收后，需为 Lisp 对象分配多少字节存储
+才会触发下一次垃圾回收。
+你可以使用 <code class="code">garbage-collect</code> 返回的结果查看特定对象类型的大小；
+分配给缓冲区内容的空间不计入该阈值。
+</p>
+<p>初始阈值为 <code class="code">GC_DEFAULT_THRESHOLD</code>，定义于 <samp class="file">alloc.c</samp>。
+由于其以 <code class="code">word_size</code> 为单位定义，
+默认 32 位配置下值为 400000，
+64 位与启用 <samp class="option">--with-wide-int</samp> 选项的 32 位编译版本为 800000。
+若设置更大的值，垃圾回收频率会降低。
+这会减少垃圾回收耗时（使 Lisp 程序在回收间隔内运行更快），
+但会增加总内存占用。
+运行会创建大量 Lisp 数据的程序时可适当调大，尤其需要提升运行速度时。
+但我们不建议长期增大该阈值，且切勿设置超过程序合理运行所需的大小。
+使用超出必要的阈值可能导致系统级内存压力升高，
+并使单次垃圾回收耗时大幅增加，因此应避免。
+</p>
+<p>你可以设置更小的值提高回收频率，最低可设为 <code class="code">GC_DEFAULT_THRESHOLD</code> 的十分之一。
+低于该最小值的设置仅生效至下次垃圾回收，
+届时 <code class="code">garbage-collect</code> 会将阈值恢复为最小值。
+</p></dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-gc_002dcons_002dpercentage"><span class="category-def">User Option: </span><span><strong class="def-name">gc-cons-percentage</strong><a class="copiable-link" href="#index-gc_002dcons_002dpercentage"> &para;</a></span></dt>
+<dd><p>该变量的值以当前堆大小的比例形式，
+指定触发垃圾回收前允许的内存分配量。
+该条件与 <code class="code">gc-cons-threshold</code> 同时生效，
+仅当两者均满足时才会触发垃圾回收。
+</p>
+<p>堆大小增大时，垃圾回收耗时也会增加。
+因此按比例降低回收频率是合理的。
+</p>
+<p>交互会话与 Emacs 转储时 (see <a class="pxref" href="Building-Emacs.html">构建 Emacs</a>)，
+初始比例为 0.1；非交互（批处理）会话中为 1.0。
+</p>
+<p>与 <code class="code">gc-cons-threshold</code> 相同，请勿非必要地增大该值，
+且切勿长期保持较大值。
+</p></dd></dl>
+
+<p>通过 <code class="code">gc-cons-threshold</code> 与 <code class="code">gc-cons-percentage</code>
+控制垃圾回收仅为近似控制。
+尽管 Emacs 会定期检查阈值是否耗尽，
+但出于效率考虑，不会在堆或阈值每次变化后立即检查，
+因此阈值耗尽不会立即触发垃圾回收。
+此外，为提高阈值计算效率，Emacs 会对堆大小进行近似计算，
+仅统计堆中当前可访问对象占用的字节数。
+</p>
+<p><code class="code">garbage-collect</code> 返回的值按数据类型细分 Lisp 数据的内存占用。
+与之相对，函数 <code class="code">memory-limit</code> 提供 Emacs 当前使用的总内存信息。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002dlimit"><span class="category-def">Function: </span><span><strong class="def-name">memory-limit</strong><a class="copiable-link" href="#index-memory_002dlimit"> &para;</a></span></dt>
+<dd><p>该函数返回 Emacs 当前使用的虚拟内存总字节数的估计值并除以 1024。
+可用于大致了解操作对内存占用的影响。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-memory_002dfull"><span class="category-def">Variable: </span><span><strong class="def-name">memory-full</strong><a class="copiable-link" href="#index-memory_002dfull"> &para;</a></span></dt>
+<dd><p>若 Emacs 即将耗尽 Lisp 对象内存，该变量为 <code class="code">t</code>，否则为 <code class="code">nil</code>。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002duse_002dcounts"><span class="category-def">Function: </span><span><strong class="def-name">memory-use-counts</strong><a class="copiable-link" href="#index-memory_002duse_002dcounts"> &para;</a></span></dt>
+<dd><p>返回一组数字列表，统计当前 Emacs 会话中创建的各类对象数量。
+每种计数器对应一类对象的创建次数。
+详情参见文档字符串。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002dinfo"><span class="category-def">Function: </span><span><strong class="def-name">memory-info</strong><a class="copiable-link" href="#index-memory_002dinfo"> &para;</a></span></dt>
+<dd><p>该函数返回系统总内存与空闲内存大小。
+在不支持的系统上返回值可能为 <code class="code">nil</code>。
+</p>
+<p>若 <code class="code">default-directory</code> 指向远程主机，
+则返回该主机的内存信息。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-gcs_002ddone"><span class="category-def">Variable: </span><span><strong class="def-name">gcs-done</strong><a class="copiable-link" href="#index-gcs_002ddone"> &para;</a></span></dt>
+<dd><p>该变量记录当前 Emacs 会话中已执行的垃圾回收总次数。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-gc_002delapsed"><span class="category-def">Variable: </span><span><strong class="def-name">gc-elapsed</strong><a class="copiable-link" href="#index-gc_002delapsed"> &para;</a></span></dt>
+<dd><p>该变量以浮点数形式记录当前 Emacs 会话中垃圾回收累计耗时（秒）。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-memory_002dreport"><span class="category-def">Function: </span><span><strong class="def-name">memory-report</strong><a class="copiable-link" href="#index-memory_002dreport"> &para;</a></span></dt>
+<dd><p>查看 Emacs 内存分布（各类变量、缓冲区、缓存）有时十分有用。
+该命令会打开一个新缓冲区（名为 &lsquo;<samp class="samp">&quot;*Memory Report*&quot;</samp>&rsquo;），
+提供内存使用概览，并列出占用 &ldquo;最大&rdquo; 的缓冲区与变量。
+</p>
+<p>此处所有数据均为近似值，因为不存在统一的变量大小计算方式。
+例如两个变量可能共享同一数据结构的部分内容，
+此时会被重复计算，但该命令仍能有效概览 Emacs 各模块的内存使用情况。
+</p></dd></dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Stack_002dallocated-Objects.html">栈分配对象</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Pure-Storage.html">纯净存储</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="GNU-Emacs-Internals.html">GNU Emacs 内部结构</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

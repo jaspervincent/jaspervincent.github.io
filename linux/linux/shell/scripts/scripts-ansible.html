@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-ansible</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-ansible</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:117c063b-b908-4bb2-a816-92a5dcc8ba5d">ansible批量更换resolv.conf</a></li>
+<li><a href="#h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b">批量添加sudo权限</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-h:117c063b-b908-4bb2-a816-92a5dcc8ba5d" class="outline-2">
+<h2 id="h:117c063b-b908-4bb2-a816-92a5dcc8ba5d"><a href="#h:117c063b-b908-4bb2-a816-92a5dcc8ba5d">ansible批量更换resolv.conf</a></h2>
+<div class="outline-text-2" id="text-h:117c063b-b908-4bb2-a816-92a5dcc8ba5d">
+<div class="org-src-container">
+<pre class="src src-sh">dns_schd2]$ tree ./
+./
+&#9500;&#9472;&#9472; ansible.cfg
+&#9500;&#9472;&#9472; exec01.retry
+&#9500;&#9472;&#9472; exec01.yml
+&#9500;&#9472;&#9472; files
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; resolv.conf
+&#9500;&#9472;&#9472; hosts
+&#9492;&#9472;&#9472; logs
+    &#9492;&#9472;&#9472; ansible.log
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &gt;ansible.cfg&lt;&lt;EOF<span class="org-sh-heredoc">
+[defaults]
+inventory = ./hosts
+forks          = 5
+remote_port    = 22
+roles_path    = ./roles
+host_key_checking = False
+timeout = 30
+log_path = ./logs/ansible.log
+private_key_file = /home/oap/.ssh/id_rsa
+[inventory]
+[privilege_escalation]
+become=True
+become_method=sudo
+become_user=root
+become_ask_pass=False
+[paramiko_connection]
+record_host_keys=False
+[ssh_connection]
+[persistent_connection]
+[accelerate]
+[selinux]
+[colors]
+[diff]
+EOF
+</span>
+cat &gt;exec01.yml&lt;&lt;EOF <span class="org-sh-heredoc">
+---
+- hosts: schd2
+  tasks:
+  - name: Copy resolv.conf to
+    copy: src={{ item.src }} dest={{ item.dest }}
+    with_items:
+      - { src: '/data/sw-edge/tools/dns_schd2/files/resolv.conf', dest: '/tmp/resolv.conf' }
+
+  - name: Cat /etc/resolv.conf
+    shell: cat /etc/resolv.conf
+    register: cat_resolv_conf
+    tags: dig_dns01
+
+  - name: Cat /etc/resolv.conf
+    debug: msg="{{ cat_resolv_conf.stdout_lines }}"
+    tags: dig_dns01
+ 
+  - name: Simple A record (IPV4 address) lookup for xxx01.com
+    debug: msg="{{ lookup('dig', 'redis-sentinel-1.yunzong')}}"
+    tags: dig_dns01
+    ignore_errors: True
+  
+  - name: Simple A record (IPV4 address) lookup for xxx02.com
+    debug: msg="{{ lookup('dig', 'oplatformgateway.xiyun')}}"
+    tags: dig_dns01
+    ignore_errors: True
+EOF</span>
+</pre>
+</div>
+
+<p>
+role ssl
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25191;&#34892;&#21629;&#20196;
+</span>ansible-playbook change_ssl.yml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#22522;&#30784;&#29615;&#22659;
+</span>mkdir ansible/
+<span class="org-builtin">cd</span> ansible
+
+cat &gt;ansible.cfg&lt;&lt;EOF<span class="org-sh-heredoc">
+[defaults]
+inventory = ./hosts
+forks          = 5
+remote_port    = 22
+roles_path    = ./roles
+host_key_checking = False
+timeout = 30
+log_path = ./logs/ansible.log
+private_key_file = /home/oap/.ssh/id_rsa
+[inventory]
+[privilege_escalation]
+become=True
+become_method=sudo
+become_user=root
+become_ask_pass=False
+[paramiko_connection]
+record_host_keys=False
+[ssh_connection]
+[persistent_connection]
+[accelerate]
+[selinux]
+[colors]
+[diff]
+EOF
+</span>
+mkdir {logs,roles}
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#35777;&#20070;role&#29615;&#22659;
+</span>mkdir  -pv roles/cron_ssl/{defaults,files,handlers,tasks,templates}
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#25191;&#34892;yml
+</span>cat &gt;change_ssl.yml&lt;&lt; \EOF<span class="org-sh-heredoc">
+---
+- name: Change cron for ssl manage
+  hosts: ssl
+  vars:
+    - script_name: "ssl_monitor.sh"
+    - script_dest_path: "/home/sh"
+    - script_type: "sh"
+    #- state: "absent"
+    - state: "present"
+    - {minute: "5", hour: "0", day: "*", month: "*", weekday: "*"}
+
+  roles:
+    - cron_ssl
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#35777;&#20070;&#29615;&#22659;&#21464;&#37327;
+</span>cat &gt;roles/cron_ssl/defaults/main.yml&lt;&lt;\EOF<span class="org-sh-heredoc">
+ssl_script: "ssl_monitor.sh"
+script_name: ""
+script_source_path: ""
+script_dest_path: "/home/sh"
+script_type: "sh"
+state: "present"
+
+user: "root"
+minute: "*"
+hour: "*"
+day: "*"
+month: "*"
+weekday: "*"
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#35777;&#20070;&#20219;&#21153;
+</span>cat &gt;roles/cron_ssl/tasks/main.yml&lt;&lt; EOF<span class="org-sh-heredoc">
+---
+- include: cron.yml
+EOF
+</span>
+cat &gt;roles/cron_ssl/tasks/cron.yml&lt;&lt; \EOF<span class="org-sh-heredoc">
+---
+- name: Backup cron
+  shell: "cp /var/spool/cron/root /data/backup/cronroot.$(date +%F)"
+  ignore_errors: yes
+
+- name: Cat cron
+  shell: crontab -l
+  register: cat_cron
+
+- name: Cat cron
+  debug: msg="{{ cat_cron.stdout_lines }}"
+
+- name: Del cron that which is "{{ script_name }}"
+  cron: name={{ script_name }} state="absent"
+  when: state  == "absent"
+
+- name: Del notcron that which is "{{ script_name }}"
+  shell: "[ $(crontab -l |grep {{ script_name }}|wc -l) != $(crontab -l |grep -A 2 Ansible| grep {{ script_name }}|wc -l) ] &amp;&amp; sed -ri '/ssl_monitor.sh/d' /var/spool/cron/root"
+  ignore_errors: yes
+  when: state  == "present"
+
+- name: Cron bash "{{ script_name }}" to "{{ state }}"
+  cron: name={{ script_name }} minute={{ minute }} hour={{ hour }} day={{ day }} month={{ month }} weekday={{ weekday }} job='/bin/bash {{ script_dest_path }}/{{ script_name }} &amp;&gt;/dev/null'
+  when: script_type == "sh" and state == "present"
+
+- name: Cat cron
+  shell: crontab -l
+  register: cat_cron
+
+- name: Cat cron
+  debug: msg="{{ cat_cron.stdout_lines }}"
+EOF</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b" class="outline-2">
+<h2 id="h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b"><a href="#h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b">批量添加sudo权限</a></h2>
+<div class="outline-text-2" id="text-h:71cfb50f-b0fd-4a90-bc1b-fec1fae2882b">
+<div class="org-src-container">
+<pre class="src src-sh">
+<span class="org-comment-delimiter"># </span><span class="org-comment">1. &#20027;&#26426;&#21015;&#34920;
+</span>cat &gt;hosts&lt;&lt;\EOF<span class="org-sh-heredoc">
+mycat-a03       192.168.100.62
+mycat-a02       192.168.100.63
+mycat-a01       192.168.100.64
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#36828;&#31243;&#25191;&#34892;&#33050;&#26412; 
+</span>cat &gt;/tmp/check.sh&lt;&lt;\EOF<span class="org-sh-heredoc">
+#!/bin/bash
+name="yongkui.zhang fuzhi.cao"
+file_name="/etc/sudoers"
+
+for n in $name; do
+
+    if ! grep $n $file_name &amp;&gt;/etc/null; then
+        echo "$n ALL=(ALL) NOPASSWD: ALL" &gt;&gt;$file_name
+    fi
+done
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. ansible&#33050;&#26412;
+</span>cat &gt;ansible_sudo.sh&lt;&lt;\EOF<span class="org-sh-heredoc">
+#!/bin/bash
+host_file="./hosts"
+ansible_host=/home/oap/hosts
+ansible_script="/tmp/check.sh"
+
+echo "##########$(date +%Y%m%d%H%M)"
+
+if [ -f "$host_file" ];then
+  echo '[chang_host]' &gt;&gt;$ansible_host
+  cat $host_file|
+  while read line; do
+  if [ -n "$line" ];then
+    ip=`echo $line|awk -F "[\t ]+" '{print $2}'`
+    echo "$ip"  &gt;&gt;$ansible_host
+  fi
+  done
+  su - oap -c "ansible chang_host -s -i  $ansible_host -m script -a '$ansible_script'"
+
+
+  rm -f  $ansible_host
+fi
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">4. &#25191;&#34892;&#21629;&#20196;
+</span>sh ansible_sudo.sh
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

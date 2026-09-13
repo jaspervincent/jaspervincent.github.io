@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>The Kill Ring (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="The Kill Ring (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="The Kill Ring (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Text.html" rel="up" title="Text">
+<link href="Undo.html" rel="next" title="Undo">
+<link href="User_002dLevel-Deletion.html" rel="prev" title="User-Level Deletion">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="The-Kill-Ring">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Undo.html" accesskey="n" rel="next">撤销</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="User_002dLevel-Deletion.html" accesskey="p" rel="prev">用户级删除命令</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Text.html" accesskey="u" rel="up">文本</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_5220_9664_73af"><span>33.8 删除环<a class="copiable-link" href="#g_t_5220_9664_73af"> &para;</a></span></h3>
+<a class="index-entry-id" id="index-kill-ring"></a>
+
+<p><em class="dfn">移除函数(Kill functions)</em>与删除函数类似，都会移除文本，但会将文本保存起来，以便用户通过<em class="dfn">取回(yanking)</em>操作重新插入。
+这类函数的名称大多以 &lsquo;<samp class="samp">kill-</samp>&rsquo; 开头。
+与之相对，名称以 &lsquo;<samp class="samp">delete-</samp>&rsquo; 开头的函数通常不会保存文本用于取回（尽管仍可撤销），它们是纯粹的删除函数。
+</p>
+<p>大多数移除命令主要用于交互式场景，此处不做介绍。
+我们主要说明用于编写这类命令的底层函数。
+你可以使用这些函数实现移除文本的命令。
+若在 Lisp 函数内部需要出于逻辑目的删除文本，通常应使用删除函数，以免干扰删除环内容。See <a class="xref" href="Deletion.html">删除文本</a>。
+</p>
+<p>被移除的文本保存在<em class="dfn">删除环(kill ring)</em>中，供后续取回使用。
+这是一个列表，可保存多次最近移除的内容，而非仅最后一次。
+称之为 &ldquo;环(ring)&rdquo;，是因为取回操作会按循环顺序遍历其中元素。
+该列表存储在变量 <code class="code">kill-ring</code> 中，可使用常规列表函数操作；本节还会介绍专门将其作为环形结构处理的专用函数。
+</p>
+<p>有人认为 &ldquo;kill&rdquo; 一词的用法并不恰当，因为此处的操作 <em class="emph">并不会</em> 真正销毁被移除的内容，这与现实世界中死亡不可逆转形成鲜明反差。
+因此也有人提出其他比喻，例如 &ldquo;剪切环(cut ring)&rdquo;，更容易让经历过纸笔剪刀剪贴时代的人理解。
+不过如今这一术语已难以更改。
+</p>
+
+<ul class="mini-toc">
+<li><a href="Kill-Ring-Concepts.html" accesskey="1">删除环概念</a></li>
+<li><a href="Kill-Functions.html" accesskey="2">用于移除文本的函数</a></li>
+<li><a href="Yanking.html" accesskey="3">取回文本</a></li>
+<li><a href="Yank-Commands.html" accesskey="4">粘贴相关函数</a></li>
+<li><a href="Low_002dLevel-Kill-Ring.html" accesskey="5">底层剪切环接口</a></li>
+<li><a href="Internals-of-Kill-Ring.html" accesskey="6">剪切环内部实现</a></li>
+</ul>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Parsing Actions (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Parsing Actions (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Parsing Actions (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Parsing-Expression-Grammars.html" rel="up" title="Parsing Expression Grammars">
+<link href="Writing-PEG-Rules.html" rel="next" title="Writing PEG Rules">
+<link href="PEX-Definitions.html" rel="prev" title="PEX Definitions">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="section-level-extent" id="Parsing-Actions">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-PEG-Rules.html" accesskey="n" rel="next">编写 PEG 规则</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="PEX-Definitions.html" accesskey="p" rel="prev">PEX 定义</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html" accesskey="u" rel="up">解析表达式文法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h3 class="section" id="g_t_89e3_6790_52a8_4f5c"><span>37.2 解析动作<a class="copiable-link" href="#g_t_89e3_6790_52a8_4f5c"> &para;</a></span></h3>
+
+<a class="index-entry-id" id="index-parsing-actions"></a>
+<a class="index-entry-id" id="index-parsing-stack"></a>
+<p>默认情况下，解析过程仅会移动当前缓冲区中的点位置，
+解析成功时最终返回 <code class="code">t</code>，失败则返回 <code class="code">nil</code>。
+也可以定义 <em class="dfn">解析动作(parsing actions)</em>，在解析文本的特定位置执行任意 Elisp 代码。
+这些动作可以选择性地影响一个被称为 <em class="dfn">解析栈(parsing stack)</em> 的结构，
+它是解析过程返回值组成的列表。这些动作仅在解析过程最终成功时才会执行
+（并返回值）；如果解析失败，动作代码完全不会运行。
+</p>
+<p>动作可以添加在规则定义的任意位置。
+它们与解析表达式的区别在于以反引号（&lsquo;<samp class="samp">`</samp>&rsquo;）开头，
+后跟一个括号形式，其中必须包含一对连字符（&lsquo;<samp class="samp">--</samp>&rsquo;）。
+连字符左侧的符号会绑定从栈中弹出的值（在某种程度上类似于 lambda 形式的参数列表）。
+连字符右侧代码产生的值会被压入栈中（类似于 lambda 的返回值）。
+例如，上文的文法可以添加动作，将解析出的数字作为实际整数返回：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(with-peg-rules ((number sign digit (* digit
+                                       `(a b -- (+ (* a 10) b)))
+                         `(sign val -- (* sign val)))
+                 (sign (or (and &quot;+&quot; `(-- 1))
+                           (and &quot;-&quot; `(-- -1))
+                           (and &quot;&quot;  `(-- 1))))
+                 (digit [0-9] `(-- (- (char-before) ?0))))
+  (peg-run (peg number)))
+</pre></div></div>
+
+<p>栈中必须先存在值才能被弹出并返回 &ndash;
+如果栈中没有足够的值绑定到动作左侧的项，它们会被绑定为 <code class="code">nil</code>。
+仅包含右侧项的动作会向栈中压入值；仅包含左侧项的动作会从栈中消耗（并丢弃）值。
+解析结束时，栈中的值会以扁平列表形式返回。
+</p>
+<p>要返回 <abbr class="acronym">PEX</abbr> 匹配的字符串（而非仅移动点位置），
+文法可以使用如下规则：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(one-word
+  `(-- (point))
+  (+ [word])
+  `(start -- (buffer-substring start (point))))
+</pre></div></div>
+
+<p>上文的第一个动作将点的初始值压入栈中。
+中间的 <abbr class="acronym">PEX</abbr> 会将点移动到下一个词之后。
+第二个动作从栈中弹出先前的值（绑定到变量 <code class="code">start</code>），
+然后使用该值从缓冲区提取子串并压入栈中。
+这种模式非常常见，因此 <abbr class="acronym">PEG</abbr> 提供了一个简写函数实现上述功能，
+同时还有其他几种应对常见场景的简写：
+</p>
+<dl class="table">
+<dt><a id="index-substring-_0028a-PEG-shorthand_0029"></a><span><code class="code">(substring <var class="var">e</var>)</code><a class="copiable-link" href="#index-substring-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
+<dd><p>匹配 <abbr class="acronym">PEX</abbr> <var class="var">e</var> 并将匹配的字符串压入栈中。
+</p>
+</dd>
+<dt><a id="index-region-_0028a-PEG-shorthand_0029"></a><span><code class="code">(region <var class="var">e</var>)</code><a class="copiable-link" href="#index-region-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
+<dd><p>匹配 <var class="var">e</var> 并将匹配区域的起始与结束位置压入栈中。
+</p>
+</dd>
+<dt><a id="index-replace-_0028a-PEG-shorthand_0029"></a><span><code class="code">(replace <var class="var">e</var> <var class="var">replacement</var>)</code><a class="copiable-link" href="#index-replace-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
+<dd><p>匹配 <var class="var">e</var> 并将匹配区域替换为字符串 <var class="var">replacement</var>。
+</p>
+</dd>
+<dt><a id="index-list-_0028a-PEG-shorthand_0029"></a><span><code class="code">(list <var class="var">e</var>)</code><a class="copiable-link" href="#index-list-_0028a-PEG-shorthand_0029"> &para;</a></span></dt>
+<dd><p>匹配 <var class="var">e</var>，将 <var class="var">e</var>（及其子表达式）产生的所有值收集为列表，
+并将该列表压入栈中。栈中的值通常以扁平列表返回；
+该方式用于将值 &ldquo;分组(grouping)&rdquo;。
+</p></dd>
+</dl>
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Writing-PEG-Rules.html">编写 PEG 规则</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="PEX-Definitions.html">PEX 定义</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Parsing-Expression-Grammars.html">解析表达式文法</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

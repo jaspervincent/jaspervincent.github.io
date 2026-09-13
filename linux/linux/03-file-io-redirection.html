@@ -1,0 +1,3352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Linux文件管理和IO重定向</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Linux文件管理和IO重定向</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:85cc577c-4718-408a-96fd-06c877f4e6b1">文件系统目录结构</a>
+<ul>
+<li><a href="#h:877e46ad-140a-4749-943a-13571a18306c">文件系统相关概念：</a></li>
+<li><a href="#h:e5629974-f35a-421d-8bba-0a1241bcb3c0">常见的文件系统目录功能</a></li>
+<li><a href="#h:5fa96916-3dcb-4411-a718-ca6f173c15a1">应用程序的组成部分</a></li>
+<li><a href="#h:52df755b-bba8-4e77-a321-fdcaf8bb0cdf">CentOS 7 以后版本目录结构变化</a></li>
+<li><a href="#h:c9c3c5d2-e856-4549-8c7c-51f06c130a01">Linux下的文件类型</a>
+<ul>
+<li><a href="#h:1CB64639-2EA8-4502-9046-C5EA1EAC7139">创建各类型文件</a></li>
+<li><a href="#h:3FEED6E5-D125-4822-8488-42F33CC241F0">linux 系统中文件类型颜色标识</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:adde0f66-ecef-4af2-973a-7ace1e202d37">文件操作命令</a>
+<ul>
+<li><a href="#h:2fe60291-ae27-4a1b-9b4f-d21fe7d3c803">显示工作目录 PWD</a></li>
+<li><a href="#h:b81d1546-9780-4db8-8ccd-1441f5c07497">绝对和相对路径</a></li>
+<li><a href="#h:0e1a6ea6-77d2-4066-8e4e-e5a5b18c3970">切换目录cd</a></li>
+<li><a href="#h:483ab726-dd5a-47a7-9229-18b2c388c252">列出指定目录下的内容-ls</a></li>
+<li><a href="#h:11dfd3c8-619c-473b-a887-bc649875e652">查看文件状态 stat</a></li>
+<li><a href="#h:d3623683-961a-4423-8701-014b12c00721">确定文件内容 file</a></li>
+<li><a href="#h:a7cbf658-ddff-4343-98da-e8bbc3d2413b">bash基础特性-文件名通配glob</a></li>
+<li><a href="#h:e46a6edb-79fe-4821-9bdf-4401ff2d2f56">创建空文件和刷新时间 touch</a></li>
+<li><a href="#h:f74a14de-0898-4465-8ee7-4d2a5301a0f0">文件管理工具：cp,mv,rm</a>
+<ul>
+<li><a href="#h:0440b7a3-d0c3-44c7-8ed1-d5b08c75dc28">复制文件和目录 cp</a></li>
+<li><a href="#h:34bf66c4-57e0-4876-972c-f983972e0661">移动和重命名文件 mv rename</a></li>
+<li><a href="#h:90a8736f-63a4-4825-aa96-ddb206a3fc72">删除文件 rm</a></li>
+</ul>
+</li>
+<li><a href="#h:1055a5f8-bb75-4ee3-9c93-b8369414da27">目录操作mkdir,rmdir,tree</a>
+<ul>
+<li><a href="#h:08345dd3-f238-44f0-8043-4996fc1d0514">显示目录树 tree</a></li>
+<li><a href="#h:4453e9d1-0c26-463d-a257-9db74466f835">创建目录 mkdir</a></li>
+<li><a href="#h:2652af1d-0070-46f9-a75d-69771d6b7440">删除空目录rmdir</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:40cab184-6462-409a-996b-6a0cda723bbb">文件元数据和节点表结构</a>
+<ul>
+<li><a href="#h:73a79875-d91d-4119-a3a5-44feceb8eab0">inode表结构</a></li>
+<li><a href="#h:73039107-a013-4171-a386-e64f24cc50a4">硬（hard）链接</a></li>
+<li><a href="#h:1cca5022-d234-4277-a2b6-c5ebc62dd4f1">符号 symbolic （或软 soft）链接</a></li>
+<li><a href="#h:a819e1ae-88b9-40e4-aebb-7bbdd419e989">硬链接和软链接区别总结</a></li>
+</ul>
+</li>
+<li><a href="#h:b5ef970f-ee2b-4255-90f0-3a1884710d33">标准I/O重定向和管道</a>
+<ul>
+<li><a href="#h:20d58ad1-8afe-4fc6-a960-b3c2b4a6dad9">标准输入和输出</a></li>
+<li><a href="#h:30053fd4-6d4b-493b-934f-4183f73b38d3">I/O重定向redirect</a>
+<ul>
+<li><a href="#h:ecd459dd-3e85-4fa0-9fcf-b67637705a05">标准输出和错误重新定向 &gt; &gt;| &gt;&gt;</a></li>
+<li><a href="#h:ac68365f-3004-43bd-afb1-2bead4928835">标准输入重定向 &lt; &lt;&lt; &lt;&lt;&lt;</a>
+<ul>
+<li><a href="#h:cb4c145e-1f68-4cb7-b435-616cb4df8646">标准输入重定向 &lt;</a></li>
+<li><a href="#h:5e7a7ad0-ba61-4455-810e-0d9211857a16">把多行重定向 &lt;&lt;终止词</a></li>
+<li><a href="#h:d179a92c-3e58-4d29-9249-5473e6496104">字符串当标准输入 &lt;&lt;&lt;字符串</a></li>
+<li><a href="#h:93b7f2d5-62f4-4414-9290-5abaee7aaa2b">tr 命令</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:e7cac8ea-11c5-448b-85b9-65a372e3ea0e">管道</a>
+<ul>
+<li><a href="#h:54993fd8-8b7d-477b-8933-d5663a34df23">管道</a></li>
+<li><a href="#h:937bee01-4db8-4527-9832-4004f861ac80">管道中的 - 符号</a></li>
+<li><a href="#h:48e80f36-ebff-4f77-8575-57e8e4c90b98">tee 命令</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a></li>
+</ul>
+
+<p>
+摘要：本文介绍Linux文件管理和IO重定向
+</p>
+
+
+<p>
+内容概述
+</p>
+
+<ul class="org-ul">
+<li>文件系统目录结构</li>
+<li>创建和查看文件</li>
+<li>复制、转移和删除文件</li>
+<li>软和硬链接</li>
+<li>IO 重定向和管道</li>
+</ul>
+<section id="outline-container-h:85cc577c-4718-408a-96fd-06c877f4e6b1" class="outline-2">
+<h2 id="h:85cc577c-4718-408a-96fd-06c877f4e6b1"><a href="#h:85cc577c-4718-408a-96fd-06c877f4e6b1">文件系统目录结构</a></h2>
+<div class="outline-text-2" id="text-h:85cc577c-4718-408a-96fd-06c877f4e6b1">
+
+<figure id="org547b449">
+<img style="aspect-ratio:613/274" decoding="async" loading="lazy" src="./images/image-20210215211437376.webp" alt="image-20210215211437376.webp" width="50%">
+
+</figure>
+
+
+<p>
+<b>FHS文件系统</b>
+</p>
+
+<p>
+FHS(Filesystem Hierarchy Standard: 文件系统层次化标准)，是由Linux基金会维护的，帮助发行版厂商和开发者们使用
+共同的标准来约定其发行的Linux系统或开发的软件遵守共同的文件和目录标准。
+</p>
+
+<p>
+FHS是多数Linux版本采用的文件组织形式，采用树形结构组织文件。FHS定义了系统中每个区域的用途、所需要的最小构成的文件和目录，同时还给出了例外处理和矛盾处理。
+</p>
+
+
+<p>
+官方网站：<a href="https://refspecs.linuxfoundation.org/fhs.shtml">https://refspecs.linuxfoundation.org/fhs.shtml</a>
+</p>
+</div>
+<div id="outline-container-h:877e46ad-140a-4749-943a-13571a18306c" class="outline-3">
+<h3 id="h:877e46ad-140a-4749-943a-13571a18306c"><a href="#h:877e46ad-140a-4749-943a-13571a18306c">文件系统相关概念：</a></h3>
+<div class="outline-text-3" id="text-h:877e46ad-140a-4749-943a-13571a18306c">
+<p>
+文件系统是层级结构；有索引；
+</p>
+
+<ol class="org-ol">
+<li><p>
+以/为原初起点 倒置树状结构
+</p>
+
+<p>
+例如/dev/pts/2 &#x2014;&gt;最左侧/: 表示根目录；其它的/: 表示路径分隔符
+</p>
+
+<p>
+Linux的路径分隔符是/ Windows的路径分隔符是<br>
+</p></li>
+
+<li><p>
+文件的路径表示方法：
+</p>
+
+<p>
+绝对路径：从根开始表示出的路径
+</p>
+
+<p>
+相对路径：从当前位置开始表示出的路径
+</p></li>
+
+<li><p>
+文件名使用法则：
+</p>
+
+<p>
+文件名法则：
+</p>
+<ol class="org-ol">
+<li>严格区分字符大小写：file1,File1,FILE1表示不同文件</li>
+<li>目录也是文件，在同一路径下，两个文件不能同名</li>
+<li>支持使用除/以后的任意字符
+当然你不能用 / 和空做为文件名，如touch xx/xx 创建这样的文件名不
+可以，\转义</li>
+<li>最长不能超过255个字符。</li>
+<li>以. 开头的文件为隐藏文件</li>
+</ol></li>
+
+<li>用户有家目录：home。用户的起始目录：普通用户管理文件的位置。</li>
+
+<li><p>
+工作目录：
+</p>
+
+<p>
+/abc/aa/bb
+</p>
+
+<p>
+bashname(基名):最右侧的文件或者目录名
+</p>
+
+<p>
+dirname(目录名):bashname左侧的路径
+</p>
+
+<p>
+获取基名和目录名的命令：basename, dirname
+</p>
+
+<pre class="example" id="orge86fc29">
+~]# basename /PATH/TO/SOMEFILE
+SOMEFILE
+~]# dirname /PATH/TO/SOMEFILE
+/PATH/TO
+</pre></li>
+
+<li>其它
+
+<ol class="org-ol">
+<li>包括路径在内文件名称最长4095个字节</li>
+<li>蓝色&#x2013;&gt;目录 绿色&#x2013;&gt;可执行文件 红色&#x2013;&gt;压缩文件 浅蓝色&#x2013;&gt;链接文件
+灰色&#x2013;&gt;其他文件 （/etc/DIR_COLORS 定义后缀颜色）</li>
+<li>除了斜杠和NUL,所有字符都有效.但使用特殊字符的目录名和文件不推荐
+使用，有些字符需要用引号来引用</li>
+<li>每个文件都有两类相关数据：元数据：metadata，即属性，
+数据：data，即文件内容 <code>stat filename</code></li>
+</ol></li>
+</ol>
+
+
+<figure id="orga0daee1">
+<img style="aspect-ratio:1896/838" decoding="async" loading="lazy" src="./images/fhs.webp" alt="fhs.webp" width="50%">
+
+<figcaption><span class="figure-number">&#22270;2&nbsp; </span>fhs</figcaption>
+</figure>
+</div>
+</div>
+<div id="outline-container-h:e5629974-f35a-421d-8bba-0a1241bcb3c0" class="outline-3">
+<h3 id="h:e5629974-f35a-421d-8bba-0a1241bcb3c0"><a href="#h:e5629974-f35a-421d-8bba-0a1241bcb3c0">常见的文件系统目录功能</a></h3>
+<div class="outline-text-3" id="text-h:e5629974-f35a-421d-8bba-0a1241bcb3c0">
+<div class="org-src-container">
+<pre class="src src-sh">/boot                              <span class="org-comment-delimiter">#</span><span class="org-comment">&#24341;&#23548;&#25991;&#20214;&#23384;&#25918;&#30446;&#24405;&#65292;&#20869;&#26680;&#25991;&#20214;(vmlinuz)&#12289;&#24341;&#23548;&#21152;&#36733;&#22120;(bootloader, grub)&#37117;&#23384;&#25918;&#20110;&#27492;&#30446;&#24405;
+</span>/bin                                <span class="org-comment-delimiter">#</span><span class="org-comment">&#25152;&#26377;&#29992;&#25143;&#20351;&#29992;&#30340;&#22522;&#26412;&#21629;&#20196;&#65307;&#19981;&#33021;&#20851;&#32852;&#33267;&#29420;&#31435;&#20998;&#21306;&#65292;OS&#21551;&#21160;&#21363;&#20250;&#29992;&#21040;&#30340;&#31243;&#24207;
+</span>/sbin                              <span class="org-comment-delimiter">#</span><span class="org-comment">&#31649;&#29702;&#31867;&#30340;&#22522;&#26412;&#21629;&#20196;&#65307;&#19981;&#33021;&#20851;&#32852;&#33267;&#29420;&#31435;&#20998;&#21306;&#65292;OS&#21551;&#21160;&#21363;&#20250;&#29992;&#21040;&#30340;&#31243;&#24207;
+</span>/lib                                <span class="org-comment-delimiter">#</span><span class="org-comment">&#21551;&#21160;&#26102;&#31243;&#24207;&#20381;&#36182;&#30340;&#22522;&#26412;&#20849;&#20139;&#24211;&#25991;&#20214;&#20197;&#21450;&#20869;&#26680;&#27169;&#22359;&#25991;&#20214;(/lib/modules)
+</span>/lib64                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#19987;&#29992;&#20110;x86_64&#31995;&#32479;&#19978;&#30340;&#36741;&#21161;&#20849;&#20139;&#24211;&#25991;&#20214;&#23384;&#25918;&#20301;&#32622;
+</span>/etc                               <span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;&#25991;&#20214;&#30446;&#24405;
+</span>/home/USERNAME        <span class="org-comment-delimiter">#</span><span class="org-comment">&#26222;&#36890;&#29992;&#25143;&#23478;&#30446;&#24405;
+</span>/root                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#31649;&#29702;&#21592;&#30340;&#23478;&#30446;&#24405;
+</span>/media                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#20415;&#25658;&#24335;&#31227;&#21160;&#35774;&#22791;&#25346;&#36733;&#28857;
+</span>/mnt                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#20020;&#26102;&#25991;&#20214;&#31995;&#32479;&#25346;&#36733;&#28857;
+</span>/dev                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#22791;&#25991;&#20214;&#21450;&#29305;&#27530;&#25991;&#20214;&#23384;&#20648;&#20301;&#32622;
+</span>    b: block device&#65292;&#38543;&#26426;&#35775;&#38382;
+    c: character device&#65292;&#32447;&#24615;&#35775;&#38382;
+/opt                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#31532;&#19977;&#26041;&#24212;&#29992;&#31243;&#24207;&#30340;&#23433;&#35013;&#20301;&#32622;
+</span>/srv                              <span class="org-comment-delimiter">#</span><span class="org-comment">&#31995;&#32479;&#19978;&#36816;&#34892;&#30340;&#26381;&#21153;&#29992;&#21040;&#30340;&#25968;&#25454;
+</span>/tmp                            <span class="org-comment-delimiter">#</span><span class="org-comment">&#20020;&#26102;&#25991;&#20214;&#23384;&#20648;&#20301;&#32622;
+</span>/usr:                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#36890;&#29992;&#20849;&#20139;&#21482;&#35835;&#25968;&#25454;
+</span>    bin: &#20445;&#35777;&#31995;&#32479;&#25317;&#26377;&#23436;&#25972;&#21151;&#33021;&#32780;&#25552;&#20379;&#30340;&#24212;&#29992;&#31243;&#24207;
+    sbin:
+    lib&#65306;32&#20301;&#20351;&#29992;
+    lib64&#65306;&#21482;&#23384;&#22312;64&#20301;&#31995;&#32479;
+    include: C&#31243;&#24207;&#30340;&#22836;&#25991;&#20214;(header files)
+    share&#65306;&#32467;&#26500;&#21270;&#29420;&#31435;&#30340;&#25968;&#25454;&#65292;&#20363;&#22914;doc, man&#31561;
+        <span class="org-builtin">local</span>&#65306;&#31532;&#19977;&#26041;&#24212;&#29992;&#31243;&#24207;&#30340;&#23433;&#35013;&#20301;&#32622;
+            bin, sbin, lib, lib64, etc, share
+/var                             <span class="org-comment-delimiter">#</span><span class="org-comment">variable data files &#21487;&#21464;&#25968;&#25454;&#30446;&#24405;
+</span>    cache: &#24212;&#29992;&#31243;&#24207;&#32531;&#23384;&#25968;&#25454;&#30446;&#24405;
+    lib: &#24212;&#29992;&#31243;&#24207;&#29366;&#24577;&#20449;&#24687;&#25968;&#25454;
+    <span class="org-builtin">local</span>&#65306;&#19987;&#29992;&#20110;&#20026;/usr/local&#19979;&#30340;&#24212;&#29992;&#31243;&#24207;&#23384;&#20648;&#21487;&#21464;&#25968;&#25454;
+    lock: &#38145;&#25991;&#20214;
+    <span class="org-builtin">log</span>: &#26085;&#24535;&#30446;&#24405;&#21450;&#25991;&#20214;
+    opt: &#19987;&#29992;&#20110;&#20026;/opt&#19979;&#30340;&#24212;&#29992;&#31243;&#24207;&#23384;&#20648;&#21487;&#21464;&#25968;&#25454;
+    run: &#36816;&#34892;&#20013;&#30340;&#36827;&#31243;&#30456;&#20851;&#25968;&#25454;,&#36890;&#24120;&#29992;&#20110;&#23384;&#20648;&#36827;&#31243;pid&#25991;&#20214;
+    spool: &#24212;&#29992;&#31243;&#24207;&#25968;&#25454;&#27744;
+    tmp: &#20445;&#23384;&#31995;&#32479;&#20004;&#27425;&#37325;&#21551;&#20043;&#38388;&#20135;&#29983;&#30340;&#20020;&#26102;&#25968;&#25454;
+/proc:                           <span class="org-comment-delimiter">#</span><span class="org-comment">&#29992;&#20110;&#36755;&#20986;&#20869;&#26680;&#19982;&#36827;&#31243;&#20449;&#24687;&#30456;&#20851;&#30340;&#34394;&#25311;&#25991;&#20214;&#31995;&#32479;
+</span>/sys                              <span class="org-comment-delimiter">#</span><span class="org-comment">&#29992;&#20110;&#36755;&#20986;&#24403;&#21069;&#31995;&#32479;&#19978;&#30828;&#20214;&#35774;&#22791;&#30456;&#20851;&#20449;&#24687;&#34394;&#25311;&#25991;&#20214;&#31995;&#32479;
+</span>/selinux                        <span class="org-comment-delimiter">#</span><span class="org-comment">security enhanced Linux&#65292;selinux&#30456;&#20851;&#30340;&#23433;&#20840;&#31574;&#30053;&#31561;&#20449;&#24687;&#30340;&#23384;&#20648;&#20301;&#32622;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5fa96916-3dcb-4411-a718-ca6f173c15a1" class="outline-3">
+<h3 id="h:5fa96916-3dcb-4411-a718-ca6f173c15a1"><a href="#h:5fa96916-3dcb-4411-a718-ca6f173c15a1">应用程序的组成部分</a></h3>
+<div class="outline-text-3" id="text-h:5fa96916-3dcb-4411-a718-ca6f173c15a1">
+<pre class="example" id="org89f1a51">
+二进制程序：/bin, /sbin, /usr/bin, /usr/sbin, /usr/local/bin, /usr/local/sbin
+库文件：/lib, /lib64, /usr/lib, /usr/lib64, /usr/local/lib, /usr/local/lib64
+配置文件：/etc, /etc/DIRECTORY, /usr/local/etc
+帮助文件：/usr/share/man, /usr/share/doc, /usr/local/share/man,/usr/local/share/doc
+</pre>
+</div>
+</div>
+<div id="outline-container-h:52df755b-bba8-4e77-a321-fdcaf8bb0cdf" class="outline-3">
+<h3 id="h:52df755b-bba8-4e77-a321-fdcaf8bb0cdf"><a href="#h:52df755b-bba8-4e77-a321-fdcaf8bb0cdf">CentOS 7 以后版本目录结构变化</a></h3>
+<div class="outline-text-3" id="text-h:52df755b-bba8-4e77-a321-fdcaf8bb0cdf">
+<ul class="org-ul">
+<li>/bin 和 /usr/bin</li>
+<li>/sbin 和 /usr/sbin</li>
+<li>/lib 和/usr/lib</li>
+<li>/lib64 和 /usr/lib6</li>
+</ul>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ls /bin /sbin /lib /lib64 -ld
+lrwxrwxrwx. 1 root root 7 May 11 &#160;2019 /bin -&gt; usr/bin
+lrwxrwxrwx. 1 root root 7 May 11 &#160;2019 /lib -&gt; usr/lib
+lrwxrwxrwx. 1 root root 9 May 11 &#160;2019 /lib64 -&gt; usr/lib64
+lrwxrwxrwx. 1 root root 8 May 11 &#160;2019 /sbin -&gt; usr/sbin
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">centos8&#20043;&#21069;&#36825;&#20123;&#30446;&#24405;&#37117;&#29420;&#31435;&#30340;
+</span>[root@centos6 ~]#ls /bin /sbin /lib /lib64 -ld
+dr-xr-xr-x. &#160;2 root root &#160;4096 Mar 20 09:14 /bin
+dr-xr-xr-x. 11 root root &#160;4096 Dec 12 &#160;2018 /lib
+dr-xr-xr-x. &#160;9 root root 12288 Mar 20 09:13 /lib64
+dr-xr-xr-x. &#160;2 root root 12288 Mar 20 09:14 /sbin
+
+[root@ubuntu1804 ~]#ll /bin /usr/bin -d
+drwxr-xr-x 2 root root &#160;4096 Jan 12 18:41 /bin/
+drwxr-xr-x 2 root root 24576 Jan 12 18:42 /usr/bin/
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c9c3c5d2-e856-4549-8c7c-51f06c130a01" class="outline-3">
+<h3 id="h:c9c3c5d2-e856-4549-8c7c-51f06c130a01"><a href="#h:c9c3c5d2-e856-4549-8c7c-51f06c130a01">Linux下的文件类型</a></h3>
+<div class="outline-text-3" id="text-h:c9c3c5d2-e856-4549-8c7c-51f06c130a01">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#21629;&#20196;ls -l&#20013;&#30340;&#31532;1&#20301;&#20013;&#34920;&#31034;&#25991;&#20214;&#31867;&#22411;&#65306;
+</span>-&#65306;&#24120;&#35268;&#25991;&#20214;&#65307;&#21363;f;
+d&#65306;directory,&#30446;&#24405;&#25991;&#20214;&#65307;
+b&#65306;block device,&#22359;&#35774;&#22791;&#25991;&#20214;&#65292;&#25903;&#25345;&#20197;<span class="org-string">"block"</span>&#20026;&#21333;&#20301;&#36827;&#34892;&#38543;&#26426;&#35775;&#38382;
+c&#65306;character device,&#23383;&#31526;&#35774;&#22791;&#25991;&#20214;&#65292;&#25191;&#34892;&#20197;<span class="org-string">"character"</span>&#20026;&#21333;&#20301;&#36827;&#34892;&#32447;&#24615;&#35775;&#38382;
+l&#65306;symbolic link&#65292;&#31526;&#21495;&#36830;&#25509;&#25991;&#20214;&#65307;&#36719;&#36830;&#25509;&#25991;&#20214;&#65307;&#31867;&#20284;&#20110;Windows&#19979;&#30340;&#24555;&#25463;&#26041;&#24335;
+p&#65306;pipe&#65292;&#21629;&#21517;&#31649;&#36947;&#65307;&#35299;&#20915;&#22810;&#20010;&#31243;&#24207;&#35775;&#38382;&#19968;&#20010;&#25991;&#20214;&#25152;&#36896;&#25104;&#30340;&#38169;&#35823;&#65292;FIFO(first-in-first-out) .  ls -l /run/
+s&#65306;socket&#65292;&#22871;&#25509;&#23383;&#25991;&#20214;&#65307;&#36890;&#24120;&#34987;&#29992;&#22312;&#32593;&#32476;&#19978;&#30340;&#25968;&#25454;&#36830;&#25509;&#65292;&#20004;&#20010;&#36827;&#31243;&#36890;&#20449;&#26102;&#22871;&#25509;(&#25554;&#24231;),&#20027;&#35201;&#29992;&#20110;&#26381;&#21153;
+</pre>
+</div>
+
+<p>
+范例：如/dev下10，175是用来表示设备号，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">c&#65306;character device,&#23383;&#31526;&#35774;&#22791;&#25991;&#20214;&#65292;&#25191;&#34892;&#20197;<span class="org-string">"character"</span>&#20026;&#21333;&#20301;&#36827;&#34892;&#32447;&#24615;&#35775;&#38382;
+major number&#65306;&#20027;&#35774;&#22791;&#21495;&#65292;&#29992;&#26631;&#35782;&#35774;&#22791;&#31867;&#22411;&#65292;&#36827;&#32780;&#30830;&#23450;&#35201;&#21152;&#36733;&#30340;&#39537;&#21160;&#31243;&#24207;
+minor number&#65306;&#27425;&#35774;&#22791;&#21495;&#65292;&#29992;&#20110;&#26631;&#35782;&#21516;&#19968;&#31867;&#22411;&#20013;&#30340;&#19981;&#21516;&#30340;&#35774;&#22791;
+8&#20301;&#20108;&#36827;&#21046;&#65306;0-255
+
+ ~]# ls -l /dev
+ crw-rw----. 1 root video 10, 175 12&#26376; 10 17:21 agpgart
+</pre>
+</div>
+
+<p>
+查看文件类型的命令：file FILENAM
+</p>
+</div>
+<div id="outline-container-h:1CB64639-2EA8-4502-9046-C5EA1EAC7139" class="outline-4">
+<h4 id="h:1CB64639-2EA8-4502-9046-C5EA1EAC7139"><a href="#h:1CB64639-2EA8-4502-9046-C5EA1EAC7139">创建各类型文件</a></h4>
+<div class="outline-text-4" id="text-h:1CB64639-2EA8-4502-9046-C5EA1EAC7139">
+<div class="org-src-container">
+<pre class="src src-sh">&#26222;&#36890;&#25991;&#20214;&#65306;
+touch filename
+
+&#30446;&#24405;&#65306;
+mkdir dirname
+
+&#31526;&#21495;&#38142;&#25509;&#65306;
+$ ln -s filename linkname
+
+FIFO&#31649;&#36947;&#25991;&#20214;:
+mknod fifo p
+
+&#23383;&#31526;&#29305;&#27530;&#25991;&#20214;&#65306;
+mknod /dev/ccc c 20 5
+
+&#22359;&#29305;&#27530;&#25991;&#20214;&#65306;
+mknod /dev/sdb b 16 8
+
+socket&#25991;&#20214;&#65306;
+mksock sock
+&#22914;&#26524;&#27809;&#26377;mksock&#21629;&#20196;&#65292;&#20351;&#29992;nc&#21629;&#20196;&#36827;&#34892;&#21019;&#24314;&#65306;
+nc -UI ./sock
+
+NB: &#19978;&#38754;&#25152;&#26377;&#20197;#&#24320;&#22836;&#30340;&#31034;&#20363;&#65292;&#21487;&#33021;&#38656;&#35201;root&#26435;&#38480;&#12290;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:3FEED6E5-D125-4822-8488-42F33CC241F0" class="outline-4">
+<h4 id="h:3FEED6E5-D125-4822-8488-42F33CC241F0"><a href="#h:3FEED6E5-D125-4822-8488-42F33CC241F0">linux 系统中文件类型颜色标识</a></h4>
+<div class="outline-text-4" id="text-h:3FEED6E5-D125-4822-8488-42F33CC241F0">
+<p>
+linux系统中，每种颜色都有对应的含义，可以提供文件在终端中显示的颜色，来判断是什么类型的文件。
+</p>
+
+<p>
+颜色与文件类型对应关系，由配置文件定义，可更改(此处的文件类型，可以理解为文件格式)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">CentOS/Rocky
+</span>vim /etc/DIR_COLORS
+
+FIFO 40;33      <span class="org-comment-delimiter"># </span><span class="org-comment">pipe
+</span>SOCK 01;35      <span class="org-comment-delimiter"># </span><span class="org-comment">socket
+</span>DOOR 01;35      <span class="org-comment-delimiter"># </span><span class="org-comment">door
+</span>BLK 40;33;01    <span class="org-comment-delimiter"># </span><span class="org-comment">block device driver
+</span>CHR 40;33;01    <span class="org-comment-delimiter"># </span><span class="org-comment">character device driver
+</span>ORPHAN 40;31;01  <span class="org-comment-delimiter"># </span><span class="org-comment">symlink to nonexistent file, or non-stat'able file
+</span>MISSING 01;05;37;41 <span class="org-comment-delimiter"># </span><span class="org-comment">... and the files they point to
+</span>SETUID 37;41    <span class="org-comment-delimiter"># </span><span class="org-comment">file that is setuid (u+s)
+</span>SETGID 30;43    <span class="org-comment-delimiter"># </span><span class="org-comment">file that is setgid (g+s)
+</span>CAPABILITY 30;41        <span class="org-comment-delimiter"># </span><span class="org-comment">file with capability
+</span>STICKY_OTHER_WRITABLE 30;42 <span class="org-comment-delimiter"># </span><span class="org-comment">dir that is sticky and other-writable (+t,o+w)
+</span>OTHER_WRITABLE 34;42 <span class="org-comment-delimiter"># </span><span class="org-comment">dir that is other-writable (o+w) and not sticky
+</span>STICKY 37;44    <span class="org-comment-delimiter"># </span><span class="org-comment">dir with the sticky bit set (+t) and not other-writable
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">This is for files with execute permission:
+</span>EXEC 01;32
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">ubuntu &#26159;&#22312; dirclors &#21629;&#20196;&#23450;&#20041;&#30340;
+</span>env |grep LS_COLORS
+[ec2-user@ip-10-0-129-226 ~]$ dircolors -p
+<span class="org-comment-delimiter"># </span><span class="org-comment">Configuration file for dircolors, a utility to help you set the
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">LS_COLORS environment variable used by GNU ls with the --color option.
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Copyright (C) 1996-2020 Free Software Foundation, Inc.
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Copying and distribution of this file, with or without modification,
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">are permitted provided the copyright notice and this notice are preserved.
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">The keywords COLOR, OPTIONS, and EIGHTBIT (honored by the
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">slackware version of dircolors) are recognized but ignored.
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Below are TERM entries, which can be a glob patterns, to match
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">against the TERM environment variable to determine if it is colorizable.
+</span>TERM Eterm
+TERM ansi
+TERM *color*
+TERM con[0-9]*x[0-9]*
+TERM cons25
+......
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26080;&#27861;&#30452;&#25509;&#20462;&#25913;, &#21487;&#20197;&#31867;&#20284;&#20110;&#21035;&#21517;&#65292;&#21152;&#22312;.bashrc&#20013;&#21363;&#21487;
+</span>
+cat &lt;&lt;\EOF&gt; ~/.bash_profile<span class="org-sh-heredoc">
+eval "$(dircolors)"
+EOF</span>
+</pre>
+</div>
+
+<p>
+管道文件： 所谓管道，是指用于连接一个读进程和一个写进程，以实现它们之间通信的共享文件，又称pipe文件。单向的，如a往管道中写，b往管道中读。
+</p>
+
+<p>
+套接字文件：Socket本身有插座的意思，在Unix/Gnu Linux环境下，用于表示进程之间网络通信的特殊文件类型。本质为内核借助缓冲区形成的伪文件。双向的。
+</p>
+
+<p>
+<b>Mac 文件类型颜色（ls 彩色）</b>
+</p>
+
+<ul class="org-ul">
+<li>macOS 自带是 <code>BSD ls</code> ，用 <code>CLICOLOR</code> + <code>LSCOLORS</code> （22 个字母，11 组，每组 2 字符：前景 + 背景）</li>
+<li>Linux/GNU ls 用 <code>LS_COLORS</code> （冒号分隔，支持后缀，两者 <b><b>不通用</b></b> ）</li>
+</ul>
+
+<p>
+编辑 <code>~/.zshrc</code>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21551;ls&#39068;&#33394;
+</span><span class="org-builtin">export</span> <span class="org-variable-name">CLICOLOR</span>=1
+<span class="org-comment-delimiter"># </span><span class="org-comment">LSCOLORS 22&#23383;&#31526;&#65306;&#30446;&#24405;&#65372;&#36719;&#38142;&#65372;socket&#65372;&#31649;&#36947;&#65372;&#21487;&#25191;&#34892;&#65372;&#22359;&#35774;&#22791;&#65372;&#23383;&#31526;&#35774;&#22791;&#65372;setuid&#21487;&#25191;&#34892;&#65372;setgid&#21487;&#25191;&#34892;&#65372;&#31896;&#28382;+&#21487;&#20889;&#30446;&#24405;&#65372;&#26080;&#31896;&#28382;&#21487;&#20889;&#30446;&#24405;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#31034;&#20363;&#37197;&#33394;&#65306;&#30446;&#24405;&#34013;&#33394;&#65292;&#36719;&#38142;&#38738;&#33394;&#65292;&#21487;&#25191;&#34892;&#32511;&#33394;
+</span><span class="org-builtin">export</span> <span class="org-variable-name">LSCOLORS</span>=ExFxCxDxBxegedabagacad
+<span class="org-builtin">alias</span> <span class="org-variable-name">ls</span>=<span class="org-string">'ls -G'</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25928;
+</span><span class="org-builtin">source</span> ~/.zshrc
+
+
+LSCOLORS &#23383;&#27597;&#33394;&#34920;
+<span class="org-variable-name">&#23567;&#20889;</span> = &#26222;&#36890;&#65292;<span class="org-variable-name">&#22823;&#20889;</span> = &#31895;&#20307;&#65307; <span class="org-variable-name">x</span> = &#40664;&#35748;&#32972;&#26223; / &#21069;&#26223;
+- a&#65306;&#40657;&#65292;b&#65306;&#32418;&#65292;c&#65306;&#32511;&#65292;d&#65306;&#26837; / &#40644;&#65292;e&#65306;&#34013;&#65292;f&#65306;&#21697;&#32418;&#65292;g&#65306;&#38738;&#65292;h&#65306;&#28784;
+- A&#65306;&#31895;&#40657;&#65292;B&#65306;&#31895;&#32418;&#65292;C&#65306;&#31895;&#32511;&#65292;D&#65306;&#31895;&#40644;&#65292;E&#65306;&#31895;&#34013;&#65292;F&#65306;&#31895;&#21697;&#32418;&#65292;G&#65306;&#31895;&#38738;&#65292;H&#65306;&#31895;&#28784;
+
+&gt; &#19978;&#38754;&#31034;&#20363; ExFxCxDxBxegedabagacad &#21547;&#20041;&#65306;
+&gt; Ex &#30446;&#24405;&#65306;&#31895;&#34013;&#21069;&#26223;&#65292;&#40664;&#35748;&#32972;&#26223;
+&gt; Fx &#36719;&#38142;&#65306;&#31895;&#21697;&#32418;&#21069;&#26223;
+&gt; Cx socket&#65306;&#31895;&#32511;
+&gt; Dx &#31649;&#36947;&#65306;&#31895;&#40644;
+&gt; Bx &#21487;&#25191;&#34892;&#25991;&#20214;&#65306;&#31895;&#32418;
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:adde0f66-ecef-4af2-973a-7ace1e202d37" class="outline-2">
+<h2 id="h:adde0f66-ecef-4af2-973a-7ace1e202d37"><a href="#h:adde0f66-ecef-4af2-973a-7ace1e202d37">文件操作命令</a></h2>
+<div class="outline-text-2" id="text-h:adde0f66-ecef-4af2-973a-7ace1e202d37">
+</div>
+<div id="outline-container-h:2fe60291-ae27-4a1b-9b4f-d21fe7d3c803" class="outline-3">
+<h3 id="h:2fe60291-ae27-4a1b-9b4f-d21fe7d3c803"><a href="#h:2fe60291-ae27-4a1b-9b4f-d21fe7d3c803">显示工作目录 PWD</a></h3>
+<div class="outline-text-3" id="text-h:2fe60291-ae27-4a1b-9b4f-d21fe7d3c803">
+<p>
+pwd：printing working directory 显示工作目录
+</p>
+
+<p>
+使用pwd命令可以显示当前的工作目录，该命令很简单，直接输入pwd即可，后面
+不带参数。
+</p>
+
+<pre class="example" id="org149b253">
+-P 显示真实路径
+-L 显示链接路径（默认）
+</pre>
+</div>
+</div>
+<div id="outline-container-h:b81d1546-9780-4db8-8ccd-1441f5c07497" class="outline-3">
+<h3 id="h:b81d1546-9780-4db8-8ccd-1441f5c07497"><a href="#h:b81d1546-9780-4db8-8ccd-1441f5c07497">绝对和相对路径</a></h3>
+<div class="outline-text-3" id="text-h:b81d1546-9780-4db8-8ccd-1441f5c07497">
+<p>
+绝对路径
+</p>
+<ul class="org-ul">
+<li>以正斜杠/ 即根目录开始</li>
+<li>完整的文件的位置路径</li>
+<li>可用于任何想指定一个文件名的时候</li>
+</ul>
+
+<p>
+相对路径名
+</p>
+<ul class="org-ul">
+<li>不以斜线开始</li>
+<li>一般情况下，是指相对于当前工作目录的路径，特殊场景下，是相对于某目录的位置</li>
+<li>可以作为一个简短的形式指定一个文件名</li>
+</ul>
+
+<p>
+基名：basename，只取文件名而不要路径
+</p>
+
+<p>
+目录名：dirname，只取路径，不要文件名 范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 bin]#basename /etc/sysconfig/network
+network
+[root@centos8 bin]#dirname /etc/sysconfig/network
+/etc/sysconfig
+[root@centos8 ~]#dirname /etc/sysconfig/network-scripts/ifcfg-eth0
+/etc/sysconfig/network-scripts
+[root@centos8 ~]#basename /etc/sysconfig/network-scripts/ifcfg-eth0
+ifcfg-eth0
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0e1a6ea6-77d2-4066-8e4e-e5a5b18c3970" class="outline-3">
+<h3 id="h:0e1a6ea6-77d2-4066-8e4e-e5a5b18c3970"><a href="#h:0e1a6ea6-77d2-4066-8e4e-e5a5b18c3970">切换目录cd</a></h3>
+<div class="outline-text-3" id="text-h:0e1a6ea6-77d2-4066-8e4e-e5a5b18c3970">
+<p>
+change directory
+</p>
+
+<p>
+所谓工作目录，就是当前操作所在的目录。
+</p>
+
+<p>
+用户在使用Unix/Linux的时候，经常需要更换工作目录。cd命令可以帮助用户切
+换工作目录。
+</p>
+
+<p>
+后面可跟绝对路径，也可以跟相对路径。如果省略目录，则默认切换到当前用户
+的主目录。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# type cd
+<span class="org-builtin">cd</span> is a shell builtin
+[root@node01 ~]# help cd
+<span class="org-builtin">cd</span>: cd [-L|[-P [-e]]] [dir]
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24120;&#29992;&#36873;&#39033;
+</span>-L   <span class="org-comment-delimiter">#</span><span class="org-comment">&#20999;&#25442;&#33267;&#38142;&#25509;&#30446;&#24405;&#65292;&#40664;&#35748;&#36873;&#39033;
+</span>-P   <span class="org-comment-delimiter">#</span><span class="org-comment">&#20999;&#25442;&#33267;&#23454;&#29616;&#30446;&#24405;&#65292;&#32780;&#38750;&#38142;&#25509;&#30446;&#24405;</span>
+</pre>
+</div>
+
+<p>
+<b>2.3.1 cd的用法</b>
+</p>
+
+<p>
+cd [/PATH/TO/SOMEDIR]
+</p>
+
+<pre class="example" id="org3f32099">
+cd : 切换回家目录；注意：bash中，~表示家目录
+cd ~：切换回自己的家目录
+cd ~USERNAME: 切换至指定的家目录
+注意，只有管理员才能随便切换指定家目录
+
+cd -: 在上一次所在目录与当前目录之间来回切换
+cd . : 当前目录
+cd .. : 上级目录
+</pre>
+
+<p>
+<b>2.3.2 相关的环境变量：</b>
+</p>
+
+<p>
+为什么cd能在当前目录和上次目录来回切换？因为shell有2个环境变量保存这个值
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$<span class="org-variable-name">PWD</span>:&#24403;&#21069;&#24037;&#20316;&#30446;&#24405;
+$<span class="org-variable-name">OLDPWD</span>&#65306;&#19978;&#19968;&#27425;&#30340;&#24037;&#20316;&#30446;&#24405;
+</pre>
+</div>
+
+<p>
+如从/root目录切换到/目录
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# echo $<span class="org-variable-name">PWD</span>
+/root
+[root@node01 ~]# cd /
+[root@node01 /]# echo $<span class="org-variable-name">PWD</span>
+/
+[root@node01 /]# echo $<span class="org-variable-name">OLDPWD</span>
+/root
+[root@node01 /]#
+</pre>
+</div>
+
+<p>
+<b>zoxide cd 优化</b>
+</p>
+
+<p>
+bash 中 cd 很不方便，没有历史，跳转模糊。zoxide 可以提高你的工作效率.
+</p>
+
+<p>
+它会记住您最常使用的目录，因此您只需敲击几下键盘就可以“跳转”到这些目录。
+</p>
+
+<p>
+<a href="https://github.com/ajeetdsouza/zoxide">https://github.com/ajeetdsouza/zoxide</a>
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">root@myhost:~# z /tmp/
+root@myhost:~# mkdir -p foo/bar/{apple,orange/{abc-bi,xyz},food/{abc,xyz}}
+root@myhost:/tmp# tree foo
+foo
+&#9492;&#9472;&#9472; bar
+    &#9500;&#9472;&#9472; apple
+    &#9500;&#9472;&#9472; food
+    &#9474;   &#9500;&#9472;&#9472; abc
+    &#9474;   &#9492;&#9472;&#9472; xyz
+    &#9492;&#9472;&#9472; orange
+        &#9500;&#9472;&#9472; abc-bi
+        &#9492;&#9472;&#9472; xyz
+
+8 directories, 0 files
+
+root@myhost:/tmp# z foo/bar/apple/
+root@myhost:/tmp/foo/bar/apple# z ../food/abc/
+root@myhost:/tmp/foo/bar/food/abc# z /tmp/foo/bar/orange/abc-bi/
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">input `abc` only would match `/tmp/foo/bar/food/abc`
+</span>root@myhost:/tmp/foo/bar/orange/abc-bi# z abc
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">more specific word, with `-` suffix, then jump to `abc-bi`
+</span>root@myhost:/tmp/foo/bar/food/abc# z abc-
+
+root@myhost:/tmp/foo/bar/orange/abc-bi# z /tmp/foo/bar/food/xyz/
+root@myhost:/tmp/foo/bar/food/xyz# z /tmp/foo/bar/orange/xyz
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">specify multiple path segments
+</span>root@myhost:/tmp/foo/bar/orange/xyz# z food xyz
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">choose alternatives for `xyz` interactively
+</span>root@myhost:/tmp/foo/bar/food/xyz# zi xyz
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:483ab726-dd5a-47a7-9229-18b2c388c252" class="outline-3">
+<h3 id="h:483ab726-dd5a-47a7-9229-18b2c388c252"><a href="#h:483ab726-dd5a-47a7-9229-18b2c388c252">列出指定目录下的内容-ls</a></h3>
+<div class="outline-text-3" id="text-h:483ab726-dd5a-47a7-9229-18b2c388c252">
+<p>
+ls [OPTION]&#x2026; [FILE] &#x2026;
+</p>
+
+<p>
+<b>2.4.1 常用参数</b>
+</p>
+
+<pre class="example" id="orgd1257c9">
+-a：显示所有文件，包括隐藏文件
+-A：显示除.(当前目录)和..(上级目录)之外的文件
+-i, –inode 印出每个文件的 inode 号
+-l：--long，长格式列表，显示文件详细属性信息
+-d：仅显示当前目录；通常结合-l使用,显示文件和目录本身
+-1：(数值一)，以换行符分隔文件, 即一行显示一个。当然，和-m或-l(小写字母)是冲突的
+-t：按修改时间排序内容。不加任何改变顺序的选项时，ls默认按照字母顺序排序
+-r：reverse，逆序显示
+-R：recursive,递归显示;
+-F或--classify 在执行文件，目录，Socket，符号连接，管道名称后面，各自加上*, /, =, @, | 号。
+-h, –human-readable 以容易理解的格式列出文件大小 (例如 1K 234M 2G)
+
+其实选项: 
+-S : 按文件大小排序，默认降序排序
+-U 按目录存放顺序显示
+-X 按文件后缀排序
+-p或--file-type   此参数的效果和指定"-F"参数类似，但不会在执行文件名称后面加上"*"号。只是在目录后面添加/
+-R, –recursive 同时列出所有子目录层
+--time-style={full-iso, long-iso, iso, locale} : 以不同的时间格式输出。long-iso效果最好
+--full-time : 显示完整的时间
+--time={atime|mtime|ctime}  读时间 、修改时间、状态元数据更新时间
+-m：使用逗号分隔各文件，当然，只适用于未使用长格式(ls -l)的情况
+-大I pattern：忽略被pattern匹配到的文件
+-Z: 显示扩展属性
+
+常用组合：
+ls -alF
+</pre>
+
+<p>
+别名：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /etc/profile.d/alias.sh<span class="org-sh-heredoc">
+alias ll='ls -alF'
+alias ls='ls --color=auto'
+alias l.='ls -d .* --color=auto' #&#20165;&#26174;&#31034;&#38544;&#34255;&#25991;&#20214;
+alias la='ls -A'
+alias l='ls -CF'
+EOF</span>
+</pre>
+</div>
+
+<p>
+注意，ls以 <code>-h</code> 显示文件大小时，一般显示的都是不带B的单位，如K/M/G，它
+们的转换比例是1024，如果显示的都是带了B的，如KB/MB/GB，则它们的转换比
+例为1000而非1024，一般很少显示带B的大小。
+</p>
+
+<p>
+不得不说，ls本身不能显示出文件的全路径名是一大缺陷，不过好在使用find命
+令可以很简单的就获取到。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# ls -l --time-style=long-iso
+-rw-r--r--   1 root root          0 2017-12-12 06:36 123
+-rw-------.  1 root root       1418 2017-03-24 18:42 anaconda-ks.cfg
+
+[root@node01 ~]#  ll --full-time <span class="org-comment-delimiter"># </span><span class="org-comment">&#26174;&#31034;&#23436;&#25972;&#30340;&#26102;&#38388;
+</span>total 1451180
+drwxr-xr-x   2 root root          6 2018-01-09 07:31:04.579132550 +0800 07-31-04
+
+ll . 
+ll . -a
+ll ./ -a
+</pre>
+</div>
+
+<p>
+<b>2.4.2 文件详细属性信息</b>
+</p>
+
+<p>
+<code>-l</code> ：&#x2013;long，长格式列表，显示文件详细属性信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# ls -l
+-rw-r--r--. 1 root   root    30499 Dec  8 12:04 Xorg.0.log
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31532;1&#21015;&#20013;&#26368;&#21518;&#30340;.&#28857;&#65292;&#26159;selinux&#24320;&#21551;&#29366;&#24577;&#26174;&#31034;&#30340;&#12290; &#32534;&#36753;/etc/selinux/config&#20462;&#25913;SELINUX=disabled&#65292;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#26032;&#30331;&#24405;&#21518;&#32493;&#21019;&#24314;&#30340;&#26032;&#25991;&#20214;&#23601;&#27809;&#26377;&#28857;&#20102;&#12290;</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li><p>
+第1列，文件类型和文件权限信息
+<code>-</code> ：文件类型，-,d,b,c,l,s,p
+</p>
+
+<p>
+<code>rw-</code> ：左3位，文件属主的权限 r&#x2013;：中3位，文件属组的权限；
+</p>
+
+<p>
+<code>r--</code> ：右3位，其他用户（非属主、属组）的权限
+</p>
+
+<p>
+拓展第1位中表示文件类型：
+</p>
+
+<pre class="example" id="orgc9862e7">
+-：常规文件；即f;
+d：directory,目录文件；
+b：block device,块设备文件，支持以"block"为单位进行随机访问
+c：character device,字符设备文件，执行以"character"为单位进行线性访问
+    major number：主设备号，用标识设备类型，进而确定要加载的驱动程序
+    minor number：次设备号，用于标识同一类型中的不同的设备
+        8位二进制：0-255
+l：symbolic link，符号连接文件；软连接文件；类似于Windows下的快捷方式
+p：pipe，管道文件；解决多个程序访问一个文件所造成的错误，FIFO(first-in-first-out)
+s：socket，套接字文件；通常被用在网络上的数据连接，两个进程通信时套接(插座),主要用于服务提供的。
+
+查看文件类型的命令：file FILENAME
+</pre>
+
+<p>
+如/dev下10，175是用来表示设备号，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]# ls -l /dev
+crw-rw----. 1 root video    10, 175 12&#26376; 10 17:21 agpgart
+</pre>
+</div></li>
+
+<li><p>
+第2列，数字表示文件被硬连接的次数
+</p>
+
+<p>
+1:数字表示文件被硬连接的次数
+</p></li>
+
+<li>第3列， 文件的属主 root：文件的属主</li>
+
+<li>第4列， 文件的属组 root：文件的属组</li>
+
+<li><p>
+第5列，数字表示文件的大小，单位是字节
+</p>
+
+<p>
+30499：数字表示文件的大小，单位是字节
+</p>
+
+<p>
+如/dev下10，175是用来表示设备号，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]# ls -l /dev
+crw-rw----. 1 root video    10, 175 12&#26376; 10 17:21 agpgart
+    major number&#65306;&#20027;&#35774;&#22791;&#21495;&#65292;&#29992;&#26631;&#35782;&#35774;&#22791;&#31867;&#22411;&#65292;&#36827;&#32780;&#30830;&#23450;&#35201;&#21152;&#36733;&#30340;&#39537;&#21160;&#31243;&#24207;
+    minor number&#65306;&#27425;&#35774;&#22791;&#21495;&#65292;&#29992;&#20110;&#26631;&#35782;&#21516;&#19968;&#31867;&#22411;&#20013;&#30340;&#19981;&#21516;&#30340;&#35774;&#22791;
+        8&#20301;&#20108;&#36827;&#21046;&#65306;0-255
+</pre>
+</div></li>
+
+<li><p>
+第6列， 文件最近一次被修改的时间
+</p>
+
+<p>
+<code>Dec 8 12:04</code> ：文件最近一次被修改的时间
+</p></li>
+
+<li><p>
+第7列，文件名 Xorg.0.log：文件名
+</p>
+
+<p>
+如，显示inode号命令ls -li
+</p></li>
+</ol>
+
+
+<figure id="org984cc12">
+<img style="aspect-ratio:498/261" decoding="async" loading="lazy" src="./images/image-20210215214035428.webp" alt="image-20210215214035428.webp" width="50%">
+
+</figure>
+
+<p>
+<b>2.4.3 文件属性中的时间属性</b>
+</p>
+
+<p>
+我们在 ls 这个命令的介绍时，有稍微提到每个文件在linux底下都会记录许多
+的时间参数，其实是有三个主要的变动时间，那么三个时间的意义是什么呢？
+</p>
+
+<p>
+在默认的情况下，ls 显示出来的是该文件的 mtime，也就是这个文件的内容上
+次被更动的时间。
+</p>
+
+<p>
+modification time
+(mtime)：当该文件的『内容数据』变更时，就会升级这个时间！内容数据指的
+是文件的内容，而不是文件的属性或权限喔！
+</p>
+
+<p>
+status time (ctime)：当该文件的『状态(status)』改变时，就会升级这个时
+间，举例来说，像是权限与属性被更改了，都会升级这个时间啊。
+</p>
+
+<p>
+access time (atime)：当『该文件的内容被取用』时，就会升级这个读取时间
+(access)。举例来说，我们使用 cat 去读取 /etc/man.config ，就会升级该文
+件的 atime 了。
+</p>
+
+<p>
+这是个挺有趣的现象，举例来说，我们来看一看你自己的 /etc/man.config
+这个文件的时间吧！
+</p>
+
+<pre class="example" id="org699c7fd">
+[root@www ~]# ls -l /etc/man.config
+-rw-r--r-- 1 root root 4617 Jan  6  2007 /etc/man.config
+[root@www ~]# ls -l --time=atime /etc/man.config
+-rw-r--r-- 1 root root 4617 Sep 25 17:54 /etc/man.config
+[root@www ~]# ls -l --time=ctime /etc/man.config
+-rw-r--r-- 1 root root 4617 Sep  4 18:03 /etc/man.config
+</pre>
+
+<p>
+<b>2.4.4 常用组合</b>
+</p>
+
+<p>
+ls -ltr 查看到最近更新的文件
+</p>
+
+<p>
+应用 1 只显示目录
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">1. ls -d *
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">2. find . -type d -maxdepth 1
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">3. ls -F | grep '/$'
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992;linux&#31649;&#36947;&#21629;&#20196;&#65292;grep&#26597;&#25214; '/$' &#20197;/&#32467;&#23614;&#30340;&#65292;&#20063;&#21363;&#26159;&#30446;&#24405;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">4. ls -l | grep '^d'</span>
+</pre>
+</div>
+
+<p>
+生产
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Linux Shell&#23454;&#29616;&#20165;&#20445;&#30041;&#26368;&#26032;&#30340;&#25991;&#20214;|&#21024;&#38500;&#26368;&#26087;&#30340;&#25991;&#20214;|Bash
+</span>ls -t | awk &#8216;{<span class="org-keyword">if</span>(NR&gt;16){<span class="org-builtin">print</span> $<span class="org-variable-name">0</span>}}&#8217; |xargs rm -f
+</pre>
+</div>
+
+<p>
+说明：
+</p>
+
+<p>
+ls 查看不同后缀文件时的颜色由 /etc/DIR_COLORS和@LS_COLORS变量定义
+</p>
+</div>
+</div>
+<div id="outline-container-h:11dfd3c8-619c-473b-a887-bc649875e652" class="outline-3">
+<h3 id="h:11dfd3c8-619c-473b-a887-bc649875e652"><a href="#h:11dfd3c8-619c-473b-a887-bc649875e652">查看文件状态 stat</a></h3>
+<div class="outline-text-3" id="text-h:11dfd3c8-619c-473b-a887-bc649875e652">
+<p>
+文件相关信息：metadata, data
+</p>
+
+<p>
+每个文件有三个时间戳：
+</p>
+
+<ul class="org-ul">
+<li>access time 访问时间，atime，读取文件内容</li>
+<li>modify time 修改时间，mtime，改变文件内容（数据）</li>
+<li>change time 改变时间，ctime，元数据发生改变</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#stat /etc/passwd
+File: /etc/passwd
+Size: 1306   Blocks: 8     IO Block: 4096  regular file
+Device: 802h/2050d Inode: 134792556  Links: 1
+Access: (0644/-rw-r--r--) Uid: (   0/  root)  Gid: (   0/  root)
+Access: 2019-12-09 20:37:12.830991350 +0800
+Modify: 2019-12-09 20:37:12.826991351 +0800
+Change: 2019-12-09 20:37:12.826991351 +0800
+Birth: -
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d3623683-961a-4423-8701-014b12c00721" class="outline-3">
+<h3 id="h:d3623683-961a-4423-8701-014b12c00721"><a href="#h:d3623683-961a-4423-8701-014b12c00721">确定文件内容 file</a></h3>
+<div class="outline-text-3" id="text-h:d3623683-961a-4423-8701-014b12c00721">
+<p>
+文件可以包含多种类型的数据，使用file命令检查文件的类型，然后确定适当的
+打开命令或应用程序使用
+</p>
+
+<p>
+格式：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">file [options] &lt;filename&gt;...
+</pre>
+</div>
+
+<p>
+常用选项:
+</p>
+
+<pre class="example" id="org551ea06">
+-b 列出文件辨识结果时，不显示文件名称
+-f filelist 列出文件filelist中文件名的文件类型
+-F 使用指定分隔符号替换输出文件名后默认的”:”分隔符
+-L 查看对应软链接对应文件的文件类型
+-s 读取块文件或字符特殊文件类型
+--help 显示命令在线帮助
+</pre>
+
+<p>
+范例：windows的文本格式和Linux的文本格式的区别
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#cat linux.txt
+a
+b
+c
+[root@centos8 data]#cat win.txt
+a
+b
+c[root@centos8 data]#file win.txt linux.txt
+win.txt:  ASCII text, with CRLF line terminators
+linux.txt: ASCII text
+
+cat -A linux.txt
+cat -A win.txt
+
+man ascii <span class="org-comment-delimiter">#</span><span class="org-comment">man-pages&#21253;
+</span>   &#34920;&#26684;
+       &#20026;&#26041;&#20415;&#36215;&#35265;&#65292;&#25105;&#20204;&#32473;&#20986;&#20102;&#26356;&#32039;&#20945;&#30340;&#21313;&#20845;&#36827;&#21046;&#21644;&#21313;&#36827;&#21046;&#34920;&#26684;&#12290;
+
+          2 3 4 5 6 7       30 40 50 60 70 80 90 100 110 120
+        -------------      ---------------------------------
+       0:   0 @ P <span class="org-sh-quoted-exec">` p     0:    (  2  &lt;  F  P  Z  d   n   x
+       1: ! 1 A Q a q     1:    )  3  =  G  Q  [  e   o   y
+       2: " 2 B R b r     2:    *  4  &gt;  H  R  \  f   p   z
+       3: # 3 C S c s     3: !  +  5  ?  I  S  ]  g   q   {
+       4: $ 4 D T d t     4: "  ,  6  @  J  T  ^  h   r   |
+       5: % 5 E U e u     5: #  -  7  A  K  U  _  i   s   }
+       6: &amp; 6 F V f v     6: $  .  8  B  L  V  `</span>  j   t   ~
+       7: &#180; 7 G W g w     7: %  /  9  C  M  W  a  k   u  DEL
+       8: ( 8 H X h x     8: &amp;  0  :  D  N  X  b  l   v
+       9: ) 9 I Y i y     9: &#180;  1  ;  E  O  Y  c  m   w
+       A: * : J Z j z
+       B: + ; K [ k {
+       C: , &lt; L <span class="org-string">\ </span>l |
+       D: - = M ] m }
+       E: . &gt; N ^ n ~
+       F: / ? O _ o DEL
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">hexdump &#26597;&#30475;16&#36827;&#21046;&#20869;&#23481;
+</span>[root@centos8 data]#hexdump -C linux.txt
+00000000  61 0a 62 0a 63 0a                 |a.b.c.|
+00000006
+[root@centos8 data]#hexdump -C win.txt
+00000000  61 0d 0a 62 0d 0a 63               |a..b..c|
+00000007
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;&#36716;&#25442;&#24037;&#20855;
+</span>[root@centos8 data]#dnf -y install dos2unix
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;Windows&#30340;&#25991;&#26412;&#26684;&#24335;&#36716;&#25442;&#25104;&#30340;Linux&#25991;&#26412;&#26684;&#24335;
+</span>[root@centos8 data]#dos2unix win.txt
+dos2unix: converting file win.txt to Unix format...
+[root@centos8 data]#file win.txt
+win.txt: ASCII text
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;Linux&#30340;&#25991;&#26412;&#26684;&#24335;&#36716;&#25442;&#25104;Windows&#30340;&#25991;&#26412;&#26684;&#24335;
+</span>[root@centos8 data]#unix2dos win.txt
+unix2dos: converting file win.txt to DOS format...
+[root@centos8 data]#file win.txt
+win.txt: ASCII text, with CRLF line terminators
+</pre>
+</div>
+
+<p>
+范例：转换文件字符集编码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#25903;&#25345;&#23383;&#31526;&#38598;&#32534;&#30721;&#21015;&#34920;
+</span>[root@centos8 ~]#iconv -l
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">windows10&#19978;&#25991;&#26412;&#40664;&#35748;&#30340;&#32534;&#30721;ANSI&#65288;GB2312&#65289;
+</span>[root@centos8 data]#file windows.txt
+windows.txt: ISO-8859 text, with no line terminators
+
+[root@centos8 data]#echo $<span class="org-variable-name">LANG</span>
+en_US.UTF-8
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#40664;&#35748;&#22312;linux&#26080;&#27861;&#27491;&#24120;&#26174;&#31034;&#25991;&#26412;&#20869;&#23481;
+</span>[root@centos8 data]#cat windows11.txt
+&#9618;&#9618;&#9618;&#9618;&#9618;&#9618;[root@centos8 data]#
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;windows10&#19978;&#25991;&#26412;&#40664;&#35748;&#30340;&#32534;&#30721;ANSI&#65288;GB2312&#65289;&#36716;&#25442;&#25104;UTF-8
+</span>[root@centos8 data]#iconv -f gb2312 windows.txt -o windows1.txt
+[root@centos8 data]#cat windows1.txt
+abc[root@centos8 data]#ll windows1.txt
+-rw-r--r-- 1 root root 12 Mar 23 10:13 windows1.txt
+[root@centos8 data]#file windows1.txt
+windows1.txt: UTF-8 Unicode text, with no line terminators
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;UTF-8&#36716;&#25442;&#25104;windows10&#19978;&#25991;&#26412;&#40664;&#35748;&#30340;&#32534;&#30721;ANSI&#65288;GB2312&#65289;
+</span>[root@centos8 data]#iconv -f utf8 -t gb2312 windows1.txt -o windows11.txt
+[root@centos8 data]#file windows11.txt
+windows11.txt: ISO-8859 text, with no line terminators
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;windows10&#19978;&#25991;&#26412;&#40664;&#35748;&#30340;&#32534;&#30721;ANSI&#65288;GB2312&#65289;&#36716;&#25442;&#25104;UTF-8
+</span>[15:34:50 root@centos8 ~]#iconv -f gb2312 win.txt -o win2.txt 
+[15:34:50 root@centos8 ~]#file linux.txt
+linux.txt: ASCII text
+[15:34:31 root@centos8 ~]#file windows.txt
+windows.txt: ASCII text, with CRLF line terminators
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;windows&#30340;&#25991;&#26412;&#26684;&#24335;&#36716;&#25442;&#25104;Linux&#30340;&#25991;&#26412;&#26684;&#24335;
+</span>[15:35:26 root@centos8 ~]#dos2unix windows.txt
+dos2unix: converting file windows.txt to Unix format...
+[15:36:00 root@centos8 ~]#file windows.txt
+windows.txt: ASCII text
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#cat list.txt
+/etc/
+/bin
+/etc/issue
+[root@centos8 ~]#file -f list.txt
+/etc/:   directory
+/bin:    symbolic link to usr/bin
+/etc/issue: ASCII text
+</pre>
+</div>
+
+<p>
+范例：读取磁盘信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]# file -sL /dev/vdb
+/dev/vdb: Linux rev 1.0 ext4 filesystem data, <span class="org-variable-name">UUID</span>=75dece20-4563-4958-ad4e-452be4ed817c (needs journal recovery) (extents) (64bit) (large files) (huge files)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21028;&#26029;&#30913;&#30424;&#26159;&#21542;&#23384;&#22312;&#26410;&#26684;&#24335;&#21270;&#65292;&#36755;&#20986;not exit&#34920;&#31034;&#30913;&#30424;&#34987;&#26684;&#24335;&#21270;&#20102;
+</span>file -sL /dev/vdb | grep -v filesystem|grep -v partition||<span class="org-builtin">echo</span> <span class="org-string">'not exist'</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a7cbf658-ddff-4343-98da-e8bbc3d2413b" class="outline-3">
+<h3 id="h:a7cbf658-ddff-4343-98da-e8bbc3d2413b"><a href="#h:a7cbf658-ddff-4343-98da-e8bbc3d2413b">bash基础特性-文件名通配glob</a></h3>
+<div class="outline-text-3" id="text-h:a7cbf658-ddff-4343-98da-e8bbc3d2413b">
+
+<figure id="org5592f21">
+<img style="aspect-ratio:790/270" decoding="async" loading="lazy" src="./images/image-20210215215412054.webp" alt="image-20210215215412054.webp" width="50%">
+
+</figure>
+
+<p>
+globbing：文件名通配(整体文件名匹配，而非部分)
+</p>
+
+<p>
+文件的通配机制：编写一种匹配模式，能够实现对多个文件名进行通配；
+</p>
+
+<p>
+匹配模式：对于文件名通配当中，如果我们要编写匹配模式就会用到元字符metacharacters。
+</p>
+
+<p>
+元字符指的是一个字符出现以后，它并不表示文件本身，而是用来匹配一定范围
+内的或者指定符合条件的字符；
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">.  &#21253;&#21547;&#38544;&#34255;&#25991;&#20214;&#30340;&#25152;&#26377;&#25991;&#20214;
+* &#37197;&#32622;&#20219;&#24847;&#38271;&#24230;&#30340;&#20219;&#24847;&#23383;&#31526;&#12290;&#20294;&#21305;&#37197;&#19981;&#20102; . &#28857;&#24320;&#22836;&#30340;&#25991;&#20214;&#65292;&#21363;&#19981;&#21253;&#21547;&#38544;&#34255;&#25991;&#20214;&#12290;
+? &#21305;&#37197;&#20219;&#24847;&#21333;&#20010;&#23383;&#31526;
+~ &#24403;&#21069;&#29992;&#25143;&#23478;&#30446;&#24405;
+~me &#29992;&#25143;me&#23478;&#30446;&#24405;
+~+&#21644;. &#24403;&#21069;&#24037;&#20316;&#30446;&#24405;
+~- &#21069;&#19968;&#20010;&#24037;&#20316;&#30446;&#24405;
+[] &#21305;&#37197;&#25351;&#23450;&#33539;&#22260;&#20869;&#30340;&#20219;&#24847;&#21333;&#20010;&#23383;&#31526;
+[^] &#21305;&#37197;&#25351;&#23450;&#33539;&#22260;&#22806;&#30340;&#20219;&#24847;&#21333;&#20010;&#23383;&#31526;
+
+** &#20219;&#24847;&#23376;&#30446;&#24405;&#12290; &#22914; ls **/*.py
+</pre>
+</div>
+
+
+<p>
+[] 有几种特殊格式：
+</p>
+<pre class="example" id="org059cd47">
+[a-z] : 匹配a到z间任意一个字符，
+[A-Z] : 匹配A到Z间任意一个字符，
+[0-9] : 匹配0到9之间任意一个数字
+[a-zA-Z0-9] : 匹配aA到zZ、0到9之间任意一个，。如[abcxyz]表示从abcxyz中匹配任意一个字符
+</pre>
+
+<p>
+在Linux系统中预定义的字符类：man 7 glob
+</p>
+
+<pre class="example" id="org67960a8">
+[:alpha:]：匹配字母(阿额儿发，等价于[a-zA-Z]
+[:digit:]：匹配数字，等价于[0-9]
+[:xdigit:]：匹配十六进制数，等价于[0-9a-fA-F]
+[:upper:]：匹配大写字母(阿坡儿额)，等价于[A-Z]
+[:lower:]：匹配小写字母(路我额)，等价于[a-z]
+[:alnum:]：匹配数字或字母，等价于[0-9a-zA-Z]
+[:blank:]：匹配空白，包括空格和制表符
+[:space:]：匹配空格，包括新行、空格、制表符、换行符、回车符等各种类型的空白
+[:punct:]：匹配所有标点符号(怕可特。包括：! ' " ` # $ % &amp; ( ) * + , . - _ / : ; &lt; = &gt; ? @ [ \ ] ^ { | } ~
+[:graph:]：非空字符。绘图类。包括：大小写字母、数字和标点符号。等价于[:alnum:]+[:punct:]
+[:print:]：非空字符（包括空格）。打印字符类。包括：大小写字母、数字、标点符号和空格。等价于[:alnum:]+[:punct:]+space
+[:cntrl:]：控制字符类。在ASCII中，这些字符的八进制代码从000到037，还包括177(DEL)。代表键盘上的控制键，包括 CR, LF, TAB, Del ..等
+[:blank:]: 空白字符：空格和制表符
+</pre>
+
+<p>
+范例：
+pa[0-9][0-9] : pa后面跟2个数字
+</p>
+
+<p>
+2[0-9][0-9] : 表示200-299之间的数字
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#65297;. * 
+</span>pa* : &#25152;&#26377;&#20197;pa&#24320;&#22836;&#30340;&#25991;&#20214;&#12290;&#20687;pa,paa*,passwd&#37117;&#31526;&#21512;&#12290;
+*pa* : &#25991;&#20214;&#21517;&#24403;&#20013;&#20219;&#24847;&#20301;&#32622;&#21253;&#21547;pa&#23383;&#31526;&#20018;&#30340;&#25991;&#20214;&#12290;
+*pa : &#25991;&#20214;&#21517;&#20013;&#20197;pa&#32467;&#23614;&#30340;
+*p*a* : &#25991;&#20214;&#21517;&#20013;&#20986;&#29616;&#23383;&#31526;pa&#25110;p&#21644;a&#30340;&#25991;&#20214;&#65292;&#36825;&#20010;&#25551;&#36848;&#26159;p&#22312;a&#20043;&#21069;&#30340;&#12290;
+
+~]# ls  /var/log/*.log <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;/var/log&#19979;&#25152;&#26377;&#20197; .log &#32467;&#23614;&#30340;&#25991;&#20214;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">2 ?
+</span>pa? : &#25991;&#20214;&#21517;&#20013;&#26377;3&#20010;&#23383;&#31526;&#65292;&#20854;&#20013;&#26377;pa&#21644;&#19968;&#20010;&#20219;&#24847;&#23383;&#31526;&#12290;&#20687;pa&#19981;&#31526;&#21512;, paa&#31526;&#21512;, passwd&#19981;&#31526;&#21512;
+??pa : &#25991;&#20214;&#21517;&#20197;pa&#32467;&#23614;&#65292;&#21069;&#38754;&#21487;&#20197;&#20986;&#29616;&#20219;&#24847;2&#20010;&#23383;&#31526;
+p?a : &#25991;&#20214;&#21517;pa&#20043;&#38388;&#20986;&#29616;&#20219;&#24847;&#21333;&#20010;&#23383;&#31526;
+p?a? : &#25991;&#20214;&#21517;p&#21644;a&#21518;&#37117;&#20986;&#29616;&#19968;&#20010;&#23383;&#31526;
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">[]&#21305;&#37197;&#25351;&#23450;&#33539;&#22260;&#20869;&#30340;&#20219;&#24847;&#21333;&#20010;&#23383;&#31526;
+</span>&#20363;&#22914;&#65292;&#25991;&#20214;&#21517;&#20013;&#20986;&#29616;&#26631;&#28857;&#31526;&#21495; , &#36887;&#21495;&#21305;&#37197;
+]# touch p,a
+]# ls p[[:punct:]]a
+&#20363;&#22914;&#65292;&#25991;&#20214;&#21517;&#20013;&#20986;&#29616;&#31354;&#30333;&#23383;&#31526;&#21305;&#37197;
+]# touch p<span class="org-string">\ </span>a
+]# ls ?[[:space:]]?
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">4 [^]&#21305;&#37197;&#25351;&#23450;&#33539;&#22260;&#22806;&#30340;&#20219;&#24847;&#21333;&#20010;&#23383;&#31526;
+</span>[^[:upper:]] : &#38500;&#22823;&#20889;&#23383;&#27597;&#20197;&#22806;&#30340;&#25152;&#26377;&#23383;&#31526;
+[^0-9] : &#38500;&#25968;&#23383;&#20197;&#22806;&#30340;&#25152;&#26377;&#23383;&#31526;
+[^[:alnum:]]&#65306;&#25152;&#26377;&#38750;&#25968;&#23383;&#21644;&#23383;&#27597;&#30340;
+
+[root@centos8 data]#ls file[a-c].txt  <span class="org-comment-delimiter">#</span><span class="org-comment">&#23567;&#20889; &gt;&#22823;&#20889;&#30340;&#39034;&#24207;
+</span>filea.txt fileA.txt fileb.txt fileB.txt filec.txt
+
+[root@centos8 data]#ls file[C-E].txt
+fileC.txt filed.txt fileD.txt filee.txt fileE.txt
+
+[root@centos8 data]#ls file[wang].txt
+filea.txt fileg.txt filen.txt filew.txt
+[root@centos8 data]#ls file[^wang].txt
+</pre>
+</div>
+
+<p>
+范例：显示当前目录下隐藏文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ls -d /etc/*/
+
+<span class="org-builtin">alias</span> l.=<span class="org-string">'ls -d .* --color=auto'</span>
+[root@centos8 ~]#l.  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21482;&#26174;&#31034;&#38544;&#34255;&#25991;&#20214;</span>
+</pre>
+</div>
+
+<p>
+范例：显示当前目录下的任意次目录下的*.py文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">ubuntu:/usr/lib/python3/dist-packages# ls **/*.py
+apport/crashdb.py                   DistUpgrade/distro.py                         pyasn1_modules/rfc1901.py        rich/_loop.py
+</pre>
+</div>
+
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">1&#65306;&#26174;&#31034;/var&#30446;&#24405;&#25152;&#26377;&#20197;l&#24320;&#22836;&#65292;&#20197;&#19968;&#20010;&#23567;&#20889;&#23383;&#27597;&#32467;&#23614;&#65292;&#19988;&#20013;&#38388;&#20986;&#29616;&#20197;&#20026;&#20219;&#24847;&#23383;&#31526;&#30340;&#25991;&#20214;&#25110;&#30446;&#24405;
+</span>ls -d /var/l?[[:lower:]]
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">2&#65306;&#26174;&#31034;/etc&#30446;&#24405;&#19979;&#65292;&#20197;&#20219;&#24847;&#20197;&#20026;&#25968;&#23383;&#24320;&#22836;&#65292;&#19988;&#20197;&#38750;&#25968;&#23383;&#32467;&#23614;&#30340;&#25991;&#20214;&#25110;&#30446;&#24405;&#65307;
+</span>ls -d /etc/[0-9]*[^0-9]
+ls -d /etc/[[:digit:]]*[^[:digit:]]
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">3&#65306;&#26174;&#31034;/etc&#30446;&#24405;&#19979;&#65292;&#20197;&#38750;&#23383;&#27597;&#24320;&#22836;&#65292;&#21518;&#38754;&#36319;&#19968;&#20010;&#23383;&#27597;&#21450;&#20854;&#20182;&#20219;&#24847;&#38271;&#24230;&#20219;&#24847;&#23383;&#31526;&#30340;&#25991;&#20214;&#25110;&#32773;&#30446;&#24405;&#65307;
+</span>ls -d /etc/[^a-z][a-z]*
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">4&#65306;&#22797;&#21046;/etc&#30446;&#24405;&#19979;&#65292;&#25152;&#26377;&#20197;m&#24320;&#22836;&#65292;&#20197;&#38750;&#25968;&#23383;&#32467;&#23614;&#30340;&#25991;&#20214;&#25110;&#30446;&#24405;&#33267;/tmp/m&#30446;&#24405;&#65307;
+</span>~]# mkdir /tmp/m
+~]# cp -r /etc/m*[^0-9] /tmp/m/
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">5&#65306;&#22797;&#21046;/usr/share/man&#30446;&#24405;&#19979;&#65292;&#25152;&#26377;&#20197;man&#24320;&#22836;&#65292;&#21518;&#36319;&#19968;&#20010;&#25968;&#23383;&#32467;&#23614;&#30340;&#25991;&#20214;&#25110;&#32773;&#30446;&#24405;&#33267;/tmp/man/&#30446;&#24405;&#19979;&#65307;
+</span>cp -ap /usr/share/man/man*[0-9] /tmp/man
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">6&#65306;&#22797;&#21046;/etc&#30446;&#24405;&#19979;&#65292;&#25152;&#26377;&#20197;.conf&#32467;&#23614;&#65292;&#19988;&#20197;m,n,rp&#24320;&#22836;&#30340;&#25991;&#20214;&#25110;&#30446;&#24405;&#33267;/tmp/conf.d&#30446;&#24405;&#19979;&#65307;
+</span>~]# ls -d /etc/[mnrp]*.conf /tmp/conf.d/
+
+&#27880;&#24847;&#65306;&#25991;&#20214;&#21517;&#20013;&#21253;&#25324;&#31354;&#30333;&#23383;&#31526;&#23601;&#38656;&#35201;\&#36716;&#31227;&#26469;&#21305;&#37197;
+</pre>
+</div>
+
+<p>
+范例：[]和{}
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[ec2-user@ip-10-0-129-226 .jasper]$ touch f{3..5}
+[ec2-user@ip-10-0-129-226 .jasper]$ ls
+f3  f4  f5
+[ec2-user@ip-10-0-129-226 .jasper]$ ls f[1-5] <span class="org-comment-delimiter">#</span><span class="org-comment">&#25552;&#21069;&#21028;&#26029;&#26377;&#27809;&#26377;&#25991;&#20214;&#65292;&#20877;&#26174;&#31034;
+</span>f3  f4  f5
+[ec2-user@ip-10-0-129-226 .jasper]$ ls f{1..5} <span class="org-comment-delimiter">#</span><span class="org-comment">&#23454;&#38469;&#26159;&#21629;&#20196;&#23637;&#24320; ls f1 f2 f3 f4 f5
+</span>ls: cannot access <span class="org-string">'f1'</span>: No such file or directory
+ls: cannot access <span class="org-string">'f2'</span>: No such file or directory
+f3  f4  f5
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e46a6edb-79fe-4821-9bdf-4401ff2d2f56" class="outline-3">
+<h3 id="h:e46a6edb-79fe-4821-9bdf-4401ff2d2f56"><a href="#h:e46a6edb-79fe-4821-9bdf-4401ff2d2f56">创建空文件和刷新时间 touch</a></h3>
+<div class="outline-text-3" id="text-h:e46a6edb-79fe-4821-9bdf-4401ff2d2f56">
+<p>
+touch命令可以用来创建空文件或刷新文件的时间
+</p>
+
+<p>
+格式： <code>touch [OPTION]... FILE...</code>
+</p>
+
+<p>
+选项说明：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-a &#20165;&#25913;&#21464; atime&#21644;ctime
+-m &#20165;&#25913;&#21464; mtime&#21644;ctime
+-t [[CC]YY]MMDDhhmm[.ss] &#25351;&#23450;atime&#21644;mtime&#30340;&#26102;&#38388;&#25139; ,&#22914;&#65306;07081556&#20195;&#34920;7&#26376;8&#21495;15&#28857;56&#20998;
+
+-c &#22914;&#26524;&#25991;&#20214;&#19981;&#23384;&#22312;&#65292;&#21017;&#19981;&#20104;&#21019;&#24314;
+</pre>
+</div>
+
+<p>
+文件时间更新策略
+</p>
+<ul class="org-ul">
+<li>上一次的atime到当前超过24小时，会更新atime</li>
+<li>mtime或ctime大于atime，会更新atime</li>
+</ul>
+
+<p>
+因为atime, ctime, mtime更新都会消耗IO资源，而一个系统中，大多数文件都是读多写少。如果
+每一次访问文件都要更新atime，则会加重系统负载。
+</p>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 data]#touch f1.txt
+[root@centos8 data]#ll
+total 0
+-rw-r--r-- 1 root root 0 Mar 23 11:30 f1.txt
+[root@centos8 data]#ll /etc/issue
+-rw-r--r--. 1 root root 23 Jan  2 23:21 /etc/issue
+[root@centos8 data]#touch /etc/issue
+[root@centos8 data]#ll /etc/issue
+-rw-r--r--. 1 root root 23 Mar 23 11:31 /etc/issue
+[root@centos8 data]#stat /etc/issue
+File: /etc/issue
+Size: 23       Blocks: 8     IO Block: 4096  regular file
+Device: 802h/2050d   Inode: 134345998  Links: 1
+Access: (0644/-rw-r--r--) Uid: (   0/  root)  Gid: (   0/  root)
+Access: 2020-03-23 11:31:20.030291332 +0800
+Modify: 2020-03-23 11:31:20.030291332 +0800
+Change: 2020-03-23 11:31:20.030291332 +0800
+Birth: -
+
+
+[root@centos8 data]#date
+Fri Dec 13 16:11:55 CST 2019
+[root@centos8 data]#touch <span class="org-sh-quoted-exec">`date -d "-1 day" +%F_%T`</span>.log
+[root@centos8 data]#ls
+2019-12-12_16:11:48.log
+[root@centos8 data]#touch $(date -d <span class="org-string">"1 year"</span> +%F_%T).log
+[root@centos8 data]#ls
+2019-12-12_16:11:48.log  2020-12-13_16:13:11.log
+</pre>
+</div>
+
+<p>
+范例：修改文件时间戳-touch
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">touch a.log
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">stat a.log
+</span>Access: 2021-02-08 00:44:51.415681426 +0800
+Modify: 2021-02-08 00:44:51.415681426 +0800
+Change: 2021-02-08 00:44:51.415681426 +0800
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">touch -at &#20351;&#29992;&#21442;&#25968;&#26356;&#26032;&#35775;&#38382;&#26102;&#38388;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">touch -at 02021400 a.log 
+</span>[root@centos7 ~/learn] <span class="org-variable-name">eth0</span> = 10.0.1.86
+<span class="org-comment-delimiter"># </span><span class="org-comment">stat a.log 
+</span>Access: 2021-02-02 14:00:00.000000000 +0800
+Modify: 2021-02-08 00:44:51.415681426 +0800
+Change: 2021-02-08 01:00:13.840403406 +0800
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">touch -m &#21482;&#26356;&#26032;&#20462;&#25913;&#26102;&#38388;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">touch -mt 02051101 a.log 
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">stat a.log 
+</span>Access: 2021-02-02 14:00:00.000000000 +0800
+Modify: 2021-02-05 11:01:00.000000000 +0800
+Change: 2021-02-08 01:02:05.930192368 +0800
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#24180;&#26376;&#26085;&#26102;&#20998;&#31186;
+</span>touch -t 1908081042.30 .1.txt 
+[root@jump test]# ls -al --full-time
+-rw-r--r--. 1 root root   0 2019-08-08 10:42:30.000000000 +0000 .1.txt
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#24180;&#26376;&#26085;&#26102;&#20998;&#31186;
+</span>touch -t 202001151042.30 .1.txt 
+[root@jump test]# ls -al --full-time
+-rw-r--r--. 1 root root   0 2020-01-15 10:42:30.000000000 +0000 .1.txt
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#26376;&#26085;&#26102;&#20998;
+</span>touch -mt 02051101 .1.txt 
+[root@jump test]# ls -al --full-time
+-rw-r--r--. 1 root root   0 2025-02-05 11:01:00.000000000 +0000 .1.txt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f74a14de-0898-4465-8ee7-4d2a5301a0f0" class="outline-3">
+<h3 id="h:f74a14de-0898-4465-8ee7-4d2a5301a0f0"><a href="#h:f74a14de-0898-4465-8ee7-4d2a5301a0f0">文件管理工具：cp,mv,rm</a></h3>
+<div class="outline-text-3" id="text-h:f74a14de-0898-4465-8ee7-4d2a5301a0f0">
+</div>
+<div id="outline-container-h:0440b7a3-d0c3-44c7-8ed1-d5b08c75dc28" class="outline-4">
+<h4 id="h:0440b7a3-d0c3-44c7-8ed1-d5b08c75dc28"><a href="#h:0440b7a3-d0c3-44c7-8ed1-d5b08c75dc28">复制文件和目录 cp</a></h4>
+<div class="outline-text-4" id="text-h:0440b7a3-d0c3-44c7-8ed1-d5b08c75dc28">
+<p>
+源文件，目标文件
+</p>
+
+<pre class="example" id="orge47b9ea">
+单源复制 :
+cp [OPTION]... [-T] SOURCE DEST
+
+多源复制 :
+cp [OPTION]... SOURCE... DIRECTORY
+cp [OPTION]... -t DIRECTORY SOURCE...
+
+复制只是复制文件的数据，从源文件中抽取数据流，一行一行的填充到目标文件中去。
+</pre>
+
+<p>
+<b>1.1 单源复制：</b>
+</p>
+
+<ol class="org-ol">
+<li><p>
+如果目标DEST不存在：则事先创建文件，并复制源文件的数据流到DEST中；
+</p>
+
+<p>
+如将/etc/fstab文件内容复制到/tmp/hi.txt中，hi.txt事先不存在
+</p>
+
+<p>
+[root@node01 ~]# cp /etc/fstab /tmp/hi.txt
+</p></li>
+
+<li><p>
+<b>如果DEST存在:</b>
+如果DEST是非目录文件：则会复制覆盖目标文件；
+</p>
+
+<p>
+如果DEST是目录文件：则现在DEST目录下创建一个与源文件同名的文件，并
+复制其数据流。
+</p></li>
+</ol>
+
+<p>
+<b>1.2 多源复制：</b>
+</p>
+
+<ol class="org-ol">
+<li><p>
+如果DEST不存在：错误
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# cp /etc/{fstab,issue}  /tmp/hi.txt
+cp: target <span class="org-string">'/tmp/hi.txt'</span> is not a directory
+</pre>
+</div></li>
+
+<li>如果DEST是非目录文件：错误；</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# cp /etc/{fstab,issue}  /tmp/hi.txt
+cp: target <span class="org-string">'/tmp/hi.txt'</span> is not a directory
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>如果DEST是目录文件：分别复制每个文件至目标目录中，并保持原名；</li>
+</ol>
+
+<p>
+<b>1.3 常用选项：</b>
+</p>
+
+<pre class="example" id="org4ab3f47">
+-i : 交互式复制，即覆盖之前提醒用户确认；
+-n : 如果目标文件存在，则跳过此文件复制
+-s : 对源文件建立符号连接，而非复制文件。
+-f : 强制覆盖目标文件；
+-r : 递归复制目录；
+-d : 等同于 --no-dereference --preserve=links，复制符号连接本身，而非其指向的源文件；
+-a :  -dR --preserve=all，archive，用于归档；
+--preserve[=属性列表   保持指定的属性(默认：模式,所有权,时间戳)]
+属性列表有：
+mode : 保留权限属性
+ownership : 属主和属组
+timestamp : 时间戳
+context : 安全标签
+links : 连接属性
+xattr : 扩展属性
+all : 上述所有属性
+-p 等同--preserv=mode,ownership,timestamp
+
+-f --force
+-u --update 只复制源比目标更新文件或目标不存在的文件
+-b 目标存在，覆盖前先备份，默认形式为 filename~ ,只保留最近的一个备份
+--backup=numbered 目标存在，覆盖前先备份加数字后缀，形式为 filename.~#~ ，可以保留多个版本
+</pre>
+
+<p>
+<code>注意：命令可以有别名：别名可以与原名相同，此时原名就被隐藏了，如果要运行原命令，则使用\COMAND</code>
+</p>
+
+<p>
+如复制/etc/fstab文件到/tmp/hi.txt文件，引用原命令则使用\cp
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# alias cp
+<span class="org-builtin">alias</span> <span class="org-variable-name">cp</span>=<span class="org-string">'cp -i'</span>
+[root@node01 ~]# \cp /etc/fstab /tmp/hi.txt
+[root@node01 ~]# /usr/bin/cp /etc/fstab /tmp/hi.txt
+</pre>
+</div>
+
+<p>
+如果file是符号连接文件，直接用cp复制的是源文件的内容到file符号连接文件
+中去。如果不想这个做则使用-d选项。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# ll /etc/system-release
+lrwxrwxrwx. 1 root root 14 Mar 24  2017 /etc/system-release -&gt; centos-release
+[root@node01 ~]# cp /etc/system-release /tmp/
+[root@node01 ~]# ll /tmp/system-release
+-rw-r--r-- 1 root root 38 Jan 11 07:00 /tmp/system-release
+[root@node01 ~]# cat /tmp/system-release
+CentOS Linux release 7.3.1611 (Core)
+</pre>
+</div>
+
+<p>
+如，-d : 等于&#x2013;no-dereference&#x2013;preserve=links。如果源文件是软连接属性，
+则复制软连接属性而文件本身
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# ln -sv /tmp/hi.txt  /tmp/hi01.txt
+&#8216;/tmp/hi01.txt&#8217; -&gt; &#8216;/tmp/hi.txt&#8217;
+[root@node01 ~]# cp -d /tmp/hi01.txt  /tmp/hi02.txt
+[root@node01 ~]# ll /tmp/hi*
+lrwxrwxrwx 1 root root  11 Jan 11 06:46 /tmp/hi01.txt -&gt; /tmp/hi.txt
+lrwxrwxrwx 1 root root  11 Jan 11 06:47 /tmp/hi02.txt -&gt; /tmp/hi.txt
+-rw-r--r-- 1 root root 465 Jan 11 06:40 /tmp/hi.txt
+</pre>
+</div>
+
+<p>
+<b>1.4 其它选项：</b>
+</p>
+
+<pre class="example" id="org11048e1">
+-H : 跟随源文件中的命令行符号链接
+-l : 对源文件建立硬连接，而非复制文件链接文件而不复制
+-L : 总是跟随符号链接
+-大P : 不跟随源文件中的符号链接
+-小p : 等于--preserve=模式,所有权,时间戳一直复制过去
+--reflink=auto # cp 命令可以单独为文件创建快照，如，[root@node01 logs]# cp --reflink=auto grub2.cfg grub2.cfg_snap
+</pre>
+
+<p>
+复制软连接对应的实体文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cp -rl a b
+cp -rL a b
+</pre>
+</div>
+
+<p>
+复制软连接文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cp -dR path1 path2
+
+rsync -rlpgoDz
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#22797;&#21046;&#30446;&#24405;&#19979;&#30340;&#38544;&#34255;&#25991;&#20214;
+</span>cp  /etc/skel/.[^.]* /home/test
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22797;&#21046;&#30446;&#24405;&#19979;&#30340;&#25152;&#26377;&#25991;&#20214;&#65292;&#21253;&#21547;&#38544;&#34255;&#25991;&#20214;
+</span>cp -r /etc/skel/. /home/test
+cp -r /etc/skel /home/test
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22797;&#21046;&#30446;&#24405;&#19979;&#30340;&#25152;&#26377;&#25991;&#20214;, &#19981;&#21253;&#21547;&#38544;&#34255;&#25991;&#20214;
+</span>cp -r /etc/skel/* /home/test
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:34bf66c4-57e0-4876-972c-f983972e0661" class="outline-4">
+<h4 id="h:34bf66c4-57e0-4876-972c-f983972e0661"><a href="#h:34bf66c4-57e0-4876-972c-f983972e0661">移动和重命名文件 mv rename</a></h4>
+<div class="outline-text-4" id="text-h:34bf66c4-57e0-4876-972c-f983972e0661">
+<pre class="example" id="org2299a6b">
+mv [参数] 源文件或目录 目标文件或目录
+mv [OPTION]... [-T] SOURCE DEST
+mv [OPTION]... SOURCE... DIRECTORY
+mv [OPTION]... -t DIRECTORY SOURCE...
+</pre>
+
+<p>
+<b>常用选项</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-i&#65306;&#20132;&#20114;&#24335;&#21024;&#38500;&#65292;&#21363;&#35206;&#30422;&#20043;&#21069;&#25552;&#37266;&#29992;&#25143;&#30830;&#35748;&#65307;
+-f:force
+-u &#65306;&#33509;&#30446;&#26631;&#25991;&#20214;&#24050;&#23384;&#22312;&#65292;&#19988; source &#27604;&#36739;&#26032;&#65292;&#25165;&#20250;&#26356;&#26032; (update)
+&#27604;cp&#22810;&#20102;&#19968;&#27493;&#25226;&#21407;&#26469;&#30340;&#32473;&#21024;&#20102;
+[root@node01 ~]# mv bashrc1 bashrc2 mvtest2
+&#27880;&#24847;&#65292;&#22914;&#26524;&#26377;&#22810;&#20010;&#26469;&#28304;&#25991;&#20214;&#25110;&#30446;&#26631;&#65292;&#21017;&#26368;&#21518;&#19968;&#20010;&#30446;&#26631;&#25991;&#20214;&#19968;&#23450;&#26159;&#30446;&#24405;&#12290;&#24847;&#24605;&#26159;&#23558;&#25152;&#26377;&#30340;&#36164;&#26009;&#31227;&#21160;&#21040;&#35813;&#30446;&#24405;&#19979;&#12290;
+
+--backup[=CONTROL]&#65306;&#22914;&#26524;&#30446;&#26631;&#25991;&#20214;&#24050;&#23384;&#22312;&#65292;&#21017;&#23545;&#35813;&#25991;&#20214;&#20570;&#19968;&#20010;&#22791;&#20221;&#65292;&#40664;&#35748;&#22791;&#20221;&#25991;&#20214;&#26159;&#22312;&#25991;&#20214;&#21517;&#21518;&#21152;&#19978;&#27874;&#28010;&#32447;&#65292;&#22914;/b.txt~
+-b&#65306;&#31867;&#20284;&#20110;--backup&#65292;&#20294;&#19981;&#25509;&#21463;&#21442;&#25968;, &#40664;&#35748;&#22791;&#20221;&#25991;&#20214;&#26159;&#22312;&#25991;&#20214;&#21517;&#21518;&#21152;&#19978;&#27874;&#28010;&#32447;&#65292;&#22914;/b.txt~
+-n&#65306;&#22914;&#26524;&#30446;&#26631;&#25991;&#20214;&#24050;&#23384;&#22312;&#65292;&#21017;&#19981;&#35206;&#30422;&#24050;&#23384;&#22312;&#30340;&#25991;&#20214;
+ &#22914;&#26524;&#21516;&#26102;&#25351;&#23450;&#20102;-f/-i/-n&#65292;&#21017;&#21518;&#25351;&#23450;&#30340;&#29983;&#25928;
+</pre>
+</div>
+
+
+<p>
+利用rename 可以批量修改文件名 格式： rename [options] &#x2026;
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">centos
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#25152;&#26377;&#30340;conf&#25991;&#20214;&#21152;&#19978;.bak&#21518;&#32512;&#65306;
+</span>rename  <span class="org-string">'conf'</span>   <span class="org-string">'conf.bak'</span>  f*
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21435;&#25481;&#25152;&#26377;&#30340;bak&#21518;&#32512;&#65306;
+</span>rename  <span class="org-string">'.bak'</span>  <span class="org-string">''</span> *.bak
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">ubuntu  f1.conf  &#25442;&#25104; f1.conf.bak
+</span>rename <span class="org-string">'s/conf$/conf.bak/'</span> f*
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:90a8736f-63a4-4825-aa96-ddb206a3fc72" class="outline-4">
+<h4 id="h:90a8736f-63a4-4825-aa96-ddb206a3fc72"><a href="#h:90a8736f-63a4-4825-aa96-ddb206a3fc72">删除文件 rm</a></h4>
+<div class="outline-text-4" id="text-h:90a8736f-63a4-4825-aa96-ddb206a3fc72">
+<p>
+rm [OPTION]&#x2026; FILE&#x2026;
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-i : &#20132;&#20114;&#24335;&#22797;&#21046;&#65292;&#21363;&#35206;&#30422;&#20043;&#21069;&#25552;&#37266;&#29992;&#25143;&#30830;&#35748;&#65307;
+-f : &#24378;&#21046;&#21024;&#38500;&#30446;&#26631;&#25991;&#20214;&#65307;
+-r : recurive&#36882;&#24402;&#21024;&#38500;
+--no-preserve-root &#21024;&#38500;/
+</pre>
+</div>
+
+<p>
+删除目录 : rm -rf /PATH/TO/DIR
+</p>
+
+<p>
+危险操作rm -fr / 或rm -fr /*
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]# rm -fr /
+rm: &#22312;<span class="org-string">"/"</span> &#36827;&#34892;&#36882;&#24402;&#25805;&#20316;&#21313;&#20998;&#21361;&#38505;
+rm: &#20351;&#29992; --no-preserve-root &#36873;&#39033;&#36339;&#36807;&#23433;&#20840;&#27169;&#24335;
+</pre>
+</div>
+
+<p>
+注意：所有不用的文件建议不要直接删除，而是移动至某个专用目录；(模拟回收站)
+</p>
+
+<p>
+范例：删除特殊文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">touch ./-f
+[root@centos8 data]#rm -- -f  <span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;-f&#25991;&#20214;
+</span>[root@centos8 data]#rm ./-f
+[root@centos8 data]#rm /data/-f
+[root@centos8 data]#touch <span class="org-string">'~'</span>
+[root@centos8 data]#ls
+<span class="org-string">'~'</span>
+[root@centos8 data]#rm -f ~
+rm: cannot remove <span class="org-string">'/root'</span>: Is a directory
+[root@centos8 data]#rm -- ~
+rm: cannot remove <span class="org-string">'/root'</span>: Is a directory
+[root@centos8 data]#rm -f ./~
+</pre>
+</div>
+
+<p>
+删除隐藏文件 <code>rm -fr .[^.]*</code>
+</p>
+
+<p>
+rm虽然删除了文件，但是被删除的文件仍然可能被恢复，在安全要求较高的场景
+下，可以使用shred安全删除文件
+</p>
+
+<p>
+shred格式 shred [OPTION]&#x2026; FILE&#x2026;
+</p>
+
+<p>
+常见选项：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">-z &#26368;&#21518;&#19968;&#27425;&#35206;&#30422;&#28155;&#21152;0&#65292;&#20197;&#38544;&#34255;&#35206;&#30422;&#25805;&#20316;
+-v &#33021;&#22815;&#26174;&#31034;&#25805;&#20316;&#36827;&#24230;
+-u &#35206;&#30422;&#21518;&#25130;&#26029;&#24182;&#21024;&#38500;&#25991;&#20214;
+-n <span class="org-comment-delimiter"># </span><span class="org-comment">&#25351;&#23450;&#35206;&#30422;&#25991;&#20214;&#20869;&#23481;&#30340;&#27425;&#25968;&#65288;&#40664;&#35748;&#20540;&#26159;3&#27425;&#65289;</span>
+</pre>
+</div>
+
+<p>
+范例
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#shred -zvun 5 passwords.txt
+shred: passwords.txt: pass 1/6 (random)...
+shred: passwords.txt: pass 2/6 (000000)...
+shred: passwords.txt: pass 3/6 (random)...
+shred: passwords.txt: pass 4/6 (ffffff)...
+shred: passwords.txt: pass 5/6 (random)...
+shred: passwords.txt: pass 6/6 (000000)...
+shred: passwords.txt: removing
+shred: passwords.txt: renamed to 0000000000000
+shred: 0000000000000: renamed to 000000000000
+shred: 000000000000: renamed to 00000000000
+shred: 00000000000: renamed to 0000000000
+shred: 0000000000: renamed to 000000000
+shred: 000000000: renamed to 00000000
+shred: 00000000: renamed to 0000000
+shred: 0000000: renamed to 000000
+shred: 000000: renamed to 00000
+shred: 00000: renamed to 0000
+shred: 0000: renamed to 000
+shred: 000: renamed to 00
+shred: 00: renamed to 0
+shred: passwords.txt: removed
+[root@centos8 ~]#ls passwords.txt
+ls: cannot access <span class="org-string">'passwords.txt'</span>: No such file or directory
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1055a5f8-bb75-4ee3-9c93-b8369414da27" class="outline-3">
+<h3 id="h:1055a5f8-bb75-4ee3-9c93-b8369414da27"><a href="#h:1055a5f8-bb75-4ee3-9c93-b8369414da27">目录操作mkdir,rmdir,tree</a></h3>
+<div class="outline-text-3" id="text-h:1055a5f8-bb75-4ee3-9c93-b8369414da27">
+</div>
+<div id="outline-container-h:08345dd3-f238-44f0-8043-4996fc1d0514" class="outline-4">
+<h4 id="h:08345dd3-f238-44f0-8043-4996fc1d0514"><a href="#h:08345dd3-f238-44f0-8043-4996fc1d0514">显示目录树 tree</a></h4>
+<div class="outline-text-4" id="text-h:08345dd3-f238-44f0-8043-4996fc1d0514">
+<p>
+有可能tree命令不存在，需要安装tree包才有(安装：yum -y install tree)。
+</p>
+
+<p>
+tree命令的选项说明如下：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#12304; &#21305;&#37197;&#36873;&#39033;&#65306;&#12305;
+-L&#65306;&#29992;&#20110;&#25351;&#23450;&#36882;&#24402;&#26174;&#31034;&#30340;&#28145;&#24230;&#65292;&#25351;&#23450;&#30340;&#28145;&#24230;&#24517;&#39035;&#26159;&#22823;&#20110;0&#30340;&#25972;&#25968;&#12290;
+-P&#65306;&#29992;&#20110;&#26174;&#31034;&#32479;&#37197;&#31526;&#21305;&#37197;&#27169;&#24335;&#30340;&#30446;&#24405;&#21644;&#25991;&#20214;&#65292;&#20294;&#26159;&#19981;&#31649;&#26159;&#21542;&#21305;&#37197;&#65292;&#30446;&#24405;&#19968;&#23450;&#26174;&#31034;&#12290;
+-I&#65306;&#29992;&#20110;&#26174;&#31034;&#38500;&#34987;&#36890;&#37197;&#31526;&#21305;&#37197;&#22806;&#30340;&#25152;&#26377;&#30446;&#24405;&#21644;&#25991;&#20214;&#12290;
+
+&#12304; &#26174;&#31034;&#36873;&#39033;&#65306;&#12305;
+-a&#65306;&#29992;&#20110;&#26174;&#31034;&#38544;&#34255;&#25991;&#20214;&#65292;&#40664;&#35748;&#19981;&#26174;&#31034;&#12290;
+-d&#65306;&#25351;&#23450;&#21482;&#26174;&#31034;&#30446;&#24405;&#12290;
+-f&#65306;&#25351;&#23450;&#26174;&#31034;&#20840;&#36335;&#24452;&#12290;
+-i&#65306;&#19981;&#32553;&#36827;&#26174;&#31034;&#12290;&#21644;-f&#19968;&#36215;&#20351;&#29992;&#24456;&#26377;&#29992;&#12290;
+-p&#65306;&#29992;&#20110;&#26174;&#31034;&#26435;&#38480;&#20301;&#20449;&#24687;&#12290;
+-h&#65306;&#29992;&#20110;&#26174;&#31034;&#22823;&#23567;&#12290;
+-u&#65306;&#26174;&#31034;username&#25110;UID(&#24403;&#27809;&#26377;username&#26102;&#21482;&#33021;&#26174;&#31034;UID&#20102;)&#12290;
+-g&#65306;&#26174;&#31034;groupname&#25110;GID&#12290;
+-D&#65306;&#26174;&#31034;&#25991;&#20214;&#30340;&#26368;&#21518;&#19968;&#27425;Mtime&#12290;
+--inodes&#65306;&#26174;&#31034;inode&#21495;&#12290;
+--device&#65306;&#26174;&#31034;&#25991;&#20214;&#25110;&#30446;&#24405;&#25152;&#23646;&#30340;&#35774;&#22791;&#21495;&#12290;
+-C&#65306;&#26174;&#31034;&#39068;&#33394;&#12290;
+
+&#12304; &#36755;&#20986;&#36873;&#39033;&#65306;&#12305;
+-o filename&#65306;&#25351;&#23450;&#23558;tree&#30340;&#32467;&#26524;&#36755;&#20986;&#21040;filename&#25991;&#20214;&#20013;&#12290;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4453e9d1-0c26-463d-a257-9db74466f835" class="outline-4">
+<h4 id="h:4453e9d1-0c26-463d-a257-9db74466f835"><a href="#h:4453e9d1-0c26-463d-a257-9db74466f835">创建目录 mkdir</a></h4>
+<div class="outline-text-4" id="text-h:4453e9d1-0c26-463d-a257-9db74466f835">
+<p>
+可使用mkdir命令创建一个新的目录。
+</p>
+
+<p>
+需要注意的是
+</p>
+
+<ol class="org-ol">
+<li><p>
+路径基名方为命令的作用对象，基名之前的路径必须存在，如在/tmp/x/y目
+录下创建z目录
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# mkdir /tmp/x/y/z
+mkdir: cannot create directory &#8216;/tmp/x/y/z&#8217;: No such file or directory
+[root@node01 ~]# mkdir /tmp/x
+[root@node01 ~]# mkdir /tmp/x/y
+[root@node01 ~]# mkdir /tmp/x/y/z
+</pre>
+</div></li>
+<li>新建目录的名称不能与当前目录中已有的目录或文件同名，并且目录创建者
+必须对当前目录具有写权限。</li>
+</ol>
+
+<p>
+该命令格式如下： mkdir [参数] 目录名
+</p>
+
+<p>
+命令选项：
+</p>
+<div class="org-src-container">
+<pre class="src src-text">-p&#65306;&#33258;&#21160;&#21019;&#24314;&#29238;&#23478;&#30446;&#24405;&#65307;
+-v&#65306;verbose&#65292;&#26174;&#31034;&#35814;&#32454;&#36807;&#31243;&#65307;
+-m MOODE&#65306;&#30452;&#25509;&#32473;&#23450;&#26435;&#38480;
+</pre>
+</div>
+
+
+<p>
+如，创建/tmp/m/n/p的层级目录
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# mkdir -pv /tmp/m/n/p
+mkdir: created directory &#8216;/tmp/m&#8217;
+mkdir: created directory &#8216;/tmp/m/n&#8217;
+mkdir: created directory &#8216;/tmp/m/n/p&#8217;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2652af1d-0070-46f9-a75d-69771d6b7440" class="outline-4">
+<h4 id="h:2652af1d-0070-46f9-a75d-69771d6b7440"><a href="#h:2652af1d-0070-46f9-a75d-69771d6b7440">删除空目录rmdir</a></h4>
+<div class="outline-text-4" id="text-h:2652af1d-0070-46f9-a75d-69771d6b7440">
+<p>
+只能删除空目录
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-p&#65306;&#21024;&#38500;&#26576;&#30446;&#24405;&#21518;&#65292;&#22914;&#26524;&#20854;&#29238;&#30446;&#24405;&#20026;&#31354;&#65292;&#21017;&#19968;&#24182;&#21024;&#38500;&#20043;&#65307;
+-v&#65306;verbose&#65292;&#26174;&#31034;&#35814;&#32454;&#36807;&#31243;&#65307;
+</pre>
+</div>
+
+<p>
+问题1：如何创建/tmp/x/y1, /tmp/x/y2, /tmp/x/y1/a, /tmp/x/y1/b?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]# mkdir /tmp/x/{y1/{}}
+</pre>
+</div>
+
+<p>
+问题2:如何创建a_c, a_d, b_c, b_d;
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]# mkdir -v {a,b}_{c,d}
+</pre>
+</div>
+
+<p>
+注意：rmdir只能删除空目录，如果想删除非空目录，可以使用rm -r 命令，递
+归删除目录树
+</p>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">alias</span> <span class="org-variable-name">rm</span>=<span class="org-string">'DIR=/data/backup`date +%F%T`;mkdir $DIR;mv -t $DIR'</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:40cab184-6462-409a-996b-6a0cda723bbb" class="outline-2">
+<h2 id="h:40cab184-6462-409a-996b-6a0cda723bbb"><a href="#h:40cab184-6462-409a-996b-6a0cda723bbb">文件元数据和节点表结构</a></h2>
+<div class="outline-text-2" id="text-h:40cab184-6462-409a-996b-6a0cda723bbb">
+</div>
+<div id="outline-container-h:73a79875-d91d-4119-a3a5-44feceb8eab0" class="outline-3">
+<h3 id="h:73a79875-d91d-4119-a3a5-44feceb8eab0"><a href="#h:73a79875-d91d-4119-a3a5-44feceb8eab0">inode表结构</a></h3>
+<div class="outline-text-3" id="text-h:73a79875-d91d-4119-a3a5-44feceb8eab0">
+<p>
+每个文件的属性信息，比如：文件的大小，时间，类型等，称为文件的元数据(m
+etadata)。
+</p>
+
+<p>
+这此元数据是存放在node（index node）表中。node 表中有很多条记录组成，
+第一条记录对应的存放了一个文件的元数据信息
+</p>
+
+<p>
+第一个node表记录对应的保存了以下信息：
+</p>
+
+<ul class="org-ul">
+<li>inode number 节点号</li>
+<li>文件类型</li>
+<li>权限</li>
+<li>UID</li>
+<li>GID</li>
+<li>链接数（指向这个文件名路径名称个数）</li>
+<li>该文件的大小和不同的时间戳</li>
+<li>指向磁盘上文件的数据块指针</li>
+<li>有关文件的其他数据</li>
+</ul>
+
+
+<figure id="org1e0991b">
+<img style="aspect-ratio:664/450" decoding="async" loading="lazy" src="./images/image-20210215220926953.webp" alt="image-20210215220926953.webp" width="50%">
+
+</figure>
+
+
+<figure id="org2ed2075">
+<img style="aspect-ratio:812/449" decoding="async" loading="lazy" src="./images/image-20210215220907952.webp" alt="image-20210215220907952.webp" width="50%">
+
+</figure>
+
+
+<p>
+<b>目录</b>
+</p>
+
+<p>
+目录是个特殊文件，目录文件的内容保存了此目录中文件的列表及inode number
+对应关系
+</p>
+
+<ul class="org-ul">
+<li>文件引用一个是 inode号</li>
+<li>人是通过文件名来引用一个文件</li>
+<li>一个目录是目录下的文件名和文件inode号之间的映射</li>
+</ul>
+
+<p>
+<b>inode表和目录</b>
+</p>
+
+
+<figure id="org6261815">
+<img style="aspect-ratio:673/371" decoding="async" loading="lazy" src="./images/image-20210215220955813.webp" alt="image-20210215220955813.webp" width="50%">
+
+</figure>
+
+<p>
+<b>cp和inode</b>
+</p>
+
+<p>
+cp 命令：
+</p>
+
+<ul class="org-ul">
+<li>分配一个空闲的inode号，在inode表中生成新条目</li>
+<li>在目录中创建一个目录项，将名称与inode编号关联</li>
+<li>拷贝数据生成新的文件</li>
+</ul>
+
+<p>
+<b>rm和inode</b>
+</p>
+
+<p>
+rm 命令：
+</p>
+
+<ul class="org-ul">
+<li>链接数递减，从而释放的inode号可以被重用</li>
+<li>把数据块放在空闲列表中</li>
+<li>删除目录项</li>
+<li>数据实际上不会马上被删除，但当另一个文件使用数据块时将被覆盖</li>
+</ul>
+
+<p>
+<b>mv和inode</b>
+</p>
+
+<ul class="org-ul">
+<li><p>
+如果mv命令的目标和源在相同的文件系统，作为mv 命令
+用新的文件名创建对应新的目录项
+</p>
+
+<p>
+删除旧目录条目对应的旧的文件名
+</p>
+
+<p>
+不影响inode表（除时间戳）或磁盘上的数据位置：没有数据被移动！
+</p></li>
+
+<li><p>
+如果目标和源在一个不同的文件系统， mv相当于cp和rm
+</p>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#df -i /boot
+Filesystem   Inodes IUsed IFree IUse% Mounted on
+/dev/sda1    65536  310 65226   1% /boot
+[root@centos8 ~]#mkdir /boot/test
+[root@centos8 ~]#touch /boot/test/file{1..65226}
+[root@centos8 ~]#touch /boot/test/new.txt
+touch: cannot touch <span class="org-string">'new.txt'</span>: No space left on device
+[root@centos8 ~]#df /boot
+Filesystem   1K-blocks  Used Available Use% Mounted on
+/dev/sda1     999320 133800   796708  15% /boot
+[root@centos8 ~]#df -i /boot
+Filesystem   Inodes IUsed IFree IUse% Mounted on
+/dev/sda1    65536 65536   0  100% /boot
+</pre>
+</div></li>
+</ul>
+
+<p>
+范例：删除大文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#cat /dev/null &gt; /var/log/huge.log
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:73039107-a013-4171-a386-e64f24cc50a4" class="outline-3">
+<h3 id="h:73039107-a013-4171-a386-e64f24cc50a4"><a href="#h:73039107-a013-4171-a386-e64f24cc50a4">硬（hard）链接</a></h3>
+<div class="outline-text-3" id="text-h:73039107-a013-4171-a386-e64f24cc50a4">
+<p>
+硬链接本质上就给一个文件起一个新的名称，实质是同一个文件
+</p>
+
+<p>
+硬链接特性
+</p>
+
+<ul class="org-ul">
+<li>创建硬链接会在对应的目录中增加额外的记录项以引用文件</li>
+<li>对应于同一文件系统上一个物理文件</li>
+<li>每个目录引用相同的inode号</li>
+<li>创建时链接数递增</li>
+<li>删除文件时：rm命令递减计数的链接，文件要存在，至少有一个链接数，当链
+接数为零时，该文件被删除</li>
+<li>不能跨越驱动器或分区</li>
+<li>不支持对目录创建硬链接</li>
+</ul>
+
+<p>
+同一分区中不同文件的节点编号必定不同
+同一个文件能否采用多个节点编号？不允许。
+</p>
+
+<p>
+本质：一个文件可以有多个文件名，可以由硬连接实现。
+</p>
+
+<p>
+格式: ln filename [linkname ]
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]# mkdir dir1
+[root@centos8 ~]# echo 11 &gt;&gt; f1.txt 
+[root@centos8 ~]# ll
+drwxr-xr-x  2 root root    6 Dec 22 07:27 dir1
+-rw-r--r--  1 root root    3 Dec 22 07:29 f1.txt
+
+[root@centos8 ~]# ln f1.txt  dir1/f1.txt
+[root@centos8 ~]# ll -i !*
+ll -i f1.txt dir1/f2.txt
+67170507 -rw-r--r-- 2 root root 3 Dec 22 07:29 dir1/f1.txt
+67170507 -rw-r--r-- 2 root root 3 Dec 22 07:29 f1.txt
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21407;&#22987;&#25991;&#20214;&#21644;&#21518;&#26469;&#21019;&#24314;&#30340;&#25991;&#20214;&#27809;&#26377;&#20381;&#36182;&#20851;&#31995;
+</span>[root@centos8 ~]# rm -f f1.txt 
+[root@centos8 ~]# cat dir1/f2.txt 
+11
+</pre>
+</div>
+
+
+<figure id="org75c4e86">
+<img style="aspect-ratio:622/90" decoding="async" loading="lazy" src="./images/image-20210215221017709.webp" alt="image-20210215221017709.webp" width="50%">
+
+</figure>
+
+<p>
+删除大文件时，会将这个文件所在的每一个数据块加标识修改为可用状态，这样
+会产生很高的磁盘IO，服务又来了很多个访问，最终可能导致服务不可用。
+</p>
+
+<p>
+如果给这个文件创建个硬连接，那么原始文件删除也只是连接数减1，并不会有
+大IO产生。等系统空闲时再删除这个大文件。
+</p>
+</div>
+</div>
+<div id="outline-container-h:1cca5022-d234-4277-a2b6-c5ebc62dd4f1" class="outline-3">
+<h3 id="h:1cca5022-d234-4277-a2b6-c5ebc62dd4f1"><a href="#h:1cca5022-d234-4277-a2b6-c5ebc62dd4f1">符号 symbolic （或软 soft）链接</a></h3>
+<div class="outline-text-3" id="text-h:1cca5022-d234-4277-a2b6-c5ebc62dd4f1">
+<p>
+一个符号链接指向另一个文件,就像 windows 中快捷方式，软链接文件和原文件
+本质上不是同一个文件
+</p>
+
+<p>
+软链接特点：
+</p>
+
+<ul class="org-ul">
+<li>一个符号链接的内容是它引用文件的名称</li>
+<li>可以对目录创建软链接</li>
+<li>可以跨分区的文件实现</li>
+<li>指向的是另一个文件的路径；其大小为指向的路径字符串的长度；不增加或减
+少目标文件inode的引用计数</li>
+<li>软链接如果使用相对路径，是相对于原文件的路径，而非相对于当前目录</li>
+</ul>
+
+<p>
+格式：~ln -s filename [linkname]~
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-f&#25110;--force&#65306;&#24378;&#34892;&#24314;&#31435;&#25991;&#20214;&#25110;&#30446;&#24405;&#30340;&#36830;&#25509;&#65292;&#19981;&#35770;&#25991;&#20214;&#25110;&#30446;&#24405;&#26159;&#21542;&#23384;&#22312;&#65307;
+-n&#25110;--no-dereference&#65306;&#25226;&#31526;&#21495;&#36830;&#25509;&#30340;&#30446;&#30340;&#30446;&#24405;&#35270;&#20026;&#19968;&#33324;&#25991;&#20214;&#65307;
+-s&#25110;--symbolic&#65306;&#23545;&#28304;&#25991;&#20214;&#24314;&#31435;&#31526;&#21495;&#36830;&#25509;&#65292;&#32780;&#38750;&#30828;&#36830;&#25509;&#65307;
+-v&#25110;--verbose&#65306;&#26174;&#31034;&#25351;&#20196;&#25191;&#34892;&#36807;&#31243;&#65307;
+</pre>
+</div>
+
+<p>
+范例:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#32477;&#23545;&#36335;&#24452;
+</span>ln -s /data/dir /data/dirlink
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#26524;&#23384;&#22312;rummy-center&#36719;&#38142;&#65292;&#21017;&#24378;&#21046;&#26367;&#25442;
+</span>ln -snf /game/rummy/rummy-center-1.28.2 /game/rummy/rummy-center
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#30456;&#23545;&#36335;&#24452;
+</span><span class="org-builtin">cd</span> /data
+ln -s ../data/dir /root/dirlink
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#28857;&#27880;&#24847;
+</span>rm -rf /data/dirlink   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#36719;&#38142;&#25509;&#26412;&#36523;,&#19981;&#20250;&#21024;&#38500;&#28304;&#30446;&#24405;&#20869;&#23481;
+</span>rm -rf /data/dirlink/  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#28304;&#30446;&#24405;&#30340;&#25991;&#20214;,&#19981;&#20250;&#21024;&#38500;&#38142;&#25509;&#25991;&#20214;&#65292;&#36825;&#31181;&#32467;&#26524;&#24456;&#35201;&#21629;&#20196;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#38142;&#25509;&#25991;&#20214;&#25351;&#21521;&#30340;&#21407;&#25991;&#20214;
+</span>readlink /data/dirlink
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a819e1ae-88b9-40e4-aebb-7bbdd419e989" class="outline-3">
+<h3 id="h:a819e1ae-88b9-40e4-aebb-7bbdd419e989"><a href="#h:a819e1ae-88b9-40e4-aebb-7bbdd419e989">硬链接和软链接区别总结</a></h3>
+<div class="outline-text-3" id="text-h:a819e1ae-88b9-40e4-aebb-7bbdd419e989">
+<ol class="org-ol">
+<li>本质： 硬链接：本质是同一个文件 软链接：本质不是同一个文件</li>
+<li>跨设备 硬链接：不支持 软链接：支持</li>
+<li>inode 硬链接：相同 软链接：不同</li>
+<li>链接数 硬链接：创建新的硬链接,链接数会增加,删除硬链接,链接数减少
+软链接：创建或删除,链接数不会变化</li>
+<li>文件夹 硬链接：不支持 软链接：支持</li>
+<li>相对路径 硬链接：原始文件相对路径是相对于当前工作目录
+软链接：原始文件的相对路径是相对于链接文件的相对路径</li>
+<li>删除源文件 硬链接：只是链接数减一,但链接文件的访问不受影响
+软链接：链接文件将无法访问</li>
+<li>文件类型 硬链接：和源文件相同 软链接：链接文件,和源文件无关</li>
+</ol>
+
+<p>
+<b>连接数的变化</b>
+</p>
+
+
+<figure id="org44a13ec">
+<img style="aspect-ratio:858/416" decoding="async" loading="lazy" src="./images/image-20210215221039844.webp" alt="image-20210215221039844.webp" width="50%">
+
+</figure>
+
+<p>
+<b>生产案例</b>
+</p>
+
+<p>
+案例1：提示空间满 No space left on device，但 df 可以看到空间很多，为
+什么？
+</p>
+
+<p>
+inode号满了
+</p>
+
+<p>
+案例2：提示空间快满，使用rm 删除了很大的无用文件后，df 仍然看到空间不
+足，为什么？如何解决？*
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">lsof |grep delete <span class="org-comment-delimiter"># </span><span class="org-comment">&#25214;&#21040;&#34987;&#36827;&#31243;&#21344;&#29992;&#21487;&#25991;&#20214;&#34987;&#21024;&#38500;&#30340;&#22823;&#25991;&#20214;
+</span>cat /dev/null &gt; /var/log/huge.log
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:b5ef970f-ee2b-4255-90f0-3a1884710d33" class="outline-2">
+<h2 id="h:b5ef970f-ee2b-4255-90f0-3a1884710d33"><a href="#h:b5ef970f-ee2b-4255-90f0-3a1884710d33">标准I/O重定向和管道</a></h2>
+<div class="outline-text-2" id="text-h:b5ef970f-ee2b-4255-90f0-3a1884710d33">
+<p>
+内容概述
+</p>
+
+<ul class="org-ul">
+<li>三种I/O设备</li>
+
+<li>把I/O重定向至文件</li>
+
+<li>使用管道</li>
+</ul>
+</div>
+<div id="outline-container-h:20d58ad1-8afe-4fc6-a960-b3c2b4a6dad9" class="outline-3">
+<h3 id="h:20d58ad1-8afe-4fc6-a960-b3c2b4a6dad9"><a href="#h:20d58ad1-8afe-4fc6-a960-b3c2b4a6dad9">标准输入和输出</a></h3>
+<div class="outline-text-3" id="text-h:20d58ad1-8afe-4fc6-a960-b3c2b4a6dad9">
+<p>
+程序：指令+数据
+</p>
+
+<p>
+读入数据：Input 输出数据：Output
+</p>
+
+<p>
+打开的文件都有一个fd: file descriptor (文件描述符)
+</p>
+
+<p>
+Linux给程序提供三种 I/O 设备
+</p>
+
+<ul class="org-ul">
+<li>标准输入（STDIN） : 0 默认接受来自终端窗口的输入</li>
+<li>标准输出（STDOUT）: 1 默认输出到终端窗口</li>
+<li>标准错误（STDERR）: 2 默认输出到终端窗口</li>
+</ul>
+
+<p>
+范例：文件描述符
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ll /dev/std*
+lrwxrwxrwx. 1 root root 15 Dec 16 08:56 /dev/stderr -&gt; /proc/self/fd/2
+lrwxrwxrwx. 1 root root 15 Dec 16 08:56 /dev/stdin -&gt; /proc/self/fd/0
+lrwxrwxrwx. 1 root root 15 Dec 16 08:56 /dev/stdout -&gt; /proc/self/fd/1
+
+[root@centos8 ~]#ll /proc/self/fd/*
+lrwx------. 1 root root 64 Dec 16 10:59 /proc/self/fd/0 -&gt; /dev/pts/0
+lrwx------. 1 root root 64 Dec 16 10:59 /proc/self/fd/1 -&gt; /dev/pts/0
+lrwx------. 1 root root 64 Dec 16 10:59 /proc/self/fd/2 -&gt; /dev/pts/0
+lr-x------. 1 root root 64 Dec 16 10:59 /proc/self/fd/3 -&gt;/var/lib/sss/mc/passwd
+lrwx------. 1 root root 64 Dec 16 10:59 /proc/self/fd/4 -&gt; <span class="org-string">'socket:[66542]'</span>
+lr-x------. 1 root root 64 Dec 16 10:59 /proc/self/fd/5 -&gt; /var/lib/sss/mc/group
+
+[root@centos8 ~]#ll /proc/<span class="org-sh-quoted-exec">`pidof tail`</span>/fd
+lrwx------. 1 root root 64 Dec 16 10:56 0 -&gt; /dev/pts/1
+lrwx------. 1 root root 64 Dec 16 10:56 1 -&gt; /dev/pts/1
+lrwx------. 1 root root 64 Dec 16 10:56 2 -&gt; /dev/pts/1
+lr-x------. 1 root root 64 Dec 16 10:56 3 -&gt; /var/log/messages
+lr-x------. 1 root root 64 Dec 16 10:56 4 -&gt; anon_inode:inotify
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:30053fd4-6d4b-493b-934f-4183f73b38d3" class="outline-3">
+<h3 id="h:30053fd4-6d4b-493b-934f-4183f73b38d3"><a href="#h:30053fd4-6d4b-493b-934f-4183f73b38d3">I/O重定向redirect</a></h3>
+<div class="outline-text-3" id="text-h:30053fd4-6d4b-493b-934f-4183f73b38d3">
+<p>
+I/O重定向：将默认的输入，输出或错误对应的设备改变，指向新的目标
+</p>
+
+
+<figure id="org79a3631">
+<img style="aspect-ratio:541/222" decoding="async" loading="lazy" src="./images/image-20210215221509208.webp" alt="image-20210215221509208.webp" width="50%">
+
+</figure>
+</div>
+<div id="outline-container-h:ecd459dd-3e85-4fa0-9fcf-b67637705a05" class="outline-4">
+<h4 id="h:ecd459dd-3e85-4fa0-9fcf-b67637705a05"><a href="#h:ecd459dd-3e85-4fa0-9fcf-b67637705a05">标准输出和错误重新定向 &gt; &gt;| &gt;&gt;</a></h4>
+<div class="outline-text-4" id="text-h:ecd459dd-3e85-4fa0-9fcf-b67637705a05">
+<p>
+STDOUT和STDERR可以被重定向到指定文件,而非默认的当前终端
+</p>
+
+<p>
+格式：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#21629;&#20196; &#25805;&#20316;&#31526;&#21495; &#25991;&#20214;&#21517;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#35206;&#30422;&#25805;&#20316;&#31526;&#65292;&#22914;&#26524;&#25991;&#20214;&#23384;&#22312;&#65292;&#25991;&#20214;&#20869;&#23481;&#20250;&#34987;&#35206;&#30422;
+</span>1&gt; &#25110; &gt;  <span class="org-comment-delimiter">#</span><span class="org-comment">&#25226;STDOUT&#37325;&#23450;&#21521;&#21040;&#25991;&#20214;
+</span>2&gt;           <span class="org-comment-delimiter">#</span><span class="org-comment">&#25226;STDERR&#37325;&#23450;&#21521;&#21040;&#25991;&#20214;
+</span>&amp;&gt;          <span class="org-comment-delimiter">#</span><span class="org-comment">&#25226;&#25152;&#26377;&#36755;&#20986;&#37325;&#23450;&#21521;&#21040;&#25991;&#20214;
+</span>&gt;&amp;          <span class="org-comment-delimiter">#</span><span class="org-comment">&#21644;&#19978;&#38754;&#21151;&#33021;&#19968;&#26679;&#65292;&#24314;&#35758;&#20351;&#29992;&#19978;&#38754;&#26041;&#24335;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36861;&#21152;, &#22312;&#21407;&#25991;&#20214;&#30340;&#22522;&#30784;&#19978;&#36861;&#21152;&#20869;&#23481;
+</span>&gt;&gt;    <span class="org-comment-delimiter">#</span><span class="org-comment">&#36861;&#21152;&#26631;&#20934;&#36755;&#20986;&#37325;&#23450;&#21521;&#33267;&#25991;&#20214;
+</span>1&gt;&gt; <span class="org-comment-delimiter">#</span><span class="org-comment">&#21516;&#19978;
+</span>2&gt;&gt; <span class="org-comment-delimiter"># </span><span class="org-comment">&#36861;&#21152;&#26631;&#20934;&#38169;&#35823;&#37325;&#23450;&#21521;&#33267;&#25991;&#20214;</span>
+</pre>
+</div>
+
+<p>
+范例： 标准输出到其他终端
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">]# tty
+/dev/pts/1
+
+[root@centos8 ~]#ls 1&gt; /dev/pts/1
+[root@centos8 ~]#ls /data &gt; /dev/pts/1
+</pre>
+</div>
+
+<p>
+范例：标准错误重定向
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#rm /data/f1.log 2&gt; /data/all.log
+</pre>
+</div>
+
+<p>
+范例：清除大文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat /dev/null &gt; /data/file.log
+&gt; /data/file.log
+</pre>
+</div>
+
+<p>
+<b>设置终端是否允许覆盖</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">set</span> -C &#31105;&#27490;&#23558;&#20869;&#23481;&#35206;&#30422;&#24050;&#26377;&#25991;&#20214;,&#20294;&#21487;&#36861;&#21152;&#65292; &#21033;&#29992; &gt;| &#20173;&#21487;&#24378;&#21046;&#35206;&#30422;
+<span class="org-builtin">set</span> +C &#20801;&#35768;&#35206;&#30422;&#65292;&#40664;&#35748;
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@node01 ~]# set -C
+[root@node01 ~]# cat /etc/issue &gt;issue.out
+-bash: issue.out: &#26080;&#27861;&#35206;&#30422;&#24050;&#23384;&#22312;&#30340;&#25991;&#20214;
+[root@node01 ~]# cat /etc/issue &gt;| issue.out
+</pre>
+</div>
+
+
+<p>
+<b>标准输出和错误输出各自定向至不同位置</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">COMMAND &gt; /path/to/file.out 2&gt; /path/to/error.out
+</pre>
+</div>
+
+<p>
+范例：分别重定向
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ls /data/ /xxx &gt; stdout.log 2&gt; stderr.log
+</pre>
+</div>
+
+
+<p>
+<b>合并标准输出和错误输出为同一个数据流进行重定向</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&amp;&gt; &#35206;&#30422;&#37325;&#23450;&#21521;
+&amp;&gt;&gt; &#36861;&#21152;&#37325;&#23450;&#21521;
+COMMAND &gt; /path/to/file.out 2&gt;&amp;1 &#65288;&#39034;&#24207;&#24456;&#37325;&#35201;&#65289;
+COMMAND &gt;&gt; /path/to/file.out 2&gt;&amp;1
+</pre>
+</div>
+
+<p>
+范例：将标准输出和错误都重定向到同一个文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#ls /data /xxx &gt; /data/all.log 2&gt;&amp;1
+[root@centos8 ~]#ls /data /xxx 2&gt; /data/all.log 1&gt;&amp;2
+[root@centos8 ~]#ls /data /xxx &amp;&gt; /data/all.log
+[root@centos8 ~]#ls /data /xxx 2&gt;&amp;1 &gt; /data/all.log
+ls: cannot access <span class="org-string">'/xxx'</span>: No such file or directory
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#passwd wang &amp;&gt; /dev/null
+</pre>
+</div>
+
+<p>
+<b>合并多个程序</b>
+</p>
+
+<p>
+(CMD1;CMD2&#x2026;&#x2026;) 或者{ CMD1;CMD2;&#x2026;.;}合并多个程序的STDOUT
+</p>
+
+<p>
+范例：合并多个命令的结果至一个文件中
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#( cal 2019 ; cal 2020 ) &gt; all.txt
+[root@centos8 ~]#{ ls;hostname;} &gt; /data/all.log
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:ac68365f-3004-43bd-afb1-2bead4928835" class="outline-4">
+<h4 id="h:ac68365f-3004-43bd-afb1-2bead4928835"><a href="#h:ac68365f-3004-43bd-afb1-2bead4928835">标准输入重定向 &lt; &lt;&lt; &lt;&lt;&lt;</a></h4>
+<div class="outline-text-4" id="text-h:ac68365f-3004-43bd-afb1-2bead4928835">
+</div>
+<div id="outline-container-h:cb4c145e-1f68-4cb7-b435-616cb4df8646" class="outline-5">
+<h5 id="h:cb4c145e-1f68-4cb7-b435-616cb4df8646"><a href="#h:cb4c145e-1f68-4cb7-b435-616cb4df8646">标准输入重定向 &lt;</a></h5>
+<div class="outline-text-5" id="text-h:cb4c145e-1f68-4cb7-b435-616cb4df8646">
+<p>
+标准输入重写向是使用文件来代替键盘输入，
+从文件中读取数据，代替当前终端的输入设备的数据，
+此处要严格区分命令是否支持标准输入，标准输入和参数是两个概念
+</p>
+
+<p>
+怎么判断命令能使用标准输入重定向？
+</p>
+
+<p>
+不跟任何选项参数，直接回车，看是否等待输入，如果是，则该命令可以使用标准输入重定向。如，输入 <code>cat</code> 命令进入交互模式。
+</p>
+
+<p>
+格式
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">&#23558;&#25991;&#20214;&#20316;&#20026;&#21629;&#20196;&#30340;&#26631;&#20934;&#36755;&#20837;
+cmd 0&lt; file
+cmd &lt; file
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt; /etc/fstab
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#echo 2^3 &gt; bc.log
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26631;&#20934;&#36755;&#20837;&#37325;&#23450;&#21521;
+</span>[root@centos8 ~]#bc &lt; bc.log
+8
+
+[root@centos8 ~]#cat &lt; mail.txt
+hello
+how old are you
+[root@centos8 ~]#cat mail.txt
+hello
+how old are you
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26631;&#20934;&#36755;&#20837;&#36755;&#20986;&#37325;&#23450;&#21521;
+</span>[root@centos8 ~]#cat &lt; mail.txt &gt; mail2.txt
+[root@centos8 ~]#cat mail2.txt
+hello
+how old are you
+
+[root@centos8 ~]#cat mail.txt
+hello
+how old are you
+
+[root@centos8 ~]#mail -s test2 user &lt; mail.txt
+
+[root@centos8 ~]#cat &gt; cat.log
+line1
+line2
+line3
+<span class="org-comment-delimiter">#</span><span class="org-comment">Ctrl+d &#31163;&#24320;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5e7a7ad0-ba61-4455-810e-0d9211857a16" class="outline-5">
+<h5 id="h:5e7a7ad0-ba61-4455-810e-0d9211857a16"><a href="#h:5e7a7ad0-ba61-4455-810e-0d9211857a16">把多行重定向 &lt;&lt;终止词</a></h5>
+<div class="outline-text-5" id="text-h:5e7a7ad0-ba61-4455-810e-0d9211857a16">
+<p>
+使用 "&lt;&lt;终止词"
+命令从键盘把多行重导向给STDIN，直到终止词位置之前的所有文本都发送给
+STDIN，有时被称为就地文本（here documents）
+</p>
+
+<p>
+其中终止词可以是任何一个或多个符号，比如： <code>!，@，$，EOF(End Of  File)</code> 等，其中EOF比较常用
+</p>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mail -s <span class="org-string">"Please Call"</span> admin@xx.com &lt;&lt;EOF<span class="org-sh-heredoc">
+&gt;Hi Wang
+&gt;
+&gt;Please give me a call
+&gt;EOF</span>
+</pre>
+</div>
+
+<p>
+注意：终止词要作为单独的存在，前面不能有空格
+</p>
+
+
+<figure id="orga335938">
+<img style="aspect-ratio:298/225" decoding="async" loading="lazy" src="./images/image-20210215221633778.webp" alt="image-20210215221633778.webp">
+
+</figure>
+
+<p>
+范例：cat多行覆盖
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &gt; a.sh &lt;&lt; EOF<span class="org-sh-heredoc">
+123
+456
+EOF
+</span>
+cat &lt;&lt;EOF&gt; a.sh<span class="org-sh-heredoc">
+123
+456
+EOF</span>
+</pre>
+</div>
+
+<p>
+<b>EOF多行写入文件 忽略 tab 键</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cmd &lt;&lt;- EOF  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24573;&#30053; tab &#38190;</span>
+</pre>
+</div>
+</div>
+<ul class="org-ul">
+<li><a id="h:40ADD194-8DA2-4BBE-9C4A-429B48DD953E"></a><a href="#h:40ADD194-8DA2-4BBE-9C4A-429B48DD953E">EOF多行写入文件防止变量替换</a><br>
+<div class="outline-text-6" id="text-h:40ADD194-8DA2-4BBE-9C4A-429B48DD953E">
+<p>
+问题描述：对多个变量及多行输出到文件，存在变量自动替换，当使用cat&lt;&lt;EOF
+不想对内容进行变量替换、命令替换、参数展开等
+</p>
+
+<p>
+问题解决：转义特殊字符，如 $ `等
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#19968;&#12289;&#23545; $&#183;<span class="org-string">\ </span>&#36827;&#34892;&#36716;&#20041;
+cat &gt;&gt; a.sh &lt;&lt; EOF<span class="org-sh-heredoc">
+echo \`hostname\`
+echo $HOME
+EOF
+</span>
+&#20108;&#12289;&#22312;&#20998;&#30028;&#31526;EOF&#21069;&#28155;&#21152;&#21453;&#26012;&#26464;<span class="org-string">\&#65292;</span>&#25110;&#32773;&#29992;&#21333;&#24341;&#21495;&#12289;&#21452;&#24341;&#21495;&#25324;&#36215;&#26469;
+cat &lt;&lt; \EOF &gt;&gt; a.sh <span class="org-sh-heredoc">
+echo `hostname`
+echo $HOME
+EOF
+</span>
+cat &gt;&gt; a.sh &lt;&lt; <span class="org-string">"EOF"</span><span class="org-sh-heredoc">
+echo `hostname`
+echo $HOME
+EOF
+</span>
+cat &gt;&gt; a.sh &lt;&lt; <span class="org-string">'EOF'</span><span class="org-sh-heredoc">
+echo `hostname`
+echo $HOME
+EOF
+</span>
+cat &lt;&lt;\EOF | tee /etc/mail.rc<span class="org-sh-heredoc">
+set from=29308620@qq.com
+set smtp=smtp.qq.com
+set smtp-auth-user=29308620@qq.com
+set smtp-auth-password=esvnhbnqocirbicf
+set smtp-auth=login
+set ssl-verify=ignore
+EOF</span>
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:d179a92c-3e58-4d29-9249-5473e6496104" class="outline-5">
+<h5 id="h:d179a92c-3e58-4d29-9249-5473e6496104"><a href="#h:d179a92c-3e58-4d29-9249-5473e6496104">字符串当标准输入 &lt;&lt;&lt;字符串</a></h5>
+<div class="outline-text-5" id="text-h:d179a92c-3e58-4d29-9249-5473e6496104">
+</div>
+<ul class="org-ul">
+<li><a id="h:19FD21B7-4394-4384-9D94-4D9E96060E92"></a><a href="#h:19FD21B7-4394-4384-9D94-4D9E96060E92">cmd &lt;&lt;&lt; “string”</a><br>
+<div class="outline-text-6" id="text-h:19FD21B7-4394-4384-9D94-4D9E96060E92">
+<p>
+Here Strings, here-document 的变种，形式是 &lt;&lt;&lt;"string"  string被扩展，提供给命令作为标准输入。
+</p>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@ip-10-0-129-226 ~]# cat &lt;&lt;&lt;abc
+abc
+[root@ip-10-0-129-226 ~]# bc &lt;&lt;&lt;<span class="org-string">"1+2+3"</span>
+6
+
+[root@ip-10-0-129-226 ~]#  tr <span class="org-string">'a'</span> <span class="org-string">'A'</span> &lt;&lt;&lt;a
+A
+</pre>
+</div>
+
+<p>
+范例：执行命令作为重定向输入
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@ip-10-0-129-226 ~]# bc &lt;&lt;&lt;<span class="org-sh-quoted-exec">`echo 1+2+3`</span>
+6
+[root@ip-10-0-129-226 ~]# bc &lt;&lt;&lt;<span class="org-sh-quoted-exec">`seq -s + 3`</span>
+6
+
+[root@ip-10-0-129-226 ~]# tr <span class="org-string">'a-z'</span> <span class="org-string">'A-Z'</span> &lt;&lt;&lt;<span class="org-sh-quoted-exec">`hostname`</span>
+IP-10-0-129-226
+</pre>
+</div>
+
+<p>
+范例：利用重定向模拟浏览器访问网站
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#exec 8&lt;&gt;/dev/tcp/www.baidu.com/80  <span class="org-comment-delimiter"># </span><span class="org-comment">&#25171;&#24320;&#26412;&#22320;&#25991;&#20214;&#25551;&#36848;&#31526; &#35775;&#38382;baidu
+</span>[root@centos8 ~]#ll /proc/$<span class="org-variable-name">$</span>/fd
+lrwx------ 1 root root 64 Apr 20 14:14 8 -&gt; <span class="org-string">'socket:[32777]'</span>
+[root@centos8 ~]# ss -nt |grep 80
+ESTAB      0      0      10.0.1.86:41430              182.61.200.7:80
+[root@centos8 ~]#echo -e <span class="org-string">'GET / HTTP/1.1\n'</span> &gt;&amp; 8 <span class="org-comment-delimiter"># </span><span class="org-comment">&#27169;&#25311;GET&#35831;&#27714;
+</span>[root@centos8 ~]#cat &lt;&amp; 8 <span class="org-comment-delimiter">#</span><span class="org-comment">&#35835;&#21462;&#25551;&#36848;&#20869;&#23481; &#19978;&#38754;&#21160;&#20316;&#24555;&#20123;&#65292;&#19981;&#28982;&#36825;&#37324;&#27809;&#26377;&#20869;&#23481;</span>
+</pre>
+</div>
+
+<p>
+范例：定义变量不显示标准输出与标准错误
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">MD5_PATH</span>=<span class="org-sh-quoted-exec">`exec &lt;&amp;- 2&gt;&amp;-; which md5sum || command -v md5sum || type md5sum`</span>
+</pre>
+</div>
+</div>
+</li>
+<li><a id="h:1BE6F18E-146A-4F71-AFDB-453FC9A44B2C"></a><a href="#h:1BE6F18E-146A-4F71-AFDB-453FC9A44B2C">&lt;(cmd)</a><br>
+<div class="outline-text-6" id="text-h:1BE6F18E-146A-4F71-AFDB-453FC9A44B2C">
+<p>
+&lt;(cmd)  命令的结果输出到临时文件，整体当一个临时文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cmd1 &lt; &lt;(cmd2)
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25226;cmd2&#30340;&#36755;&#20986;&#20256;&#36882;&#32473;cmd1  &#20854;&#20013;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">cmd1 &lt; &#36825;&#26159;&#26631;&#20934;&#30340;stdin&#37325;&#23450;&#21521;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&lt;(cmd2)  &#21629;&#20196;&#32467;&#26524;&#20805;&#24403;&#19968;&#20010;&#25991;&#20214;</span>
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">bc &lt;&lt;&lt; <span class="org-sh-quoted-exec">`seq -s +3`</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">ll &lt;(hostname)
+</span>lr-x------. 1 root root 64 Sep 22 16:42 /dev/fd/63 -&gt; <span class="org-string">'pipe:[28762099]'</span>
+
+]# cat  &lt;(hostname)
+ip-10-0-129-226.af-south-1.compute.internal
+</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div id="outline-container-h:93b7f2d5-62f4-4414-9290-5abaee7aaa2b" class="outline-5">
+<h5 id="h:93b7f2d5-62f4-4414-9290-5abaee7aaa2b"><a href="#h:93b7f2d5-62f4-4414-9290-5abaee7aaa2b">tr 命令</a></h5>
+<div class="outline-text-5" id="text-h:93b7f2d5-62f4-4414-9290-5abaee7aaa2b">
+<p>
+tr 转换和删除字符
+</p>
+
+
+<p>
+选项：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tr [OPTION]... SET1 [SET2]
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24120;&#29992;&#36873;&#39033;
+</span>-c &#8211;C --complement            <span class="org-comment-delimiter">#</span><span class="org-comment">&#21462;&#23383;&#31526;&#38598;&#30340;&#34917;&#38598;. &#29992;SET2&#26367;&#25442;SET1&#20013;&#27809;&#26377;&#21253;&#21547;&#30340;&#23383;&#31526;
+</span>-d --delete                            <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;SET1&#20013;&#25152;&#26377;&#23383;&#31526;&#65292;&#19981;&#36716;&#25442;
+</span>-s --squeeze-repeats&#65306;       <span class="org-comment-delimiter">#</span><span class="org-comment">&#25226;&#36830;&#32493;&#37325;&#22797;&#30340;&#23383;&#31526;&#20197;&#21333;&#29420;&#19968;&#20010;&#23383;&#31526;&#34920;&#31034;,&#21363;&#21435;&#37325;
+</span>-t --truncate-set1                <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;&#31532;&#19968;&#20010;&#23383;&#31526;&#38598;&#23545;&#24212;&#23383;&#31526;&#36716;&#21270;&#20026;&#31532;&#20108;&#23383;&#31526;&#38598;&#23545;&#24212;&#30340;&#23383;&#31526;
+</span>
+\NNN  character with octal value NNN (1 to 3 octal digits)
+<span class="org-string">\\</span>  backslash
+\a  audible BEL
+\b  backspace
+\f  form feed
+\n  new line
+\r  return
+\t  horizontal tab
+\v  vertical tab
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24120;&#29992;&#36890;&#37197;&#31526;
+</span>[:alnum:]&#65306;&#23383;&#27597;&#21644;&#25968;&#23383;
+[:alpha:]&#65306;&#23383;&#27597;
+[:digit:]&#65306;&#25968;&#23383;
+[:lower:]&#65306;&#23567;&#20889;&#23383;&#27597;
+[:upper:]&#65306;&#22823;&#20889;&#23383;&#27597;
+[:space:]&#65306;&#31354;&#30333;&#23383;&#31526;
+[:print:]&#65306;&#21487;&#25171;&#21360;&#23383;&#31526;
+[:punct:]&#65306;&#26631;&#28857;&#31526;&#21495;
+[:graph:]&#65306;&#22270;&#24418;&#23383;&#31526;
+[:cntrl:]&#65306;&#25511;&#21046;&#65288;&#38750;&#25171;&#21360;&#65289;&#23383;&#31526;
+[:xdigit:]&#65306;&#21313;&#20845;&#36827;&#21046;&#23383;&#31526;
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26367;&#25442;
+</span>[root@ip-10-0-129-226 ~]# tr 123 abc
+123456
+abc456
+123456122
+abc456abb
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23567;&#20889;&#36716;&#22823;&#20889;
+</span>tr <span class="org-string">'a-z'</span> <span class="org-string">'A-Z'</span>&lt; /etc/issue
+tr [:lower:]  [:upper:]
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#38750;123&#23601;&#26367;&#25442;&#25104;x
+</span>[root@ip-10-0-129-226 ~]# tr -c <span class="org-string">'123'</span> x
+123456
+123xxxx
+Ctrl+d&#32467;&#26463;
+
+[root@ip-10-0-129-226 ~]# tr -c <span class="org-string">'123'</span> x &lt;&lt;&lt; <span class="org-sh-quoted-exec">`echo 13569`</span>
+13xxxx
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#38750;2-5&#30340;&#20869;&#23481;&#26367;&#25442;&#25104;x
+</span>[root@ip-10-0-129-226 ~]# echo 123456 |tr -c <span class="org-string">'2-5'</span> x
+x2345xx
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;2-5
+</span>x2345xx[root@ip-10-0-129-226 ~]# echo 123456 |tr -d <span class="org-string">'2-5'</span>
+16
+[root@ip-10-0-129-226 ~]# tr -d <span class="org-string">'2-5'</span>
+123456
+16
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;fstab&#25991;&#20214;&#20013;&#30340;&#25152;&#26377;abc&#20013;&#20219;&#24847;&#23383;&#31526;
+</span>tr &#8211;d abc &lt; /etc/fstab
+</pre>
+</div>
+
+<p>
+范例：随机字符
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;20&#20301;&#23383;&#31526;
+</span>tr -dc <span class="org-string">'#@%a-zA-Z0-9'</span> &lt; /dev/urandom |head -c 20
+</pre>
+</div>
+
+<p>
+范例：命令重向定
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#31354;&#26684;&#21435;&#37325;
+</span>tr -s <span class="org-string">' '</span> &lt;&lt;&lt;<span class="org-sh-quoted-exec">`df`</span>
+tr -s <span class="org-string">' '</span> &lt; &lt;(df)
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31354;&#26684;&#21435;&#37325;, &#24182;&#23558;&#31354;&#26684;&#26367;&#25442;&#20026;:&#20882;&#21495;
+</span>tr -s <span class="org-string">' '</span> : &lt; &lt;(df)
+Filesystem:1K-blocks:Used:Available:Use%:Mounted:on
+devtmpfs:1929756:0:1929756:0%:/dev
+tmpfs:1940120:0:1940120:0%:/dev/shm
+tmpfs:1940120:688:1939432:1%:/run
+tmpfs:1940120:0:1940120:0%:/sys/fs/cgroup
+/dev/vda1:41152812:14248900:25000204:37%:/
+tmpfs:388028:0:388028:0%:/run/user/0
+</pre>
+</div>
+
+<p>
+范例：将 Windows 的文本转化 Linux的文本格式
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">dos2unix test.txt
+</span>
+[root@centos8 ~]#cat windows.txt
+a
+b
+c[root@centos8 ~]#file windows.txt
+windows.txt: ASCII text, with CRLF line terminators
+
+[root@centos8 ~]#hexdump -C windows.txt
+00000000 61 0d 0a 62 0d 0a 63 |a..b..c|
+00000007
+
+[root@centos8 ~]#nano linux.txt
+[root@centos8 ~]#hexdump -C linux.txt
+00000000 61 0a 62 0a 63 0a |a.b.c.|
+00000006
+
+[root@centos8 ~]#tr -d <span class="org-string">'\r'</span>  windows2.txt
+
+[root@centos8 ~]#hexdump -C windows2.txt
+00000000 61 0a 62 0a 63 |a.b.c|
+00000005
+[root@centos8 ~]#file windows2.txt
+windows2.txt: ASCII text
+</pre>
+</div>
+
+<p>
+思考：将 Linux 的文本转化 Windows 的文本格式 ? <code>unix2dos</code>
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e7cac8ea-11c5-448b-85b9-65a372e3ea0e" class="outline-3">
+<h3 id="h:e7cac8ea-11c5-448b-85b9-65a372e3ea0e"><a href="#h:e7cac8ea-11c5-448b-85b9-65a372e3ea0e">管道</a></h3>
+<div class="outline-text-3" id="text-h:e7cac8ea-11c5-448b-85b9-65a372e3ea0e">
+</div>
+<div id="outline-container-h:54993fd8-8b7d-477b-8933-d5663a34df23" class="outline-4">
+<h4 id="h:54993fd8-8b7d-477b-8933-d5663a34df23"><a href="#h:54993fd8-8b7d-477b-8933-d5663a34df23">管道</a></h4>
+<div class="outline-text-4" id="text-h:54993fd8-8b7d-477b-8933-d5663a34df23">
+<p>
+管道（使用符号“|”表示）用来连接多个命令 格式
+</p>
+
+<pre class="example" id="org4adfd34">
+命令1 | 命令2 | 命令3 | …
+</pre>
+
+<p>
+功能说明：
+</p>
+
+<ul class="org-ul">
+<li>将命令1的STDOUT发送给命令2的STDIN，命令2的STDOUT发送到命令3的STDIN</li>
+<li><p>
+所有命令会在当前shell进程的子shell进程中执行
+</p>
+
+
+<figure id="org4cbd24c">
+<img style="aspect-ratio:784/53" decoding="async" loading="lazy" src="./images/image-20210215221656833.webp" alt="image-20210215221656833.webp" width="50%">
+
+</figure></li>
+
+<li>组合多种工具的功能</li>
+</ul>
+
+<p>
+注意：STDERR默认不能通过管道转发，可利用 <code>2&gt;&amp;1</code> 或 <code>|&amp;</code> 实现，格式如下
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">&#21629;&#20196;1 2&gt;&amp;1 | &#21629;&#20196;2
+&#21629;&#20196;1 |&amp; &#21629;&#20196;2
+</pre>
+</div>
+
+<p>
+范例： 多重管道
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#31354;&#26684;&#21435;&#37325;, &#24182;&#23558;&#31354;&#26684;&#26367;&#25442;&#20026;:&#20882;&#21495;
+</span>tr -s <span class="org-string">' '</span> : &lt; &lt;(df)
+
+df | tr -s <span class="org-string">' '</span> :
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31354;&#26684;&#21435;&#37325;, &#24182;&#23558;&#31354;&#26684;&#26367;&#25442;&#20026;:&#20882;&#21495;, &#24182;&#25490;&#24207;
+</span>df | tr -s <span class="org-string">' '</span> : |sort
+</pre>
+</div>
+
+<p>
+范例: 远程复制公钥信息
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat ~/.ssh/id_rsa.pub | ssh user@host <span class="org-string">"mkdir -p ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys"</span>
+</pre>
+</div>
+
+<p>
+范例：本地打包远程传送并解压
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tar -cf - *|ssh -t cc@172.21.39.98 <span class="org-string">"cd /opt/project/client/cst-wallet-sdk/staging$pdate; tar -xf -"</span>
+</pre>
+</div>
+
+<p>
+范例：修改用户密码
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#passwd --stdin wang
+Changing password for user wang.
+123456
+passwd: all authentication tokens updated successfully.
+
+[root@centos8 ~]#cat pass.txt
+centos
+[root@centos8 ~]# passwd --stdin wang &lt; pass.txt
+[root@centos8 ~]#cat pass.txt | passwd --stdin wang
+[root@centos8 ~]#echo 123456 | passwd --stdin wang
+Changing password for user wang.
+passwd: all authentication tokens updated successfully.
+
+[root@centos8 ~]#echo 123456 | passwd --stdin wang &amp;&gt; /dev/null <span class="org-comment-delimiter"># </span><span class="org-comment">&#26174;&#31034;&#20449;&#24687;&#23548;&#20837;&#21040;&#31354;</span>
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#36716;&#25442;&#20026;&#22823;&#20889;&#23383;&#27597;
+</span>ls | tr <span class="org-string">'a-z'</span> <span class="org-string">'A-Z'</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">less&#23454;&#29616;&#20998;&#39029;&#22320;&#26597;&#30475;&#36755;&#20837;
+</span>ls -l /etc | less
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">mail&#36890;&#36807;&#30005;&#23376;&#37038;&#20214;&#21457;&#36865;&#36755;&#20837;
+</span><span class="org-builtin">echo</span> <span class="org-string">"test email"</span> | mail  -s <span class="org-string">"test"</span> wang@example.com
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31639;&#26415;&#36816;&#31639;
+</span><span class="org-builtin">echo</span> <span class="org-string">"2^3"</span> |bc
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21453;&#21521;&#26174;&#31034;
+</span>[root@middle-ware ~]#  echo <span class="org-string">'hello wold'</span> |rev 
+dlow olleh
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:937bee01-4db8-4527-9832-4004f861ac80" class="outline-4">
+<h4 id="h:937bee01-4db8-4527-9832-4004f861ac80"><a href="#h:937bee01-4db8-4527-9832-4004f861ac80">管道中的 - 符号</a></h4>
+<div class="outline-text-4" id="text-h:937bee01-4db8-4527-9832-4004f861ac80">
+<p>
+管道中有时会使用 - 符号
+</p>
+
+<p>
+范例： 将 /home
+里面的文件打包，但打包的数据不是记录到文件，而是传送到
+stdout，经过管道后，将 tar -cvf - /home 传送给后面的 tar -xvf - ,
+后面的这个 - 则是取前一个命令的 stdout， 因此，就不需要使用临时file了
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tar -cvf - /home | tar -xvf -
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:48e80f36-ebff-4f77-8575-57e8e4c90b98" class="outline-4">
+<h4 id="h:48e80f36-ebff-4f77-8575-57e8e4c90b98"><a href="#h:48e80f36-ebff-4f77-8575-57e8e4c90b98">tee 命令</a></h4>
+<div class="outline-text-4" id="text-h:48e80f36-ebff-4f77-8575-57e8e4c90b98">
+<p>
+将标准输入复制到每个指定文件，并显示到标准输出
+</p>
+
+<p>
+格式
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">tee [OPTION]...   [FILE]...
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24120;&#29992;&#36873;&#39033;
+</span>-a                                    <span class="org-comment-delimiter">#</span><span class="org-comment">&#20869;&#23481;&#36861;&#21152;&#21040;&#25351;&#23450;&#25991;&#20214;&#65292;&#32780;&#38750;&#35206;&#30422;
+</span>-i                                     <span class="org-comment-delimiter">#</span><span class="org-comment">&#24573;&#30053;&#20013;&#26029;&#31526;&#21495;
+</span>-p                                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#23545;&#20889;&#20837;&#38750;&#31649;&#36947;&#30340;&#34892;&#20026;&#25490;&#26597;&#38169;&#35823;&#65292;&#20854;&#20351;&#29992;&#30340;&#26159; warn-nopipe
+</span>--output-error=[&#27169;&#24335;]   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#20889;&#20837;&#20986;&#38169;&#26102;&#30340;&#34892;&#20026;(warn|warn-nopipe|exit|exit-nopipe)
+</span>
+cm1 | tee [-a] filename | cmd2
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#31649;&#36947;&#37325;&#23450;&#21521;
+</span>[root@ip-10-0-129-226 ~]# echo hello | tee tee.log
+hello
+[root@ip-10-0-129-226 ~]# cat tee.log 
+hello
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">tee.log&#37324;&#38754;&#20869;&#23481;&#26159;hello, &#32456;&#31471;&#36755;&#20986;&#26159;HELLO
+</span>[root@ip-10-0-129-226 ~]# echo hello | tee tee.log | tr <span class="org-string">'a-z'</span> <span class="org-string">'A-Z'</span>
+HELLO
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@centos8 ~]#echo {1..100}|tr <span class="org-string">' '</span> +|bc
+5050
+[root@centos8 ~]#echo {1..100..2} | tr <span class="org-string">' '</span> + | bc
+2500
+[root@centos8 ~]#seq -s + 1 100 |bc
+5050
+[root@centos8 ~]#seq -s+ 1 2 100 | bc
+2500
+</pre>
+</div>
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">~]#cat &lt;&lt;EOF | tee /etc/mail.rc<span class="org-sh-heredoc">
+set from=29308620@qq.com
+set smtp=smtp.qq.com
+set smtp-auth-user=29308620@qq.com
+set smtp-auth-password=esvnhbnqocirbicf
+set smtp-auth=login
+set ssl-verify=ignore
+EOF
+</span><span class="org-builtin">set</span> <span class="org-variable-name">from</span>=29308620@qq.com
+<span class="org-builtin">set</span> <span class="org-variable-name">smtp</span>=smtp.qq.com
+<span class="org-builtin">set</span> smtp-auth-user=29308620@qq.com
+<span class="org-builtin">set</span> smtp-auth-password=esvnhbnqocirbicf
+<span class="org-builtin">set</span> smtp-auth=login
+<span class="org-builtin">set</span> ssl-verify=ignore
+
+<span class="org-builtin">echo</span> <span class="org-string">"test email"</span> | mail  -s <span class="org-string">"test"</span> user@example.com
+</pre>
+</div>
+
+<p>
+动动手
+</p>
+<ul class="org-ul">
+<li>将/etc/issue文件中的内容转换为大写后保存至/tmp/issue.out文件中</li>
+<li>将当前系统登录用户的信息转换为大写后保存至/tmp/who.out文件中</li>
+<li>一个linux用户给root发邮件，要求邮件标题为”help”，邮件正文如下：
+Hello, I am 用户名,The system version is here,please help me to chec
+k it,thanks!</li>
+</ul>
+
+<p>
+操作系统版本信息
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@middle-ware ~]# mail -s help root &lt;&lt;EOF<span class="org-sh-heredoc">
+I am `whoami`,The ..
+`cat /etc/redhat-release`
+EOF</span>
+</pre>
+</div>
+<p>
+将/root/下文件列表，显示成一行，并文件名之间用空格隔开
+计算1+2+3+&#x2026;+99+100的总和
+删除Windows文本文件中的回车字符，即“\r”
+处理字符串“xt.,l 1 jr#!$mn 2 c*/fe 3 uz 4”，只保留其中的数字和空格
+将PATH变量每个目录显示在独立的一行
+将指定文件中0-9分别替代成a-j
+将文件/etc/centos-release中每个单词（由字母组成）显示在独立一行，并无空行
+</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

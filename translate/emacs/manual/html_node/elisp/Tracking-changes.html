@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Tracking changes (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Tracking changes (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Tracking changes (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Change-Hooks.html" rel="up" title="Change Hooks">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Tracking-changes">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Change-Hooks.html" accesskey="u" rel="up">变更钩子</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_8ddf_8e2a_7f13_51b2_533a_4fee_6539"><span>33.34.1 跟踪缓冲区修改<a class="copiable-link" href="#g_t_8ddf_8e2a_7f13_51b2_533a_4fee_6539"> &para;</a></span></h4>
+<a class="index-entry-id" id="index-track_002dchanges"></a>
+<a class="index-entry-id" id="index-change-tracker"></a>
+
+<p>在实际使用中，<code class="code">before-change-functions</code> 与 <code class="code">after-change-functions</code>
+存在诸多陷阱，例如两类钩子调用未必成对、部分调用可能丢失（原因包括 Emacs 原语未正确配对调用
+或不当使用 <code class="code">inhibit-modification-hooks</code>）。
+此外，这类钩子函数有诸多限制：基本不应修改当前缓冲区、不能执行阻塞操作，
+且必须快速执行，因为部分命令可能高频调用这些钩子。
+</p>
+<p>变更跟踪库在这些钩子之上提供了一套替代 API，从根本上解决了上述问题。
+与 <code class="code">after-change-functions</code> 相比，第一个重要区别是：
+它不提供变更边界与旧长度，而是提供变更边界与该区域实际的旧内容。
+很多包需要同时使用 <code class="code">before-change-functions</code> 与 <code class="code">after-change-functions</code>
+并尝试配对调用，主要原因就是需要从缓冲区原始内容中提取信息。
+</p>
+<p>第二个区别是，它将变更通知与变更处理解耦，
+并自动将第一次变更到实际处理之间的所有修改合并为单次变更操作。
+这使得以更大粒度（例如每命令一次）处理变更变得自然简单，
+同时解除了普通变更钩子的大部分限制，允许执行阻塞操作或修改缓冲区。
+</p>
+<p>要开始跟踪变更，需调用 <code class="code">track-changes-register</code>，
+并传入一个 <var class="var">signal</var> 函数作为参数。该函数返回一个跟踪器 <var class="var">id</var>，
+用于在库的其他函数中标识你的变更跟踪器。
+当缓冲区被修改时，库会调用 <var class="var">signal</var> 函数通知发生变更，
+并立即将后续变更累积为单次合并变更。
+<var class="var">signal</var> 函数仅用于提示发生了修改，不接收变更详情。
+且在你获取本次变更前，库不会再次调用该函数。
+</p>
+<p>要获取变更，需调用 <code class="code">track-changes-fetch</code>，
+它会返回自上次调用以来累积的所有变更的边界，以及该区域的旧内容。
+同时它会重新 &ldquo;武装(re-arms)&rdquo; <var class="var">signal</var> 函数，使库在下次缓冲区修改时能再次调用它。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-track_002dchanges_002dregister"><span class="category-def">Function: </span><span><strong class="def-name">track-changes-register</strong> <var class="def-var-arguments">signal &amp;key nobefore disjoint immediate</var><a class="copiable-link" href="#index-track_002dchanges_002dregister"> &para;</a></span></dt>
+<dd><p>该函数创建一个新的 <em class="dfn">变更跟踪器(change tracker)</em>。变更跟踪器为抽象对象，仅以标识区分，
+因此函数返回跟踪器的 <var class="var">id</var>。
+</p>
+<p><var class="var">signal</var> 是库用于通知变更的函数，调用时可能传入一个或两个参数。
+当跟踪器上次调用 <code class="code">track-changes-fetch</code> 后缓冲区发生首次变更时，
+库会以跟踪器 <var class="var">id</var> 为单一参数调用该函数。
+</p>
+<p>默认情况下，<var class="var">signal</var> 函数不会立即调用，
+而是通过 0 秒定时器延迟执行（see <a class="pxref" href="Timers.html">用于延迟执行的定时器</a>）。
+这通常是为了避免 <var class="var">signal</var> 被过于频繁地调用，
+并使其运行在宽松的上下文环境中，让使用者无需担心性能问题或潜在的异常操作。
+若使用者需要更精细的控制，可将 <var class="var">immediate</var> 参数设为非 <code class="code">nil</code>，
+此时库会直接从 <code class="code">after-change-functions</code> 中调用 <var class="var">signal</var>。
+注意这意味着 <var class="var">signal</var> 函数必须避免修改缓冲区或执行阻塞操作。
+</p>
+<p>若你不关心缓冲区实际的旧内容，仅使用该库将大量小变更合并为大变更，
+并将处理延迟到更合适的时机，可将 <var class="var">nobefore</var> 参数设为非 <code class="code">nil</code>。
+此时 <code class="code">track-change-fetch</code> 仅返回旧内容长度，与 <code class="code">after-change-functions</code> 行为一致，
+同时库也能减少部分计算开销。
+</p>
+<p>虽然你希望累积小变更为大变更，但如果变更位置相距过远，可能不希望合并。
+若将 <var class="var">disjoint</var> 参数设为非 <code class="code">nil</code>，
+当新变更与当前待处理变更位置“相距较远”时，库会立即调用 <var class="var">signal</var> 函数并传入两个参数：
+跟踪器 <var class="var">id</var> 与新变更和待处理变更之间的字符间隔数。
+这一行为本身不会阻止新变更与旧变更合并，因此若你认为距离过远，
+应立即调用 <code class="code">track-change-fetch</code>。
+注意：因不连续变更触发的 <var class="var">signal</var> 调用直接来自 <code class="code">before-change-functions</code>，
+因此同样遵循不可修改缓冲区、不可执行阻塞操作的限制。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-track_002dchanges_002dfetch"><span class="category-def">Function: </span><span><strong class="def-name">track-changes-fetch</strong> <var class="def-var-arguments">id func</var><a class="copiable-link" href="#index-track_002dchanges_002dfetch"> &para;</a></span></dt>
+<dd><p>该函数用于获取缓冲区中的变更内容。
+传入跟踪器 <var class="var">id</var> 后，库会判断哪些变更已被你的跟踪器处理过。
+<code class="code">track-changes-fetch</code> 不会直接返回变更描述，
+而是调用 <var class="var">func</var> 并以三个参数传递变更信息：<var class="var">beg</var>、<var class="var">end</var> 与 <var class="var">before</var>。
+其中 <code class="code"><var class="var">beg</var>..<var class="var">end</var></code> 为修改区域，<var class="var">before</var> 为该区域的旧内容。
+通常 <var class="var">before</var> 是包含旧文本的字符串；
+但若你在 <code class="code">track-changes-register</code> 中指定了非 <code class="code">nil</code> 的 <var class="var">nobefore</var>，
+则该参数会替换为旧内容的字符长度。
+</p>
+<p>若自上次调用后未发生任何变更，
+<code class="code">track-changes-fetch</code> 不会调用 <var class="var">func</var> 并直接返回 <code class="code">nil</code>。
+若发生变更，则调用 <var class="var">func</var> 并返回其执行结果。
+注意无论发生多少次变更，<var class="var">func</var> 只会被调用一次：
+所有变更会被汇总为单个 <var class="var">beg</var>/<var class="var">end</var>/<var class="var">before</var> 组合。
+</p>
+<p>在某些情况下，库无法正确获取所有变更通知，
+例如底层 C 代码存在 bug 或不当使用 <code class="code">inhibit-modification-hooks</code>。
+当检测到此类问题时，<var class="var">func</var> 接收的 <code class="code"><var class="var">beg</var>..<var class="var">end</var></code>
+会覆盖整个缓冲区，且 <var class="var">before</var> 为符号 <code class="code">error</code>，
+表示库无法确定具体变更内容。
+</p>
+<p><var class="var">func</var> 执行完毕后，<code class="code">track-changes-fetch</code> 会重新启用 <var class="var">signal</var> 函数，
+以便下次变更时再次触发。这也是它调用 <var class="var">func</var> 而非直接返回结果的原因：
+确保你处理变更时不会被中途触发的 <var class="var">signal</var> 打断，
+因为信号会在 <var class="var">func</var> 结束后才重新启用。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-track_002dchanges_002dunregister"><span class="category-def">Function: </span><span><strong class="def-name">track-changes-unregister</strong> <var class="def-var-arguments">id</var><a class="copiable-link" href="#index-track_002dchanges_002dunregister"> &para;</a></span></dt>
+<dd><p>该函数告知库，跟踪器 <var class="var">id</var> 不再需要监听缓冲区变更。
+大多数使用者不会主动停止跟踪，但对于次要模式等场景，
+在禁用次要模式时必须调用该函数，否则跟踪器会持续累积变更并不断消耗资源。
+</p></dd></dl>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Change-Hooks.html">变更钩子</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

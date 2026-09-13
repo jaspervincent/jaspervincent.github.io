@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Internals of Debugger (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Internals of Debugger (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Internals of Debugger (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Debugger.html" rel="up" title="Debugger">
+<link href="Invoking-the-Debugger.html" rel="prev" title="Invoking the Debugger">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+kbd.kbd {font-style: oblique}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Internals-of-Debugger">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Invoking-the-Debugger.html" accesskey="p" rel="prev">调用调试器</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Debugger.html" accesskey="u" rel="up">Lisp 调试器</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_8c03_8bd5_5668_7684_5185_90e8_5b9e_73b0"><span>19.1.11 调试器的内部实现<a class="copiable-link" href="#g_t_8c03_8bd5_5668_7684_5185_90e8_5b9e_73b0"> &para;</a></span></h4>
+
+<p>本节介绍调试器内部使用的函数和变量。
+</p>
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-debugger"><span class="category-def">Variable: </span><span><strong class="def-name">debugger</strong><a class="copiable-link" href="#index-debugger"> &para;</a></span></dt>
+<dd><p>该变量的值是用于调用调试器的函数。
+其值必须是接受任意数量参数的函数，或更常见的是函数名。
+该函数应触发某种调试器。变量的默认值为 <code class="code">debug</code>。
+</p>
+<p>Lisp 传递给该函数的第一个参数表示调用原因。
+参数的约定在 <code class="code">debug</code> 的说明中有详细描述（see <a class="pxref" href="Invoking-the-Debugger.html">调用调试器</a>）。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-backtrace"><span class="category-def">Function: </span><span><strong class="def-name">backtrace</strong><a class="copiable-link" href="#index-backtrace"> &para;</a></span></dt>
+<dd><a class="index-entry-id" id="index-run-time-stack"></a>
+<a class="index-entry-id" id="index-call-stack"></a>
+<p>该函数打印当前活跃的 Lisp 函数调用跟踪信息。
+输出的跟踪信息与 <code class="code">debug</code> 在 <samp class="file">*Backtrace*</samp> 缓冲区中显示的内容完全相同。
+函数的返回值始终为 <code class="code">nil</code>。
+</p>
+<p>以下示例中，Lisp 表达式显式调用 <code class="code">backtrace</code>。
+这会将调用栈打印到流 <code class="code">standard-output</code>，
+本示例中该流对应缓冲区 &lsquo;<samp class="samp">backtrace-output</samp>&rsquo;。
+</p>
+<p>调用栈的每一行代表一次函数调用。
+如果函数的所有参数值均已确定，该行会显示函数名及参数值列表；
+如果参数仍在计算中，该行则显示包含函数及其未求值参数的列表。
+长列表或深度嵌套的结构可能会被省略。
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">(with-output-to-temp-buffer &quot;backtrace-output&quot;
+  (let ((var 1))
+    (save-excursion
+      (setq var (eval '(progn
+                         (1+ var)
+                         (list 'testing (backtrace))))))))
+
+     &rArr; (testing nil)
+</pre></div><pre class="example-preformatted">
+
+</pre><div class="group"><pre class="example-preformatted">----------- Buffer: backtrace-output ------------
+  backtrace()
+  (list 'testing (backtrace))
+</pre></div><pre class="example-preformatted">  (progn ...)
+  eval((progn (1+ var) (list 'testing (backtrace))))
+  (setq ...)
+  (save-excursion ...)
+  (let ...)
+  (with-output-to-temp-buffer ...)
+  eval((with-output-to-temp-buffer ...))
+  eval-last-sexp-1(nil)
+</pre><div class="group"><pre class="example-preformatted">  eval-last-sexp(nil)
+  call-interactively(eval-last-sexp)
+----------- Buffer: backtrace-output ------------
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-defvr first-defopt-alias-first-defvr def-block">
+<dt class="defvr defopt-alias-defvr def-line" id="index-debugger_002dstack_002dframe_002das_002dlist"><span class="category-def">User Option: </span><span><strong class="def-name">debugger-stack-frame-as-list</strong><a class="copiable-link" href="#index-debugger_002dstack_002dframe_002das_002dlist"> &para;</a></span></dt>
+<dd><p>若该变量为非<code class="code">nil</code>，调用栈中的每个栈帧都会以列表形式显示。
+此举旨在提升调用栈的可读性，但代价是特殊形式与常规函数调用在视觉上不再有区别。
+</p>
+<p>当 <code class="code">debugger-stack-frame-as-list</code> 为非<code class="code">nil</code> 时，上述示例的输出如下：
+</p>
+<div class="example smallexample">
+<div class="group"><pre class="example-preformatted">----------- Buffer: backtrace-output ------------
+  (backtrace)
+  (list 'testing (backtrace))
+</pre></div><pre class="example-preformatted">  (progn ...)
+  (eval (progn (1+ var) (list 'testing (backtrace))))
+  (setq ...)
+  (save-excursion ...)
+  (let ...)
+  (with-output-to-temp-buffer ...)
+  (eval (with-output-to-temp-buffer ...))
+  (eval-last-sexp-1 nil)
+</pre><div class="group"><pre class="example-preformatted">  (eval-last-sexp nil)
+  (call-interactively eval-last-sexp)
+----------- Buffer: backtrace-output ------------
+</pre></div></div>
+</dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-debug_002don_002dnext_002dcall"><span class="category-def">Variable: </span><span><strong class="def-name">debug-on-next-call</strong><a class="copiable-link" href="#index-debug_002don_002dnext_002dcall"> &para;</a></span></dt>
+<dd><a class="index-entry-id" id="index-eval_002c-and-debugging"></a>
+<a class="index-entry-id" id="index-apply_002c-and-debugging"></a>
+<a class="index-entry-id" id="index-funcall_002c-and-debugging"></a>
+<p>若该变量为非<code class="code">nil</code>，表示在下一次调用 <code class="code">eval</code>、<code class="code">apply</code> 或 <code class="code">funcall</code> 前调用调试器。
+进入调试器后，该变量 <code class="code">debug-on-next-call</code> 会被设为 <code class="code">nil</code>。
+</p>
+<p>调试器中的 <kbd class="kbd">d</kbd> 命令正是通过设置该变量实现功能。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-backtrace_002ddebug"><span class="category-def">Function: </span><span><strong class="def-name">backtrace-debug</strong> <var class="def-var-arguments">level flag</var><a class="copiable-link" href="#index-backtrace_002ddebug"> &para;</a></span></dt>
+<dd><p>该函数设置调用栈中向下数 <var class="var">level</var> 层的栈帧的“退出时调试”标志，将其值设为 <var class="var">flag</var>。
+若 <var class="var">flag</var> 为非<code class="code">nil</code>，该栈帧后续退出时会触发调试器。
+即使通过该栈帧进行非本地退出，也会进入调试器。
+</p>
+<p>该函数仅由调试器内部使用。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-command_002ddebug_002dstatus"><span class="category-def">Variable: </span><span><strong class="def-name">command-debug-status</strong><a class="copiable-link" href="#index-command_002ddebug_002dstatus"> &para;</a></span></dt>
+<dd><p>该变量记录当前交互式命令的调试状态。
+每次交互式调用命令时，该变量会被绑定为 <code class="code">nil</code>。
+调试器可设置该变量，为同一命令调用期间后续的调试器触发留存信息。
+</p>
+<p>使用该变量而非普通全局变量的优势在于：
+其数据不会延续到后续的命令调用中。
+</p>
+<p>该变量已废弃，将在未来版本中移除。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-backtrace_002dframe"><span class="category-def">Function: </span><span><strong class="def-name">backtrace-frame</strong> <var class="def-var-arguments">frame-number &amp;optional base</var><a class="copiable-link" href="#index-backtrace_002dframe"> &para;</a></span></dt>
+<dd><p>函数 <code class="code">backtrace-frame</code> 专为 Lisp 调试器设计使用。
+它返回调用栈中向下数 <var class="var">frame-number</var> 层的栈帧的计算状态信息。
+</p>
+<p>如果该栈帧尚未求参数值，或属于特殊形式，返回值为 <code class="code">(nil <var class="var">function</var> <var class="var">arg-forms</var>&hellip;)</code>。
+</p>
+<p>如果该栈帧已完成参数求值并调用了函数，返回值为 <code class="code">(t <var class="var">function</var> <var class="var">arg-values</var>&hellip;)</code>。
+</p>
+<p>返回值中，<var class="var">function</var> 是被求值列表的 <small class="sc">CAR</small> 部分，
+若是宏调用则为 <code class="code">lambda</code> 表达式。
+如果函数包含 <code class="code">&amp;rest</code> 参数，该参数会表示为 <var class="var">arg-values</var> 列表的尾部。
+</p>
+<p>若指定了 <var class="var">base</var>，则 <var class="var">frame-number</var> 相对于
+<var class="var">function</var> 为 <var class="var">base</var> 的最顶层栈帧计数。
+</p>
+<p>若 <var class="var">frame-number</var> 超出范围，<code class="code">backtrace-frame</code> 返回 <code class="code">nil</code>。
+</p></dd></dl>
+
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-mapbacktrace"><span class="category-def">Function: </span><span><strong class="def-name">mapbacktrace</strong> <var class="def-var-arguments">function &amp;optional base</var><a class="copiable-link" href="#index-mapbacktrace"> &para;</a></span></dt>
+<dd><p>函数 <code class="code">mapbacktrace</code> 会为调用栈中的每个栈帧调用一次 <var class="var">function</var>，
+起始位置为 <var class="var">function</var> 等于 <var class="var">base</var> 的第一个栈帧
+（若省略 <var class="var">base</var> 或其值为 <code class="code">nil</code>，则从栈顶开始）。
+</p>
+<p>调用 <var class="var">function</var> 时传入四个参数：<var class="var">evald</var>、<var class="var">func</var>、<var class="var">args</var> 和 <var class="var">flags</var>。
+</p>
+<p>如果栈帧尚未求参数值或属于特殊形式，<var class="var">evald</var> 为 <code class="code">nil</code>，<var class="var">args</var> 为表达式列表。
+</p>
+<p>如果栈帧已完成参数求值并调用了函数，<var class="var">evald</var> 为 <code class="code">t</code>，<var class="var">args</var> 为值列表。
+<var class="var">flags</var> 是当前栈帧属性的属性列表（plist）：
+目前仅支持 <code class="code">:debug-on-exit</code> 属性，
+若栈帧的“退出时调试”标志已设置，则该属性值为 <code class="code">t</code>。
+</p></dd></dl>
+
+
+
+
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Invoking-the-Debugger.html">调用调试器</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Debugger.html">Lisp 调试器</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

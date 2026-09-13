@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Eval During Expansion (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Eval During Expansion (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Eval During Expansion (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Problems-with-Macros.html" rel="up" title="Problems with Macros">
+<link href="Repeated-Expansion.html" rel="next" title="Repeated Expansion">
+<link href="Surprising-Local-Vars.html" rel="prev" title="Surprising Local Vars">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+span.r {font-family: initial; font-weight: normal; font-style: normal}
+span:hover a.copiable-link {visibility: visible}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Eval-During-Expansion">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Next: </span><span class="nav-link"><a href="Repeated-Expansion.html" accesskey="n" rel="next">宏会被展开多少次？</a></span></span>, <span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Surprising-Local-Vars.html" accesskey="p" rel="prev">Local Variables in Macro Expansions</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Problems-with-Macros.html" accesskey="u" rel="up">使用宏的常见问题</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_5728_5c55_5f00_8fc7_7a0b_4e2d_6c42_503c_5b8f_53c2_6570"><span>14.5.4 在展开过程中求值宏参数<a class="copiable-link" href="#g_t_5728_5c55_5f00_8fc7_7a0b_4e2d_6c42_503c_5b8f_53c2_6570"> &para;</a></span></h4>
+
+<p>如果宏定义本身会对宏参数表达式进行求值（例如调用 <code class="code">eval</code>），就可能引发另一个问题（see <a class="pxref" href="Eval.html">求值</a>）。你必须考虑到：宏展开可能远早于代码实际运行，而调用者的上下文（宏展开式最终会在其中运行）此时还不可用。
+</p>
+<p>此外，如果你的宏定义没有使用 <code class="code">lexical-binding</code>（词法绑定），它的形参可能会遮蔽用户代码中的同名变量。在宏体内部，宏参数的绑定是该变量最内层的局部绑定，因此被求值表达式内部对该名称的任何引用，都会指向这个宏参数。示例如下：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(defmacro foo (a)
+  (list 'setq (eval a) t))
+</pre></div><div class="group"><pre class="example-preformatted">(setq x 'b)
+(foo x) &rarr; (setq b t)
+     &rArr; t                  ; <span class="r">and <code class="code">b</code> has been set.</span>
+;; <span class="r">but</span>
+(setq a 'c)
+(foo a) &rarr; (setq a t)
+     &rArr; t                  ; <span class="r">but this set <code class="code">a</code>, not <code class="code">c</code>.</span>
+
+</pre></div></div>
+
+<p>用户代码中的变量是叫 <code class="code">a</code> 还是 <code class="code">x</code>，结果会完全不同，因为 <code class="code">a</code> 会与宏的参数变量 <code class="code">a</code> 发生冲突。
+</p>
+<p>另外，上面的 <code class="code">(foo x)</code> 在代码被编译时，展开结果会不一样，甚至直接报错。原因是：编译时 <code class="code">(foo x)</code> 就会被展开，而 <code class="code">(setq x 'b)</code> 要等到程序真正运行时才会执行。
+</p>
+<p>要避免这类问题，<strong class="strong">不要在计算宏展开的过程中对参数表达式求值</strong>。正确的做法是：把表达式代入到宏展开式中，让它的值在执行展开后代码时才计算。本章的其他示例都是这么做的。
+</p>
+</div>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

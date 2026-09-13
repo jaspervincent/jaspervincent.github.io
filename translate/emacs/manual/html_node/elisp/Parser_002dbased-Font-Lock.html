@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<!-- Created by GNU Texinfo 7.3, https://www.gnu.org/software/texinfo/ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- 这是 GNU Emacs Lisp 参考手册
+ 对应于 Emacs 版本 30.2.
+
+版权所有 © 1990-1996, 1998-2025 自由软件基金会
+
+本文件允许在GNU自由文档许可证 1.3 版或自由软件基金会发布的任何后续版本的条款下复制、分发和/或修改；不变部分为"GNU通用公共许可证"，封面文字为"GNU手册"，封底文字如下(a)所示。许可证副本包含在题为"GNU自由文档许可证"的部分中。
+
+（a）自由软件基金会（FSF）的封底文字是："您可以自由复制和修改本 GNU手册。从 FSF 购买副本将支持其开发 GNU 并促进软件自由。" -->
+<title>Parser-based Font Lock (翻译: GNU Emacs Lisp 参考手册)</title>
+
+<meta name="description" content="Parser-based Font Lock (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="keywords" content="Parser-based Font Lock (翻译: GNU Emacs Lisp 参考手册)">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="makeinfo">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<link href="index.html" rel="start" title="Top">
+<link href="Elisp-index.html" rel="index" title="Elisp index">
+<link href="index.html#SEC_Contents" rel="contents" title="Table of Contents">
+<link href="Font-Lock-Mode.html" rel="up" title="Font Lock Mode">
+<link href="Multiline-Font-Lock.html" rel="prev" title="Multiline Font Lock">
+<style type="text/css">
+a.copiable-link {visibility: hidden; text-decoration: none; line-height: 0em}
+div.example {margin-left: 3.2em}
+dt.def-line {font-size: 1rem}
+span:hover a.copiable-link {visibility: visible}
+strong.def-name {font-family: monospace; font-weight: bold}
+ul.mark-bullet {list-style-type: disc}
+</style>
+
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<link rel="stylesheet" type="text/css" href="https://www.gnu.org/software/emacs/manual.css">
+<!--
+<link rel="stylesheet" type="text/css" href="/static/www.gnu.org/manual.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+-->
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+
+</head>
+
+<body>
+<div class="subsection-level-extent" id="Parser_002dbased-Font-Lock">
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Multiline-Font-Lock.html" accesskey="p" rel="prev">多行字体锁定结构</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Font-Lock-Mode.html" accesskey="u" rel="up">Font Lock Mode</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+<hr>
+<h4 class="subsection" id="g_t_57fa_4e8e_89e3_6790_5668_7684_5b57_4f53_9501_5b9a"><span>24.7.10 基于解析器的字体锁定<a class="copiable-link" href="#g_t_57fa_4e8e_89e3_6790_5668_7684_5b57_4f53_9501_5b9a"> &para;</a></span></h4>
+<a class="index-entry-id" id="index-parser_002dbased-font_002dlock"></a>
+
+
+<p>除了简单的语法字体锁定和基于正则表达式的字体锁定外，
+Emacs 还借助解析器提供完整的语法字体锁定能力。
+目前，Emacs 使用 tree-sitter 库实现这一功能（see <a class="pxref" href="Parsing-Program-Source.html">解析程序源代码</a>）。
+</p>
+<p>基于解析器的字体锁定与其他字体锁定机制并不互斥。
+默认情况下，若启用，基于解析器的字体会先运行，替代语法字体锁定，
+之后再运行基于正则表达式的字体锁定。
+</p>
+<p>尽管基于解析器的字体锁定与基于正则表达式的字体锁定不共用同一套自定义变量，
+但采用了相似的自定义方案。<code class="code">font-lock-keywords</code> 对应的 tree-sitter 变量是
+<code class="code">treesit-font-lock-settings</code>。
+</p>
+<a class="index-entry-id" id="index-tree_002dsitter-fontifications_002c-overview"></a>
+<a class="index-entry-id" id="index-fontifications-with-tree_002dsitter_002c-overview"></a>
+<p>通常，tree-sitter 高亮的工作流程如下：
+</p>
+<ul class="itemize mark-bullet">
+<li>Lisp 程序（通常是主模式的一部分）提供一个由若干 <em class="dfn">模式(patterns)</em> 组成的 <em class="dfn">查询(query)</em>，
+每个模式关联一个 <em class="dfn">捕获名称(capture name)</em>。
+
+</li><li>tree-sitter 库在解析树中查找匹配这些模式的节点，
+用对应的捕获名称标记节点，并将它们返回给 Lisp 程序。
+
+</li><li>Lisp 程序使用返回的节点，对缓冲区中与每个节点对应的文本部分进行适当高亮，
+根据节点标记的捕获名称确定正确的高亮方式。
+例如，标记为 <code class="code">font-lock-keyword</code> 的节点会使用
+<code class="code">font-lock-keyword-face</code> 进行高亮。
+</li></ul>
+
+<p>关于查询、模式和捕获名称的更多信息，参见 <a class="ref" href="Pattern-Matching.html">匹配 tree-sitter 节点的模式</a>。
+</p>
+<p>要设置 tree-sitter 高亮，主模式应先使用
+<code class="code">treesit-font-lock-rules</code> 的输出设置
+<code class="code">treesit-font-lock-settings</code>，然后调用
+<code class="code">treesit-major-mode-setup</code>。
+</p>
+<dl class="first-deffn first-defun-alias-first-deffn def-block">
+<dt class="deffn defun-alias-deffn def-line" id="index-treesit_002dfont_002dlock_002drules"><span class="category-def">Function: </span><span><strong class="def-name">treesit-font-lock-rules</strong> <var class="def-var-arguments">&amp;rest query-specs</var><a class="copiable-link" href="#index-treesit_002dfont_002dlock_002drules"> &para;</a></span></dt>
+<dd><p>该函数用于设置 <code class="code">treesit-font-lock-settings</code>。
+它负责编译查询和其他后处理，并输出一个
+<code class="code">treesit-font-lock-settings</code> 可接受的值。示例如下：
+</p>
+<div class="example">
+<div class="group"><pre class="example-preformatted">(treesit-font-lock-rules
+ :language 'javascript
+ :feature 'constant
+ :override t
+ '((true) @font-lock-constant-face
+   (false) @font-lock-constant-face)
+ :language 'html
+ :feature 'script
+ &quot;(script_element) @font-lock-builtin-face&quot;)
+</pre></div></div>
+
+<p>该函数接收一系列 <var class="var">query-spec</var>，每个 <var class="var">query-spec</var>
+是在一个 <var class="var">query</var> 前面加上一个或多个 <var class="var">keyword</var>/<var class="var">value</var> 对。
+每个 <var class="var">query</var> 是一个字符串形式、S 表达式形式或已编译形式的 tree-sitter 查询。
+</p>
+<p>对每个 <var class="var">query</var>，其前面的 <var class="var">keyword</var>/<var class="var">value</var> 对为其附加元信息。
+<code class="code">:language</code> 关键字声明 <var class="var">query</var> 的语言。
+<code class="code">:feature</code> 关键字设置 <var class="var">query</var> 的功能名称。
+用户可以通过 <code class="code">treesit-font-lock-level</code> 和
+<code class="code">treesit-font-lock-feature-list</code>（见下文）控制启用哪些功能。
+这两个关键字是必需的（个别情况除外）。
+</p>
+<p>其他关键字为可选：
+</p>
+<table class="multitable">
+<thead><tr><th width="15%">关键字</th><th width="15%">取值</th><th width="60%">说明</th></tr></thead>
+<tbody><tr><td width="15%"><code class="code">:override</code></td><td width="15%"><code class="code">nil</code></td><td width="60%">若区域已有外观，则丢弃新外观</td></tr>
+<tr><td width="15%"></td><td width="15%"><code class="code">t</code></td><td width="60%">始终应用新外观</td></tr>
+<tr><td width="15%"></td><td width="15%"><code class="code">append</code></td><td width="60%">将新外观追加到现有外观之后</td></tr>
+<tr><td width="15%"></td><td width="15%"><code class="code">prepend</code></td><td width="60%">将新外观插入到现有外观之前</td></tr>
+<tr><td width="15%"></td><td width="15%"><code class="code">keep</code></td><td width="60%">仅为无外观的区域填充新外观</td></tr>
+<tr><td width="15%"><code class="code">:default-language</code></td><td width="15%"><var class="var">language</var></td><td width="60%">此关键字之后的所有 <var class="var">query</var> 默认使用该语言</td></tr>
+</tbody>
+</table>
+
+<p>Lisp 程序在 <var class="var">query</var> 中用捕获名称（以 <code class="code">@</code> 开头的名称）标记模式，
+tree-sitter 会返回带有相同捕获名称标记的匹配节点。
+出于高亮目的，<var class="var">query</var> 中的捕获名称应当是外观名，
+如 <code class="code">font-lock-keyword-face</code>。被捕获的节点将使用该外观高亮。
+</p>
+<a class="index-entry-id" id="index-treesit_002dfontify_002dwith_002doverride"></a>
+<p>捕获名称也可以是函数名。此时该函数会接收 4 个参数：
+<var class="var">node</var>、<var class="var">override</var>、<var class="var">start</var> 和 <var class="var">end</var>，
+其中 <var class="var">node</var> 是节点本身，<var class="var">override</var> 是捕获该节点的规则的
+<code class="code">:override</code> 属性，<var class="var">start</var> 和 <var class="var">end</var> 限定了该函数应当高亮的区域。
+（如果该函数希望遵守 <var class="var">override</var> 参数，可以使用 <code class="code">treesit-fontify-with-override</code>。）
+</p>
+<p>除了给出的 4 个参数外，该函数还应接受更多可选参数，以便未来扩展。
+</p>
+<p>如果一个捕获名称既是外观又是函数，外观优先。
+如果一个捕获名称既不是外观也不是函数，则会被忽略。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-treesit_002dfont_002dlock_002dfeature_002dlist"><span class="category-def">Variable: </span><span><strong class="def-name">treesit-font-lock-feature-list</strong><a class="copiable-link" href="#index-treesit_002dfont_002dlock_002dfeature_002dlist"> &para;</a></span></dt>
+<dd><p>这是一个由功能符号列表组成的列表。列表中的每个元素代表一个装饰级别。
+<code class="code">treesit-font-lock-level</code> 控制哪些级别被激活。
+</p>
+<p>列表中的每个元素形如 <code class="code">(<var class="var">feature</var>&nbsp;&hellip;)</code><!-- /@w -->，
+其中每个 <var class="var">feature</var> 对应 <code class="code">treesit-font-lock-rules</code> 中定义的查询的
+<code class="code">:feature</code> 值。从该列表中移除某个功能符号会在字体锁定时禁用对应的查询。
+</p>
+<p>许多编程语言常用的功能名称包括：
+<code class="code">definition</code>、<code class="code">type</code>、<code class="code">assignment</code>、<code class="code">builtin</code>、
+<code class="code">constant</code>、<code class="code">keyword</code>、<code class="code">string-interpolation</code>、
+<code class="code">comment</code>、<code class="code">doc</code>、<code class="code">string</code>、<code class="code">operator</code>、
+<code class="code">preprocessor</code>、<code class="code">escape-sequence</code> 和 <code class="code">key</code>。
+主模式可自由细分或扩展这些通用功能。
+</p>
+<p>其中部分功能需要说明：
+<code class="code">definition</code> 高亮被定义的对象，例如函数定义中的函数名、结构体定义中的结构体名、变量定义中的变量名；
+<code class="code">assignment</code> 高亮被赋值的对象，例如赋值语句中的变量或字段；
+<code class="code">key</code> 高亮键值对中的键，例如 JSON 对象或 Python 字典中的键；
+<code class="code">doc</code> 高亮文档字符串或文档注释。
+</p>
+<p>例如，该变量的值可以是：
+</p><div class="example">
+<div class="group"><pre class="example-preformatted">((comment string doc) ; level 1
+ (function-name keyword type builtin constant) ; level 2
+ (variable-name string-interpolation key)) ; level 3
+</pre></div></div>
+
+<p>主模式应在调用 <code class="code">treesit-major-mode-setup</code> 之前设置此变量。
+</p>
+<a class="index-entry-id" id="index-treesit_002dfont_002dlock_002drecompute_002dfeatures"></a>
+<p>要让该变量生效，Lisp 程序应调用
+<code class="code">treesit-font-lock-recompute-features</code>（会相应重置
+<code class="code">treesit-font-lock-settings</code>），
+或调用 <code class="code">treesit-major-mode-setup</code>（它内部会调用
+<code class="code">treesit-font-lock-recompute-features</code>）。
+</p></dd></dl>
+
+<dl class="first-defvr first-defvar-alias-first-defvr def-block">
+<dt class="defvr defvar-alias-defvr def-line" id="index-treesit_002dfont_002dlock_002dsettings"><span class="category-def">Variable: </span><span><strong class="def-name">treesit-font-lock-settings</strong><a class="copiable-link" href="#index-treesit_002dfont_002dlock_002dsettings"> &para;</a></span></dt>
+<dd><p>基于 tree-sitter 的字体锁定的设置列表。
+每个设置的具体格式被视为内部实现。
+应当始终使用 <code class="code">treesit-font-lock-rules</code> 来设置此变量。
+</p>
+</dd></dl>
+
+<p>多语言主模式应在 <code class="code">treesit-range-functions</code> 中提供范围函数，
+Emacs 会在高亮某一区域前相应设置范围（see <a class="pxref" href="Multiple-Languages.html">多语言文本解析</a>）。
+</p>
+</div>
+<hr>
+<p class="nav-panel">
+<span class="nav-button"><span class="nav-label">Previous: </span><span class="nav-link"><a href="Multiline-Font-Lock.html">多行字体锁定结构</a></span></span>, <span class="nav-button"><span class="nav-label">Up: </span><span class="nav-link"><a href="Font-Lock-Mode.html">Font Lock Mode</a></span></span><span class="nav-button"> &nbsp; </span><span class="nav-button">[<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>]</span><span class="nav-button">[<a href="Elisp-index.html" title="Index" rel="index">Index</a>]</span></p>
+
+
+
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+
+</body>
+</html>

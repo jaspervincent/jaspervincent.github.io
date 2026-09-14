@@ -20,10 +20,13 @@ document.addEventListener("DOMContentLoaded", function(event) {
 //        addDisqus();
 //    }
 
-    // Navbar 的导航页面在小屏幕上会折叠为一个按钮，这个按钮的响应需要 bootstrap.min.js
-    // 而 bootstrap.min.js 依赖于 popper.js（Bootstrap dropdowns, popovers, and tooltips depend on it）
-    loadScripts(['https://unpkg.com/@popperjs/core@2.11.6/dist/umd/popper.min.js',
-                 'https://unpkg.com/bootstrap@5.2.1/dist/js/bootstrap.min.js'])
+    // Navbar 在小屏幕上折叠成一个汉堡按钮，按钮的展开/收起由 bootstrap.min.js 的
+    // collapse 组件负责。
+    //
+    // 不再加载 Popper：它只服务于 dropdown / tooltip / popover，本站这三类组件
+    // 各 0 个页面在用，collapse 用不着它。详见 /static/vendor/README.md —— 将来
+    // 若用了下拉菜单，要把 popper 加回数组第一个位置。
+    loadScripts(['/static/vendor/bootstrap.min.js'])
 });
 
 var disqus_config = function () {
@@ -62,7 +65,7 @@ function refreshDisqus() {
 
 function addBackToTopButton() {
     // See https://www.npmjs.com/package/vanilla-back-to-top
-    loadScriptAsync('https://unpkg.com/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js', function(){addBackToTop();})
+    loadScriptAsync('/static/vendor/vanilla-back-to-top.min.js', function(){addBackToTop();})
 }
 
 function addNavbar() {

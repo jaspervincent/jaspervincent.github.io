@@ -1290,7 +1290,7 @@ docker compose up -d
 <p>
 默认管理员用户：
 </p>
-<pre class="example" id="org2ff30c7">
+<pre class="example" id="orgb76fa6d">
 Email:    admin@example.com
 Password: changeme
 </pre>
@@ -3566,13 +3566,16 @@ EOF</span>
 <h3 id="h:ce985658-ef5b-4a4a-a36f-35dde3d85db5"><a href="#h:ce985658-ef5b-4a4a-a36f-35dde3d85db5">prometheus compose</a></h3>
 <div class="outline-text-3" id="text-h:ce985658-ef5b-4a4a-a36f-35dde3d85db5">
 <p>
-grafana
+grafana 模板
 </p>
 <ul class="org-ul">
-<li>8919 1860 node</li>
-<li>docker 14282</li>
-<li>7362 mysql-exporter 14057</li>
-<li>redis-exporter 763</li>
+<li>k8s clustr: 13105</li>
+<li>prometheus:25537</li>
+<li>node: 8919(中文汉化版) 1860(首选) node</li>
+<li>docker:14282</li>
+<li>mysql:7362 mysql-exporter 14057</li>
+<li>redis: 763</li>
+<li>JVM:4701</li>
 <li>nodejs
 <ul class="org-ul">
 <li>Node.js Exporter 14058</li>
@@ -3591,10 +3594,32 @@ grafana
 </div>
 
 <p>
-prometheus/prometheus.yml 
+prometheus/web.yml
 </p>
 <div class="org-src-container">
-<pre class="src src-sh">cat &lt;&lt;\EOF&gt; prometheus/prometheus.yml <span class="org-sh-heredoc">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#23494;&#30721;
+</span>cat p.py &lt;&lt;EOF<span class="org-sh-heredoc">
+import getpass
+import bcrypt
+
+password = getpass.getpass("password: ")
+hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+print(hashed_password.decode())
+EOF
+</span>python3 p.py <span class="org-comment-delimiter"># </span><span class="org-comment">&#36755;&#20837;&#23494;&#30721;
+</span>
+cat &gt; prometheus/web.yml &lt;&lt;\EOF<span class="org-sh-heredoc">
+basic_auth_users:
+  admin: $2b$12$Bq/xxx
+EOF</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">prometheus/prometheus.yml
+</span>cat &gt; prometheus/prometheus.yml  &lt;&lt;\EOF<span class="org-sh-heredoc">
 global:
   scrape_interval: 30s
   scrape_timeout: 10s
@@ -3629,6 +3654,9 @@ scrape_configs:
   scrape_interval: 1m
   static_configs:
   - targets: ['localhost:9090']
+  basic_auth:
+    username: admin
+    password: xxxpasswd
 
 - job_name: 'cadvisor'
   scrape_interval: 5s
@@ -3639,6 +3667,40 @@ scrape_configs:
   static_configs:
   - targets: ['node-exporter:9100']
 
+- job_name: 'blackbox-exporter'
+  static_configs:
+  - targets: ['blackbox-exporter:9115']
+- job_name: domain-url
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  metrics_path: /probe
+  params:
+    modelue: [http_2xx]
+  static_configs:
+  # &#20869;&#32593;&#19981;&#20114;&#36890;
+  #- targets:
+  #    - http://argocd.xxx.com/login
+  #  labels:
+  #    bussiness: ops
+  #    serverty: info
+  - targets:
+      - https://jp.xxx.com/api/
+    labels:
+      bussiness: dev
+      service: web
+      serverty: info
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: blackbox-exporter:9115
+  - source_labels: [instance]
+    regex: https?://(.*)
+    replacement: "$1"
+    target_label: target
+
 - job_name: 'mysql'
   static_configs:
   - targets: ['mysqld_exporter:9104']
@@ -3646,15 +3708,10 @@ scrape_configs:
 - job_name: 'redis'
   static_configs:
   - targets: ['redis_exporter:9121']
-EOF</span>
-</pre>
-</div>
-
-<p>
-prometheus/alertmanager.yml 
-</p>
-<div class="org-src-container">
-<pre class="src src-sh">cat &lt;&lt;\EOF&gt; prometheus/alertmanager.yml <span class="org-sh-heredoc">
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">prometheus/alertmanager.yml
+</span>cat &lt;&lt;\EOF&gt; prometheus/alertmanager.yml <span class="org-sh-heredoc">
 route:
   group_by: ['alertname']
   group_wait: 10s
@@ -3664,40 +3721,62 @@ route:
 
 receivers:
 - name: default-receiver
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#40657;&#30418;&#30417;&#25511;
+</span>cat &gt; prometheus/blackbox.yml &lt;&lt;EOF<span class="org-sh-heredoc">
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      preferred_ip_protocol: "ip4"
+      valid_status_codes: [200, 401, 301, 302]
+      method: GET
+  http_post_2xx:
+    http:
+      method: POST
+      preferred_ip_protocol: ip4
+    prober: http
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+  icmp:
+    prober: icmp
+    timeout: 5s
 EOF</span>
 </pre>
 </div>
 
 
 <p>
-docker-compose.yml 
+docker-compose.yml
 </p>
-<div class="org-src-container">
-<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml <span class="org-sh-heredoc">
-networks:
-#  slots-net:
-#    name: slots-game-net
-#    external: true
 
-  vm_net:
-    name: vm_net
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; docker-compose.yml &lt;&lt;EOF<span class="org-sh-heredoc">
+networks:
+  monitor_net:
+    name: monitor_net
     driver: bridge
     ipam:
       config:
-        - subnet: 172.26.0.0/24
+        - subnet: 192.168.222.0/24
 
 services:
   prometheus:
-    image: prom/prometheus:v3.0.1
+    image: prom/prometheus:v3.13.3
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/web.yml:/etc/prometheus/web.yml
       - ./prometheus/rules:/etc/prometheus-rules
       - ./prometheus/data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.config.file=/etc/prometheus/web.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
@@ -3707,13 +3786,12 @@ services:
     ports:
       - 9090:9090
     networks:
-      - vm_net
-#      - slots-net
+      - monitor_net
 
   alertmanager:
     hostname: alertmanager
     container_name: alertmanager
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.34.0
     volumes:
       - ./prometheus/alertmanager.yml:/config/alertmanager.yml
     command:
@@ -3722,12 +3800,12 @@ services:
     ports:
       - 9093:9093
     networks:
-      - vm_net
+      - monitor_net
     restart: always
 
   grafana:
     container_name: grafana
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:13.0.8
     depends_on:
       - prometheus
     user: '0'
@@ -3736,27 +3814,33 @@ services:
     volumes:
       - ./grafana-data:/var/lib/grafana
     networks:
-      - vm_net
-#      - slots-net
+      - monitor_net
     restart: always
 
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    image: ghcr.io/google/cadvisor:v0.57.0
     hostname: cadvisor
     container_name: cadvisor
     #platform: linux/aarch64
     privileged: true
     volumes:
-      - "/:/rootfs:ro"
-      - "/var/run:/var/run:ro"
-      - "/sys:/sys:ro"
-      - "/var/lib/docker/:/var/lib/docker:ro"
-      - "/dev/disk/:/dev/disk:ro"
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+      - --store_container_labels=false
+      - --disable_metrics=percpu,sched,tcp,udp,hugetlb,referenced_memory,cpu_topology,resctrl
     ports:
       - 8080
     networks:
-      - vm_net
+      - monitor_net
+    restart: unless-stopped
 
 
   node-exporter:
@@ -3776,7 +3860,24 @@ services:
     ports:
       - 9100:9100
     networks:
-      - vm_net
+      - monitor_net
+
+  blackbox-exporter:
+      image: quay.io/prometheus/blackbox-exporter:latest
+      hostname: blackbox-exporter
+      container_name: blackbox-exporter
+      restart: unless-stopped
+      volumes:
+      - ./prometheus/blackbox.yml:/etc/blackbox_exporter/config.yml
+      command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+      ports:
+      - "9115:9115"
+      networks:
+      - monitor_net
+      # &#24320;&#21551; icmp ping&#25506;&#27979;
+      cap_add:
+        - NET_RAW
 
 #  mysqld_exporter:
 #    image: prom/mysqld-exporter:v0.15.1
@@ -3790,8 +3891,7 @@ services:
 #      - '--tls.insecure-skip-verify'
 #    restart: always
 #    networks:
-#      - vm_net
-#      - slots-net
+#      - monitor_net
 #
 #  redis_exporter:
 #    image: oliver006/redis_exporter:v1.62.0
@@ -3800,12 +3900,11 @@ services:
 #      - 9121
 #    command:
 #      - "--redis.addr=redis://redis-stack-slots:6379"
-#      - "--redis.password=OzTKYlJ9KvGZAkYf9B"
+#      - "--redis.password=OzTKxxx9B"
 #      - '--debug'
 #    restart: always
 #    networks:
-#      - vm_net
-#      - slots-net
+#      - monitor_net
 
 #  debian:
 #    image: debian:unstable-slim
@@ -3815,8 +3914,7 @@ services:
 #    #entrypoint:
 #    #  - cat
 #    networks:
-#      - vm_net
-#      - slots-net
+#      - monitor_net
 EOF</span>
 </pre>
 </div>
@@ -3878,7 +3976,7 @@ EOF</span>
 <p>
 vaules.yaml
 </p>
-<pre class="example" id="org6839485">
+<pre class="example" id="org8ade6ad">
 prometheus:
   prometheusSpec:
     enableAdminAPI: true

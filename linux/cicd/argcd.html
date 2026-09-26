@@ -1,0 +1,2609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: CICD-ArgoCD</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="GitOps 由 Weaveworks 公司在 2017年 提出。" />
+<link rel="canonical" href="https://xuchangwei.com/linux/cicd/argcd.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: CICD-ArgoCD" />
+<meta property="og:description" content="GitOps 由 Weaveworks 公司在 2017年 提出。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/cicd/argcd.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/cicd/argcd.html","@type":"WebPage","name":"Linux: CICD-ArgoCD","description":"GitOps 由 Weaveworks 公司在 2017年 提出。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: CICD-ArgoCD</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:EAC18214-247E-4FA0-AD54-54293CC52A99">GitOps 介绍</a>
+<ul>
+<li><a href="#h:C5BAB517-C426-434F-A7F9-9DB8B61ADD5B">什么是 GitOps</a></li>
+<li><a href="#h:21D447E1-1C9B-4A66-B8FD-29C9574960B4">GitOps 核心理念：声明式运维</a></li>
+<li><a href="#h:9DDBEBB7-6E0E-4903-8A28-D285ECB2A1CD">GitOps 工作流程</a></li>
+<li><a href="#h:7BF9FB6E-D37A-428E-AE4C-6AB74112BEE9">GitOps 对比 传统 CD</a></li>
+<li><a href="#h:69E0238D-450D-481F-A41B-982A28FBB3D7">主流 GitOps 工具对比</a></li>
+<li><a href="#h:6F78A1C7-D448-4C61-B061-121B0831AEA8">GitOps 适用与不适用场景</a></li>
+</ul>
+</li>
+<li><a href="#h:757FE916-37E2-4D9B-BD31-4EC7B22146AC">Argo 介绍</a></li>
+<li><a href="#h:2A499FA3-A928-4677-A61C-F822689B5430">ArgoCD 介绍和架构</a>
+<ul>
+<li><a href="#h:F4B8BCAF-7C87-4011-89CC-E4761A6124D2">ArgoCD 是什么</a></li>
+<li><a href="#h:DF6639F4-DDE3-446D-8677-AB754CC0F88B">ArgoCD 架构</a></li>
+<li><a href="#h:DBC7D2ED-1545-4B50-B94B-665748B846C6">ArgoCD 核心组件</a></li>
+<li><a href="#h:760BD305-F9E8-4916-99BC-B0A8C7283487">ArgoCD 配套主流 CI 工具</a>
+<ul>
+<li><a href="#h:6945B031-E7E1-4972-A1F8-778F011F9678">明确核心分工</a></li>
+<li><a href="#h:04036747-9420-497B-B77D-5569B7EE091A">ArgoCD和主流CI对比</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:E03E8D70-7057-4242-B3A1-1E4E000779F8">安装</a>
+<ul>
+<li><a href="#h:7B9A65E0-EA2D-4273-87B1-9360C1ACF543">安装</a>
+<ul>
+<li><a href="#h:1AD002EB-78DD-4891-9B55-55F9F8AF4A73">方法1-基于 mainfests 安装</a></li>
+<li><a href="#h:57AD9D3B-CFE8-47A0-92C4-40408AD5E1AE">方法2-基于 helm 安装</a></li>
+</ul>
+</li>
+<li><a href="#h:FF343091-C85E-46BA-BBE8-7D5B1B922236">UI 访问</a>
+<ul>
+<li><a href="#h:30773281-2921-40E6-9563-09616A155E20">方法1-基于 LoadBalancer 或者 NodePort 类型</a></li>
+<li><a href="#h:BC9550D9-545C-4282-9BF2-A0A843CC6F05">方法2-基于 ingress http</a></li>
+<li><a href="#h:5DF44BD6-A46E-4F61-8B26-2570AC54A2D7">方法3-基于 ingress SSL Passthrough TLS 透传实例 https</a></li>
+<li><a href="#h:73D58EC4-CA95-414F-990D-43F1F15EA379">方法4-基于 Port Forwarding</a></li>
+<li><a href="#h:C1060A97-3651-40C8-9078-B910480692C9">方法5-基于 gateway api</a></li>
+</ul>
+</li>
+<li><a href="#h:292694B5-A5ED-4E39-B1A1-9480167DDDFB">UI 登录修改密码</a>
+<ul>
+<li><a href="#h:3DE9684C-577D-4199-A04B-5129C39DB027">获取登录密码</a></li>
+<li><a href="#h:36307C5F-9B1F-4679-A2AE-B71D870710E0">登录并修改密码</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:069CC269-5E6B-4B58-95DF-7AA79889E913">相关 CR 资源说明</a>
+<ul>
+<li><a href="#h:02121C28-8E41-41DD-85C5-B749F0DE1B38">ArgoCD 核心 CR (Custom Resource)</a>
+<ul>
+<li><a href="#h:2B4EA021-804B-4AFE-BB78-FC9697341513">Application(最核心，单应用部署定义)</a>
+<ul>
+<li><a href="#h:CF835643-CDE8-4C0E-8A0D-5BFE7F583B1F">代码库</a></li>
+<li><a href="#h:0E8905DD-E547-412A-A613-F482D0D08238">多集群管理</a></li>
+</ul>
+</li>
+<li><a href="#h:5F11C8EE-230C-42EA-937E-275ACF7A8E4C">ApplicationSet(批量生成 Application)</a></li>
+<li><a href="#h:9F18C361-E6DB-4048-9759-ED91654EBD59">AppProject(多租户权限管控)</a>
+<ul>
+<li><a href="#h:2BE6A7E0-9272-4CCB-B92D-091FAA889E0E">自定义 Project</a></li>
+<li><a href="#h:6737BC5C-66C8-44CB-8F59-38B3A3EE4085">添加用户</a></li>
+<li><a href="#h:926FDC25-26FA-4E45-8627-43808A392AFE">api 同步</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:38CA62FC-FBA2-4B2B-88CC-5C4DD01F6B3E">ArgoCD Application source 支持渲染类型</a>
+<ul>
+<li><a href="#h:82D70CB1-B40E-4EEF-8BDA-D343467E47A0">秒级同步</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:D7A47513-FF30-402D-A1EF-F0DF958B0345">管理应用实现 CD 实例</a>
+<ul>
+<li><a href="#h:7D3318F9-9902-44F7-8A1B-B1E7E72417D1">GitOps 仓库结构设计</a></li>
+<li><a href="#h:11576F9D-E61F-400C-9F82-04E11DA2AFA9">基于 Directory 案例</a></li>
+<li><a href="#h:92338562-1346-4249-B2FF-6111296F01F4">基于 Kustomize 案例</a></li>
+<li><a href="#h:A570791B-9947-4F42-AA98-507BBEF9FDE7">基于 Helm 案例</a></li>
+<li><a href="#h:CDF18F85-A0D6-40CA-B654-ED3CC8D19698">applicationset 案例</a></li>
+</ul>
+</li>
+<li><a href="#h:6E2E2209-EEA9-4A85-A7C8-1CFE16F50AA7">CLI 工具</a>
+<ul>
+<li><a href="#h:8A1AED11-0704-4E31-8EED-5DA5A6EEBD4C">argocd 安装和登录</a></li>
+<li><a href="#h:D8ACF1C3-E57E-4E6B-A49E-BF85D3E50457">argocd 用法说明</a></li>
+</ul>
+</li>
+<li><a href="#h:7CEF77D0-A0FC-42CA-9705-176E36527ED3">维护</a>
+<ul>
+<li><a href="#h:19BCE958-A715-4C64-A057-4700F76C11C5">查看</a></li>
+<li><a href="#h:AB89B6B7-9D75-4D5E-B9BE-C55548EB46AF">同步</a></li>
+<li><a href="#h:EB64C1CC-E781-4B4E-B7FB-63D880EE6E43">回滚</a></li>
+<li><a href="#h:F0742739-7597-42D3-B4C9-40AA3599EE2C">订阅通知</a></li>
+<li><a href="#h:FA3C39EB-F13E-4C96-97FA-1F1554A53398">CICD 脚本</a></li>
+</ul>
+</li>
+<li><a href="#h:A10C4498-BB23-408A-9733-85D08806FF3A">参考</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">CICD</a></li>
+</ul>
+<section id="outline-container-h:EAC18214-247E-4FA0-AD54-54293CC52A99" class="outline-2">
+<h2 id="h:EAC18214-247E-4FA0-AD54-54293CC52A99"><a href="#h:EAC18214-247E-4FA0-AD54-54293CC52A99">GitOps 介绍</a></h2>
+<div class="outline-text-2" id="text-h:EAC18214-247E-4FA0-AD54-54293CC52A99">
+</div>
+<div id="outline-container-h:C5BAB517-C426-434F-A7F9-9DB8B61ADD5B" class="outline-3">
+<h3 id="h:C5BAB517-C426-434F-A7F9-9DB8B61ADD5B"><a href="#h:C5BAB517-C426-434F-A7F9-9DB8B61ADD5B">什么是 GitOps</a></h3>
+<div class="outline-text-3" id="text-h:C5BAB517-C426-434F-A7F9-9DB8B61ADD5B">
+<p>
+GitOps 由 Weaveworks 公司在 2017年 提出。
+</p>
+
+<p>
+CNCF(云原生基金会) 官方标准定义 GitOps
+</p>
+<ul class="org-ul">
+<li>GitOps 是一套标准化云原生运维交付范式，用于实现持续部署</li>
+<li>它将 <b>基础设施、应用的全部期望状态</b> 以声明式格式存入 Git 仓库并把 Git 作为 <b>唯一可信数据源</b> 。</li>
+<li>部署在目标集群内的代理程序(如ArgoCD、Flux)会主动从 Git 拉取配置，持续对比集群真实状态,自动收敛至 Git 中定义的期望状态。</li>
+</ul>
+
+
+<p>
+传统 CI/CD：CI 打包镜像 &#x2013;&gt; 工具(kubectl/helm) 直接推送资产原到集群
+</p>
+
+<p>
+GitOps：Git 存所有 K8s YAML &#x2013;&gt; 集群控制器拉取 Git 配置，自动同步集群状态
+</p>
+</div>
+</div>
+<div id="outline-container-h:21D447E1-1C9B-4A66-B8FD-29C9574960B4" class="outline-3">
+<h3 id="h:21D447E1-1C9B-4A66-B8FD-29C9574960B4"><a href="#h:21D447E1-1C9B-4A66-B8FD-29C9574960B4">GitOps 核心理念：声明式运维</a></h3>
+<div class="outline-text-3" id="text-h:21D447E1-1C9B-4A66-B8FD-29C9574960B4">
+<p>
+CNCF 认证标准符合以下 4 条，才算标准的 GitOps 实现
+</p>
+
+<dl class="org-dl">
+<dt>Declarative 声明式</dt><dd><p>
+系统所有期望状态（应用 yaml、helm、kustiomize、网络策略、RBAC） 必须用声明式描述，只定义“最终要达到什么状态”，而非分步执行命令； 工具自动计算差异完成变更。
+</p>
+
+<blockquote>
+<p>
+对比：命令式（kubectl run / Jenkins 脚本）是“一步步做什么”，不符合 GitOps。
+</p>
+</blockquote></dd>
+
+<dt>Versioned &amp; Immutable 版本化、不可变</dt><dd><p>
+所有期望的状态统一放在 Git 版本仓库，天然具备完整提交历史、变更审计；
+</p>
+
+<p>
+支持一键回滚至任意历史提交，不允许无记录的临时手动修改集群。
+</p></dd>
+
+<dt>Pulled Automatically 自动拉取（Pull 模型，核心区别于传统 Jenkins）</dt><dd><p>
+集群内部代理（ArgoCD）主动从 Git 拉取配置，而非外部 CI 工具推送配置到集群；
+</p>
+
+<p>
+<b>集群凭证仅保存在集群内部</b> ，不会暴露给 Jenkins 等外网流水线，安全性大副提升。
+</p></dd>
+
+<dt>Continuously Reconsiled 持续协调自愈</dt><dd>代理程序循环检测集群真实状态与 Git 期望状态，一旦发现配置飘逸（如人工 kubectl 改集群资源），自动将集群恢复为 Git 内标准状态，杜绝环境不一致。</dd>
+</dl>
+</div>
+</div>
+<div id="outline-container-h:9DDBEBB7-6E0E-4903-8A28-D285ECB2A1CD" class="outline-3">
+<h3 id="h:9DDBEBB7-6E0E-4903-8A28-D285ECB2A1CD"><a href="#h:9DDBEBB7-6E0E-4903-8A28-D285ECB2A1CD">GitOps 工作流程</a></h3>
+<div class="outline-text-3" id="text-h:9DDBEBB7-6E0E-4903-8A28-D285ECB2A1CD">
+<p>
+<b>仓库分层</b>
+</p>
+
+<p>
+通常分两类仓库隔离职责：
+</p>
+
+<ol class="org-ol">
+<li>应用代码仓库(App Repo)：业务代码、Dockerfile，CI 打包镜像、推送镜像仓库，更新镜像版本提交到配置仓库。</li>
+<li>集群配置仓库(Infra/GitOps Repo)：存放所有K8s资源清单，分环境目录(dev/test/prod)。</li>
+</ol>
+
+
+
+<figure id="org9610ea1">
+<img style="aspect-ratio:1036/529" decoding="async" loading="lazy" src="./images/img_20260903_010220.webp" alt="img_20260903_010220.webp" width="800">
+
+</figure>
+
+
+<p>
+<b>GitOps 完整流程</b>
+</p>
+
+<p>
+流程：
+</p>
+<ol class="org-ol">
+<li>开发提交业务代码到应用仓库</li>
+<li>CI 拉代码、编译、跑测试</li>
+<li>CI 流水线构建容器镜像，推送到镜像仓库</li>
+<li>CI 自动修改 GitOps 仓库中 Deployment 的镜像 tag，提交 PR(PuRequest)/MR (Merge Request)</li>
+<li>运维审核 PR、合并到主分支</li>
+</ol>
+
+
+<p>
+CD流程：GitOps 只工作于 CD，只监听 <b>配置仓库</b>
+</p>
+<ol class="org-ol">
+<li>集群内 GitOps 控制器(ArgoCD/Flux)定时拉取 Git 仓库</li>
+<li>控制器对比集群当前资源，检测 Git 配置文件变更(镜像版本本、资源规格、环境变量修改)，自动执行更新、滚动发布</li>
+<li>集群发生人工篡改(手动 kubectl edit)，控制器检测差异， <b>自动回滚为 Git 版本</b></li>
+<li>故障回滚：仅需 Git 仓库回滚提交，控制器自动同步旧版本。</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:7BF9FB6E-D37A-428E-AE4C-6AB74112BEE9" class="outline-3">
+<h3 id="h:7BF9FB6E-D37A-428E-AE4C-6AB74112BEE9"><a href="#h:7BF9FB6E-D37A-428E-AE4C-6AB74112BEE9">GitOps 对比 传统 CD</a></h3>
+<div class="outline-text-3" id="text-h:7BF9FB6E-D37A-428E-AE4C-6AB74112BEE9">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">维度</th>
+<th scope="col" class="org-left">传统CICD(直接操作集群,kubectl部署)</th>
+<th scope="col" class="org-left">GitOps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">可信数据源</td>
+<td class="org-left">集群实时状态</td>
+<td class="org-left">Git 仓库</td>
+</tr>
+
+<tr>
+<td class="org-left">部署方式</td>
+<td class="org-left">命令式(执行脚本)</td>
+<td class="org-left">声明式(对比状态)</td>
+</tr>
+
+<tr>
+<td class="org-left">数据流</td>
+<td class="org-left">主动推送配置到集群</td>
+<td class="org-left">集群内 Agent 主动拉取 Git 配置</td>
+</tr>
+
+<tr>
+<td class="org-left">变更记录</td>
+<td class="org-left">零散日志，难追溯</td>
+<td class="org-left">Git commit完整历史</td>
+</tr>
+
+<tr>
+<td class="org-left">回滚方式</td>
+<td class="org-left">需要手动操作流水线</td>
+<td class="org-left">直接回滚 Git 版本</td>
+</tr>
+
+<tr>
+<td class="org-left">集群漂移</td>
+<td class="org-left">极易发生，人工修改无法管控</td>
+<td class="org-left">自动修复漂移</td>
+</tr>
+
+<tr>
+<td class="org-left">权限管控</td>
+<td class="org-left">CICD 都需开放K8S集群操作权限</td>
+<td class="org-left">CI 仅需要管控 Git 仓库权限</td>
+</tr>
+
+<tr>
+<td class="org-left">多环境管理</td>
+<td class="org-left">脚本复制，易出错</td>
+<td class="org-left">多分支/目录隔离配置，一套 Git 仓库，</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">同时同步多套K8s集群，统一管控基础设施</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-h:69E0238D-450D-481F-A41B-982A28FBB3D7" class="outline-3">
+<h3 id="h:69E0238D-450D-481F-A41B-982A28FBB3D7"><a href="#h:69E0238D-450D-481F-A41B-982A28FBB3D7">主流 GitOps 工具对比</a></h3>
+<div class="outline-text-3" id="text-h:69E0238D-450D-481F-A41B-982A28FBB3D7">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">工具</td>
+<td class="org-left">开发方</td>
+<td class="org-left">核心特点</td>
+<td class="org-left">适用场景</td>
+</tr>
+
+<tr>
+<td class="org-left">ArgoCD</td>
+<td class="org-left">RedHat</td>
+<td class="org-left">UI 可视化、支持 Kustomize/Helm、集群可视化、</td>
+<td class="org-left">企业级生产、可视化操作、多集群管理，</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">Webhook、权限完善、支持手动同步、自动同步两种模式</td>
+<td class="org-left">当前最主流企业 GitOps 工具</td>
+</tr>
+
+<tr>
+<td class="org-left">Flux CD</td>
+<td class="org-left">CNCF 毕业项目</td>
+<td class="org-left">轻量、原生集成 Helm、CI 联动强、</td>
+<td class="org-left">云原生原生、轻量化集群、自动化流水线</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">无UI(配套Flux  Dashboard)</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">Argo Rollouts</td>
+<td class="org-left">RedHat</td>
+<td class="org-left">配合 ArgoCD，灰度发布、蓝绿、金丝雀</td>
+<td class="org-left">需要精细化发布策略的业务</td>
+</tr>
+
+<tr>
+<td class="org-left">Flagger</td>
+<td class="org-left">Weaveworks</td>
+<td class="org-left">配套 Flux，自动化灰度+指标判断</td>
+<td class="org-left">全自动流量发布</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-h:6F78A1C7-D448-4C61-B061-121B0831AEA8" class="outline-3">
+<h3 id="h:6F78A1C7-D448-4C61-B061-121B0831AEA8"><a href="#h:6F78A1C7-D448-4C61-B061-121B0831AEA8">GitOps 适用与不适用场景</a></h3>
+<div class="outline-text-3" id="text-h:6F78A1C7-D448-4C61-B061-121B0831AEA8">
+<p>
+适合
+</p>
+<ul class="org-ul">
+<li>多 K8s 集群、多环境企业;</li>
+<li>需要严格审计、变更追溯的生产环境;</li>
+<li>团队分离开发/运维,收紧集群权限;</li>
+<li>微服务持续频繁发布。</li>
+<li>只要资源能用 <b>声明式代码</b> 描述、能检测配置漂移,无论云资源、反控制机、裸金属、数据库、传统服务器,都能落地 GitOps</li>
+</ul>
+
+<p>
+不适合
+</p>
+<ul class="org-ul">
+<li>单机临时测试、短期本地开发环境;</li>
+<li>完全无代码管理、一次性临时集群。</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-h:757FE916-37E2-4D9B-BD31-4EC7B22146AC" class="outline-2">
+<h2 id="h:757FE916-37E2-4D9B-BD31-4EC7B22146AC"><a href="#h:757FE916-37E2-4D9B-BD31-4EC7B22146AC">Argo 介绍</a></h2>
+<div class="outline-text-2" id="text-h:757FE916-37E2-4D9B-BD31-4EC7B22146AC">
+<p>
+<b>项目基础概况</b>
+</p>
+
+<p>
+<a href="https://argoproj.github.io/">https://argoproj.github.io/</a>
+</p>
+
+<p>
+Argo 是一套 <b>K8s原生开源工具套件</b> ，用于运行和管理 Kubernetes上 的作业和应用程序。
+</p>
+
+<p>
+由 Intuit 公司创立，2020 年进入 CNCF 孵化，现已正式毕业，是云原生领域最主流的 GitOps、CI/CD、流水线、灰度发布标准工具栈 Code Pipes。
+</p>
+
+<p>
+所有的 Argo 工具都实现为控制器和自定义资源。
+</p>
+
+<p>
+全部基于 Kubernetes CRD 扩展，所有组件独立可单独部署，也可组合搭建完整云原生交付平台，覆盖 <b>流水线、持续部署、灰度发布、事件自动化</b> 四大核心场景。
+</p>
+
+<p>
+发展时间线
+</p>
+<ul class="org-ul">
+<li>2015：初代 ArgoWorkflows 发布</li>
+<li>2017：ArgoCD 诞生，落地 GitOps 理念</li>
+<li>2019：Argo Rollouts、Argo Events 推出</li>
+<li>2020：整体进入 CNCF 孵化</li>
+<li>2022：全套四大核心组件正式从 CNCF 毕业</li>
+</ul>
+
+
+<p>
+<b>四大核心独立组件</b>
+</p>
+
+<p>
+四个组件无强制依赖,可按需单独安装使用:
+</p>
+
+
+<dl class="org-dl">
+<dt>Argo CD</dt><dd><ul class="org-ul">
+<li>核心定位：GitOps 持续交付工具</li>
+<li>核心作用：以Git仓库为唯一可信源，自动同步 K8s 资源配置到集群</li>
+<li>关键能力：
+<ol class="org-ol">
+<li>持续对比Git期望状态与集群实际状态，自动修复配置漂移</li>
+<li>提供WebUI、CLI、API，支持多集群统一管理</li>
+<li>一键同步/回滚、部署审计日志、RBAC 权限、SSO 登录</li>
+<li>扩展组件：ApplicationSet 批量管理应用、Image Updater 自动更新镜像</li>
+</ol></li>
+<li>典型业务场景：Git 提交 K8s YAML 清单，ArgoCD 自动拉取配置并完成集群部署，标准 GitOps 落地流程</li>
+</ul></dd>
+<dt>Argo Workflows</dt><dd><ul class="org-ul">
+<li>核心定位：K8s 原生容器流水线引擎</li>
+<li>核心作用：在 K8s 上编排容器化任务流水线，替代原生 Job/Cronjob</li>
+<li>关键能力：
+<ol class="org-ol">
+<li>支持串行、并行、DAG 依赖拓扑编排任务</li>
+<li>每个任务独立容器运行，资源隔离、弹性调度</li>
+<li>内置脚本、缓存、循环、分支、人工审批能力</li>
+</ol></li>
+<li>典型业务场景：代码提交后自动执行完整 CI 流程：代码编译 &#x2013;&gt; 单元测试 &#x2013;&gt; 镜像构建 &#x2013;&gt; 镜像推送</li>
+</ul></dd>
+<dt>Argo Rollouts</dt><dd><ul class="org-ul">
+<li>核心定位：渐进式灰度发布控制器</li>
+<li>核心作用：弥补 K8s 原生 Deployment 滚动更新短板，提供企业级精细化发布策略</li>
+<li>关键能力：
+<ol class="org-ol">
+<li>金丝雀发布：按比例逐步切分流量放量</li>
+<li>蓝绿发布：两套完整环境快速切换，一键回滚</li>
+<li>对接 Prometheus 监控指标，异常自动回滚</li>
+<li>配合服务网格(Istio/Linkerd)实现精准流量权重、标签灰度</li>
+</ol></li>
+<li>典型业务场景：生产新版本上线,先分配 10% 用户流量验证，指标无异常后再全量发布</li>
+</ul></dd>
+<dt>Argo Events</dt><dd><ul class="org-ul">
+<li>核心定位：事件驱动自动化框架</li>
+<li>核心作用：监听内外各类事件，自动触发集群自动化动作</li>
+<li>关键能力：
+<ol class="org-ol">
+<li>支持海量事件源：Git Webhook、镜像推送、K8s 资源变更、定时任务、Kafka/MQ、HTTP 回调、监控告警</li>
+<li>可触发 Workflow、ArgoCD 同步、创建K8s资源等动作</li>
+</ol></li>
+<li>典型业务场景：
+<ol class="org-ol">
+<li>Git代码提交自动触发CI流水线</li>
+<li>镜像仓库推送新版本镜像后，自动触发 ArgoCD 重新部署应用</li>
+</ol></li>
+</ul></dd>
+</dl>
+</div>
+</section>
+<section id="outline-container-h:2A499FA3-A928-4677-A61C-F822689B5430" class="outline-2">
+<h2 id="h:2A499FA3-A928-4677-A61C-F822689B5430"><a href="#h:2A499FA3-A928-4677-A61C-F822689B5430">ArgoCD 介绍和架构</a></h2>
+<div class="outline-text-2" id="text-h:2A499FA3-A928-4677-A61C-F822689B5430">
+</div>
+<div id="outline-container-h:F4B8BCAF-7C87-4011-89CC-E4761A6124D2" class="outline-3">
+<h3 id="h:F4B8BCAF-7C87-4011-89CC-E4761A6124D2"><a href="#h:F4B8BCAF-7C87-4011-89CC-E4761A6124D2">ArgoCD 是什么</a></h3>
+<div class="outline-text-3" id="text-h:F4B8BCAF-7C87-4011-89CC-E4761A6124D2">
+<ul class="org-ul">
+<li><a href="https://github.com/argoproj/argo-cd">https://github.com/argoproj/argo-cd</a></li>
+<li><a href="https://argo-cd.readthedocs.io/en/stable/">https://argo-cd.readthedocs.io/en/stable/</a></li>
+</ul>
+
+
+<p>
+ArgoCD 是一个为 Kubernetes 而生的，遵循声明式 GitOps 理念的持续部部署工具。
+</p>
+
+<p>
+ArgoCD 遵循 GitOps 模式，使用 Git 仓库作为定义所需应用程序状态的真实来源
+</p>
+
+<p>
+ArgoCD 是云原生计算基金会(Cloud Native Computing FoNCF)的成员。
+</p>
+
+<p>
+2018年3月首次发布 v0.1.0 版本，2019 年 5 月发布 v1.0.0 版本
+</p>
+</div>
+</div>
+<div id="outline-container-h:DF6639F4-DDE3-446D-8677-AB754CC0F88B" class="outline-3">
+<h3 id="h:DF6639F4-DDE3-446D-8677-AB754CC0F88B"><a href="#h:DF6639F4-DDE3-446D-8677-AB754CC0F88B">ArgoCD 架构</a></h3>
+<div class="outline-text-3" id="text-h:DF6639F4-DDE3-446D-8677-AB754CC0F88B">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/#architecture">https://argo-cd.readthedocs.io/en/stable/#architecture</a></li>
+</ul>
+
+
+
+<figure id="org494dea0">
+<img style="aspect-ratio:743/708" decoding="async" loading="lazy" src="./images/20260903-015235.webp" alt="20260903-015235.webp" width="800">
+
+<figcaption><span class="figure-number">&#22270;2&nbsp; </span>ArgoCD 架构图</figcaption>
+</figure>
+</div>
+</div>
+<div id="outline-container-h:DBC7D2ED-1545-4B50-B94B-665748B846C6" class="outline-3">
+<h3 id="h:DBC7D2ED-1545-4B50-B94B-665748B846C6"><a href="#h:DBC7D2ED-1545-4B50-B94B-665748B846C6">ArgoCD 核心组件</a></h3>
+<div class="outline-text-3" id="text-h:DBC7D2ED-1545-4B50-B94B-665748B846C6">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">组件</th>
+<th scope="col" class="org-left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">argocd-server</td>
+<td class="org-left">API + UI</td>
+</tr>
+
+<tr>
+<td class="org-left">argocd-repo-server</td>
+<td class="org-left">拉取 Git 仓库</td>
+</tr>
+
+<tr>
+<td class="org-left">argocd-application-controller</td>
+<td class="org-left">核心控制器(调谐状态)</td>
+</tr>
+
+<tr>
+<td class="org-left">argocd-dex-server</td>
+<td class="org-left">SSO 认证</td>
+</tr>
+
+<tr>
+<td class="org-left">Redis</td>
+<td class="org-left">缓存</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-h:760BD305-F9E8-4916-99BC-B0A8C7283487" class="outline-3">
+<h3 id="h:760BD305-F9E8-4916-99BC-B0A8C7283487"><a href="#h:760BD305-F9E8-4916-99BC-B0A8C7283487">ArgoCD 配套主流 CI 工具</a></h3>
+<div class="outline-text-3" id="text-h:760BD305-F9E8-4916-99BC-B0A8C7283487">
+</div>
+<div id="outline-container-h:6945B031-E7E1-4972-A1F8-778F011F9678" class="outline-4">
+<h4 id="h:6945B031-E7E1-4972-A1F8-778F011F9678"><a href="#h:6945B031-E7E1-4972-A1F8-778F011F9678">明确核心分工</a></h4>
+<div class="outline-text-4" id="text-h:6945B031-E7E1-4972-A1F8-778F011F9678">
+<p>
+<b>ArgoCD 只做 CD(集群部署、GitOps同步)，不负责代码编译、镜像构建、单元测试</b>
+</p>
+<ul class="org-ul">
+<li>必须搭配 CI 工具完成「代码→镜像→更新Git配置」整条流水线。</li>
+</ul>
+
+<p>
+<b>标准 GitOps 流程统一逻辑:</b>
+</p>
+<ul class="org-ul">
+<li>代码提交 → CI 执行测试/构建镜像推送仓库 → CI 修改 GitOps 仓库的 Deployyment/Helm values 镜像标签并提交 → ArgoCD 监听 Git 变更自动同步到集群。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:04036747-9420-497B-B77D-5569B7EE091A" class="outline-4">
+<h4 id="h:04036747-9420-497B-B77D-5569B7EE091A"><a href="#h:04036747-9420-497B-B77D-5569B7EE091A">ArgoCD和主流CI对比</a></h4>
+<div class="outline-text-4" id="text-h:04036747-9420-497B-B77D-5569B7EE091A">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">CI工具</td>
+<td class="org-left">最佳匹配企业规模</td>
+<td class="org-left">核心优势</td>
+<td class="org-left">短板</td>
+</tr>
+
+<tr>
+<td class="org-left">Drone</td>
+<td class="org-left">小型私有K8s集群、极简轻量化需求、预算有限小团队</td>
+<td class="org-left">部署极简，单容器即可运行；配置文件简洁；完全容器化执行；资源占用极低；开源免费无臃肿组件</td>
+<td class="org-left">企业级多租户、权限、审计能力薄弱;生态插件少，复杂构建需大量自定义脚本;大厂大规模落地案例少</td>
+</tr>
+
+<tr>
+<td class="org-left">GitLab CI</td>
+<td class="org-left">几十~两百人中小团队、GitLab 用户</td>
+<td class="org-left">代码仓库一体化，零额外运维</td>
+<td class="org-left">平台化多租户能力弱</td>
+</tr>
+
+<tr>
+<td class="org-left">Jenkins</td>
+<td class="org-left">传统企业、存量改造、复杂构建</td>
+<td class="org-left">插件丰富，兼容各类老旧构建工具</td>
+<td class="org-left">有单点，运维成本高</td>
+</tr>
+
+<tr>
+<td class="org-left">Tekton</td>
+<td class="org-left">中大型集团、金融、自研 DevOps 平台、OpenShift</td>
+<td class="org-left">K8s 原生、多租户、弹性扩缩容、合规强</td>
+<td class="org-left">上手门槛高，需自研前端门户</td>
+</tr>
+
+<tr>
+<td class="org-left">Argo Workflows</td>
+<td class="org-left">纯云原生小团队、简单流水线</td>
+<td class="org-left">同 Argo 生态，语法统一</td>
+<td class="org-left">多租户管控不足</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:E03E8D70-7057-4242-B3A1-1E4E000779F8" class="outline-2">
+<h2 id="h:E03E8D70-7057-4242-B3A1-1E4E000779F8"><a href="#h:E03E8D70-7057-4242-B3A1-1E4E000779F8">安装</a></h2>
+<div class="outline-text-2" id="text-h:E03E8D70-7057-4242-B3A1-1E4E000779F8">
+</div>
+<div id="outline-container-h:7B9A65E0-EA2D-4273-87B1-9360C1ACF543" class="outline-3">
+<h3 id="h:7B9A65E0-EA2D-4273-87B1-9360C1ACF543"><a href="#h:7B9A65E0-EA2D-4273-87B1-9360C1ACF543">安装</a></h3>
+<div class="outline-text-3" id="text-h:7B9A65E0-EA2D-4273-87B1-9360C1ACF543">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/getting_started/">https://argo-cd.readthedocs.io/en/stable/getting_started/</a></li>
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/">https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/</a></li>
+</ul>
+
+
+<p>
+官方说明
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#38750;&#39640;&#21487;&#29992; HA
+</span>kubectl create namespace argocd
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#25351;&#23450;&#29256;&#26412;
+</span>kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.2/manifests/install.yaml
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#26368;&#26032;&#29256;&#26412;
+</span>kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">HA
+</span>kubectl create namespace argocd
+kubectl apply -n argocd --server-side --force-conflicts -f https://github.com/argoproj/argo-cd/blob/stable/manifests/ha/install.yaml
+</pre>
+</div>
+</div>
+<div id="outline-container-h:1AD002EB-78DD-4891-9B55-55F9F8AF4A73" class="outline-4">
+<h4 id="h:1AD002EB-78DD-4891-9B55-55F9F8AF4A73"><a href="#h:1AD002EB-78DD-4891-9B55-55F9F8AF4A73">方法1-基于 mainfests 安装</a></h4>
+<div class="outline-text-4" id="text-h:1AD002EB-78DD-4891-9B55-55F9F8AF4A73">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create namespace argocd
+<span class="org-variable-name">VERSION</span>=3.5.2
+wget https://raw.githubusercontent.com/argoproj/argo-cd/v${<span class="org-variable-name">VERSION</span>}/manifests/install.yaml
+kubectl apply -n argocd --server-side --force-conflicts -f install.yaml
+
+grep <span class="org-string">"^kind:"</span> install.yaml
+grep <span class="org-string">"image:"</span> install.yaml <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#38236;&#20687;
+</span>        image: quay.io/argoproj/argocd:v3.5.2
+        image: ghcr.io/dexidp/dex:v2.45.1
+        image: quay.io/argoproj/argocd:v3.5.2
+        image: quay.io/argoproj/argocd:v3.5.2
+        image: public.ecr.aws/docker/library/redis:8.2.3-alpine
+        image: quay.io/argoproj/argocd:v3.5.2
+        image: quay.io/argoproj/argocd:v3.5.2
+        image: quay.io/argoproj/argocd:v3.5.2
+        image: quay.io/argoproj/argocd:v3.5.2
+        image: quay.io/argoproj/argocd:v3.5.2
+
+        
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104; CRD
+</span>kubectl get crd | grep argo
+kubectl api-resources | grep -i argo
+
+kubectl get pod -n argocd
+kubectl get cm -n argocd
+kubectl get secrets -n argocd
+
+</pre>
+</div>
+
+<p>
+范例
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">root@jenkins:~/.jasper/tmp# kubectl get crd | grep argo
+applications.argoproj.io                                  2026-09-05T06:51:28Z
+applicationsets.argoproj.io                               2026-09-05T06:51:29Z
+appprojects.argoproj.io                                   2026-09-05T06:51:30Z
+root@jenkins:~/.jasper/tmp# kubectl api-resources | grep -i argo
+applications                        app,apps                          argoproj.io/v1alpha1                  true         Application
+applicationsets                     appset,appsets                    argoproj.io/v1alpha1                  true         ApplicationSet
+appprojects                         appproj,appprojs                  argoproj.io/v1alpha1                  true         AppProject
+root@jenkins:~/.jasper/tmp# kubectl get pod -n argocd
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0          55s
+argocd-applicationset-controller-5959f79d67-klcvn   1/1     Running   0          56s
+argocd-dex-server-6f84fd5569-k56gs                  1/1     Running   0          56s
+argocd-notifications-controller-5856884878-lhmd4    1/1     Running   0          56s
+argocd-redis-86846d5986-2z2rh                       1/1     Running   0          56s
+argocd-repo-server-7d44c57bc8-hjv67                 1/1     Running   0          56s
+argocd-server-8567f6cc96-m4hmn                      1/1     Running   0          56s
+
+kubectl get cm -n argocd
+NAME                        DATA   AGE
+argocd-cm                   9      58s
+argocd-cmd-params-cm        0      58s
+argocd-gpg-keys-cm          0      58s
+argocd-notifications-cm     0      58s
+argocd-rbac-cm              0      58s
+argocd-ssh-known-hosts-cm   1      58s
+argocd-tls-certs-cm         0      58s
+kube-root-ca.crt            1      2m36s
+
+root@jenkins:~/.jasper/tmp# kubectl get secrets -n argocd
+NAME                          TYPE     DATA   AGE
+argocd-initial-admin-secret   Opaque   1      60s
+argocd-notifications-secret   Opaque   0      73s
+argocd-redis                  Opaque   1      63s
+argocd-secret                 Opaque   5      73s
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:57AD9D3B-CFE8-47A0-92C4-40408AD5E1AE" class="outline-4">
+<h4 id="h:57AD9D3B-CFE8-47A0-92C4-40408AD5E1AE"><a href="#h:57AD9D3B-CFE8-47A0-92C4-40408AD5E1AE">方法2-基于 helm 安装</a></h4>
+<div class="outline-text-4" id="text-h:57AD9D3B-CFE8-47A0-92C4-40408AD5E1AE">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/#helm">https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/#helm</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#28155;&#21152; helm repo
+</span>helm repo add argo-cd https://argoproj.github.io/argo-helm
+helm repo update
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#21629;&#21517;&#31354;&#38388;&#24182;&#23433;&#35013;
+</span>helm install --create-namespace argocd arg/argo-cd -n argocd
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:FF343091-C85E-46BA-BBE8-7D5B1B922236" class="outline-3">
+<h3 id="h:FF343091-C85E-46BA-BBE8-7D5B1B922236"><a href="#h:FF343091-C85E-46BA-BBE8-7D5B1B922236">UI 访问</a></h3>
+<div class="outline-text-3" id="text-h:FF343091-C85E-46BA-BBE8-7D5B1B922236">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#gateway-api-example">https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#gateway-api-example</a></li>
+</ul>
+</div>
+<div id="outline-container-h:30773281-2921-40E6-9563-09616A155E20" class="outline-4">
+<h4 id="h:30773281-2921-40E6-9563-09616A155E20"><a href="#h:30773281-2921-40E6-9563-09616A155E20">方法1-基于 LoadBalancer 或者 NodePort 类型</a></h4>
+<div class="outline-text-4" id="text-h:30773281-2921-40E6-9563-09616A155E20">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/getting_started/#service-type-load-balancer">https://argo-cd.readthedocs.io/en/stable/getting_started/#service-type-load-balancer</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#23558; argocd-server &#26381;&#21153;&#31867;&#22411;&#26356;&#25913;&#20026; LoadBalancer
+</span>kubectl patch svc argocd-server -n argocd -p <span class="org-string">'{"spec": {"type": "LoadBalancer"}}'</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#31245;&#31561;&#29255;&#21051;&#65292;&#20320;&#30340;&#20113;&#26381;&#21153;&#25552;&#20379;&#21830;&#23558;&#20026;&#35813;&#26381;&#21153;&#20998;&#37197;&#19968;&#20010;&#22806;&#37096; IP &#22320;&#22336;&#12290;&#20320;&#21487;&#20197;&#36890;&#36807;&#20197;&#19979;&#21629;&#20196;&#33719;&#21462;&#35813; IP
+</span>kubectl get svc argocd-server -n argocd -o=<span class="org-variable-name">jsonpath</span>=<span class="org-string">'{.status.loadBalancer.ingress[0].ip}'</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:BC9550D9-545C-4282-9BF2-A0A843CC6F05" class="outline-4">
+<h4 id="h:BC9550D9-545C-4282-9BF2-A0A843CC6F05"><a href="#h:BC9550D9-545C-4282-9BF2-A0A843CC6F05">方法2-基于 ingress http</a></h4>
+<div class="outline-text-4" id="text-h:BC9550D9-545C-4282-9BF2-A0A843CC6F05">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;1&#65306;&#20462;&#25913; ConfigMap argocd&#8209;cmd&#8209;params&#8209;cm
+</span>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  server.insecure: <span class="org-string">"true"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25928;
+</span>kubectl rollout restart deployment argocd-server -n argocd
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;2&#65306;&#30452;&#25509;&#20462;&#25913; Deployment &#23481;&#22120; args&#65288;&#30452;&#25509;&#36861;&#21152; --insecure&#65289;
+</span>containers:
+- name: argocd-server
+  command: [<span class="org-string">"/usr/local/bin/argocd-server"</span>]
+  args:
+    - --insecure   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22686;&#21152;&#27492;&#34892;</span>
+</pre>
+</div>
+
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">ingress
+</span>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: argocd.xx.com
+    http:
+      paths:
+      - path: /
+        <span class="org-comment-delimiter">#</span><span class="org-comment">pathType: ImplementationSpecific
+</span>        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5DF44BD6-A46E-4F61-8B26-2570AC54A2D7" class="outline-4">
+<h4 id="h:5DF44BD6-A46E-4F61-8B26-2570AC54A2D7"><a href="#h:5DF44BD6-A46E-4F61-8B26-2570AC54A2D7">方法3-基于 ingress SSL Passthrough TLS 透传实例 https</a></h4>
+<div class="outline-text-4" id="text-h:5DF44BD6-A46E-4F61-8B26-2570AC54A2D7">
+<p>
+默认 ArgoCD 的 Pod 开启 https，在 ingress 上开启 ssl Passthrough TLS(四层 TCP 透传，不解密，读取 SNI 域名路由)实现访问
+</p>
+
+<p>
+流量链路
+</p>
+<ul class="org-ul">
+<li>用户 http &#x2013;&gt; 重定向 https 443 &#x2013;&gt; nginx ingress 四层透传不解密 &#x2013;&gt; argocd-server Service:443 &#x2013;&gt; Pod:8080（argo自签证书）</li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">ingress
+</span>apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21551; tls &#36879;&#20256;
+</span>    nginx.ingress.kubernetes.io/ssl-passthrough: <span class="org-string">"true"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">ingress &#21040;&#21518;&#31471;&#36208; https &#21327;&#35758;
+</span>    nginx.ingress.kubernetes.io/backend-protocol: <span class="org-string">"HTTPS"</span>
+  name: argocd-ingress-passthrough
+  namespace: argocd
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: argocd.xx.com
+    http:
+      paths:
+      - path: /
+        <span class="org-comment-delimiter">#</span><span class="org-comment">pathType: ImplementationSpecific
+</span>        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:73D58EC4-CA95-414F-990D-43F1F15EA379" class="outline-4">
+<h4 id="h:73D58EC4-CA95-414F-990D-43F1F15EA379"><a href="#h:73D58EC4-CA95-414F-990D-43F1F15EA379">方法4-基于 Port Forwarding</a></h4>
+<div class="outline-text-4" id="text-h:73D58EC4-CA95-414F-990D-43F1F15EA379">
+<p>
+端口转发
+</p>
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/getting_started/#port-forwarding">https://argo-cd.readthedocs.io/en/stable/getting_started/#port-forwarding</a></li>
+</ul>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#30830;&#20445; argocd-server &#30340; pod &#25152;&#22312;&#23487;&#20027;&#26426;&#33410;&#28857;&#24050;&#23433;&#35013; socat &#24037;&#20855;
+</span>apt update &amp;&amp; apt -y install socat
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36890;&#36807;&#33410;&#28857; 8080 &#31471;&#21475;&#26292;&#38706;&#26381;&#21153;
+</span>kubectl port-forward svc/argocd-server -n argocd 8080:443 --address 0.0.0.0
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:C1060A97-3651-40C8-9078-B910480692C9" class="outline-4">
+<h4 id="h:C1060A97-3651-40C8-9078-B910480692C9"><a href="#h:C1060A97-3651-40C8-9078-B910480692C9">方法5-基于 gateway api</a></h4>
+<div class="outline-text-4" id="text-h:C1060A97-3651-40C8-9078-B910480692C9">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#gateway-api-example">https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#gateway-api-example</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748; http &#36716;&#21040; https &#65292;&#25152;&#20197;&#25552;&#21069;&#20851;&#38381; argocd &#30340; https
+</span>cat &lt;&lt;\EOF&gt;&gt; httprout.yaml <span class="org-sh-heredoc">
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-httproute
+  namespace: argocd
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: default
+  hostnames:
+  - "devargocd.xxx.cn"
+  rules:
+    - backendRefs:
+        - name: argocd-server
+          port: 80
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:292694B5-A5ED-4E39-B1A1-9480167DDDFB" class="outline-3">
+<h3 id="h:292694B5-A5ED-4E39-B1A1-9480167DDDFB"><a href="#h:292694B5-A5ED-4E39-B1A1-9480167DDDFB">UI 登录修改密码</a></h3>
+<div class="outline-text-3" id="text-h:292694B5-A5ED-4E39-B1A1-9480167DDDFB">
+</div>
+<div id="outline-container-h:3DE9684C-577D-4199-A04B-5129C39DB027" class="outline-4">
+<h4 id="h:3DE9684C-577D-4199-A04B-5129C39DB027"><a href="#h:3DE9684C-577D-4199-A04B-5129C39DB027">获取登录密码</a></h4>
+<div class="outline-text-4" id="text-h:3DE9684C-577D-4199-A04B-5129C39DB027">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get secrets argocd-initial-admin-secret -n argocd -oyaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25552;&#21462; password &#21464;&#37327;&#30340;&#20540;&#65292;&#21363; admin &#29992;&#25143;&#30331;&#24405;&#23494;&#30721;
+</span>kubectl -n argocd get secret argocd-initial-admin-secret -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">'{.data.password}'</span> | base64 -d
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:36307C5F-9B1F-4679-A2AE-B71D870710E0" class="outline-4">
+<h4 id="h:36307C5F-9B1F-4679-A2AE-B71D870710E0"><a href="#h:36307C5F-9B1F-4679-A2AE-B71D870710E0">登录并修改密码</a></h4>
+<div class="outline-text-4" id="text-h:36307C5F-9B1F-4679-A2AE-B71D870710E0">
+<p>
+在登录界面 User Info 侧边栏更改密码。也可以用 ArgoCD CLI 命令行工具修改密码。
+</p>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:069CC269-5E6B-4B58-95DF-7AA79889E913" class="outline-2">
+<h2 id="h:069CC269-5E6B-4B58-95DF-7AA79889E913"><a href="#h:069CC269-5E6B-4B58-95DF-7AA79889E913">相关 CR 资源说明</a></h2>
+<div class="outline-text-2" id="text-h:069CC269-5E6B-4B58-95DF-7AA79889E913">
+</div>
+<div id="outline-container-h:02121C28-8E41-41DD-85C5-B749F0DE1B38" class="outline-3">
+<h3 id="h:02121C28-8E41-41DD-85C5-B749F0DE1B38"><a href="#h:02121C28-8E41-41DD-85C5-B749F0DE1B38">ArgoCD 核心 CR (Custom Resource)</a></h3>
+<div class="outline-text-3" id="text-h:02121C28-8E41-41DD-85C5-B749F0DE1B38">
+<p>
+ArgoCD 基于 <code>argoproj.io/v1alpha1</code> 提供多套自定义资源 CR
+</p>
+
+<p>
+最主要是3个：Application、AppProject、Application
+</p>
+</div>
+<div id="outline-container-h:2B4EA021-804B-4AFE-BB78-FC9697341513" class="outline-4">
+<h4 id="h:2B4EA021-804B-4AFE-BB78-FC9697341513"><a href="#h:2B4EA021-804B-4AFE-BB78-FC9697341513">Application(最核心，单应用部署定义)</a></h4>
+<div class="outline-text-4" id="text-h:2B4EA021-804B-4AFE-BB78-FC9697341513">
+<p>
+代表一套 GitOps 应用，定义「Git源码位置+目标集群+同步策略」，ArgoCD Controller 持续调谐 Git 与集群状态。
+</p>
+
+<p>
+所有 UI/CLI 创建的应用最终都会生成该 CR，存于 argocd nameespace。
+</p>
+
+<p>
+Application 资源的完整结构说明
+</p>
+</div>
+<div id="outline-container-h:CF835643-CDE8-4C0E-8A0D-5BFE7F583B1F" class="outline-5">
+<h5 id="h:CF835643-CDE8-4C0E-8A0D-5BFE7F583B1F"><a href="#h:CF835643-CDE8-4C0E-8A0D-5BFE7F583B1F">代码库</a></h5>
+<div class="outline-text-5" id="text-h:CF835643-CDE8-4C0E-8A0D-5BFE7F583B1F">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">ssh &#36830;&#25509;
+</span>&#30028;&#38754;&#28155;&#21152; Settings --&gt; Repositories &#25110;&#32773;&#37117;&#36890;&#36807;&#25991;&#20214;&#29983;&#25104;
+
+cat &gt; argcd-deploy-secret.yaml &lt;&lt; EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-tls-certs-cm
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: git@github.com:argoproj/my-private-repository.git
+  sshPrivateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    ...
+    -----END OPENSSH PRIVATE KEY-----
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36890;&#36807; SSH &#24314;&#31435;&#36830;&#25509;&#65292;&#27599;&#20010;&#20179;&#24211;&#26381;&#21153;&#22120;&#30340;&#20844;&#38053;&#24517;&#39035;&#39044;&#20808;&#22312; Argo CD &#20013;&#37197;&#32622;&#22909;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#ssh-known-host-public-keys
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#27604;&#22914; &#33719;&#21462; git &#20179;&#24211; 47.2.9.1 &#30340;&#20844;&#38053;&#65292;&#23558;&#20844;&#38053;&#20449;&#24687;&#28155;&#21152;&#21040; argocd &#20013;
+</span><span class="org-keyword">for</span> host<span class="org-keyword"> in</span> 47.2.9.1 ; <span class="org-keyword">do</span> ssh-keyscan $<span class="org-variable-name">host</span> 2&gt; /dev/null ; <span class="org-keyword">done</span>
+
+Settings --&gt; Repository certificates and known hosts
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#26597;&#30475;&#23545;&#24212;&#20844;&#38053;
+</span>kubectl  get cm argocd-ssh-known-hosts-cm -oyaml -n argocd 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0E8905DD-E547-412A-A613-F482D0D08238" class="outline-5">
+<h5 id="h:0E8905DD-E547-412A-A613-F482D0D08238"><a href="#h:0E8905DD-E547-412A-A613-F482D0D08238">多集群管理</a></h5>
+<div class="outline-text-5" id="text-h:0E8905DD-E547-412A-A613-F482D0D08238">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-management/#adding-a-cluster">https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-management/#adding-a-cluster</a></li>
+<li><a href="https://argo-cd.readthedocs.io/en/stable/getting_started/#5-register-a-cluster-to-deploy-apps-to-optional">https://argo-cd.readthedocs.io/en/stable/getting_started/#5-register-a-cluster-to-deploy-apps-to-optional</a></li>
+</ul>
+
+
+<p>
+下载 argocd 命令行客户端
+</p>
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/cli_installation/">https://argo-cd.readthedocs.io/en/stable/cli_installation/</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475; Argo CD &#30340;&#26368;&#26032;&#29256;&#26412;
+</span><span class="org-variable-name">VERSION</span>=$(curl --silent <span class="org-string">"https://api.github.com/repos/argoproj/argo-cd/releases/latest"</span> | grep <span class="org-string">'"tag_name"'</span> | sed -E <span class="org-string">'s/.*"([^"]+)".*/\1/'</span>)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">mac
+</span>curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/$<span class="org-variable-name">VERSION</span>/argocd-darwin-arm64
+<span class="org-comment-delimiter"># </span><span class="org-comment">linux
+</span>curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+
+
+sudo install -m 555 argocd /usr/local/bin/argocd
+rm argocd
+</pre>
+</div>
+
+<p>
+添加集群
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#23558;&#21478;&#19968;&#20010;&#38598;&#32676;&#30340; kubeconfig &#37197;&#32622;&#25991;&#20214;&#25918;&#21040;&#26412;&#22320;
+</span>scp xxx.xx.x:~/.kube/config ~/.kube/one.config
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#28155;&#21152; k8s &#38598;&#32676;&#19978;&#19979;&#25991;
+</span><span class="org-builtin">export</span> <span class="org-variable-name">KUBECONFIG</span>=$<span class="org-variable-name">HOME</span>/.kube/config:$<span class="org-variable-name">HOME</span>/.kube/on.config
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#22810;&#38598;&#32676;&#20449;&#24687;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">kubectl  config get-contexts 
+</span>CURRENT   NAME               CLUSTER     AUTHINFO       NAMESPACE
+*         ks-v1              ks-v1       ks-v1   
+          k8s-admin@one      one         k8s-admin
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#28155;&#21152;
+</span>argocd login argocd.xxx.com       
+argocd cluster add k8s-admin@one 
+</pre>
+</div>
+
+<p>
+在 UI 页面就可以看到对应集群了。
+</p>
+<ul class="org-ul">
+<li>Settings &#x2013;&gt; Clusters</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5F11C8EE-230C-42EA-937E-275ACF7A8E4C" class="outline-4">
+<h4 id="h:5F11C8EE-230C-42EA-937E-275ACF7A8E4C"><a href="#h:5F11C8EE-230C-42EA-937E-275ACF7A8E4C">ApplicationSet(批量生成 Application)</a></h4>
+<div class="outline-text-4" id="text-h:5F11C8EE-230C-42EA-937E-275ACF7A8E4C">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Argo-CD-Integration/">https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Argo-CD-Integration/</a></li>
+</ul>
+
+<p>
+ApplicationSet 模板化批量生成多个 Application CR，解决多环境、多集群、多租户重复写 Application YAML 的痛点。
+</p>
+
+
+<figure id="org4e1226b">
+<img style="aspect-ratio:497/466" decoding="async" loading="lazy" src="./images/20260903-110242.webp" alt="20260903-110242.webp" width="800">
+
+</figure>
+
+<p>
+ArgoCD 内置多种生成器(List/Cluster/Git/Matrix)，自动渲染参数生成应用。
+</p>
+
+<p>
+主要 Generator
+</p>
+<ol class="org-ol">
+<li>ListGenerator：静态多环境参数(dev/test/prod)</li>
+<li>ClusterGenerator：自动读取 ArgoCD 注册的所有集群,一键全集群部署</li>
+<li>GitGenerator：扫描 Git 目录自动生成应用(目录即环境)</li>
+<li>MatrixGenerator：多维度组合(集群+环境)</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:9F18C361-E6DB-4048-9759-ED91654EBD59" class="outline-4">
+<h4 id="h:9F18C361-E6DB-4048-9759-ED91654EBD59"><a href="#h:9F18C361-E6DB-4048-9759-ED91654EBD59">AppProject(多租户权限管控)</a></h4>
+<div class="outline-text-4" id="text-h:9F18C361-E6DB-4048-9759-ED91654EBD59">
+<p>
+AppProject (CRD:argoproj.io/v1alpha1) 是 ArgoCD 的 <b>权限隔离、资源白名单控制单元</b> ，所有 Application 必须绑定一个 Project (默认自带 default )。
+</p>
+
+<p>
+作用：给应用划分边界，限制应用能访问哪些 Git 仓库、部署到哪些集群、能创建哪些K8s资源、设置资源配额、阻断高危操作，实现多租户/多环境隔离。
+</p>
+
+<p>
+区分:
+</p>
+<ul class="org-ul">
+<li>Application：单个应用部署声明(在哪拉代码、部署到哪)</li>
+<li>AppProject：权限规则容器，批量管控一组 Application 的约束</li>
+</ul>
+
+<p>
+AppProject 对应用做 <b>逻辑分组+权限隔离</b> ，企业多环境/多团队必备约束项目内所有 Application:
+</p>
+
+<p>
+AppProject 核心能力
+</p>
+<ol class="org-ol">
+<li>限制可访问的 Git 仓库(允许/禁止仓库地址)</li>
+<li>限制可部署的目标集群&amp;命名空间</li>
+<li>允许/禁止创建的 K8s 资源类型(禁止创建 Namespace、Secret、ClusterRole 等高危资源)</li>
+<li>资源配额：限制该项目下所有应用总 CPU/内存/Pod 数量</li>
+<li>集群资源黑名单：阻止创建特权容器、节点端口、HostPatth 等风险配置</li>
+<li>配置外部集群、集群级资源权限</li>
+<li>项目级元数据、描述、UI展示信息</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748; default &#27809;&#20570;&#25511;&#21046;&#65292;&#26435;&#38480;&#24320;&#25918;&#30340;
+</span>kubectl get appprojects -n argocd default -oyaml
+</pre>
+</div>
+
+<p>
+AppProject资源的完整结构说明
+</p>
+</div>
+<div id="outline-container-h:2BE6A7E0-9272-4CCB-B92D-091FAA889E0E" class="outline-5">
+<h5 id="h:2BE6A7E0-9272-4CCB-B92D-091FAA889E0E"><a href="#h:2BE6A7E0-9272-4CCB-B92D-091FAA889E0E">自定义 Project</a></h5>
+<div class="outline-text-5" id="text-h:2BE6A7E0-9272-4CCB-B92D-091FAA889E0E">
+<p>
+界面操作 Settings &#x2013;&gt; Projects
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#20135;&#29615;&#22659; delete &#26435;&#38480;&#38750;&#24120;&#21361;&#38505;&#65292;&#21487;&#20197;&#19981;&#32473;&#27492;&#26435;&#38480;&#65292;&#40664;&#35748;&#19981;&#37197;&#32622;&#30340;&#26435;&#38480;&#37117;&#26159; deny
+</span>]# kubectl -n argocd get appprojects.argoproj.io  evescn  -o yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: evescn
+  namespace: argocd
+spec:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768;&#30340; git &#20179;&#24211;&#30333;&#21517;&#21333;
+</span>  sourceRepos:
+  - https://gitee.com/evescn/kustomize-demo
+  description: test project
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768;&#37096;&#32626;&#30340; k8s &#38598;&#32676;&#21644;&#21517;&#31216;&#31354;&#38388;&#30333;&#26126;&#21333;
+</span>  destinations:
+  - name: in-cluster
+    namespace: dev-*
+    server: https://kubernetes.default.svc
+  - name: in-cluster
+    namespace: test
+    server: https://kubernetes.default.svc
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#38598;&#32676;&#36164;&#28304;&#30333;&#21517;&#21333;&#65288;&#20801;&#35768;&#31649;&#29702; CRD/ClusterRole &#31561;&#65289;
+</span>  clusterResourceWhitelist:
+  - group: <span class="org-string">'*'</span>
+    kind: Namespace
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#38598;&#32676;&#36164;&#28304;&#40657;&#21517;&#21333;
+</span>  clusterResourceBlacklist:
+  - group: <span class="org-string">'*'</span>
+    kind: <span class="org-string">'*'</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#20801;&#35768;&#30340;&#21517;&#31216;&#31354;&#38388;
+</span>  namespaceResourceWhitelist:
+  - group: <span class="org-string">'*'</span>
+    kind: <span class="org-string">'*'</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#31105;&#27490;&#30340;&#21629;&#21517;&#31354;&#38388;
+</span>  namespaceResourceBlacklist:
+  - group: <span class="org-string">'*'</span>
+    kind: Secret
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#39033;&#30446;&#20869; RBAC &#26435;&#38480;
+</span>  roles:
+  - description: evescn_role &#24320;&#21457;&#20165;&#21487;&#26597;&#30475;&#12289;&#25163;&#21160;&#21516;&#27493;
+    name: evescn_role
+    policies:
+    - p, role:dev, applications, get, payment-team/*, allow
+    - p, role:dev, applications, sync, payment-team/*, allow
+    - p, proj:evescn:evescn_role, applications, sync, evescn/*, allow
+    - p, proj:evescn:evescn_role, applications, get, evescn/*, allow
+    - p, proj:evescn:evescn_role, applications, delete, evescn/*, allow
+    jwtTokens:
+    - iat: 1691651971
+      id: evescn_token
+    - iat: 1691649777
+      id: token
+</pre>
+</div>
+
+<p>
+role 中 同步窗口类似于版本火车概念
+</p>
+</div>
+</div>
+<div id="outline-container-h:6737BC5C-66C8-44CB-8F59-38B3A3EE4085" class="outline-5">
+<h5 id="h:6737BC5C-66C8-44CB-8F59-38B3A3EE4085"><a href="#h:6737BC5C-66C8-44CB-8F59-38B3A3EE4085">添加用户</a></h5>
+<div class="outline-text-5" id="text-h:6737BC5C-66C8-44CB-8F59-38B3A3EE4085">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/user-management/">https://argo-cd.readthedocs.io/en/stable/operator-manual/user-management/</a></li>
+</ul>
+
+
+
+<ol class="org-ol">
+<li>本地用户（local accounts）：修改 <code>argocd-cm</code> 创建账号， <code>argocd‑rbac‑cm</code> 分配 RBAC 权限
+<ul class="org-ul">
+<li>⚠️生产大规模环境推荐 OIDC/SSO（Dex、Keycloak），本地账号不适合多人正式环境</li>
+</ul></li>
+
+<li>SSO 单点登录 (OIDC/Dex)：对接企业 ldap/github，本文不展开</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1. &#21019;&#24314;&#26412;&#22320;&#29992;&#25143;&#65288;&#20462;&#25913; argocd&#8209;cm&#65289;
+</span>kubectl edit cm argocd-cm -n argocd
+
+data:
+  <span class="org-comment-delimiter">#</span><span class="org-comment">&#21551;&#29992;&#29992;&#25143;devuser&#65292;&#20801;&#35768; webUI &#21644; cli &#30331;&#24405;
+</span>  accounts.devuser.enabled: <span class="org-string">"true"</span>
+  accounts.devuser: <span class="org-string">"login"</span>
+  accounts.jasper.enabled: <span class="org-string">"true"</span>
+  accounts.jasper: <span class="org-string">"login"</span>
+  accounts.bx.enabled: <span class="org-string">"true"</span>
+  accounts.bx: <span class="org-string">"login"</span>
+  accounts.cdsync.enabled: <span class="org-string">"true"</span>
+  accounts.cdsync: <span class="org-string">"apiKey"</span>
+  <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#26159; API &#26426;&#22120;&#20154;&#36134;&#21495;&#65292;&#25913;&#25104; capabilities: "apiKey" &#31105;&#27490;&#32593;&#39029;&#30331;&#24405;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#29992;&#25143;
+</span>user@host ~ % argocd --grpc-web account list
+NAME     ENABLED  CAPABILITIES
+admin    true     login
+bx       true     login
+devuser  true     login
+jasper   true     login
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#19981;&#24819;&#36755;&#20837; --grpc-web &#21487;&#20197;&#35774;&#32622;&#29615;&#22659;&#21464;&#37327;&#65292;&#27704;&#20037;&#29983;&#25928;
+</span><span class="org-builtin">alias</span> <span class="org-variable-name">argocd</span>=<span class="org-string">'argocd --grpc-web'</span>
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#26597;&#30475;&#29992;&#25143;&#24773;&#20917;
+</span>argocd --grpc-web account get --account devuser
+argocd --grpc-web account get --account jasper
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35774;&#32622;devuser&#23494;&#30721;
+</span>argocd  --grpc-web account update-password <span class="org-sh-escaped-newline">\</span>
+  --account devuser
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#25110;&#32773;&#26126;&#25991;&#36755;&#20837;
+</span>argocd  --grpc-web account update-password <span class="org-sh-escaped-newline">\</span>
+  --account &lt;name&gt; <span class="org-sh-escaped-newline">\</span>
+  --current-password &lt;current-user-password&gt; <span class="org-sh-escaped-newline">\</span>
+  --new-password &lt;new-user-password&gt;
+
+argocd --grpc-web account update-password <span class="org-sh-escaped-newline">\</span>
+  --account jasper <span class="org-sh-escaped-newline">\</span>
+  --new-password <span class="org-string">'72x3%prigswjsey0x66zargocd'</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. RBAC &#26435;&#38480; (argocd&#8209;rbac&#8209;cm)
+</span>
+kubectl edit cm argocd-rbac-cm -n argocd
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#20869;&#32622; 3 &#20010;&#31995;&#32479;&#35282;&#33394;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">- role:admin&#65306;&#20840;&#37096;&#26435;&#38480;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">- role:readonly&#65306;&#21482;&#33021;&#26597;&#30475;&#65292;&#19981;&#33021;&#21516;&#27493;&#20462;&#25913;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">- role:clusterAdmin&#65306;&#38598;&#32676;&#12289;&#20179;&#24211;&#20840;&#37096;&#31649;&#29702;&#26435;&#38480;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#35821;&#27861;&#35268;&#21017;&#65306;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">p,&#35282;&#33394;&#21517;,&#36164;&#28304;,&#21160;&#20316;,&#39033;&#30446;/&#24212;&#29992;,allow
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">g,&#29992;&#25143;&#21517;,&#35282;&#33394;&#21517;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36164;&#28304;&#21160;&#20316;&#24120;&#29992;&#20540;&#65306;get/sync/refresh/delete/rollback/create/update
+</span>
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+data:
+  policy.default: role:readonly
+  policy.csv: |
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21457;&#20154;&#21592;&#21482;&#33021;&#26597;&#30475;&#21644; sync &#38750;&#29983;&#20135;&#29615;&#22659;
+</span>    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, */*-dev, allow
+    p, role:developer, applications, sync, */*-staging, allow
+
+    <span class="org-comment-delimiter"># </span><span class="org-comment">SRE&#21487;&#20197;&#25805;&#20316;&#25152;&#26377;&#29615;&#22659;
+</span>    p, role:sre, applications, *, */*, allow
+    p, role:sre, clusters, *, *, allow
+
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Sync &#21516;&#27493;
+</span>    p, role:rync, applications, get, */*, allow
+    p, role:rync, applications, sync, */*, allow
+
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#32465;&#23450;&#29992;&#25143;devuser&#21040;devops&#35282;&#33394;
+</span>    g, cdsync, role:rync
+    g, devuser, role:developer
+    g, jasper, role:sre
+    g, bx, role:sre
+    
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#32465;&#23450;GitHub Team
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">g, myorg:developers, role:developer
+</span>    <span class="org-comment-delimiter">#</span><span class="org-comment">g, myorg:sre-team, role:sre
+</span>
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. &#39564;&#35777;&#26435;&#38480;
+</span>1. UI &#30331;&#24405;&#65306;&#20351;&#29992;&#26032;&#36134;&#21495;&#23494;&#30721;&#30331;&#24405;
+2. CLI &#27979;&#35797;
+argocd login &lt;argocd-server&gt;
+argocd app list
+argocd app sync myapp
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26435;&#38480;&#19981;&#36275;&#20250;&#36820;&#22238;`PermissionDenied`</span>
+</pre>
+</div>
+
+<p>
+两种权限模型
+</p>
+<ol class="org-ol">
+<li>全局 RBAC（argocd‑rbac‑cm）：全局，跨 Project 权限</li>
+<li>AppProject 内部角色（项目级 RBAC）：在 AppProject CR 里定义，仅作用于本项目，适合多团队隔离</li>
+</ol>
+
+<p>
+可以叠加使用
+</p>
+</div>
+</div>
+<div id="outline-container-h:926FDC25-26FA-4E45-8627-43808A392AFE" class="outline-5">
+<h5 id="h:926FDC25-26FA-4E45-8627-43808A392AFE"><a href="#h:926FDC25-26FA-4E45-8627-43808A392AFE">api 同步</a></h5>
+<div class="outline-text-5" id="text-h:926FDC25-26FA-4E45-8627-43808A392AFE">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1. &#21019;&#24314;&#26412;&#22320;&#29992;&#25143;&#65288;&#20462;&#25913; argocd&#8209;cm&#65289;
+</span>kubectl edit cm argocd-cm -n argocd
+
+data:
+  accounts.cdsync.enabled: <span class="org-string">"true"</span>
+  accounts.cdsync: <span class="org-string">"apiKey"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#35774;&#32622;&#20840;&#23616; RBAC &#26435;&#38480; (argocd&#8209;rbac&#8209;cm)
+</span>
+kubectl edit cm argocd-rbac-cm -n argocd
+data:
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Sync &#21516;&#27493;
+</span>    p, role:rync, applications, get, */*, allow
+    p, role:rync, applications, sync, */*, allow
+
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#32465;&#23450;&#29992;&#25143;&#21040;&#35282;&#33394;
+</span>    g, cdsync, role:rync
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. &#29983;&#25104;&#29992;&#25143; token
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_account_generate-token/
+</span>% argocd account generate-token --account cdsync
+eyJhbGciOiJIUzI1NiIsInR5cCI
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#26597;&#30475;&#29992;&#25143; token
+</span>argocd account get -a cdsync
+</pre>
+</div>
+
+<p>
+同步更新验证
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">ARGO_APP</span>=<span class="org-string">"nginx-dev"</span>
+<span class="org-variable-name">ARGOCD_SERVER</span>=<span class="org-string">'argocd.xxx.com:80'</span>
+<span class="org-variable-name">ARGOCD_AUTH_TOKEN</span>=<span class="org-string">'eyJxxxxoXnlQ'</span>
+<span class="org-variable-name">GITOPS_SHA</span>=<span class="org-string">'HEAD'</span>
+argocd app list --grpc-web --server <span class="org-string">"$ARGOCD_SERVER"</span> --auth-token <span class="org-string">"$ARGOCD_AUTH_TOKEN"</span>
+
+           
+                        argocd app sync <span class="org-string">"$ARGO_APP"</span> <span class="org-sh-escaped-newline">\</span>
+                          --server <span class="org-string">"$ARGOCD_SERVER"</span> <span class="org-sh-escaped-newline">\</span>
+                          --auth-token <span class="org-string">"$ARGOCD_AUTH_TOKEN"</span> <span class="org-sh-escaped-newline">\</span>
+                          --revision <span class="org-string">"$GITOPS_SHA"</span> <span class="org-sh-escaped-newline">\</span>
+                          --grpc-web <span class="org-sh-escaped-newline">\</span>
+                          --plaintext <span class="org-sh-escaped-newline">\</span>
+                          --timeout 10
+
+                        argocd app wait <span class="org-string">"$ARGO_APP"</span> <span class="org-sh-escaped-newline">\</span>
+                          --server <span class="org-string">"$ARGOCD_SERVER"</span> <span class="org-sh-escaped-newline">\</span>
+                          --auth-token <span class="org-string">"$ARGOCD_AUTH_TOKEN"</span> <span class="org-sh-escaped-newline">\</span>
+                          --sync <span class="org-sh-escaped-newline">\</span>
+                          --health <span class="org-sh-escaped-newline">\</span>
+                          --operation <span class="org-sh-escaped-newline">\</span>
+                          --insecure <span class="org-sh-escaped-newline">\</span>
+                          --timeout 600
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:38CA62FC-FBA2-4B2B-88CC-5C4DD01F6B3E" class="outline-3">
+<h3 id="h:38CA62FC-FBA2-4B2B-88CC-5C4DD01F6B3E"><a href="#h:38CA62FC-FBA2-4B2B-88CC-5C4DD01F6B3E">ArgoCD Application source 支持渲染类型</a></h3>
+<div class="outline-text-3" id="text-h:38CA62FC-FBA2-4B2B-88CC-5C4DD01F6B3E">
+<p>
+<code>spec.source</code> 下只能选下面四种的其中一种渲染器，互互斥不能共存:
+</p>
+
+<p>
+四种渲染器完整对比
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">类型</th>
+<th scope="col" class="org-left">适用仓库内容</th>
+<th scope="col" class="org-left">核心能力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">directory</td>
+<td class="org-left">纯原生 Deployment/ServiceYAML，无任何工具配置文件</td>
+<td class="org-left">直接下发原始清单，无变量替换能力</td>
+</tr>
+
+<tr>
+<td class="org-left">kustomize</td>
+<td class="org-left">带 kustomization.yaml 的 Base+Overlay 目录</td>
+<td class="org-left">镜像替换、副本补丁、多环境覆盖、无模板语法</td>
+</tr>
+
+<tr>
+<td class="org-left">helm</td>
+<td class="org-left">Helm Chart (Chart.yaml+templates+values)</td>
+<td class="org-left">模板渲染、values分层、Chart 依赖</td>
+</tr>
+
+<tr>
+<td class="org-left">plugin</td>
+<td class="org-left">自定义 CRD /第三方渲染插件 Jsonnet/Helmfile/Terraform 等第三方工具工程</td>
+<td class="org-left">扩展支持任意外部laC工具，高度自定义</td>
+</tr>
+</tbody>
+</table>
+
+
+<ol class="org-ol">
+<li><code>source</code> 下 helm/kustomize/directory/plugin 四仲会直接报错 <code>cannot specify multiple source type</code></li>
+<li>日常 GitOps 主流只用：helm/kustomize;</li>
+<li>简单静态清单用 directory;复杂混合 IaC(Infrastructure as Code)工具才用 <code>plugin</code> 。</li>
+</ol>
+
+
+<p>
+官方文档
+</p>
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/application_sources/">https://argo-cd.readthedocs.io/en/stable/user-guide/application_sources/</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">ArgoCD &#39029;&#38754;&#23637;&#31034;&#30340;&#24212;&#29992;&#21517;&#31216;&#65292;prod &#29615;&#22659;&#23454;&#20363;
+</span>  name: order-prod
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Application CR &#33258;&#36523;&#23384;&#25918;&#30340;&#21629;&#21517;&#31354;&#38388;&#65292;&#22266;&#23450; argocd(&#25152;&#26377; Argo &#24212;&#29992;&#37117;&#22312;&#36825;&#37324;)
+</span>  namespace: argocd
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;&#24212;&#29992;&#26102;&#21516;&#27493;&#21024;&#38500;&#38598;&#32676;&#36164;&#28304;&#65288;&#32423;&#32852;&#21024;&#38500;&#65289;
+</span>  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#24402;&#23646;&#39033;&#30446;&#65288;&#26435;&#38480;&#38548;&#31163;&#65289;&#65292;default &#20026;&#40664;&#35748;&#39033;&#30446;
+</span>  project: default
+
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Source&#65306; Git &#26399;&#26395;&#29366;&#24577;&#28304;&#65288;Kustomize/Helm/&#21407;&#29983;Yaml&#65289;
+</span>  <span class="org-builtin">source</span>:
+    repoURL: https://github.com/user/my-repo.git
+    targetRevision: main <span class="org-comment-delimiter"># </span><span class="org-comment">&#20998;&#25903;/tag/commit hash
+</span>    path: app/order/prod
+    directory:         <span class="org-comment-delimiter"># </span><span class="org-comment">&#32431; yaml/kustomize &#30446;&#24405;&#37197;&#32622;
+</span>      resourse: true   <span class="org-comment-delimiter"># </span><span class="org-comment">&#26159;&#21542;&#36882;&#24402;&#25195;&#25551;&#23376;&#30446;&#24405;
+</span>      include: <span class="org-string">"{*.yaml, *.yml}"</span>
+      exclude:         <span class="org-comment-delimiter"># </span><span class="org-comment">&#25490;&#38431;&#25991;&#20214;
+</span>      - *.tmp
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Helm &#19987;&#29992;&#37197;&#32622;
+</span>    helm:
+      valueFiles:
+      - values-prod.yaml
+      valueObject:
+        replicaCount: 3
+      values: |
+        image:
+          repository: user/my-image
+          pullPolicy: Always
+          tag: xxx
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Kustomize &#19987;&#29992;
+</span>    kustomize:
+      version: v5
+
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Destination&#65306;&#37096;&#32626;&#30446;&#26631;&#38598;&#32676;&#21644;&#21629;&#21517;&#31354;&#38388;
+</span>  destination:
+    <span class="org-comment-delimiter"># </span><span class="org-comment">&#26412;&#22320;&#38598;&#32676;&#65306; https://kubernetes.default.svc
+</span>    server: https://esk-prod.ap-southeast-1.eks.amazonaws.com
+    namespace: order-prod
+
+  <span class="org-comment-delimiter"># </span><span class="org-comment">SyncPolicy &#33258;&#21160;&#21516;&#27493;/&#33258;&#24840;/&#20462;&#21098;&#31574;&#30053;&#65288;GitOps &#26680;&#24515;&#65289;
+</span>  syncPolicy:
+    automated:
+      prune: true          <span class="org-comment-delimiter"># </span><span class="org-comment">git &#21024;&#38500;&#36164;&#28304;&#65292;&#38598;&#32676;&#21516;&#27493;
+</span>      selfHeal: true       <span class="org-comment-delimiter"># </span><span class="org-comment">&#38598;&#32676;&#25163;&#21160;&#31713;&#25913;&#65292;&#33258;&#21160;&#24674;&#22797; git &#29366;&#24577;
+</span>      allowEmpty: false    <span class="org-comment-delimiter"># </span><span class="org-comment">&#19981;&#20801;&#35768;&#21516;&#27493;&#21518;&#26080;&#36164;&#28304;
+</span>    syncOptions:
+    - <span class="org-variable-name">CreateNamespace</span>=true <span class="org-comment-delimiter"># </span><span class="org-comment">&#19981;&#23384;&#22312; ns &#33258;&#21160;&#21019;&#24314;
+</span>    - <span class="org-variable-name">PrunePropagationPolicy</span>=forground
+    retry: <span class="org-comment-delimiter"># </span><span class="org-comment">&#37096;&#32626;&#22833;&#36133;&#33258;&#21160;&#37325;&#35797;
+</span>      <span class="org-builtin">limit</span>: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">status: ArgoCD &#33258;&#21160;&#22635;&#20805;&#65292;&#21482;&#35835;
+</span>status:
+  sync:
+    status: Synced <span class="org-comment-delimiter"># </span><span class="org-comment">Synced/OutOfSync/Unknown
+</span>  health:
+    status: Healthy <span class="org-comment-delimiter"># </span><span class="org-comment">Healthy/Progressing/Degraded/Missing</span>
+</pre>
+</div>
+</div>
+<div id="outline-container-h:82D70CB1-B40E-4EEF-8BDA-D343467E47A0" class="outline-4">
+<h4 id="h:82D70CB1-B40E-4EEF-8BDA-D343467E47A0"><a href="#h:82D70CB1-B40E-4EEF-8BDA-D343467E47A0">秒级同步</a></h4>
+<div class="outline-text-4" id="text-h:82D70CB1-B40E-4EEF-8BDA-D343467E47A0">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/#automatic-retry-refresh-on-new-revisions">https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/#automatic-retry-refresh-on-new-revisions</a></li>
+<li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-cm-yaml/">https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-cm-yaml/</a></li>
+</ul>
+
+<p>
+自动同步间隔由argocd-cm ConfigMap 中的timeout.reconciliation值决定，默认值为120s，会额外增加60s的抖动，最长可达3分钟。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl  -n argocd edit cm argocd-cm
+data:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#21516;&#27493;&#38388;&#38548;&#20026; 10 + &#39069;&#22806;&#30340; 20 s &#25289;&#21160; = 30s &#21516;&#27493;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#21482;&#26159;&#25511;&#21046;&#22120; &#8220;&#22810;&#20037;&#37266;&#26469;&#19968;&#36718;&#24178;&#27963;&#8221;&#65292;&#19981;&#26159; git &#36718;&#35810;&#38388;&#38548;&#65292;&#25913;&#23567;&#23427;&#26080;&#27861;&#28040;&#38500; 2min &#32531;&#23384;&#24310;&#36831;
+</span>  timeout.reconciliation: 10s
+  timeout.reconciliation.jitter: 20s
+</pre>
+</div>
+
+<p>
+秒级同步方案1
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">comparison &#32531;&#23384;&#27809;&#36807;&#26399;&#65288;2min&#65289;&#65292;ArgoCD &#19981;&#20250;&#21435;&#36828;&#31471; git &#25289;&#21462;&#26032; commit
+</span>kubectl -n argocd logs -f argocd-application-controller-0 |grep <span class="org-string">"comparison expired"</span> |grep <span class="org-string">"nginx-dev"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">expiry:2m0s &#26159; ArgoCD controller &#30828;&#32534;&#30721;&#30340;&#27604;&#36739;&#32531;&#23384; TTL&#65292;cm &#21442;&#25968;&#26080;&#27861;&#20462;&#25913;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#20294;&#26159;&#21482;&#35201; comparison &#32531;&#23384;&#26410;&#36807;&#26399;&#65288;&#30828;&#32534;&#30721; 2min&#65292;&#26080;&#37197;&#32622;&#39033;&#65289;&#65292;&#23601;&#31639;&#27599; 10s &#37266;&#26469;&#19968;&#27425;&#65292;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#20063;&#19981;&#20250;&#21435;&#25289;&#21462;&#36828;&#31471; Git**&#65292;&#30452;&#25509;&#22797;&#29992;&#26087;&#32531;&#23384;&#65292;&#26085;&#24535;&#25171;&#21360; Skipping auto&#8209;sync: application status is Synced&#12290;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#37322; / &#21024;&#38500;&#36825;&#19968;&#27573;&#65288;&#26368;&#20851;&#38190;&#65281;&#24674;&#22797;&#27880;&#35299;&#21047;&#26032;&#33021;&#21147;&#65289;
+</span>kubectl  -n argocd edit cm argocd-cm
+<span class="org-comment-delimiter"># </span><span class="org-comment">resource.customizations.ignoreResourceUpdates.argoproj.io_Application: |
+</span><span class="org-comment-delimiter">#   </span><span class="org-comment">jqPathExpressions:
+</span><span class="org-comment-delimiter">#     </span><span class="org-comment">- '.metadata.annotations."argocd.argoproj.io/refresh"'
+</span><span class="org-comment-delimiter">#     </span><span class="org-comment">- '.metadata.annotations."argocd.argoproj.io/hydrate"'
+</span><span class="org-comment-delimiter">#     </span><span class="org-comment">- '.operation'
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20462;&#25913; cm &#21518;&#37325;&#21551; argocd&#8209;application&#8209;controller
+</span>kubectl rollout restart statefulset -n argocd argocd-application-controller
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551;&#23436;&#25104;&#21518;&#65292;&#20877;&#25191;&#34892; annotate &#21047;&#26032;&#27880;&#35299;&#65292;&#25165;&#33021;&#30495;&#27491;&#35302;&#21457;&#21363;&#26102;&#25289;&#21462; git&#12290;
+</span>kubectl annotate -n argocd app nginx-dev argocd.argoproj.io/refresh=hard --overwrite
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:D7A47513-FF30-402D-A1EF-F0DF958B0345" class="outline-2">
+<h2 id="h:D7A47513-FF30-402D-A1EF-F0DF958B0345"><a href="#h:D7A47513-FF30-402D-A1EF-F0DF958B0345">管理应用实现 CD 实例</a></h2>
+<div class="outline-text-2" id="text-h:D7A47513-FF30-402D-A1EF-F0DF958B0345">
+</div>
+<div id="outline-container-h:7D3318F9-9902-44F7-8A1B-B1E7E72417D1" class="outline-3">
+<h3 id="h:7D3318F9-9902-44F7-8A1B-B1E7E72417D1"><a href="#h:7D3318F9-9902-44F7-8A1B-B1E7E72417D1">GitOps 仓库结构设计</a></h3>
+<div class="outline-text-3" id="text-h:7D3318F9-9902-44F7-8A1B-B1E7E72417D1">
+<p>
+合理的仓库结构是GitOps成功的关键。强烈建议分离应用代码仓库和部署配置仓库，避免配置变更触发不必要的CI流程：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#24212;&#29992;&#20195;&#30721;&#20179;&#24211; (app-repo)
+</span>app-repo/
+&#9500;&#9472;&#9472; src/
+&#9500;&#9472;&#9472; tests/
+&#9500;&#9472;&#9472; Dockerfile
+&#9500;&#9472;&#9472; .github/
+&#9474;   &#9492;&#9472;&#9472; workflows/
+&#9474;       &#9492;&#9472;&#9472; ci.yaml
+&#9492;&#9472;&#9472; README.md
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37096;&#32626;&#37197;&#32622;&#20179;&#24211; (deploy-repo)
+</span>deploy-repo/
+&#9500;&#9472;&#9472; apps/
+&#9474;   &#9500;&#9472;&#9472; frontend/
+&#9474;   &#9474;   &#9500;&#9472;&#9472; base/
+&#9474;   &#9474;   &#9474;   &#9500;&#9472;&#9472; deployment.yaml
+&#9474;   &#9474;   &#9474;   &#9500;&#9472;&#9472; service.yaml
+&#9474;   &#9474;   &#9474;   &#9492;&#9472;&#9472; kustomization.yaml
+&#9474;   &#9474;   &#9492;&#9472;&#9472; overlays/
+&#9474;   &#9474;       &#9500;&#9472;&#9472; dev/
+&#9474;   &#9474;       &#9500;&#9472;&#9472; staging/
+&#9474;   &#9474;       &#9492;&#9472;&#9472; prod/
+&#9474;   &#9492;&#9472;&#9472; backend/
+&#9500;&#9472;&#9472; argocd/
+&#9474;   &#9492;&#9472;&#9472; applications/
+&#9492;&#9472;&#9472; README.md
+</pre>
+</div>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://aws51.com/github-actions-argocd-%E6%9E%84%E5%BB%BA%E7%8E%B0%E4%BB%A3gitops%E9%83%A8%E7%BD%B2%E6%B5%81%E6%B0%B4%E7%BA%BF/">GitHub Actions + ArgoCD 构建现代GitOps部署流水线</a></li>
+</ul>
+
+
+<p>
+下面案例来源：
+</p>
+<ul class="org-ul">
+<li><a href="https://gitee.com/lbtooth/argocd-demo">https://gitee.com/lbtooth/argocd-demo</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:11576F9D-E61F-400C-9F82-04E11DA2AFA9" class="outline-3">
+<h3 id="h:11576F9D-E61F-400C-9F82-04E11DA2AFA9"><a href="#h:11576F9D-E61F-400C-9F82-04E11DA2AFA9">基于 Directory 案例</a></h3>
+<div class="outline-text-3" id="text-h:11576F9D-E61F-400C-9F82-04E11DA2AFA9">
+<ul class="org-ul">
+<li><a href="https://gitee.com/lbtooth/argocd-demo/tree/main/manifest">https://gitee.com/lbtooth/argocd-demo/tree/main/manifest</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell">argocd-demo % tree manifest
+manifest
+&#9500;&#9472;&#9472; dev
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; 01-namespace.yaml
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; 02-service.yaml
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; 03-deployment.yaml
+&#9500;&#9472;&#9472; prod
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; 01-namespace.yaml
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; 02-service.yaml
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; 03-deployment.yaml
+&#9492;&#9472;&#9472; test
+    &#9500;&#9472;&#9472; 01-namespace.yaml
+    &#9500;&#9472;&#9472; 02-service.yaml
+    &#9492;&#9472;&#9472; 03-deployment.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF&gt;&gt; manifest/application.yaml<span class="org-sh-heredoc">
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spring-boot-helloworld-test
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://gitee.com/lbtooth/argocd-demo.git  # &#24517;&#39035;&#35201;&#22312; coredns &#20013;&#23454;&#29616;&#22495;&#21517; gitlab.xx.com &#35299;&#26512;
+    targetRevision: HEAD
+    path: manifest/test
+    directory:
+      resourse: true  # &#26159;&#21542;&#36882;&#24402;&#25195;&#25551;&#23376;&#30446;&#24405;
+      include: "{*.yaml, *.yml}"
+      exclude: "{README.md, dos/**,scripts/*.sh}"
+  destination:
+    # &#24212;&#29992;&#22312;&#24403;&#21069;&#38598;&#32676;
+    server: https://kubernetes.default.svc
+    namespace: test
+  # &#21516;&#27493;&#31574;&#30053;
+  syncPolicy:
+    # &#24320;&#21551; git &#21464;&#26356;&#21516;&#27493;
+    automated:
+      prune: true          # git &#21024;&#38500;&#36164;&#28304;&#65292;&#38598;&#32676;&#21516;&#27493;
+      selfHeal: true       # &#38598;&#32676;&#25163;&#21160;&#31713;&#25913;&#65292;&#33258;&#21160;&#22238;&#28378;&#20026; git &#26631;&#20934;&#37197;&#32622;
+      allowEmpty: false    # &#19981;&#20801;&#35768;&#21516;&#27493;&#21518;&#26080;&#36164;&#28304;
+    # &#23450;&#26102;&#36718;&#35810;&#25289;&#21462; git &#20179;&#24211;
+    syncOptions:
+    - CreateNamespace=true # &#30446;&#26631;&#19981;&#23384;&#22312; namespace &#21017;&#33258;&#21160;&#21019;&#24314;
+    # &#21516;&#27493;&#37325;&#35797;&#26426;&#21046;&#65288;&#37096;&#32626;&#22833;&#36133;&#33258;&#21160;&#37325;&#35797;&#65289;
+    retry:
+      limit: 3
+      backoff:
+        duration: "30s"
+        factor: 2
+        maxDuration: "5m"
+EOF
+</span>
+kubectl apply -f application.yaml
+
+kubectl get applications -n argocd
+
+kubectl get pod -n test
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25163;&#21160;&#20462;&#25913;&#21103;&#26412;&#25968;
+</span>kubectl scale deploy -n test --replicas 3 spring-boot-helloworld; kubectl get pod -n test
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36807;&#19968;&#20250;&#20799;&#21103;&#26412;&#25968;&#21448;&#24674;&#22797;&#20026; 1 &#20010;&#21103;&#26412;
+</span>kubectl get pod -n test
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:92338562-1346-4249-B2FF-6111296F01F4" class="outline-3">
+<h3 id="h:92338562-1346-4249-B2FF-6111296F01F4"><a href="#h:92338562-1346-4249-B2FF-6111296F01F4">基于 Kustomize 案例</a></h3>
+<div class="outline-text-3" id="text-h:92338562-1346-4249-B2FF-6111296F01F4">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/tasks/manage-kubernetes-objects/kustomization/">https://kubernetes.io/zh-cn/docs/tasks/manage-kubernetes-objects/kustomization/</a></li>
+
+<li><a href="https://gitee.com/lbtooth/argocd-demo/tree/main/kustomization">https://gitee.com/lbtooth/argocd-demo/tree/main/kustomization</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#22797;&#29992;&#19968;&#22871;&#37197;&#32622;&#65292;overlays &#25171;&#34917;&#19969;
+</span>argocd-demo % tree kustomization
+kustomization
+&#9500;&#9472;&#9472; base
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; deployment.yaml
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; kustomization.yaml
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; service.yaml
+&#9492;&#9472;&#9472; overlays
+    &#9500;&#9472;&#9472; dev
+    &#9474;&#160;&#160; &#9492;&#9472;&#9472; kustomization.yaml
+    &#9500;&#9472;&#9472; prod
+    &#9474;&#160;&#160; &#9492;&#9472;&#9472; kustomization.yaml
+    &#9492;&#9472;&#9472; test
+        &#9492;&#9472;&#9472; kustomization.yaml
+
+
+kubectl create deploy nginx --image=nginx:1.15.12 --replicas=2 -oyaml --dry-run=client &gt;base/deployment.yaml 
+kubectl create svc clusterip nginx --tcp=8080:80 -o yaml --dry-run=client &gt; base/service.yaml
+cat &gt; kustomization.yaml &lt;&lt; EOF<span class="org-sh-heredoc">
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- deployment.yaml
+- service.yaml
+EOF</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF&gt;&gt; kustomize/dev.yaml<span class="org-sh-heredoc">
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spring-boot-hello-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://gitee.com/lbtooth/argocd-demo.git
+    targetRevision: HEAD
+    path: kustomization/overlays/dev
+    # Kustomize &#19987;&#29992;
+    kustomize:
+      # kustomize &#28210;&#26579;&#26102;&#33258;&#21160;&#32473;&#25152;&#26377;&#36164;&#28304;&#28155;&#21152; namespace: dev&#65292;&#20248;&#20808;&#32423;&#39640;&#20110; kustomization/overlays/test/kustomization.yaml
+      namespace: dev
+  destination:
+    server: https://kubernetes.default.svc
+    # &#25351;&#23450; k8s &#38598;&#32676;&#26368;&#32456;&#25918;&#22312;&#19994;&#21153; pod/service &#30340;&#21629;&#21517;&#31354;&#38388;&#65292;&#20248;&#20808;&#32423;&#39640;&#20110;&#19978;&#38754;&#30340; kustomize.namespace
+    namespace: dev
+  # &#21516;&#27493;&#31574;&#30053;
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    retry:
+      limit: 5
+      backoff:
+        duration: "30s"
+        factor: 2
+        maxDuration: "5m"
+    syncOptions:
+    - CreateNamespace=true
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:A570791B-9947-4F42-AA98-507BBEF9FDE7" class="outline-3">
+<h3 id="h:A570791B-9947-4F42-AA98-507BBEF9FDE7"><a href="#h:A570791B-9947-4F42-AA98-507BBEF9FDE7">基于 Helm 案例</a></h3>
+<div class="outline-text-3" id="text-h:A570791B-9947-4F42-AA98-507BBEF9FDE7">
+<ul class="org-ul">
+<li><a href="https://gitee.com/lbtooth/argocd-demo/tree/main/chart">https://gitee.com/lbtooth/argocd-demo/tree/main/chart</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">argocd-demo % tree chart
+chart
+&#9500;&#9472;&#9472; Chart.yaml
+&#9500;&#9472;&#9472; templates
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; _helpers.tpl
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; deployment.yaml
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; ingress.yaml
+&#9474;&#160;&#160; &#9500;&#9472;&#9472; NOTES.txt
+&#9474;&#160;&#160; &#9492;&#9472;&#9472; service.yaml
+&#9500;&#9472;&#9472; values-dev.yaml
+&#9500;&#9472;&#9472; values-prod.yaml
+&#9500;&#9472;&#9472; values-test.yaml
+&#9492;&#9472;&#9472; values.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF&gt;&gt; helm/dev.yaml<span class="org-sh-heredoc">
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spring-boot-hello-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://gitee.com/lbtooth/argocd-demo.git
+    targetRevision: HEAD
+    path: chart
+    helm:
+      valueFiles:
+      - values.yaml     # &#22522;&#30784;&#25991;&#20214;
+      - values-dev.yaml # &#34917;&#20805;&#25991;&#20214;
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  # &#21516;&#27493;&#31574;&#30053;
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+     retry:
+      limit: 5
+      backoff:
+        duration: "30s"
+        factor: 2
+        maxDuration: "5m"
+    syncOptions:
+    - CreateNamespace=true
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:CDF18F85-A0D6-40CA-B654-ED3CC8D19698" class="outline-3">
+<h3 id="h:CDF18F85-A0D6-40CA-B654-ED3CC8D19698"><a href="#h:CDF18F85-A0D6-40CA-B654-ED3CC8D19698">applicationset 案例</a></h3>
+<div class="outline-text-3" id="text-h:CDF18F85-A0D6-40CA-B654-ED3CC8D19698">
+<p>
+如果要部署到多个名称空间，要写多个 application，比较麻烦。使用 applicationset 来生成具体的 application
+</p>
+
+<p>
+支持多种<a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/">生成器</a>：
+</p>
+<ul class="org-ul">
+<li>列表生成器</li>
+<li>集群生成器</li>
+<li>Git 生成器</li>
+<li>矩阵生成器</li>
+</ul>
+
+<p>
+列表生成器
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &lt;&lt;\EOF&gt;&gt; manifest/applicationset.yaml<span class="org-sh-heredoc">
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: spring-boot-helloworld
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - env: dev
+        path: manifest/dev
+        ns: dev
+      - env: test
+        path: manifest/test
+        ns: test
+      - env: prod
+        path: manifest/prod
+        ns: prod
+  template:
+    metadata:
+      name: 'sprint-boot-helloword-{{env}}'
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://gitee.com/lbtooth/argocd-demo.git
+        targetRevision: HEAD
+        path: "{{path}"
+        directory:
+          resourse: true
+          include: "{*.yaml, *.yml}"
+          exclude: "{README.md,dos/**,scripts/*.sh}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: dev
+      # &#21516;&#27493;&#31574;&#30053;
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        retry:
+          limit: 5
+          backoff:
+            duration: "30s"
+            factor: 2
+            maxDuration: "5m"
+        syncOptions:
+        - CreateNamespace=true
+EOF</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; argocd/kustomize/applicationset.yaml  &lt;&lt; EOF<span class="org-sh-heredoc">
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nginx
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - env: dev
+        business: pt
+        path: pt/argocd/tmp/overlays/dev
+        k8s-cluster: https://kubernetes.default.svc
+        ns: default
+      - env: test
+        business: pt
+        path: pt/argocd/tmp/overlays/test
+        k8s-cluster: https://kubernetes.default.svc
+        ns: test
+      - env: prod
+        business: pt
+        path: pt/argocd/tmp/overlays/prod
+        k8s-cluster: https://kubernetes.default.svc
+        ns: prod
+  template:
+    metadata:
+      name: '{{business}}-nginx-{{env}}'
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: git@git.xxx.com:gitops/ops-deploy.git
+        targetRevision: HEAD
+        path: "{{path}}"
+        kustomize:
+          namespace: "{{ns}}"
+      destination:
+        server: "{{k8s-cluster}}"
+        namespace: "{{ns}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        retry:
+          limit: 5
+          backoff:
+            duration: "30s"
+            factor: 2
+            maxDuration: "5m"
+        syncOptions:
+        - CreateNamespace=true
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:6E2E2209-EEA9-4A85-A7C8-1CFE16F50AA7" class="outline-2">
+<h2 id="h:6E2E2209-EEA9-4A85-A7C8-1CFE16F50AA7"><a href="#h:6E2E2209-EEA9-4A85-A7C8-1CFE16F50AA7">CLI 工具</a></h2>
+<div class="outline-text-2" id="text-h:6E2E2209-EEA9-4A85-A7C8-1CFE16F50AA7">
+</div>
+<div id="outline-container-h:8A1AED11-0704-4E31-8EED-5DA5A6EEBD4C" class="outline-3">
+<h3 id="h:8A1AED11-0704-4E31-8EED-5DA5A6EEBD4C"><a href="#h:8A1AED11-0704-4E31-8EED-5DA5A6EEBD4C">argocd 安装和登录</a></h3>
+<div class="outline-text-3" id="text-h:8A1AED11-0704-4E31-8EED-5DA5A6EEBD4C">
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/getting_started/#2-download-argo-cd-cli">https://argo-cd.readthedocs.io/en/stable/getting_started/#2-download-argo-cd-cli</a></li>
+<li><a href="https://argo-cd.readthedocs.io/en/stable/cli_installation/">https://argo-cd.readthedocs.io/en/stable/cli_installation/</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
+rm argocd-linux-amd64
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Mac
+</span>brew install argocd
+</pre>
+</div>
+
+<p>
+命令补全
+</p>
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd/">https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd/</a></li>
+<li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_completion/">https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_completion/</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">echo</span> <span class="org-string">'source &lt;(argocd completion bash)'</span> &gt;&gt; ~/.bashrc
+<span class="org-builtin">source</span>  ~/.bashrc
+</pre>
+</div>
+
+
+<p>
+基础登录
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#33719;&#21462;&#23494;&#30721;&#26041;&#27861;1
+</span>argocd admin initial-password -n argocd
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#33719;&#21462;&#23494;&#30721;&#26041;&#27861;2&#65306;k8s &#38598;&#32676;&#20869;&#25191;&#34892;
+</span>kubectl -n argocd get secret argocd-initial-admin-secret -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">'{.data.password}'</span> | base64 -d
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#21069;&#65292;&#20808;&#30331;&#24405; admin
+</span>argocd login argocd.xxx.com --username admin --password &lt;&#21021;&#22987;&#23494;&#30721;&gt; --insecure
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#20462;&#25913;&#23494;&#30721;&#12290;&#36755;&#20837;&#26087;&#23494;&#30721;&#65292;&#20877;&#36755;&#20837;&#26032;&#23494;&#30721;
+</span>argocd account update-password
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#27880;&#38144;&#21518;&#29992;&#26032;&#23494;&#30721;&#30331;&#24405;
+</span>argocd logout argocd.xx.com
+argocd login argocd.xxx.com
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:D8ACF1C3-E57E-4E6B-A49E-BF85D3E50457" class="outline-3">
+<h3 id="h:D8ACF1C3-E57E-4E6B-A49E-BF85D3E50457"><a href="#h:D8ACF1C3-E57E-4E6B-A49E-BF85D3E50457">argocd 用法说明</a></h3>
+<div class="outline-text-3" id="text-h:D8ACF1C3-E57E-4E6B-A49E-BF85D3E50457">
+<p>
+前置说明
+</p>
+<ul class="org-ul">
+<li>登录前置： <code>argocd login &lt;argocd-server地址&gt;</code></li>
+<li>能用全局参数： <code>--namespace argocd</code> 、 <code>--grpc-web</code> 、 <code>--insecure</code></li>
+<li>分类：登录认证、Application、Project、仓库/集群、插件配置、同步/运维、状态查询</li>
+</ul>
+
+
+<p>
+全局能用参数
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">--server    <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450; ArgoCDServer &#35775;&#38382;&#22320;&#22336;&#12290;&#36866;&#29992;&#22810;&#22871; ArgoCD &#29615;&#22659;&#20999;&#25442;&#30331;&#24405;
+</span>--username  <span class="org-comment-delimiter">#</span><span class="org-comment">&#30331;&#24405;&#29992;&#25143;&#21517;&#12290;&#33050;&#26412;&#33258;&#21160;&#21270;&#30331;&#24405;&#65292;&#26080;&#38656;&#20132;&#20114;&#24335;&#36755;&#20837;
+</span>--password  <span class="org-comment-delimiter">#</span><span class="org-comment">&#30331;&#24405;&#23494;&#30721;&#12290;&#33258;&#21160;&#21270;&#33050;&#26412;&#25209;&#37327;&#25191;&#34892; argocd login
+</span>--insecure  <span class="org-comment-delimiter">#</span><span class="org-comment">&#36339;&#36807; TLS &#35777;&#20070;&#26657;&#39564;&#12290;&#27979;&#35797;&#29615;&#22659;&#33258;&#31614;&#35777;&#20070;&#12289;&#20869;&#32593;&#26080;&#21512;&#27861;SSL&#35777;&#20070;
+</span>--grpc-web  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992; grpc-web &#21327;&#35758;&#36890;&#20449;&#12290;&#36890;&#36807; Ingress/LB &#35775;&#38382; ArgoCD &#26381;&#21153;&#65292;&#24517;&#22791;&#21442;&#25968;
+</span>--timeout   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#35831;&#27714;&#36229;&#26102;&#26102;&#38388;&#12290;&#36866;&#29992;&#20110;&#32593;&#32476;&#36739;&#24046;&#12289;&#36328;&#26426;&#25151;&#35775;&#38382;&#65292;&#38450;&#27490;&#21629;&#20196;&#36229;&#26102;&#22833;&#36133;
+</span>-y/--yes    <span class="org-comment-delimiter">#</span><span class="org-comment">&#25152;&#26377;&#20132;&#20114;&#24335;&#30830;&#35748;&#33258;&#21160;&#36873;&#25321; yes&#12290;&#36866;&#29992;&#20110;&#33258;&#21160;&#21270;&#33050;&#26412;&#12289;CI &#27969;&#27700;&#32447;,&#36991;&#20813;&#31561;&#24453;&#20154;&#24037;&#30830;&#35748;</span>
+</pre>
+</div>
+
+<p>
+登录和账号管理命令
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd login                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#30331;&#24405;ArgoCD&#26381;&#21153;&#31471;,&#20445;&#23384;&#26412;&#22320;token&#12290;&#22914; 
+</span>argocd login argocd.example.com --username admin password xxx
+
+argocd logout                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#36864;&#20986;&#30331;&#24405;,&#28165;&#38500;&#26412;&#22320;&#20973;&#35777;&#12290;&#22914; 
+</span>argocd logout argocd.example.com
+
+argocd account update-password <span class="org-comment-delimiter">#</span><span class="org-comment">&#20462;&#25913;&#24403;&#21069;&#30331;&#24405;&#29992;&#25143;&#23494;&#30721;
+</span>
+argocd account list            <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25152;&#26377;&#29992;&#25143;&#36134;&#21495;
+</span>
+
+argocd context list            <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#26412;&#22320;&#20445;&#23384;&#30340;&#22810;&#20010; argocd &#26381;&#21153;&#36830;&#25509;
+</span>
+argocd context switch          <span class="org-comment-delimiter">#</span><span class="org-comment">&#20999;&#25442;&#26412;&#22320; argocd &#26381;&#21153;&#19978;&#19979;&#25991;
+</span>argocd context switch argocd-prod
+</pre>
+</div>
+
+<p>
+Application 应用核心操作
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd app list  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#35810;&#25152;&#26377; application &#21015;&#34920;
+</span>argocd app list -o wide
+
+argocd app get &lt;&#24212;&#29992;&#21517;&gt;  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#21333;&#20010;&#24212;&#29992;&#35814;&#24773;
+</span>
+argocd app create       <span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314; application cr&#65288;&#21629;&#20196;&#34892;&#21019;&#24314;&#65292;&#26367;&#20195; yaml apply&#65289;
+</span>argocd app create order-svc --repo https://gitlab/xxx <span class="org-sh-escaped-newline">\</span>
+   --path manifests <span class="org-sh-escaped-newline">\</span>
+   --dest-server https://k8s/api <span class="org-sh-escaped-newline">\</span>
+   --dest-namespace prod <span class="org-sh-escaped-newline">\</span>
+   --project prod-project
+
+argocd app delete       <span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;&#24212;&#29992;</span>
+</pre>
+</div>
+
+<p>
+AppProject 项目权限管理
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd proj xxx
+</pre>
+</div>
+
+<p>
+仓库/集群管理
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd repo list
+argocd repo xx
+
+argocd cluster list
+argocd cluster xx
+</pre>
+</div>
+
+<p>
+配置管理插件/系统配置
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd admin settings get <span class="org-comment-delimiter"># </span><span class="org-comment">&#35835;&#21462;&#20840;&#23616; argocd-cm &#37197;&#32622;
+</span>argocd admin settings edit <span class="org-comment-delimiter"># </span><span class="org-comment">&#30452;&#25509;&#32534;&#36753;&#20840;&#23616;&#37197;&#32622;</span>
+</pre>
+</div>
+
+<p>
+同步策略/运维批量操作
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd app sync --all <span class="org-comment-delimiter"># </span><span class="org-comment">&#21516;&#27493;&#38598;&#32676;&#20869;&#25152;&#26377;&#24212;&#29992;
+</span>argocd app list --sync-status OutOfSync  <span class="org-comment-delimiter"># </span><span class="org-comment">&#31579;&#36873;&#25152;&#26377;&#19981;&#21516;&#27493;&#30340;&#24212;&#29992;
+</span>argocd app list --health-status Degraded <span class="org-comment-delimiter"># </span><span class="org-comment">&#31579;&#36873;&#24322;&#24120;&#19981;&#20581;&#24247;&#24212;&#29992;
+</span>argocd app teminate-op                   <span class="org-comment-delimiter"># </span><span class="org-comment">&#32456;&#27490;&#21345;&#20303;&#30340;&#21516;&#27493;&#25805;&#20316;</span>
+</pre>
+</div>
+
+<p>
+导入/导出资源（迁移备份）
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">argocd app export <span class="org-comment-delimiter"># </span><span class="org-comment">&#23548;&#20986; application &#23436;&#25972; yaml
+</span>argocd app export order-svc &gt; app-order.yaml
+
+argocd proj export <span class="org-comment-delimiter"># </span><span class="org-comment">&#23548;&#20986; AppProject &#23436;&#25972; yaml</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7CEF77D0-A0FC-42CA-9705-176E36527ED3" class="outline-2">
+<h2 id="h:7CEF77D0-A0FC-42CA-9705-176E36527ED3"><a href="#h:7CEF77D0-A0FC-42CA-9705-176E36527ED3">维护</a></h2>
+<div class="outline-text-2" id="text-h:7CEF77D0-A0FC-42CA-9705-176E36527ED3">
+</div>
+<div id="outline-container-h:19BCE958-A715-4C64-A057-4700F76C11C5" class="outline-3">
+<h3 id="h:19BCE958-A715-4C64-A057-4700F76C11C5"><a href="#h:19BCE958-A715-4C64-A057-4700F76C11C5">查看</a></h3>
+<div class="outline-text-3" id="text-h:19BCE958-A715-4C64-A057-4700F76C11C5">
+<div class="org-src-container">
+<pre class="src src-shell">argocd app get nginx-dev
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26641;&#24418;&#23618;&#32423;&#23637;&#31034;&#65288;&#30475;&#29238;&#23376;&#20851;&#31995;&#65306;Deployment &#8594; ReplicaSet &#8594; Pod&#65289;
+</span>argocd app resources nginx-dev --output tree
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475; Git &#28210;&#26579;&#20986;&#26469;&#30340;&#20840;&#37096; yaml &#28165;&#21333;
+</span>argocd app manifests nginx-dev
+</pre>
+</div>
+
+<p>
+kubectl 查看 Application CR 内记录的资源
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get application nginx-dev -n argocd -o yaml
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#28857;&#30475; status.resources &#25968;&#32452;&#65292;&#37324;&#38754;&#35760;&#24405;&#25152;&#26377;&#25176;&#31649;&#36164;&#28304;
+</span>kubectl describe application nginx-dev -n argocd
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:AB89B6B7-9D75-4D5E-B9BE-C55548EB46AF" class="outline-3">
+<h3 id="h:AB89B6B7-9D75-4D5E-B9BE-C55548EB46AF"><a href="#h:AB89B6B7-9D75-4D5E-B9BE-C55548EB46AF">同步</a></h3>
+<div class="outline-text-3" id="text-h:AB89B6B7-9D75-4D5E-B9BE-C55548EB46AF">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25552;&#21069;&#24674;&#22797;&#27880;&#35299;&#21047;&#26032;&#33021;&#21147;&#12290; &#20462;&#25913; configMap argocd-cm
+</span><span class="org-variable-name">APP</span>=nginx-dev
+kubectl annotate -n argocd app ${<span class="org-variable-name">APP</span>} argocd.argoproj.io/refresh=hard --overwrite
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:EB64C1CC-E781-4B4E-B7FB-63D880EE6E43" class="outline-3">
+<h3 id="h:EB64C1CC-E781-4B4E-B7FB-63D880EE6E43"><a href="#h:EB64C1CC-E781-4B4E-B7FB-63D880EE6E43">回滚</a></h3>
+<div class="outline-text-3" id="text-h:EB64C1CC-E781-4B4E-B7FB-63D880EE6E43">
+<p>
+推荐使用Git revert保留完整变更历史：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;1: ArgoCD UI&#22238;&#28378;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#22312;History&#39029;&#38754;&#36873;&#25321;&#20043;&#21069;&#29256;&#26412;Sync
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;2: &#21629;&#20196;&#34892;&#22238;&#28378;
+</span>argocd app rollback myapp-prod
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;3: Git revert&#65288;&#25512;&#33616;&#65289;
+</span><span class="org-builtin">cd</span> deploy-repo
+git revert HEAD
+git push
+</pre>
+</div>
+
+<p>
+jenkins 回滚思路
+</p>
+<ul class="org-ul">
+<li>- 目标 tag 参数 → 修改服务 yaml 镜像 tag 版本 → 人工确认 → git 提交 → argocd 同步</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:F0742739-7597-42D3-B4C9-40AA3599EE2C" class="outline-3">
+<h3 id="h:F0742739-7597-42D3-B4C9-40AA3599EE2C"><a href="#h:F0742739-7597-42D3-B4C9-40AA3599EE2C">订阅通知</a></h3>
+<div class="outline-text-3" id="text-h:F0742739-7597-42D3-B4C9-40AA3599EE2C">
+<p>
+发布状态进行通知。
+</p>
+
+<ul class="org-ul">
+<li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/subscriptions/">https://argo-cd.readthedocs.io/en/stable/user-guide/subscriptions/</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:FA3C39EB-F13E-4C96-97FA-1F1554A53398" class="outline-3">
+<h3 id="h:FA3C39EB-F13E-4C96-97FA-1F1554A53398"><a href="#h:FA3C39EB-F13E-4C96-97FA-1F1554A53398">CICD 脚本</a></h3>
+<div class="outline-text-3" id="text-h:FA3C39EB-F13E-4C96-97FA-1F1554A53398">
+<p>
+jenkins pipline
+</p>
+<ul class="org-ul">
+<li>jenkins 中提前准备相关密钥凭证</li>
+<li>创建 argocd 用户并生成 token</li>
+<li>发送 Lark 通知</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell">pipeline {
+    agent any
+
+    options {
+        withBuildUser()
+    }
+    environment {
+        <span class="org-variable-name">BUSINESS</span> = <span class="org-string">"rl"</span>
+        <span class="org-variable-name">DEPLOY_ENV</span> = <span class="org-string">"dev"</span>
+        
+        <span class="org-variable-name">jobname</span> = <span class="org-string">"${JOB_BASE_NAME}"</span>
+        <span class="org-variable-name">OPS_GIT_URL</span> = <span class="org-string">'git@1.x.x.x:gitops/ops-deploy.git'</span>
+        <span class="org-variable-name">OPS_PATH</span> = <span class="org-string">"ops-deploy/${BUSINESS}/${jobname}/overlays/${DEPLOY_ENV}"</span>
+        <span class="org-variable-name">image_url</span>=<span class="org-string">"public.ecr.aws/xxx/${jobname}:v${BUILD_NUMBER}"</span>
+
+        <span class="org-variable-name">ARGO_APP</span> = <span class="org-string">"${jobname}"</span> + <span class="org-string">"-${DEPLOY_ENV}"</span>
+        <span class="org-variable-name">ARGOCD_SERVER</span>   = <span class="org-string">'argocd.xxx.com:80'</span>
+        <span class="org-variable-name">GITOPS_SHA</span> = <span class="org-string">'HEAD'</span>
+    }
+
+    stages {
+
+        
+        stage(<span class="org-string">'create deployment yaml'</span>) {
+            steps {
+                script {
+                  //configFileProvider([configFile(fileId: <span class="org-string">'eks-config'</span>, targetLocation: <span class="org-string">"eks-config"</span>)]){
+                  //    sh <span class="org-string">"""
+                  //    /root/bin/kubectl --kubeconfig=/root/.kube/config-dev set image deployment/${jobname} ${jobname}=${image_url}
+                  //    """</span>
+                  //} 
+                  dir(<span class="org-string">"ops-deploy"</span>) {
+                    git branch: <span class="org-string">'main'</span>,  changelog: false, poll: false, credentialsId: <span class="org-string">'git-argocd'</span>, url: OPS_GIT_URL
+                  }
+                  dir(OPS_PATH) {
+                    withCredentials([sshUserPrivateKey(credentialsId: <span class="org-string">'git-argocd'</span>, keyFileVariable: <span class="org-string">'PK'</span>)]) {
+                      sh <span class="org-string">"""
+                      ls -l
+                      yq '.images[0].newTag = "</span>v<span class="org-string">" + strenv(BUILD_NUMBER)' kustomization.yaml 
+                      git status
+                      yq -i '.images[0].newTag = "</span>v<span class="org-string">" + strenv(BUILD_NUMBER)' kustomization.yaml
+                      git status
+                      GIT_SSH_COMMAND="</span>ssh -i $<span class="org-variable-name">PK</span><span class="org-string">" git pull origin main
+                      git add kustomization.yaml
+                      git commit -m "</span>Ci: ${<span class="org-variable-name">jobname</span>}.${<span class="org-variable-name">DEPLOY_ENV</span>}.${<span class="org-variable-name">BUSINESS</span>} image: ${<span class="org-variable-name">image_url</span>}<span class="org-string">"
+                      GIT_SSH_COMMAND="</span>ssh -i $<span class="org-variable-name">PK</span><span class="org-string">" git push  origin HEAD:main
+                      """</span>
+                    }
+                  }
+                }
+            }
+        }
+
+        stage(<span class="org-string">'Argo CD Deploy'</span>) {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: <span class="org-string">'argocd-token'</span>,
+                        variable: <span class="org-string">'ARGOCD_AUTH_TOKEN'</span>
+                    )
+                ]) {
+                    sh <span class="org-string">'''
+                        echo "$ARGOCD_AUTH_TOKEN"
+                        argocd app sync "$ARGO_APP" \
+                          --server "$ARGOCD_SERVER" \
+                          --grpc-web \
+                          --plaintext \
+                          --auth-token "$ARGOCD_AUTH_TOKEN" \
+                          --revision "$GITOPS_SHA" \
+                          --timeout 600
+
+                        argocd app wait "$ARGO_APP" \
+                          --server "$ARGOCD_SERVER" \
+                          --grpc-web \
+                          --plaintext \
+                          --auth-token "$ARGOCD_AUTH_TOKEN" \
+                          --sync \
+                          --health \
+                          --operation \
+                          --timeout 600
+                    '''</span>
+                }
+            }
+        }
+    }
+    post {
+        success {
+            script {
+                notifyLark(<span class="org-string">'SUCCESS'</span>)
+            }
+        }
+
+        failure {
+            script {
+                notifyLark(<span class="org-string">'FAILURE'</span>)
+            }
+        }
+
+        aborted {
+            script {
+                notifyLark(<span class="org-string">'ABORTED'</span>)
+            }
+        }
+    }
+}
+
+import groovy.json.JsonOutput
+def notifyLark(String result) {
+    def <span class="org-variable-name">success</span> = <span class="org-variable-name">result</span> == <span class="org-string">'SUCCESS'</span>
+    def <span class="org-variable-name">title</span> = success ? <span class="org-string">'&#9989; Argo CD &#21457;&#24067;&#25104;&#21151;'</span> : <span class="org-string">'&#10060; Argo CD &#21457;&#24067;&#22833;&#36133;'</span>
+    def <span class="org-variable-name">color</span> = success ? <span class="org-string">'green'</span> : <span class="org-string">'red'</span>
+
+    withCredentials([
+        string(
+            credentialsId: <span class="org-string">'lark-release-webhook'</span>,
+            variable: <span class="org-string">'LARK_WEBHOOK'</span>
+        )
+    ]) {
+        def <span class="org-variable-name">payload</span> = JsonOutput.toJson([
+            msg_type: <span class="org-string">'interactive'</span>,
+            card: [
+                header: [
+                    template: color,
+                    title: [
+                        tag    : <span class="org-string">'plain_text'</span>,
+                        content: title
+                    ]
+                ],
+                elements: [
+                    [
+                        tag: <span class="org-string">'markdown'</span>,
+                        content: <span class="org-string">"""\
+**&#39033;&#30446;&#65306;** ${BUSINESS ?: 'unknown'}
+**&#24212;&#29992;&#65306;** ${ARGO_APP ?: 'unknown'}
+**&#29615;&#22659;&#65306;** ${DEPLOY_ENV ?: 'unknown'}
+**GitOps SHA&#65306;** `${env.GITOPS_SHA ?: 'unknown'}`
+**&#26500;&#24314;&#20219;&#21153;&#65306;** ${env.JOB_NAME} #${env.BUILD_NUMBER} by ${env.BUILD_USER}
+**&#21457;&#24067;&#32467;&#26524;&#65306;** ${result}
+**&#35814;&#24773;&#65306;** [&#26597;&#30475; Jenkins &#26500;&#24314;](${env.BUILD_URL})
+"""</span>.stripIndent()
+                    ]
+                ]
+            ]
+        ])
+
+        writeFile file: <span class="org-string">'lark-message.json'</span>, text: payload
+
+        sh <span class="org-string">'''
+            curl --fail-with-body \
+              --silent \
+              --show-error \
+              --request POST \
+              --header '</span>Content-Type: application/json<span class="org-string">' \
+              --data @lark-message.json \
+              "$LARK_WEBHOOK"
+        '''</span>
+    }
+}
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:A10C4498-BB23-408A-9733-85D08806FF3A" class="outline-2">
+<h2 id="h:A10C4498-BB23-408A-9733-85D08806FF3A"><a href="#h:A10C4498-BB23-408A-9733-85D08806FF3A">参考</a></h2>
+<div class="outline-text-2" id="text-h:A10C4498-BB23-408A-9733-85D08806FF3A">
+<ul class="org-ul">
+<li><a href="https://www.cnblogs.com/evescn/p/17606149.html">Argo CD 系列</a></li>
+<li><a href="https://aws51.com/github-actions-argocd-%E6%9E%84%E5%BB%BA%E7%8E%B0%E4%BB%A3gitops%E9%83%A8%E7%BD%B2%E6%B5%81%E6%B0%B4%E7%BA%BF/">GitHub Actions + ArgoCD 构建现代GitOps部署流水线</a></li>
+<li>源码 CI <a href="https://github.com/ppsite/flask-demo/blob/main/.github/workflows/main.yml">https://github.com/ppsite/flask-demo/blob/main/.github/workflows/main.yml</a>
+<ul class="org-ul">
+<li>创建账号的 secret： CI-TOKEN</li>
+<li>Trigger CI 清单仓库 CD <a href="https://github.com/ppsite/flask-demo-kustomize/blob/master/.github/workflows/main.yml">https://github.com/ppsite/flask-demo-kustomize/blob/master/.github/workflows/main.yml</a></li>
+<li>原file: <a href="https://github.com/ppsite/argocd-in-action/tree/main/kustomize">https://github.com/ppsite/argocd-in-action/tree/main/kustomize</a> 上面为 代码和 部署拆分部署</li>
+</ul></li>
+</ul>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

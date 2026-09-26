@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>trouble-kafka</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="参考：brokerconfigs_min.insync.replicas" />
+<link rel="canonical" href="https://xuchangwei.com/linux/trouble/trouble-kafka.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="trouble-kafka" />
+<meta property="og:description" content="参考：brokerconfigs_min.insync.replicas" />
+<meta property="og:url" content="https://xuchangwei.com/linux/trouble/trouble-kafka.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/trouble/trouble-kafka.html","@type":"WebPage","name":"trouble-kafka","description":"参考：brokerconfigs_min.insync.replicas"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">trouble-kafka</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org2425ef3">ISR问题</a></li>
+<li><a href="#orgd7ae174">brorker id异常</a></li>
+<li><a href="#orgb27d459">副本数</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Trouble</a></li>
+</ul>
+<section id="outline-container-org2425ef3" class="outline-2">
+<h2 id="org2425ef3"><a href="#org2425ef3">ISR问题</a></h2>
+<div class="outline-text-2" id="text-org2425ef3">
+<p>
+现象
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;rebalancing&#65292;&#22312;&#25968;&#25454;&#24179;&#34913;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">./kafka-consumer-groups.sh --describe --bootstrap-server localhost:9092  --describe  --group ParserKafkaPipeline | grep -e ParserBody | sort
+</span>Warning: Consumer group <span class="org-string">'ParserKafkaPipeline'</span> is rebalancing.
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26085;&#24535;&#26174;&#31034;, ISR&#19981;&#28385;&#36275;&#26368;&#23567;&#35774;&#32622;&#38656;&#27714;
+</span>org.apache.kafka.common.errors.NotEnoughReplicasException: The size of the current ISR Set(0, 3, 5) is insufficient to satisfy the min.isr requirement of 4 for partition __consumer_offsets-37
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23548;&#33268;&#26080;&#27861;&#28040;&#36153;</span>
+</pre>
+</div>
+
+<p>
+解决
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">min.insync.replicas=1 <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;&#21442;&#25968;&#20540;&#30001;4&#25913;&#20026;&#40664;&#35748;&#20540;1
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#35813;&#21442;&#25968;&#29992;&#20110;&#25511;&#21046;ISR&#38598;&#21512;&#30340;&#26368;&#23567;&#21103;&#26412;&#25968;&#37327;&#65292;&#20445;&#35777;&#26368;&#23567;&#21103;&#26412;&#35201;&#28385;&#36275;&#35201;&#27714;
+</span>
+
+min.insync.replicas
+Type:   int
+Default:        1
+Valid Values:   [1,...]
+Importance:     high
+Update Mode:    cluster-wide
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21160;&#24577;&#26356;&#26032;&#27169;&#24335;
+</span>read-only &#65306;&#38656;&#35201;&#37325;&#21551;&#20195;&#29702;&#25165;&#33021;&#26356;&#26032;
+per-broker &#65306;&#21487;&#20197;&#20026;&#27599;&#20010;&#32463;&#32426;&#20154;&#21160;&#24577;&#26356;&#26032;
+cluster-wide &#65306;&#21487;&#20197;&#20316;&#20026;&#38598;&#32676;&#33539;&#22260;&#20869;&#30340;&#40664;&#35748;&#20540;&#21160;&#24577;&#26356;&#26032;&#12290;&#20063;&#21487;&#20197;&#26356;&#26032;&#20026;&#27599;&#20010;&#32463;&#32426;&#21830;&#30340;&#27979;&#35797;&#20540;&#12290;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21160;&#24577;&#26356;&#26032;
+</span>bin/kafka-configs.sh  --bootstrap-server localhost:9092  --entity-type brokers --entity-default --alter --add-config min.insync.replicas=1
+</pre>
+</div>
+
+<p>
+参考：<a href="https://kafka.apache.org/documentation/#brokerconfigs_min.insync.replicas">brokerconfigs_min.insync.replicas</a>
+</p>
+</div>
+</section>
+<section id="outline-container-orgd7ae174" class="outline-2">
+<h2 id="orgd7ae174"><a href="#orgd7ae174">brorker id异常</a></h2>
+<div class="outline-text-2" id="text-orgd7ae174">
+<p>
+问题现象
+</p>
+<ul class="org-ul">
+<li>机器查看负载40左右，且服务器无法登录，但可以ping通</li>
+<li>事务任务出现问题</li>
+<li>异常broker id 占用副本资源</li>
+</ul>
+
+<p>
+问题修复
+</p>
+
+<p>
+将所有事务相关的topic数据迁到别的机器。服务恢复正常。
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">cd</span> /usr/hdp/3.1.0.0-78/kafka
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">1. &#20808;&#25972;&#29702;&#19968;&#20010;topic&#30340;json&#25991;&#20214; a.json&#65306;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#26684;&#24335;&#65306;{"topics": [{"topic": "xxx"}], "version":1}
+</span><span class="org-variable-name">tn</span>=yzcrm
+<span class="org-builtin">echo</span> <span class="org-string">'{"topics": [{"topic": "'</span>$<span class="org-variable-name">tn</span><span class="org-string">'"}], "version":1}'</span> &gt;a.json
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#29983;&#25104;&#39044;&#25191;&#34892;&#35745;&#21010;&#65306;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#24847;&#28857;&#65306;--broker-list &#20026;&#35201;&#37325;&#24179;&#34913;&#21040;&#21738;&#20123;broker id&#19978;
+</span>bin/kafka-reassign-partitions.sh --zookeeper 172.18.50.179:2181 --topics-to-move-json-file a.json --broker-list <span class="org-string">"1007,1008,1009,1011,1012,1013,1014,1015,1016,1017"</span> --generate
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#29983;&#25104;&#30340;&#35745;&#21010;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. &#25191;&#34892;&#25968;&#25454;&#37325;&#24179;&#34913;&#65306;
+</span>bin/kafka-reassign-partitions.sh --zookeeper 172.18.50.179:2181 --reassignment-json-file a-1.json --execute
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">4. &#26597;&#30475;&#24179;&#34913;&#36827;&#23637;&#29366;&#24577;&#65306;
+</span>bin/kafka-reassign-partitions.sh --zookeeper 172.18.50.179:2181 --reassignment-json-file a-1.json --verify
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-orgb27d459" class="outline-2">
+<h2 id="orgb27d459"><a href="#orgb27d459">副本数</a></h2>
+<div class="outline-text-2" id="text-orgb27d459">
+<p>
+问题描述
+</p>
+
+<p>
+kafka集群节点挂掉致数据缺失
+</p>
+
+<p>
+问题原因
+default.replication.factor 默认值为1，副本数为1，会有单点故障
+</p>
+
+<p>
+解决：
+</p>
+
+<p>
+default.replication.factor 3 默认创建topic的副本数。也可通过 &#x2013;replication-factor，在创建的时候指定。应改为3
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#21160;&#24577;&#20462;&#25913;
+</span>bin/kafka-configs.sh  --bootstrap-server localhost:9092  --entity-type brokers --entity-default --alter --add-config default.replication.factor=3
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;
+</span>bin/kafka-configs.sh --describe --bootstrap-server localhost:9092 --entity-type brokers
+
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21160;&#24577;&#26356;&#26032;&#27169;&#24335;
+</span>read-only &#65306;&#38656;&#35201;&#37325;&#21551;&#20195;&#29702;&#25165;&#33021;&#26356;&#26032;
+per-broker &#65306;&#21487;&#20197;&#20026;&#27599;&#20010;&#32463;&#32426;&#20154;&#21160;&#24577;&#26356;&#26032;
+cluster-wide &#65306;&#21487;&#20197;&#20316;&#20026;&#38598;&#32676;&#33539;&#22260;&#20869;&#30340;&#40664;&#35748;&#20540;&#21160;&#24577;&#26356;&#26032;&#12290;&#20063;&#21487;&#20197;&#26356;&#26032;&#20026;&#27599;&#20010;&#32463;&#32426;&#21830;&#30340;&#27979;&#35797;&#20540;&#12290;
+
+&#22914;
+default.replication.factor
+Type:   int
+Default:        1
+Valid Values:   
+Importance:     medium
+Update Mode:    read-only <span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551;&#25165;&#33021;&#26356;&#26032;</span>
+</pre>
+</div>
+
+<p>
+参考：<a href="https://kafka.apache.org/documentation/#brokerconfigs">brokerconfig</a>
+</p>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

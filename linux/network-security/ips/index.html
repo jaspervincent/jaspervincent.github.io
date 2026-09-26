@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 入侵防御</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="添加对应的 header 头部。report-to 在 CSP3 中取代了 report-uri。" />
+<link rel="canonical" href="https://xuchangwei.com/linux/network-security/ips/index.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: 入侵防御" />
+<meta property="og:description" content="添加对应的 header 头部。report-to 在 CSP3 中取代了 report-uri。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/network-security/ips/index.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/network-security/ips/index.html","@type":"WebPage","name":"Linux: 入侵防御","description":"添加对应的 header 头部。report-to 在 CSP3 中取代了 report-uri。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 入侵防御</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:60ddc2e9-79b8-48ba-9b51-75e8de7b2996">IPS</a>
+<ul>
+<li><a href="#h:0ecd5170-4476-46f7-bb43-d6f88d15185b">开启 CSP 内容安全策略</a>
+<ul>
+<li><a href="#h:86f10833-adae-4647-bb88-e9b4e41d2f0b">nginx 中开户 CSP 日志</a></li>
+</ul>
+</li>
+<li><a href="#h:5363a1a5-06ff-41f8-b235-4a26714e1f96">开启 HSTS</a></li>
+<li><a href="#h:0d2c4c1d-8639-4aa7-8018-72d91370b3b7">nginx 安全配置</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-h:60ddc2e9-79b8-48ba-9b51-75e8de7b2996" class="outline-2">
+<h2 id="h:60ddc2e9-79b8-48ba-9b51-75e8de7b2996"><a href="#h:60ddc2e9-79b8-48ba-9b51-75e8de7b2996">IPS</a></h2>
+<div class="outline-text-2" id="text-h:60ddc2e9-79b8-48ba-9b51-75e8de7b2996">
+<p>
+初级安全防护
+</p>
+<ul class="org-ul">
+<li>IDS/IPS：入侵检测/入侵防护(Intrusion Detection System/Intrusion Prevention System)，主机层防护。虽然IPS即可以入侵检测也可以入侵防护，但有的业务场景不需要入侵防护，所有会有IDS</li>
+</ul>
+</div>
+<div id="outline-container-h:0ecd5170-4476-46f7-bb43-d6f88d15185b" class="outline-3">
+<h3 id="h:0ecd5170-4476-46f7-bb43-d6f88d15185b"><a href="#h:0ecd5170-4476-46f7-bb43-d6f88d15185b">开启 CSP 内容安全策略</a></h3>
+<div class="outline-text-3" id="text-h:0ecd5170-4476-46f7-bb43-d6f88d15185b">
+<p>
+主要操作：
+</p>
+
+<ol class="org-ol">
+<li>明确域名下各目录路径资源，查找对应要访问的域名和协议 主要：</li>
+
+<li>执行。可能有用多种方式，如 header 中添加、代码中添加</li>
+
+<li>验证
+
+<ul class="org-ul">
+<li>添加 header方式：可通过浏览器访问验证，页面正常打开且有对应的
+header头部说明策略生效</li>
+
+<li>代码中添加：添加不在访问范围内资源验证</li>
+</ul></li>
+</ol>
+
+<p>
+<b>nginx 配置文件</b>
+</p>
+
+<pre class="example" id="orgc96a691">
+add_header Report-To '{"group": "csp-reports","max_age":31536000,"endpoints":[{"url":"https://pathstaging.xxx.com/_csp/prod"}]}';
+
+add_header Content-Security-Policy "object-src 'none';script-src 'self' 'unsafe-eval' 'unsafe-inline' https: http: *.xxx.com *.pxxx.com 39.97.xx.xx;report-uri https://pathstaging.xxx.com/_csp/prod;report-to csp-reports;";
+</pre>
+
+<pre class="example" id="orgab35689">
+语法说明：
+object-src：插件
+script-src：外部脚本
+'none'：禁止加载任何外部资源，需要加引号
+'unsafe-inline'：'unsafe-inline'允许使用内联资源，如内联&lt;script&gt;元素，javascript:URL，内联事件处理程序和内联&lt;style&gt;元素。
+'unsafe-eval'：允许将字符串当作代码执行，比如使用eval、setTimeout、setInterval和Function等函数。
+</pre>
+
+<p>
+<b>html 文件</b>
+</p>
+
+<p>
+范例：index.html
+</p>
+<pre class="example" id="orgdd1dbbf">
+&lt;meta http-equiv="Content-Security-Policy" content="object-src 'none';script-src 'self' 'unsafe-eval' 'unsafe-inline' https: http: *.xxx.com *.pxxx.com 39.97.xx.xx;"&gt;
+</pre>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://content-security-policy.com/">https://content-security-policy.com/</a></li>
+<li><a href="https://developer.mozilla.org/zh-CN/docs/Web/HTTP/CSP">CSP mozilla</a></li>
+<li><a href="https://cloud.tencent.com/developer/section/1189876">CSP qq</a></li>
+</ul>
+</div>
+<div id="outline-container-h:86f10833-adae-4647-bb88-e9b4e41d2f0b" class="outline-4">
+<h4 id="h:86f10833-adae-4647-bb88-e9b4e41d2f0b"><a href="#h:86f10833-adae-4647-bb88-e9b4e41d2f0b">nginx 中开户 CSP 日志</a></h4>
+<div class="outline-text-4" id="text-h:86f10833-adae-4647-bb88-e9b4e41d2f0b">
+<p>
+<b>nginx 中网站开启 CSP</b>
+</p>
+
+<p>
+添加对应的 header 头部。report-to 在 CSP3 中取代了 report-uri。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">location /path-h5/ {
+    access_log  /var/log/nginx/path_h5_access.log  main;
+    add_header Report-To <span class="org-string">'{"group": "csp-reports","max_age":31536000,"endpoints":[{"url":"https://pathstaging.xxx.com/_csp"}]}'</span>;
+    add_header Content-Security-Policy <span class="org-string">"object-src 'none';script-src 'self' 'unsafe-eval' 'unsafe-inline' https: http: ws: wss: *.xxx.com 39.97.xx.xx;report-uri https://pathstaging.xxx.com/_csp;report-to csp-reports;"</span>;
+    <span class="org-builtin">alias</span>  /xxx/path/path-h5/staging/;
+    index bonus-account.html;
+}
+</pre>
+</div>
+
+<p>
+<b>nginx 中 CSP 日志配置</b>
+</p>
+
+<p>
+1.格式化日志 conf.d/csp.conf
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">log_format CSP <span class="org-variable-name">escape</span>=json <span class="org-string">'{
+           "date":"$time_local",
+           "IP address":"$remote_addr",
+           "http_x_forwarded_for":"$http_x_forwarded_for",
+           "status":"$status",
+           "http_user_agent":"$http_user_agent",
+           "body_bytes_sent":"$body_bytes_sent",
+           "request":"$request",
+           "request_body": "$request_body"}'</span>;
+</pre>
+</div>
+
+<p>
+sites-available/default
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">server {
+    listen 443 ssl http2 default_server;
+    server_name example.org;
+
+    <span class="org-variable-name">location</span> = /_csp {
+            access_log /var/log/nginx/csp.log CSP;
+            proxy_pass http://127.0.0.1/_csp_response;
+    }
+}
+
+server {
+    listen 80 default_server;
+    server_name example.org;
+
+    <span class="org-comment-delimiter"># </span><span class="org-comment">More config here
+</span>
+    location /_csp_response {
+            access_log off;
+            <span class="org-keyword">return</span> 204;
+    }
+}
+</pre>
+</div>
+
+<p>
+2.CSP 日志报告说明
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat /var/log/nginx/csp.log | jq -r <span class="org-string">'.request_body | fromjson'</span>
+[
+  {
+    <span class="org-string">"age"</span>: 1,
+    <span class="org-string">"body"</span>: {
+      <span class="org-string">"blockedURL"</span>: <span class="org-string">"https://pathstaging.xxx.com/path-h5/js/chunk-common.6fb7c2f8.js"</span>,
+      <span class="org-string">"disposition"</span>: <span class="org-string">"enforce"</span>,
+      <span class="org-string">"documentURL"</span>: <span class="org-string">"https://pathstaging.xxx.com/path-h5/lucky-card.html"</span>,
+      <span class="org-string">"effectiveDirective"</span>: <span class="org-string">"script-src-elem"</span>,
+      <span class="org-string">"lineNumber"</span>: 1,
+      <span class="org-string">"originalPolicy"</span>: <span class="org-string">"object-src 'none';script-src 'self' 'strict-dynamic' 'unsafe-eval' 'unsafe-inline' https: http: *.xxx.com 39.97.124.19;report-to csp-reports;"</span>,
+      <span class="org-string">"referrer"</span>: <span class="org-string">""</span>,
+      <span class="org-string">"sample"</span>: <span class="org-string">""</span>,
+      <span class="org-string">"sourceFile"</span>: <span class="org-string">"https://pathstaging.xxx.com/path-h5/lucky-card.html"</span>,
+      <span class="org-string">"statusCode"</span>: 200
+    },
+    <span class="org-string">"type"</span>: <span class="org-string">"csp-violation"</span>,
+    <span class="org-string">"url"</span>: <span class="org-string">"https://pathstaging.xxx.com/path-h5/lucky-card.html"</span>,
+    <span class="org-string">"user_agent"</span>: <span class="org-string">"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"</span>
+  }
+]
+</pre>
+</div>
+
+<p>
+报告的JSON对象报告包含了以下数据：
+</p>
+
+<ul class="org-ul">
+<li>document-uri: 发生违规的文档的URI。</li>
+<li>referrer: 违规发生处的文档引用（地址）。</li>
+<li>blocked-uri:被CSP阻止的资源URI。如果被阻止的URI来自不同的源而非文档
+URI，那么被阻止的资源URI会被删减，仅保留协议，主机和端口号。</li>
+<li>violated-directive: 违反的策略名称。</li>
+<li>original-policy: 在 Content-Security-Policy HTTP
+头部中指明的原始策略。</li>
+</ul>
+
+<p>
+参考： <a href="https://mgdm.net/weblog/csp-logging-with-nginx/">CSP logging with nginx</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5363a1a5-06ff-41f8-b235-4a26714e1f96" class="outline-3">
+<h3 id="h:5363a1a5-06ff-41f8-b235-4a26714e1f96"><a href="#h:5363a1a5-06ff-41f8-b235-4a26714e1f96">开启 HSTS</a></h3>
+<div class="outline-text-3" id="text-h:5363a1a5-06ff-41f8-b235-4a26714e1f96">
+<p>
+参考：
+</p>
+
+<ul class="org-ul">
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security">Strict-Transport-Security - HTTP | MDN</a></li>
+<li><a href="https://www.cnblogs.com/upyun/p/10767548.html">HSTS 详解，让 HTTPS更安全</a></li>
+</ul>
+
+<p>
+优点：
+</p>
+
+<ul class="org-ul">
+<li>比传统的302重定向更加安全，不会被劫持；</li>
+<li>对访问速度有提示，302 跳转需要一个 RTT消耗，浏览器执行跳转也需要時間。</li>
+</ul>
+
+<p>
+缺点：
+</p>
+
+<ul class="org-ul">
+<li>使用者首次访问某网站是不受HSTS保护的。這是因为首次访问时，浏览器还未
+收到HSTS，所以仍有可能通过明文HTTP來访问。</li>
+<li>HSTS会在一定时间段后失效，需要手动设定快取期。</li>
+</ul>
+
+<p>
+HSTS Header的语法如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">Strict-Transport-Security: &lt;max-age=&gt;[; includeSubDomains][; preload]
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>max-age是必选参数，是一个以秒为单位的数值，它代表着HSTS Header的过期
+时间，通常设置为1年，即31536000秒。</li>
+<li>includeSubDomains是可选参数，如果包含它，则意味着当前域名及其子域名
+均开启HSTS保护。</li>
+<li>preload是可选参数，只有当你申请将自己的域名加入到浏览器内置列表的时
+候才需要使用到它。通过 <a href="https://hstspreload.appspot.com/">https://hstspreload.appspot.com/</a> 提交其域名。</li>
+</ul>
+
+<p>
+nginx
+</p>
+
+<pre class="example" id="org54f7846">
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains;" always;
+</pre>
+
+<ul class="org-ul">
+<li>always:表示无论哪种请求都将HSTS的头发送给客户端，也包括错误响应。默
+认情况404等是不发送HSTS头的。</li>
+<li>要注意 add_header 这个指令的继承方式，如果一个子配置块中设置了
+add_header 指令，那么在上层配置块中的 add_header指令是不会被继承的。
+如果你需要在子配置中添加额外的 add_header指令，那么有关HSTS那部分要
+复制到子配置中。</li>
+</ul>
+
+<p>
+ingress
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">cat admin-website-ingress.yaml
+</span>---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50M
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: <span class="org-string">"600"</span>
+    nginx.ingress.kubernetes.io/proxy-read-timeout: <span class="org-string">"600"</span>
+    nginx.ingress.kubernetes.io/proxy-send-timeout: <span class="org-string">"600"</span>
+    nginx.ingress.kubernetes.io/server-snippet: |
+        location ~* /api/actuator {
+            deny all;
+        }
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+        add_header Strict-Transport-Security <span class="org-string">'max-age=31536000; includeSubDomains;'</span> always;
+        more_set_headers <span class="org-string">"xxerver: hide"</span>;
+  name: rummy-admin-website
+  namespace: rummy
+spec:
+  rules:
+    - host: cmsstaging.xxx.com
+      http:
+        paths:
+          - backend:
+              serviceName: rummy-admin-website
+              servicePort: 80
+            path: /
+</pre>
+</div>
+
+<p>
+验证
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ curl -kIs https://example.com | grep Strict
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+</pre>
+</div>
+
+<p>
+网站评级：<a href="https://www.ssllabs.com/">https://www.ssllabs.com/</a>
+</p>
+
+<p>
+清除浏览器 HSTS 设置
+</p>
+
+<p>
+<a href="https://www.ssl2buy.com/wiki/how-to-clear-hsts-settings-on-chrome-firefox-and-ie-browsers">https://www.ssl2buy.com/wiki/how-to-clear-hsts-settings-on-chrome-firefox-and-ie-browsers</a>
+</p>
+
+<p>
+删除Chrome中的HSTS设置
+</p>
+
+<ul class="org-ul">
+<li>导航到chrome://net-internals/#hsts</li>
+<li>确认Chrome记录了域名的HSTS设置，请在页面底部的查询域名部分输入主机名。如www.example.com或example.com</li>
+<li>在删除域名部分中输入相同的主机名并点击</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:0d2c4c1d-8639-4aa7-8018-72d91370b3b7" class="outline-3">
+<h3 id="h:0d2c4c1d-8639-4aa7-8018-72d91370b3b7"><a href="#h:0d2c4c1d-8639-4aa7-8018-72d91370b3b7">nginx 安全配置</a></h3>
+<div class="outline-text-3" id="text-h:0d2c4c1d-8639-4aa7-8018-72d91370b3b7">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#38450;&#27490;&#23884;&#20837; &#21040;frame &#20013;&#65307;&#36991;&#20813;&#28857;&#20987;&#21163;&#25345;***
+</span>add_header X-Frame-Options  DENY ;
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31105;&#27490;&#26381;&#21153;&#22120;&#33258;&#21160;&#35299;&#26512;&#36164;&#28304;&#31867;&#22411;
+</span>add_header X-Content-Type-Options  nosniff ;
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#38450;XSS***
+</span>add_header X-Xss-Protection 1;
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

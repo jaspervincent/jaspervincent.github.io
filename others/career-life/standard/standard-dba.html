@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Career: 数据库设计规范</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="强制 考虑大数据系统分析，业务建表须包含两个时间字段，且字段名称请保持一致：" />
+<link rel="canonical" href="https://xuchangwei.com/others/career-life/standard/standard-dba.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Career: 数据库设计规范" />
+<meta property="og:description" content="强制 考虑大数据系统分析，业务建表须包含两个时间字段，且字段名称请保持一致：" />
+<meta property="og:url" content="https://xuchangwei.com/others/career-life/standard/standard-dba.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/others/career-life/standard/standard-dba.html","@type":"WebPage","name":"Career: 数据库设计规范","description":"强制 考虑大数据系统分析，业务建表须包含两个时间字段，且字段名称请保持一致："}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Career: 数据库设计规范</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org832ca69">设计规范</a>
+<ul>
+<li><a href="#org6c0f7f1">表设计规范：</a></li>
+<li><a href="#orge4184cb">命名规范：</a></li>
+<li><a href="#orgb151e2b">数据类型</a></li>
+<li><a href="#org5eaf0f9">索引</a></li>
+<li><a href="#org9fb83dc">权限</a></li>
+</ul>
+</li>
+<li><a href="#org10caf1d">SQL规范</a>
+<ul>
+<li><a href="#org705dfe7">书写规范</a></li>
+<li><a href="#orga965d61">查询规范</a></li>
+<li><a href="#orgadd81a3">条件查询规范</a></li>
+<li><a href="#org4c36075">写入规范</a></li>
+</ul>
+</li>
+<li><a href="#orgaa011a8">读写分离</a>
+<ul>
+<li><a href="#org9310735">读写规范</a></li>
+</ul>
+</li>
+<li><a href="#org37d9311">数据库代理规范</a>
+<ul>
+<li><a href="#orgb93979e">使用规范</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Career</a></li>
+</ul>
+
+<p>
+规范目的：
+</p>
+<ol class="org-ol">
+<li>达成共识，形成统一的标准，大家在此标准上沟通协作</li>
+<li>提高效率，提高沟通效率，避免沟通南辕北辙</li>
+</ol>
+<section id="outline-container-org832ca69" class="outline-2">
+<h2 id="org832ca69"><a href="#org832ca69">设计规范</a></h2>
+<div class="outline-text-2" id="text-org832ca69">
+</div>
+<div id="outline-container-org6c0f7f1" class="outline-3">
+<h3 id="org6c0f7f1"><a href="#org6c0f7f1">表设计规范：</a></h3>
+<div class="outline-text-3" id="text-org6c0f7f1">
+<ol class="org-ol">
+<li>必须使用INNODB存储引擎
+<ul class="org-ul">
+<li>解读：支持事务、行级锁、并发性能更好、支持崩溃恢复、CPU及内存缓存页优化使得资源利用率更高</li>
+</ul></li>
+
+<li>必须使用UTF8(UTF8MB3)、UTF8MB4字符集
+<ul class="org-ul">
+<li>解读：通用字符集，俗称：万国码，避免乱码</li>
+</ul></li>
+
+<li>必须使用注释，不限于：库、表、字段
+<ul class="org-ul">
+<li>解读：团结协作、梳理E-R关系、梳理数据资产必备</li>
+</ul></li>
+
+<li>表必须包括主键、创建时间、修改时间
+<ul class="org-ul">
+<li>解读：聚簇索引性能更优，迁移、维护，更方便</li>
+</ul></li>
+
+<li>同一业务列，必须使用相同的列名、列定义
+<ul class="org-ul">
+<li>解读：团结协作、梳理E-R关系、梳理数据资产必备</li>
+</ul></li>
+
+<li>禁止使用存储过程、函数、触发器、事件、视图、外键、UDF
+<ul class="org-ul">
+<li>解读：不便于迁移、维护，DB负载更高，不便于版本迭代</li>
+</ul></li>
+
+<li>禁止使用非标字段，例如TEXT、BLOB、ENUM、大VARCHAR等
+<ul class="org-ul">
+<li>解读：内存碎片多、IO性能低、维护成本高、RT慢</li>
+</ul></li>
+
+<li>分场景谨慎使用FLOAT、DOUBLE
+<ul class="org-ul">
+<li>解读：审计、账单相关业务，使用DECIMAL，也可以使用BIGINT</li>
+</ul></li>
+
+<li>禁止跨库查询 解读：业务耦合度更高，维护成本与业务耦合度成线性增长</li>
+
+<li>禁止业务高峰期进行大表DML、DDL 解读：业务低峰期、分批操作、无锁变更</li>
+
+<li>必须使用NOT NULL，且有DEFAULT 解读：NULL的缺点，不言而喻</li>
+
+<li>单表列数小于30，最多不超过50
+<ul class="org-ul">
+<li>解读：便于维护，避免产生热点，业务耦合度低</li>
+</ul></li>
+
+<li>单实例表数量小于500张
+<ul class="org-ul">
+<li>解读：便于维护，避免由于单表操作引起的雪崩、连锁效应</li>
+</ul></li>
+
+<li>表中有逻辑状态标识字段 解读：避免物理删除带来的数据丢失</li>
+
+<li>UPDATE、DELETE必须使用WHERE条件，且不能永真，如1=1
+<ul class="org-ul">
+<li>解读：避免产生大量磁盘碎片，误删除</li>
+</ul></li>
+
+<li>单表超过10G，年增长数据大于500W，表行数2000W，可考虑分表，归档
+<ul class="org-ul">
+<li>解读：避免表过大影响性能</li>
+</ul></li>
+
+<li>表索引个数不超过8个 解读：索引加快了查询速度，但也增加了写入IO负载</li>
+
+<li>表组合索引列数最多不超过5个
+<ul class="org-ul">
+<li>解读：过多的索引列，起不到过滤数据效果，可能会适得其反</li>
+</ul></li>
+
+<li>组合索引的原则要记住 解读：最左前缀，且选择度高的</li>
+
+<li>禁止在区分度不高的列上创建索引 解读：会导致全表扫描</li>
+
+<li>INSERT必须指定列名 解读：增加、删除字段，后端程序出现BUG
+<ul class="org-ul">
+<li>错误：INSERT INTO t_xxx VALUES(x,x)</li>
+<li>正确：INSERT INTO t_xxx(col_1,col_2) VALUES(x,x)</li>
+</ul></li>
+
+<li>禁止变更、更新主键
+<ul class="org-ul">
+<li>解读：相关连的数据、索引都要重组，成本特别高，更易产生碎片</li>
+</ul></li>
+
+<li>禁止使用保留关键字 解读：避免出现冲突，造成程序ERROR</li>
+
+<li>禁止存储图片、文件等大数据 解读：可采用OSS，图数据库等更优</li>
+
+<li>禁止使用分区表 解读：分区表的操作成本、维护成本都很高</li>
+
+<li>同一表的ALTER操作，需合并成一个DDL
+<ul class="org-ul">
+<li>解读：调用一次API，效率更高，锁表时间更短</li>
+</ul></li>
+
+<li>ONLINE-DDL 明细图</li>
+</ol>
+
+
+<figure id="orgc88f5cc">
+<img style="aspect-ratio:1019/216" decoding="async" loading="lazy" src="./images/image-20210709152555291.webp" alt="image-20210709152555291.webp">
+
+</figure>
+
+
+<figure id="org7f58ed7">
+<img style="aspect-ratio:1022/167" decoding="async" loading="lazy" src="./images/image-20210709152606148.webp" alt="image-20210709152606148.webp">
+
+</figure>
+
+
+<figure id="org3007b34">
+<img style="aspect-ratio:1025/363" decoding="async" loading="lazy" src="./images/image-20210709152527305.webp" alt="image-20210709152527305.webp">
+
+</figure>
+
+
+<figure id="orga327f07">
+<img style="aspect-ratio:1030/196" decoding="async" loading="lazy" src="./images/image-20210709152618473.webp" alt="image-20210709152618473.webp">
+
+</figure>
+
+
+<figure id="org4c96504">
+<img style="aspect-ratio:1010/244" decoding="async" loading="lazy" src="./images/image-20210709152628130.webp" alt="image-20210709152628130.webp">
+
+</figure>
+
+<p>
+27.1 online ddl的关键字
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql">ALGORITHM=INPLACE,LOCK=<span class="org-keyword">NONE</span>
+</pre>
+</div>
+
+<p>
+例如：
+</p>
+
+
+<figure id="org4ae8e0d">
+<img style="aspect-ratio:848/69" decoding="async" loading="lazy" src="./images/image-20210709152647024.webp" alt="image-20210709152647024.webp">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-orge4184cb" class="outline-3">
+<h3 id="orge4184cb"><a href="#orge4184cb">命名规范：</a></h3>
+<div class="outline-text-3" id="text-orge4184cb">
+<ul class="org-ul">
+<li>强制 库名、表名、字段名采用26个英文字母和0-9这十个数字,加上下划线'_'组成,不能出现其他字符
+<ul class="org-ul">
+<li>解读：便于维护，统一命名</li>
+</ul></li>
+<li>强制 库名、表名、字段名禁止超过32个字符</li>
+<li>建议 库名以xx_为前缀，后跟业务系统名称，如: xx_wallet</li>
+<li>强制 库名、表名、字段名禁止使用MySQL保留字</li>
+<li>建议 表名以t_为前缀，业务模块、功能标识、描述为组合，如t_wallet_transaction_detail</li>
+<li>强制 数据对象、变量的命名都采用英文字符,禁止使用中文汉字命名</li>
+<li>强制 临时库、表(中转数据)名必须以tmp为前缀，并以日期为后缀. 如tmp_tablename_20220326</li>
+<li>强制 备份库名、表名以日期与bak组合为后缀，如tablename_20210910_bak</li>
+<li>强制 分区表名称，采用表名、自然数序列为组合，例如: t_wallet_transaction_1，最大不超过512张</li>
+<li>强制 表字符集默认采用utf8mb4，存储引擎采用innodb</li>
+<li>强制 DB 中事务的隔离级别默认为READ-COMMITED(RC)</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgb151e2b" class="outline-3">
+<h3 id="orgb151e2b"><a href="#orgb151e2b">数据类型</a></h3>
+<div class="outline-text-3" id="text-orgb151e2b">
+<ul class="org-ul">
+<li>强制 采用自增列id(auto_increment)为主键，采用bigint unsigned非负数设置</li>
+<li>强制 使用tinyint或采用位运算替换enum，set等类型使用</li>
+<li>建议 使用tinytint或者smallint类型存储 选择性低的status、type等类型字段</li>
+<li>建议 使用int unsigned类型存储IP地址字段</li>
+<li>建议 表中所有字段必须都是NOT NULL属性，必须定义DEFAULT值，可用0或者空字符('')来代替null</li>
+<li>强制 存储财务、金额等精确浮点数必须使用 DECIMAL 替代 FLOAT 和 DOUBLE</li>
+<li>强制 使用 UNSIGNED 存储非负整数</li>
+<li>建议 慎用大字段(BLOB/TEXT等)，使用率低的情况，建议将其拆分至单独的表</li>
+<li>建议 varchar(N)，N代表字符数，尽量小,最大长度65535个字节,进行排序和创建临时表一类的内存操作时,会使用N的长度申请内存</li>
+<li>建议 时间，年：year，日期：date，时间：建议timestamp</li>
+<li>强制 建表时字段必须附带comment信息，要求描述尽量详细，清晰明了</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org5eaf0f9" class="outline-3">
+<h3 id="org5eaf0f9"><a href="#org5eaf0f9">索引</a></h3>
+<div class="outline-text-3" id="text-org5eaf0f9">
+<ul class="org-ul">
+<li>强制 InnoDB类型表必须要有主键列，且主键必须是单列字段，使用有序递增的整数值做主键，表的主键列值禁止被更新，可以进行删除</li>
+<li>操作，比如 id bigint(20) unsigned NOT NULL AUTO_INCREMENT</li>
+<li>强制 每张表除主键外，必须存在唯一索引</li>
+<li>强制 避免创建包含多个字段的联合主键，请使用唯一索引代替</li>
+<li>建议 多列构造的组合索引时，依据列数据的散列度高低，进行排列组合</li>
+<li>建议 数据散列度低的列，禁止建立单独索引</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org9fb83dc" class="outline-3">
+<h3 id="org9fb83dc"><a href="#org9fb83dc">权限</a></h3>
+<div class="outline-text-3" id="text-org9fb83dc">
+<ul class="org-ul">
+<li>强制 业务账号不允许拥有root权限</li>
+<li>建议 业务账号与库保持独立对应，一库，两账号方式(读写账号、只读账号)</li>
+<li>强制 账号后缀标识读写权限，例如 xx_wallet_rw， xx_wallet_r</li>
+<li>强制 业务只读账号只授权对应库的 SELECT权限</li>
+<li>强制 读写账号只授权DML权限（SELECT, INSERT, UPDATE, DELETE）</li>
+<li>强制 DBA账号可以授权root权限，但是只能由DBA和运维使用</li>
+<li>强制 数据库复制、归档、备份、大数据等账号，不按业务区分，采用统一账号密码</li>
+<li>强制 root账号只允许本服务器登录</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-org10caf1d" class="outline-2">
+<h2 id="org10caf1d"><a href="#org10caf1d">SQL规范</a></h2>
+<div class="outline-text-2" id="text-org10caf1d">
+</div>
+<div id="outline-container-org705dfe7" class="outline-3">
+<h3 id="org705dfe7"><a href="#org705dfe7">书写规范</a></h3>
+<div class="outline-text-3" id="text-org705dfe7">
+<ul class="org-ul">
+<li>强制 统计和复杂查询不可使用线上库，各业务线有专用库，如：用户库，商家库，脚本库，统计库，测试库等，具体请看配置文件规范</li>
+<li>或咨询DBA</li>
+<li>强制 业务中大表全表扫描和全表导出（dump）请放在备份库或者交由DBA执行</li>
+<li>强制 禁止使用load data等批量导入的操作，请修改为小批量(推荐不超过1000条/次)insert,每次间隔1s</li>
+<li>强制 程序端禁止显示使用set语句，包括set names、set sql_mode和set isolation_level等，框架默认启动方式单独讨论</li>
+<li>强制 禁止使用存储过程、触发器、UDF、events、视图，业务逻辑处理均在程序端完成</li>
+<li>强制 禁止不同类型字段做比较，避免隐式转换</li>
+<li>强制 禁止单条SQL语句同时更新多个表</li>
+<li>强制 Insert语句必须显示的指定字段名</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orga965d61" class="outline-3">
+<h3 id="orga965d61"><a href="#orga965d61">查询规范</a></h3>
+<div class="outline-text-3" id="text-orga965d61">
+<ul class="org-ul">
+<li>强制 尽量避免使用select *，请用字段名称代替,如：select user,password from users,替代select * from users</li>
+<li>强制 线上sql禁止写成多层子查询嵌套的SQL语句，推荐改写成表顺序连接的格式</li>
+<li>强制 禁止线上sql做逻辑运算，数据逻辑运算需在程序进行</li>
+<li>建议 查询结果不得超过2000行，如超过会被强制截断</li>
+<li>强制 禁止使用order by rand()</li>
+<li>建议 建议使用union all替换union</li>
+<li>建议 线上尽量避免使用count的操作，推荐使用缓存代替，也可新建总量表或程序端计算</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgadd81a3" class="outline-3">
+<h3 id="orgadd81a3"><a href="#orgadd81a3">条件查询规范</a></h3>
+<div class="outline-text-3" id="text-orgadd81a3">
+<ul class="org-ul">
+<li>建议 SELECT|UPDATE|DELETE|REPLACE要有WHERE子句，且WHERE子句的条件必需使用索引查找，where条件中如包含两个以上的范围查询（&gt;,&lt;,in,between）只有一个可用到索引</li>
+<li>建议 in和or，推荐使用in，性能更高，使用in时，包含的值应尽可能少，建议不超过100个</li>
+<li>强制 WHERE 子句中禁止只使用全模糊的LIKE条件进行查找，必须有其他查询条件</li>
+<li>强制 WHERE子句中的索引列或组合索引前导列上不能使用函数</li>
+<li>建议 有distinct、order by和group by子句的查询，需添加索引，如无非常消耗系统资源，排序分组等中间结果集应限制在2000行以内，超过限制应在程序端实现。避免使用limit m，n的方式来进行分页，效率十分低下，请使用合理的方式进行分页查询</li>
+</ul>
+
+<p>
+其他
+</p>
+<ul class="org-ul">
+<li>禁止索引列上使用函数表达式
+<ul class="org-ul">
+<li>解读：SELECT uid FROM t_user WHERE from_unixtime(day)&gt;='2017-02-15' 会导致全表扫描</li>
+<li>正确：SELECT uid FROM t_user WHERE day&gt;= unix_timestamp('2017-02-15 00:00:00')</li>
+</ul></li>
+<li>禁止使用order by rand() 解读：会导致全表扫描，资源使用率变高</li>
+<li>禁止隐式转换 解读：SELECT uid FROM t_account WHERE phone=13812345678
+<ul class="org-ul">
+<li>正确：SELECT uid FROM t_account WHERE phone='13812345678'</li>
+</ul></li>
+<li>禁止%开头的模糊查询 解读：会导致全表扫描，资源使用率变高</li>
+<li>禁止反向查询，包括：NOT、!=、&lt;&gt;、!&lt;、!&gt;、NOT IN、NOT LIKE
+<ul class="org-ul">
+<li>解读：会导致全表扫描，资源使用率变高</li>
+</ul></li>
+<li>禁止使用OR，可用union all改写
+<ul class="org-ul">
+<li>解读：会产生全表扫描，即使命中索引，CPU消耗也很高</li>
+</ul></li>
+<li>禁止大表使用JOIN查询，禁止大表使用子查询
+<ul class="org-ul">
+<li>解读：会产生临时表，消耗较多内存与CPU</li>
+</ul></li>
+<li>用union all而不是union 解读：会导致排序</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org4c36075" class="outline-3">
+<h3 id="org4c36075"><a href="#org4c36075">写入规范</a></h3>
+<div class="outline-text-3" id="text-org4c36075">
+<ul class="org-ul">
+<li>强制 禁止在INSERT|UPDATE|DELETE|REPLACE语句中进行多表连接操作，例如：insert …select from xxx,update xxx where xx in (select xxx)等</li>
+<li>强制 insert必须指明字段名，不可insert into table values(A,B,C),应为：insert into table (a,b,c) values(A,B,C)</li>
+<li>强制 insert，update，delete建议批量操作，但操作行数不可超过1000条，delete推荐不超过100，执行过程中sleep 1s
+<ul class="org-ul">
+<li>解读：避免单个事务过大，资源使用率变高</li>
+</ul></li>
+<li>强制 禁用update|delete t1 … where a=XX limit XX; 这种带limit的更新语句。因为会导致主从不一致，导致数据错乱，建议加上order by PK</li>
+<li>强制 禁用insert into …on duplicate key update…在高并发环境下，会造成主从不一致</li>
+<li>强制 禁止使用create table xx as select * from xxx，容易引发主从复制中断</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-orgaa011a8" class="outline-2">
+<h2 id="orgaa011a8"><a href="#orgaa011a8">读写分离</a></h2>
+<div class="outline-text-2" id="text-orgaa011a8">
+</div>
+<div id="outline-container-org9310735" class="outline-3">
+<h3 id="org9310735"><a href="#org9310735">读写规范</a></h3>
+<div class="outline-text-3" id="text-org9310735">
+<ul class="org-ul">
+<li>强制 禁止往从库写数据，所有从库会设置成read_only=on</li>
+<li>强制 对于同步延迟不敏感的只读查询，必须放到从库上执行，对于同步延迟敏感的只读查询，可放到主库上执行，理论上主库读写比例不得超过2:1</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="outline-container-org37d9311" class="outline-2">
+<h2 id="org37d9311"><a href="#org37d9311">数据库代理规范</a></h2>
+<div class="outline-text-2" id="text-org37d9311">
+</div>
+<div id="outline-container-orgb93979e" class="outline-3">
+<h3 id="orgb93979e"><a href="#orgb93979e">使用规范</a></h3>
+<div class="outline-text-3" id="text-orgb93979e">
+<ul class="org-ul">
+<li>建议 只支持SELECT|UPDATE|DELETE|REPLACE|INSERT等命令，除此之外所有命令都不支持</li>
+<li>建议 支持事务，暂不能支持读写分离(主库承担读写)</li>
+<li>强制 执行结果超过1G的SQL自动断开(mysql allowed_packet 参数配置限制)</li>
+<li>建议 代理对分表支持有特殊要求，具体请看，代理分表规范，并进行测试后再上线使用</li>
+<li>建议 推荐打开 SQL 语句的PREPARES=true 功能，设置为false的话，不支持读写分离（原因同事务）</li>
+<li>建议 连接代理的SQL如没有limit，会默认加上limit 2000</li>
+<li>强制 需两次以上（包括两次）跟myslq交互的命令不能支持，例如：show warnnings，select last_insert_id select sleep select get_lock，select release_lock ,select connection_id等</li>
+<li>建议 只允许程序连接，禁止一切客户端连接操作</li>
+<li><p>
+强制 考虑大数据系统分析，业务建表须包含两个时间字段，且字段名称请保持一致：
+</p>
+<div class="org-src-container">
+<pre class="src src-sql">`update_time` <span class="org-type">TIMESTAMP</span> <span class="org-keyword">DEFAULT</span> <span class="org-builtin">CURRENT_TIMESTAMP</span> <span class="org-keyword">ON</span> <span class="org-keyword">UPDATE</span> <span class="org-builtin">CURRENT_TIMESTAMP</span> COMMENT <span class="org-string">'&#26356;&#26032;&#26102;&#38388;'</span>
+`create_time` <span class="org-type">timestamp</span> <span class="org-keyword">NOT</span> <span class="org-keyword">NULL</span> <span class="org-keyword">default</span> <span class="org-builtin">CURRENT_TIMESTAMP</span> COMMENT <span class="org-string">'&#21019;&#24314;&#26102;&#38388;</span>
+</pre>
+</div></li>
+
+<li><p>
+强制 对业务数据采用软删除策略
+</p>
+<div class="org-src-container">
+<pre class="src src-sql"><span class="org-string">'is_del`tinyint(1) unsigned NOT NULL DEFAULT '</span>0<span class="org-string">' COMMENT '</span>&#26159;&#21542;&#21024;&#38500; 0 &#27491;&#24120; 1 &#24050;&#21024;&#38500;<span class="org-string">'</span>
+</pre>
+</div></li>
+</ul>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

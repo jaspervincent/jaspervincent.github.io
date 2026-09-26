@@ -1,0 +1,2690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s-安装篇-kueadm-1.37</title>
+<meta name="description" content="kubernetes(k8s) 是一个容器编排平台，核心目标：" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+<link rel="canonical" href="https://xuchangwei.com/linux/kubernetes/setup/kubeadm1.37.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Kubernetes: k8s-安装篇-kueadm-1.37" />
+<meta property="og:description" content="kubernetes(k8s) 是一个容器编排平台，核心目标：" />
+<meta property="og:url" content="https://xuchangwei.com/linux/kubernetes/setup/kubeadm1.37.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/kubernetes/setup/kubeadm1.37.html","@type":"WebPage","name":"Kubernetes: k8s-安装篇-kueadm-1.37","description":"kubernetes(k8s) 是一个容器编排平台，核心目标："}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s-安装篇-kueadm-1.37</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:5F824545-F5B0-4AF6-ABD4-2D0D20701CF9">概述</a>
+<ul>
+<li><a href="#h:B0F7F7BE-4A4E-44CB-B1B4-9DFAEA18D665">k8s 架构和组件</a>
+<ul>
+<li><a href="#h:A6017011-224B-418E-A494-67FFA93BAF77">整体架构</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:547b4f5c-fd62-4a1f-93f2-c0bdc13fc269">环境准备</a>
+<ul>
+<li><a href="#h:3d4f56b7-18cd-4224-b70c-b022c27c0fb5">网段划分</a></li>
+<li><a href="#h:2c3d31e2-bff3-4854-a947-0b51d90f3fe7">机器规划</a></li>
+<li><a href="#h:F1D23330-CD87-4180-81CA-7188B8933C3F">所有主机初始化</a>
+<ul>
+<li><a href="#h:E2C4E098-860E-4172-B3D0-5AD5D4C3C504">环境变量定义（master01）执行</a></li>
+<li><a href="#h:2A499920-3D41-42D8-8BBE-81ADA8CFDD0F">配置 SSH 名密登录（master1 执行）</a></li>
+<li><a href="#h:2A915A34-AD17-44A9-8CC8-421D3A50C1F0">主机名和域名解析（所有节点执行）</a></li>
+<li><a href="#h:44A7E3ED-4882-4578-8BA9-A48ED58BF6E2">必备工具（可选）</a></li>
+<li><a href="#h:5CC81FA0-58F3-4454-A528-A247DD270088">关闭swap分区（所有节点执行）</a></li>
+<li><a href="#h:54655217-7BFB-4755-B214-83C8F006932F">同步时间（所有节点执行）</a>
+<ul>
+<li><a href="#h:5F3999E0-CDD2-4BAA-BE6E-A11DA26C91B3">设置时区</a></li>
+</ul>
+</li>
+<li><a href="#h:4C7505BD-9B8C-4717-A959-A412DD6866D2">关闭防火墙（所有节点执行）</a></li>
+<li><a href="#h:D017F8FC-2906-4372-90AF-A10057B4D375">limit(所有节点执行)</a></li>
+<li><a href="#h:803F90E2-9862-421A-A1CC-BD74805AAA25">内核优化 （所有节点执行）</a>
+<ul>
+<li><a href="#h:a4817068-d11c-47f4-b398-b82242818ef3">内核升级</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:1161B07C-FEE0-42DD-9D2B-054E6CBB2717">安装容器运行时（所有节点执行）</a>
+<ul>
+<li><a href="#h:1292D041-9587-40D4-8033-CDFBA4025A1F">安装容器运行时 containerd</a>
+<ul>
+<li><a href="#h:6141889D-EF9E-4402-9155-3E5036E691B8">安装依赖 runc</a></li>
+</ul>
+</li>
+<li><a href="#h:DD691C9C-E2E7-4755-9140-231A123C9DB5">安装 crictl（CRI 客户端，k8s 运维必备）</a></li>
+</ul>
+</li>
+<li><a href="#h:31474281-9c84-4e14-99a6-c1f2bd741f6a">所有主机安装 kubeadm、kubelet和kubectl</a></li>
+</ul>
+</li>
+<li><a href="#h:415bccff-b785-4ea8-9d60-a6cce023f710">高可用实现(弃用，这里使用kube-vip)</a>
+<ul>
+<li><a href="#h:60BA0E88-E6C5-4FBB-B16F-318747853BC0">Master 节点 HAProxy</a></li>
+<li><a href="#h:f00eac7a-b4f5-40bc-92a2-83973b516d30">master01 keepalived</a></li>
+<li><a href="#h:29e428cb-d0dc-454e-a714-5d1f63db468a">master02 keepalived</a></li>
+<li><a href="#h:80cb9b3c-3aa9-4892-8f21-b62ed302f90b">master03 keepalived</a></li>
+<li><a href="#h:c6bfa594-e662-4ad7-b055-320cf7af0345">健康检查配置</a></li>
+</ul>
+</li>
+<li><a href="#h:05ce7887-a24c-47db-a03b-6944fe20dfa5">集群初始化</a>
+<ul>
+<li><a href="#h:4e2afd45-6d9c-49e1-ab7f-170ffc410611">kubeadm 命令使用</a></li>
+<li><a href="#h:8459c629-b142-43a1-9db8-fb123646c0c7">kubeadm init 命令简介</a></li>
+<li><a href="#h:10a34219-ecbf-4307-9819-3197cd660ea6">高可用 master 初始化</a></li>
+</ul>
+</li>
+<li><a href="#h:7FBE5F9F-11EA-4B20-8A94-80C1E8608479">在 master1 节点生成 kube-vip Static Pod</a></li>
+<li><a href="#h:3e5773ea-b8d7-45a0-8596-2cd2f595158b">加入其他 Master 节点到集群</a>
+<ul>
+<li><a href="#h:7711fe4b-3916-43e2-aaf3-0018d9a71bf5">token 过期处理</a></li>
+</ul>
+</li>
+<li><a href="#h:7e6ce312-429c-4991-820e-37ed40f5b234">添加Node节点</a>
+<ul>
+<li><a href="#h:fad58a69-70dd-43bc-9654-741226b45332">k8s 安装失败故障排查</a></li>
+<li><a href="#h:d63e7df5-cb97-4e4c-b68e-0f74d0adea30">给node节点打标签（可选）</a></li>
+</ul>
+</li>
+<li><a href="#h:defb103a-7c80-46e6-b274-872135fe041d">安装网络插件</a>
+<ul>
+<li><a href="#h:23BC19D9-C051-4975-BF5F-5240FFAAC2F5">Cilium</a>
+<ul>
+<li><a href="#h:B38E9875-2F4B-4B84-89BC-C149D8A0DE7B">master01 节点执行安装 cilium-cli</a></li>
+<li><a href="#h:684BC13F-AACD-4E8B-BF53-E03DF38BD493">安装 Cilium</a>
+<ul>
+<li><a href="#h:5FF133C4-ACF4-4038-9A53-F91DA2BB4EED">原生路由模式</a></li>
+<li><a href="#h:34886C7E-4A59-4D1C-917F-FD2E00AE9D8B">XVLAN 模式</a></li>
+</ul>
+</li>
+<li><a href="#h:E4423BFE-B4B1-4CF9-AAD2-4B68EF77FEC9">检查状态</a></li>
+<li><a href="#h:F0F7C102-C2B8-42FD-9F9C-CA4122F59E0F">定义地址池</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:ACC78EAE-F5ED-4BE8-B9F4-E7870771CC82">部署 Metrics Server （Master 节点）</a>
+<ul>
+<li><a href="#h:7e083d0d-272b-4cb1-bd40-633f6b994159">Metrics Server</a></li>
+</ul>
+</li>
+<li><a href="#h:d4deb790-db57-4d09-a8c1-14203ad88961">Dashboard</a>
+<ul>
+<li><a href="#h:a0b3571f-873e-4c64-9c39-0b98ae009f39">Headlamp</a>
+<ul>
+<li><a href="#h:07e5b985-82e4-4535-a085-4cd1ced6abb8">登录 dashboard</a></li>
+<li><a href="#h:8424F0BC-82AF-4927-81A9-65EC327D8CCD">多集群管理</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:7239c867-fe95-49e4-ad97-78862adb1563">收尾工作</a>
+<ul>
+<li><a href="#h:739033d5-1c6a-4b43-b750-378cb34ae156">注意事项</a></li>
+<li><a href="#h:a4b8287b-e1f0-4a76-8651-121b261a6273">集群检测</a></li>
+<li><a href="#h:e95f990c-63ec-4d6e-95b7-4025a17487ca">删除集群</a></li>
+<li><a href="#h:a6a25d02-e454-4664-a352-2d4452b0af06">kubeadm 证书更新</a>
+<ul>
+<li><a href="#h:54aaad72-6794-4141-afda-04d8f36e4f88">更新一年</a></li>
+<li><a href="#h:4d59fc88-cb69-4cb8-b2cc-a523b99051e2">更新为 99 年</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:427eaf49-db05-4a2f-a3e7-690ac9e11f0b">参考</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Kubernetes</a></li>
+</ul>
+
+
+<ul class="org-ul">
+<li>版本特性：<a href="https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.37.md">CHANGELOG/CHANGELOG-1.37.md</a></li>
+</ul>
+<section id="outline-container-h:5F824545-F5B0-4AF6-ABD4-2D0D20701CF9" class="outline-2">
+<h2 id="h:5F824545-F5B0-4AF6-ABD4-2D0D20701CF9"><a href="#h:5F824545-F5B0-4AF6-ABD4-2D0D20701CF9">概述</a></h2>
+<div class="outline-text-2" id="text-h:5F824545-F5B0-4AF6-ABD4-2D0D20701CF9">
+</div>
+<div id="outline-container-h:B0F7F7BE-4A4E-44CB-B1B4-9DFAEA18D665" class="outline-3">
+<h3 id="h:B0F7F7BE-4A4E-44CB-B1B4-9DFAEA18D665"><a href="#h:B0F7F7BE-4A4E-44CB-B1B4-9DFAEA18D665">k8s 架构和组件</a></h3>
+<div class="outline-text-3" id="text-h:B0F7F7BE-4A4E-44CB-B1B4-9DFAEA18D665">
+</div>
+<div id="outline-container-h:A6017011-224B-418E-A494-67FFA93BAF77" class="outline-4">
+<h4 id="h:A6017011-224B-418E-A494-67FFA93BAF77"><a href="#h:A6017011-224B-418E-A494-67FFA93BAF77">整体架构</a></h4>
+<div class="outline-text-4" id="text-h:A6017011-224B-418E-A494-67FFA93BAF77">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/concepts/architecture/">https://kubernetes.io/zh-cn/docs/concepts/architecture/</a></li>
+</ul>
+
+<p>
+kubernetes(k8s) 是一个容器编排平台，核心目标：
+</p>
+<ul class="org-ul">
+<li>自动部署、自动扩容、服务发现、负载均衡、自愈能力、滚动更新、高可用管理。</li>
+</ul>
+
+
+<figure id="orga90fbd4">
+<img decoding="async" loading="lazy" src="./images/kubernetes-cluster-architecture.svg" alt="kubernetes-cluster-architecture.svg" class="org-svg" width="60%">
+
+</figure>
+
+
+<p>
+Kubernetes 集群由一个控制平面和一组用于运行容器化应用的工作机器组成， 这些工作机器称作节点（Node）。每个集群至少需要一个工作节点来运行 Pod。
+</p>
+
+<p>
+工作节点托管着组成应用负载的 Pod。控制平面管理集群中的工作节点和 Pod。 
+</p>
+
+<p>
+控制平面组件
+</p>
+<ul class="org-ul">
+<li>kube-apiserver：集群核心入口，负责处理接受请求的工作。以下所有组件必需通过 apiserver 通信
+<ul class="org-ul">
+<li>kubectl\controller\scheduler\kubelet</li>
+</ul></li>
+<li>etcd：键值数据库，保存集群的状态信息。高可用，通常为奇数节点。保存内容包括
+<ul class="org-ul">
+<li>Pod\Deployment\Node\ConfigMap\Secret\Service\Endpoint</li>
+</ul></li>
+<li>kube-scheduler：负责 pod 的调度，决定 pod 运行在哪个 node 节点。调试依据
+<ul class="org-ul">
+<li>CPU\内存\污点容忍\节点亲和性\Pod亲和性\数据本地性</li>
+</ul></li>
+<li>kube-controller-manager：运行各种控制器，保证 Pod 或其他资源到达期望值。常见的控制器
+<ul class="org-ul">
+<li>Deployment Controller\ReplicaSet Controller\Node Controller\Endpoint Controller\ServeAccount Controller</li>
+</ul></li>
+<li>cloud-controller-manager：允许将你的集群连接到云提供商的 API 之上。</li>
+</ul>
+
+<p>
+节点组件
+</p>
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/reference/command-line-tools-reference/kubelet/">kubelet</a>：管理当前节点的 Pod，对容器进行健康检查及监控。包括
+<ul class="org-ul">
+<li>接收PodSpec（从 apiserver 获取）</li>
+<li>调用容器运行时。如 containerd\CRI-O</li>
+<li>健康检查：livenessProbe\redinessProbe等</li>
+<li>上报节点状态：CPU\内存\磁盘</li>
+<li>挂载存储：PVC\ConfigMap</li>
+</ul></li>
+<li><a href="https://kubernetes.io/zh-cn/docs/reference/command-line-tools-reference/kube-proxy/">kube-proxy</a>： 实现 Service 网络转发。工作模式：
+<ul class="org-ul">
+<li>iptables：通过 iptable NAT 实现转发</li>
+<li>IPVS: 性能高</li>
+<li>eBPF （新趋势）：Cilium （可替代 kube-proxy）</li>
+</ul></li>
+<li>容器运行时（runtime）：负责容器的执行和生命周期。常见的有
+<ul class="org-ul">
+<li>containerd（官方推荐）</li>
+<li>CRI-O</li>
+<li>Docker（已弃用 dockershim） 1.24 版本后移除。</li>
+</ul></li>
+</ul>
+
+
+<p>
+插件（Addons）
+</p>
+<ul class="org-ul">
+<li>网络插件 <a href="https://kubernetes.io/zh-cn/docs/concepts/cluster-administration/addons/#networking-and-network-policy">CNI(Container Network Interface)</a>：负责为 pod 提供专用通信网络。calico\flannel</li>
+<li><a href="https://kubernetes.io/zh-cn/docs/concepts/services-networking/dns-pod-service/">DNS</a>：CoreDns</li>
+<li><p>
+<a href="https://kubernetes.io/zh-cn/docs/tasks/debug/debug-cluster/resource-usage-monitoring/">容器资源监控</a>：metrics-server 通过 <code>metrics.k8s.io</code> API 提供给 k8s 使用。metrics server 在 k8s 中的位置
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubetctl top/HPA/VPA/Dashboard
+
+metrics.k8s.io API
+
+metrics-server
+
+kubelet Summary API
+
+Node &#36164;&#28304;&#25968;&#25454;
+</pre>
+</div></li>
+<li><a href="https://kubernetes.io/zh-cn/docs/tasks/access-application-cluster/web-ui-dashboard/">Web 界面（仪表盘）</a>：Headlamp</li>
+<li><a href="https://kubernetes.io/zh-cn/docs/concepts/cluster-administration/logging/">集群层面日志</a></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:547b4f5c-fd62-4a1f-93f2-c0bdc13fc269" class="outline-2">
+<h2 id="h:547b4f5c-fd62-4a1f-93f2-c0bdc13fc269"><a href="#h:547b4f5c-fd62-4a1f-93f2-c0bdc13fc269">环境准备</a></h2>
+<div class="outline-text-2" id="text-h:547b4f5c-fd62-4a1f-93f2-c0bdc13fc269">
+<ul class="org-ul">
+<li>请不要使用带中文的服务器和克隆的虚拟机</li>
+<li>生产环境建议使用二进制安装方式。</li>
+<li>请将该文档复制一份，然后进行更改安装。</li>
+<li>文档中的IP地址请统一替换，不要一个一个替换</li>
+</ul>
+</div>
+<div id="outline-container-h:3d4f56b7-18cd-4224-b70c-b022c27c0fb5" class="outline-3">
+<h3 id="h:3d4f56b7-18cd-4224-b70c-b022c27c0fb5"><a href="#h:3d4f56b7-18cd-4224-b70c-b022c27c0fb5">网段划分</a></h3>
+<div class="outline-text-3" id="text-h:3d4f56b7-18cd-4224-b70c-b022c27c0fb5">
+<p>
+集群安装时会涉及到三个网段：
+</p>
+<ul class="org-ul">
+<li>宿主机网段：就是安装k8s的服务器</li>
+<li>Pod网段：k8s Pod的网段，相当于容器的IP</li>
+<li>Service网段：k8s service网段，service用于集群容器通信。</li>
+</ul>
+
+<p>
+一般 service 网段会设置为10.96.0.0/12
+</p>
+
+<p>
+Pod 网段会设置成10.244.0.0/12 或者 172.16.0.1/12
+</p>
+
+<p>
+宿主机网段可能是 192.168.0.0/24
+</p>
+
+
+<p>
+需要注意的是这三个网段不能有任何交叉。
+</p>
+
+<p>
+比如如果宿主机的IP是10.105.0.x
+</p>
+
+<p>
+那么service网段就不能是10.96.0.0/12，因为10.96.0.0/12网段可用IP是：
+</p>
+
+<p>
+10.96.0.1 ~ 10.111.255.255
+</p>
+
+<p>
+所以10.105是在这个范围之内的，属于网络交叉，此时service网段需要更换，
+</p>
+
+<p>
+可以更改为192.168.0.0/16网段（注意如果service网段是192.168开头的子网掩码最好不要是12，最好为16，因为子网掩码是12他的起始IP为192.160.0.1 不是192.168.0.1）。
+</p>
+
+<p>
+同样的道理，技术别的网段也不能重复。可以通过 <a href="http://tools.jb51.net/aideddesign/ip_net_calc/">http://tools.jb51.net/aideddesign/ip_net_calc/</a> 计算。
+</p>
+
+
+<p>
+所以一般的推荐是，直接第一个开头的就不要重复，比如
+</p>
+<ul class="org-ul">
+<li>你的宿主机是 192 开头的，那么你的 service可以是 10.96.0.0/12.</li>
+<li>如果你的宿主机是 10 开头的，就直接把 service的 网段改成 192.168.0.0/16</li>
+<li>如果你的宿主机是 172 开头的，就直接把 pod 网段改成 192.168.0.0/12</li>
+</ul>
+
+
+<p>
+注意搭配，均为 10 网段、172 网段、192 网段的搭配，第一个开头数字不一样就免去了网段冲突的可能性，也可以减去计算的步骤。
+</p>
+
+
+<p>
+安装及优化部分
+</p>
+
+<ul class="org-ul">
+<li>基本环境配置及优化</li>
+<li>安装 Runtime</li>
+<li>k8s 组件 及 etcd 安装</li>
+<li>高可用实现</li>
+</ul>
+
+<p>
+集群建立部分
+</p>
+
+<ul class="org-ul">
+<li>生成集群证书</li>
+<li>Master 节点初始化</li>
+<li>Node 节点配置</li>
+<li>CNI 插件安装</li>
+</ul>
+
+<p>
+Addons 安装
+</p>
+
+<ul class="org-ul">
+<li>Metrics Server</li>
+<li>Dashboard</li>
+<li>CoreDNS</li>
+<li>&#x2026;</li>
+</ul>
+
+<p>
+收尾工作
+</p>
+
+<ul class="org-ul">
+<li>集群可用性验证</li>
+<li>生产必备配置</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:2c3d31e2-bff3-4854-a947-0b51d90f3fe7" class="outline-3">
+<h3 id="h:2c3d31e2-bff3-4854-a947-0b51d90f3fe7"><a href="#h:2c3d31e2-bff3-4854-a947-0b51d90f3fe7">机器规划</a></h3>
+<div class="outline-text-3" id="text-h:2c3d31e2-bff3-4854-a947-0b51d90f3fe7">
+<p>
+k8s官网：<a href="https://kubernetes.io/docs/setup/">https://kubernetes.io/docs/setup/</a>
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-right">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">主机名</th>
+<th scope="col" class="org-right">IP地址</th>
+<th scope="col" class="org-left">版本</th>
+<th scope="col" class="org-left">配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">master01.jasper.org</td>
+<td class="org-right">10.0.0.101</td>
+<td class="org-left">Ubuntu 26.04</td>
+<td class="org-left">2C2G 40G</td>
+</tr>
+
+<tr>
+<td class="org-left">master02.jasper.org</td>
+<td class="org-right">10.0.0.102</td>
+<td class="org-left">Ubuntu 26.04</td>
+<td class="org-left">2C2G 40G</td>
+</tr>
+
+<tr>
+<td class="org-left">master03.jasper.org</td>
+<td class="org-right">10.0.0.103</td>
+<td class="org-left">Ubuntu 26.04</td>
+<td class="org-left">2C2G 40G</td>
+</tr>
+
+<tr>
+<td class="org-left">kubeapi.jasper.org</td>
+<td class="org-right">10.0.0.236</td>
+<td class="org-left">Ubuntu 26.04</td>
+<td class="org-left">keepalived虚拟 IP</td>
+</tr>
+
+<tr>
+<td class="org-left">node01.jasper.org</td>
+<td class="org-right">10.0.0.104</td>
+<td class="org-left">Ubuntu 26.04</td>
+<td class="org-left">2C2G 40G</td>
+</tr>
+
+<tr>
+<td class="org-left">node02.jasper.org</td>
+<td class="org-right">10.0.0.105</td>
+<td class="org-left">Ubuntu 26.04</td>
+<td class="org-left">2C2G 40G</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+请统一替换这些网段，Pod网段和service和宿主机网段不要重复！
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">配置信息</th>
+<th scope="col" class="org-left">备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Pod网段</td>
+<td class="org-left">10.244.0.0/12</td>
+</tr>
+
+<tr>
+<td class="org-left">Service网段</td>
+<td class="org-left">10.96.0.0/12</td>
+</tr>
+</tbody>
+</table>
+
+
+
+<p>
+说明：
+</p>
+<ul class="org-ul">
+<li>宿主机网段、K8s Service网段、Pod网段不能重复.</li>
+<li>不要使用中文的环境，还有不要克隆的虚拟机。生产环境，使用二进制安装。</li>
+<li>VIP（虚拟IP）不要和公司内网IP重复，首先去ping一下，不通才可用。VIP需要和主机在同一个局域网内！
+<ul class="org-ul">
+<li>公有云的话，VIP 为公有云的负载均衡的IP，比如阿里云的 SLB 地址，腾讯云的 ELB 地址，注意公有云的负载均衡都是内网的负载均衡。</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:F1D23330-CD87-4180-81CA-7188B8933C3F" class="outline-3">
+<h3 id="h:F1D23330-CD87-4180-81CA-7188B8933C3F"><a href="#h:F1D23330-CD87-4180-81CA-7188B8933C3F">所有主机初始化</a></h3>
+<div class="outline-text-3" id="text-h:F1D23330-CD87-4180-81CA-7188B8933C3F">
+<p>
+一键初始化
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">bash install_kubernetes_containerd.sh
+
+root@ubuntu2604:~# bash install_kubernetes_containerd.sh
+1) &#21021;&#22987;&#21270;&#26032;&#30340;Kubernetes&#38598;&#32676;       3) &#36864;&#20986;Kubernetes&#38598;&#32676;
+2) &#21152;&#20837;Kubernetes&#38598;&#32676;&#21069;&#30340;&#29615;&#22659;&#20934;&#22791;  4) &#36864;&#20986;&#26412;&#31243;&#24207;
+<span class="org-function-name">&#35831;&#36873;&#25321;&#32534;&#21495;</span>(1-4): 2
+</pre>
+</div>
+</div>
+<div id="outline-container-h:E2C4E098-860E-4172-B3D0-5AD5D4C3C504" class="outline-4">
+<h4 id="h:E2C4E098-860E-4172-B3D0-5AD5D4C3C504"><a href="#h:E2C4E098-860E-4172-B3D0-5AD5D4C3C504">环境变量定义（master01）执行</a></h4>
+<div class="outline-text-4" id="text-h:E2C4E098-860E-4172-B3D0-5AD5D4C3C504">
+<p>
+方便后面执行命令，可以先定义相关变量，可选
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">
+root@jasper-server:~# cat /etc/os-release
+<span class="org-variable-name">PRETTY_NAME</span>=<span class="org-string">"Ubuntu 26.04.1 LTS"</span>
+<span class="org-variable-name">NAME</span>=<span class="org-string">"Ubuntu"</span>
+<span class="org-variable-name">VERSION_ID</span>=<span class="org-string">"26.04"</span>
+<span class="org-variable-name">VERSION</span>=<span class="org-string">"26.04.1 LTS (Resolute Raccoon)"</span>
+<span class="org-variable-name">VERSION_CODENAME</span>=resolute
+<span class="org-variable-name">ID</span>=ubuntu
+<span class="org-variable-name">ID_LIKE</span>=debian
+<span class="org-variable-name">HOME_URL</span>=<span class="org-string">"https://www.ubuntu.com/"</span>
+<span class="org-variable-name">SUPPORT_URL</span>=<span class="org-string">"https://help.ubuntu.com/"</span>
+<span class="org-variable-name">BUG_REPORT_URL</span>=<span class="org-string">"https://bugs.launchpad.net/ubuntu/"</span>
+<span class="org-variable-name">PRIVACY_POLICY_URL</span>=<span class="org-string">"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"</span>
+<span class="org-variable-name">UBUNTU_CODENAME</span>=resolute
+<span class="org-variable-name">LOGO</span>=ubuntu-logo
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">MASTER_IPS</span>=<span class="org-string">"10.0.0.101 10.0.0.102 10.0.0.103"</span>
+<span class="org-variable-name">NODE_IPS</span>=<span class="org-string">"10.0.0.104 10.0.0.105"</span>
+
+<span class="org-variable-name">K8S_VERSION</span>=v1.37.1
+<span class="org-comment-delimiter">#</span><span class="org-comment">ETCD_VERSION=v3.7.0
+</span>
+<span class="org-variable-name">CONTAINERD_VERSION</span>=2.3.5
+<span class="org-comment-delimiter">#</span><span class="org-comment">CRI_DOCKER_VERSION=0.4.2
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">POD_CIDR=172.16.0.0/12
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">SERVICE_CIDR=192.168.0.0/16
+</span><span class="org-variable-name">POD_CIDR</span>=10.244.0.0/16
+<span class="org-variable-name">SERVICE_CIDR</span>=10.96.0.0/16
+
+<span class="org-variable-name">IFACE</span>=eth0
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2A499920-3D41-42D8-8BBE-81ADA8CFDD0F" class="outline-4">
+<h4 id="h:2A499920-3D41-42D8-8BBE-81ADA8CFDD0F"><a href="#h:2A499920-3D41-42D8-8BBE-81ADA8CFDD0F">配置 SSH 名密登录（master1 执行）</a></h4>
+<div class="outline-text-4" id="text-h:2A499920-3D41-42D8-8BBE-81ADA8CFDD0F">
+<p>
+Master01 节点免密钥登录其他节点，安装过程中生成配置文件和证书均在 Master01 上操作，集群管理也在 Master01 上操作，阿里云或者 AWS 上需要单独一台 kubectl 服务器。密钥配置如下：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">ssh-keygen -t rsa -N <span class="org-string">''</span> -f ~/.ssh/id_rsa
+<span class="org-keyword">for</span> i<span class="org-keyword"> in</span> master01.jasper.org master02.jasper.org master03.jasper.org node01.jasper.org node02.jasper.org;<span class="org-keyword">do</span>
+    ssh-copy-id -i ~/.ssh/id_rsa.pub $<span class="org-variable-name">i</span>;
+<span class="org-keyword">done</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25110;
+</span><span class="org-keyword">for</span> i<span class="org-keyword"> in</span> $<span class="org-variable-name">MASTER_IPS</span>  $<span class="org-variable-name">NODE_IPS</span>;<span class="org-keyword">do</span>
+    ssh-copy-id -i ~/.ssh/id_rsa.pub $<span class="org-variable-name">i</span>;
+<span class="org-keyword">done</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2A915A34-AD17-44A9-8CC8-421D3A50C1F0" class="outline-4">
+<h4 id="h:2A915A34-AD17-44A9-8CC8-421D3A50C1F0"><a href="#h:2A915A34-AD17-44A9-8CC8-421D3A50C1F0">主机名和域名解析（所有节点执行）</a></h4>
+<div class="outline-text-4" id="text-h:2A915A34-AD17-44A9-8CC8-421D3A50C1F0">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1. &#35774;&#32622;&#20027;&#26426;&#21517;&#65288;&#21508;&#33258;&#33410;&#28857;&#25191;&#34892;&#23545;&#24212;&#21629;&#20196;&#65289;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Master &#33410;&#28857;
+</span>hostnamectl set-hostname master01.jasper.org &amp;&amp; <span class="org-keyword">exit</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Node &#33410;&#28857;
+</span>hostnamectl set-hostname node01.jasper.org &amp;&amp; <span class="org-keyword">exit</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2. &#37197;&#32622;  /etc/hosts&#65292;&#28155;&#21152;&#25152;&#26377;&#33410;&#28857;&#30340; IP &#19982;&#20027;&#26426;&#21517;&#35299;&#26512;
+</span>cat &gt;&gt; /etc/hosts &lt;&lt; EOF<span class="org-sh-heredoc">
+10.0.0.101 master01.jasper.org master01
+10.0.0.102 master02.jasper.org master02
+10.0.0.103 master03.jasper.org master03
+10.0.0.236 kubeapi.jasper.org kubeapi # VIP &#34394;IP&#19981;&#21344;&#29992;&#26426;&#22120;&#36164;&#28304; # &#22914;&#26524;&#19981;&#26159;&#39640;&#21487;&#29992;&#38598;&#32676;&#65292;&#35813; IP &#20026; Master01 &#30340; IP
+10.0.0.104 node01.jasper.org node01
+10.0.0.105 node02.jasper.org node02
+EOF</span>
+</pre>
+</div>
+
+<p>
+注意： <code>/etc/hosts</code> 配置确保节点间可以通过主机名相互解析，这对 k8s 集群内通信至关重要
+</p>
+</div>
+</div>
+<div id="outline-container-h:44A7E3ED-4882-4578-8BA9-A48ED58BF6E2" class="outline-4">
+<h4 id="h:44A7E3ED-4882-4578-8BA9-A48ED58BF6E2"><a href="#h:44A7E3ED-4882-4578-8BA9-A48ED58BF6E2">必备工具（可选）</a></h4>
+<div class="outline-text-4" id="text-h:44A7E3ED-4882-4578-8BA9-A48ED58BF6E2">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">CentOS 7 &#23433;&#35013;yum&#28304;&#22914;&#19979;(&#20316;&#24223;)
+</span>curl -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-7.repo
+yum install -y yum-utils device-mapper-persistent-data lvm2
+
+yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+sed -i -e <span class="org-string">'/mirrors.cloud.aliyuncs.com/d'</span> -e <span class="org-string">'/mirrors.aliyuncs.com/d'</span> /etc/yum.repos.d/CentOS-Base.repo
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24517;&#22791;&#24037;&#20855;&#23433;&#35013;
+</span>yum install wget jq psmisc vim net-tools telnet yum-utils device-mapper-persistent-data lvm2 git -y
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5CC81FA0-58F3-4454-A528-A247DD270088" class="outline-4">
+<h4 id="h:5CC81FA0-58F3-4454-A528-A247DD270088"><a href="#h:5CC81FA0-58F3-4454-A528-A247DD270088">关闭swap分区（所有节点执行）</a></h4>
+<div class="outline-text-4" id="text-h:5CC81FA0-58F3-4454-A528-A247DD270088">
+<div class="org-src-container">
+<pre class="src src-shell">swapoff -a &amp;&amp; sysctl -w vm.swappiness=0
+sed -ri <span class="org-string">'/^[^#]*swap/s@^@#@'</span> /etc/fstab
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">k8s &#35201;&#27714;&#31105;&#29992; swap &#20197;&#30830;&#20445;&#35843;&#35797;&#21644;&#36164;&#28304;&#31649;&#29702;&#30340;&#20934;&#30830;&#24615;&#12290;&#24320;&#21551; swap
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#26102; kubelet &#40664;&#35748;&#25298;&#32477;&#21551;&#21160;&#65292; k8s-1.22 &#20197;&#21518;&#29256;&#26412;&#21487;&#20197;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">kubectl --fail-swap-on=false &#20801;&#35768;&#24320;&#21551; swap</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:54655217-7BFB-4755-B214-83C8F006932F" class="outline-4">
+<h4 id="h:54655217-7BFB-4755-B214-83C8F006932F"><a href="#h:54655217-7BFB-4755-B214-83C8F006932F">同步时间（所有节点执行）</a></h4>
+<div class="outline-text-4" id="text-h:54655217-7BFB-4755-B214-83C8F006932F">
+<p>
+方法1-基于 chrony 实现时间同步（推荐）
+</p>
+
+<p>
+Kubernetes 官方不建议使用 systemd-timesyncd，推荐 chrony
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013;
+</span>apt update
+apt install  -y chrony
+systemctl enable --now  chrony
+systemctl status chrony
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;
+</span>cat &gt; /etc/chrony/sources.d/ubuntu-ntp-pools.sources &lt;&lt; EOF<span class="org-sh-heredoc">
+server ntp1.aliyun.com iburst minpoll 4 maxpoll 10
+server cn.pool.ntp.org iburst minpoll 4 maxpoll 10
+server s1b.time.edu.cn iburst minpoll 4 maxpoll 10
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25226;&#21407;&#26469; makestep 1.0 3 &#20462;&#25913;&#65292;&#21435;&#25481;&#27425;&#25968;&#38480;&#21046;&#65292;&#20559;&#24046;&gt;1s&#23601;&#20801;&#35768;&#36339;
+</span>cp /etc/chrony/chrony.conf{,.bak}
+sed -i <span class="org-string">'s/^makestep .*/makestep 1 -1/g'</span> /etc/chrony/chrony.conf
+
+systemctl restart chrony.service
+timedatectl set-timezone Asia/Shanghai <span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#26102;&#21306;
+</span>chronyc -a makestep <span class="org-comment-delimiter"># </span><span class="org-comment">&#24378;&#21046;&#21516;&#27493;&#19979;&#31995;&#32479;&#26102;&#38047;
+</span>timedatectl set-ntp yes <span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#29992;NTP&#26381;&#21153;
+</span>timedatectl
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#38388;&#21516;&#27493;&#28304;&#65306;
+</span>chronyc sources -v
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26102;&#38388;&#21516;&#27493;&#28304;&#29366;&#24577;&#65306;
+</span>chronyc sourcestats -v
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#21516;&#27493;&#20559;&#31227;&#37327;&#65292;&#30475;System time     : &#20559;&#31227;&#20540;&#65292;&#36234;&#23567;&#36234;&#22909;
+</span>chronyc tracking
+</pre>
+</div>
+
+<p>
+方法2-基于 systemd-timesyncd 实现时间同步
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apt update
+apt install systemd-timesyncd
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#26426;&#33258;&#21551;
+</span>systemctl enable --now systemd-timesyncd
+
+timedatectl status
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">ubuntu &#40664;&#35748;&#23433;&#35013;&#30340;&#36731;&#37327;&#26102;&#38388;&#21516;&#27493; systemd-timesyncd &#21487;&#20197;&#25903;&#25345;&#26102;&#38388;&#21516;&#27493;&#65292;&#20294;&#19981;&#22914; chronyd &#31934;&#24230;&#39640;
+</span>systemctl status systemd-timesyncd
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20248;&#21270;&#20026;&#22269;&#20869;&#26102;&#38388;&#21516;&#27493;&#37197;&#32622;
+</span>cp /etc/systemd/timesyncd.conf{,.bak}
+cat &gt; /etc/systemd/timesyncd.conf &lt;&lt; EOF<span class="org-sh-heredoc">
+[Time]
+NTP=ntp.aliyun.com ntp.tencent.com ntp.ntsc.ac.cn
+FallbackNTP=cn.pool.ntp.org 0.cn.pool.ntp.org 1.cn.pool.ntp.org
+RootDistanceMaxSec=5
+PollIntervalMinSec=32
+PollIntervalMaxSec=2048
+ConnectionRetrySec=30
+SaveIntervalSec=60
+EOF
+</span>systemctl restart systemd-timesyncd
+timedatectl timesync-status
+</pre>
+</div>
+
+<p>
+方法3-基于 ntpdate 的同时同步
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013;
+</span>rpm -ivh http://mirrors.wlnmp.com/centos/wlnmp-release-centos.noarch.rpm
+yum install ntpdate -y
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25152;&#26377;&#33410;&#28857;&#21516;&#27493;&#26102;&#38388;&#12290;&#26102;&#38388;&#21516;&#27493;&#37197;&#32622;&#22914;&#19979;
+</span>ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+<span class="org-builtin">echo</span> <span class="org-string">'Asia/Shanghai'</span> &gt;/etc/timezone
+ntpdate time2.aliyun.com
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21152;&#20837;&#21040;crontab
+</span>*/5 * * * * /usr/sbin/ntpdate time2.aliyun.com &amp;&gt;/dev/null
+</pre>
+</div>
+</div>
+<div id="outline-container-h:5F3999E0-CDD2-4BAA-BE6E-A11DA26C91B3" class="outline-5">
+<h5 id="h:5F3999E0-CDD2-4BAA-BE6E-A11DA26C91B3"><a href="#h:5F3999E0-CDD2-4BAA-BE6E-A11DA26C91B3">设置时区</a></h5>
+<div class="outline-text-5" id="text-h:5F3999E0-CDD2-4BAA-BE6E-A11DA26C91B3">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21015;&#20986;&#25152;&#26377;&#26102;&#21306;
+</span>timedatectl list-timezones |grep Shanghai
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35774;&#32622;&#26102;&#21306;&#65288;&#19978;&#28023;&#26102;&#21306; CST+8&#65289;
+</span>timedatectl set-timezone Asia/Shanghai
+chronyc -a makestep <span class="org-comment-delimiter"># </span><span class="org-comment">&#24378;&#21046;&#21516;&#27493;&#19979;&#31995;&#32479;&#26102;&#38047;
+</span>timedatectl set-ntp yes 
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597;&#26102;&#21306;
+</span>ll /etc/localtime
+timedatectl
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4C7505BD-9B8C-4717-A959-A412DD6866D2" class="outline-4">
+<h4 id="h:4C7505BD-9B8C-4717-A959-A412DD6866D2"><a href="#h:4C7505BD-9B8C-4717-A959-A412DD6866D2">关闭防火墙（所有节点执行）</a></h4>
+<div class="outline-text-4" id="text-h:4C7505BD-9B8C-4717-A959-A412DD6866D2">
+<p>
+所有节点关闭firewalld 、dnsmasq、selinux(CentOS7需要关闭NetworkManager，CentOS8不需要)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Ubuntu &#40664;&#35748;&#20351;&#29992; ufw&#65292;&#19981;&#26159; firewalld
+</span>ufw disable
+ufw status
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">CentOS
+</span>systemctl disable --now firewalld 
+systemctl disable --now dnsmasq
+systemctl disable --now NetworkManager
+
+setenforce 0
+sed -i <span class="org-string">'s#SELINUX=enforcing#SELINUX=disabled#g'</span> /etc/sysconfig/selinux
+sed -i <span class="org-string">'s#SELINUX=enforcing#SELINUX=disabled#g'</span> /etc/selinux/config
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:D017F8FC-2906-4372-90AF-A10057B4D375" class="outline-4">
+<h4 id="h:D017F8FC-2906-4372-90AF-A10057B4D375"><a href="#h:D017F8FC-2906-4372-90AF-A10057B4D375">limit(所有节点执行)</a></h4>
+<div class="outline-text-4" id="text-h:D017F8FC-2906-4372-90AF-A10057B4D375">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-builtin">ulimit</span> -SHn 65535
+
+cat &gt;/etc/security/limits.d/k8s.conf&lt;&lt;EOF<span class="org-sh-heredoc">
+* soft nofile 1000000
+* hard nofile 1000000
+* soft nproc 1000000
+* hard nproc 1000000
+* soft memlock unlimited
+* hard memlock unlimited
+
+root soft nofile 1000000
+root hard nofile 1000000
+root soft nproc unlimited
+root hard nproc unlimited
+root soft memlock unlimited
+root hard memlock unlimited
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:803F90E2-9862-421A-A1CC-BD74805AAA25" class="outline-4">
+<h4 id="h:803F90E2-9862-421A-A1CC-BD74805AAA25"><a href="#h:803F90E2-9862-421A-A1CC-BD74805AAA25">内核优化 （所有节点执行）</a></h4>
+<div class="outline-text-4" id="text-h:803F90E2-9862-421A-A1CC-BD74805AAA25">
+<p>
+ubuntu ipvs(1.35后 弃用)
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">1.&#23433;&#35013; IPVS &#27169;&#24335;&#25152;&#20381;&#36182;&#30340;&#22522;&#30784;&#24037;&#20855;&#65292;&#21542;&#21017; IPVS &#27169;&#24335;&#19979;&#30340; kube-proxy.service &#26381;&#21153;&#26080;&#27861;&#21551;&#21160;
+</span>apt update &amp;&amp; apt install -y ipvsadm ipset <span class="org-comment-delimiter"># </span><span class="org-comment">(sysstat conntrack)
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#37322;:
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">ipvsadm: &#29992;&#20110; IPVS &#36127;&#36733;&#22343;&#34913;&#27169;&#24335;(kube-proxy&#30340;&#19968;&#31181;&#27169;&#24335;)&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">ipset,conntrack: &#32593;&#32476;&#36807;&#28388;&#21644;&#36830;&#25509;&#36319;&#36394;&#24037;&#20855;&#65292;&#20026;Service&#32593;&#32476;&#25552;&#20379;&#25903;&#25345;&#12290;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">2.&#21152;&#36733;&#24517;&#35201;&#20869;&#26680;&#27169;&#22359;
+</span>cat&gt;/etc/modules-load.d/k8s.conf &lt;&lt;<span class="org-string">'EOF'</span><span class="org-sh-heredoc">
+br_netfilter
+overlay
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25928;
+</span>systemctl enable --now systemd-modules-load.service
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">3. &#20248;&#21270;&#20869;&#26680;&#21442;&#25968;
+</span>
+cat &lt;&lt;EOF &gt; /etc/sysctl.d/k8s.conf<span class="org-sh-heredoc">
+net.ipv4.ip_forward = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+fs.file-max=10485760
+fs.nr_open=10485760
+EOF
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#35828;&#26126;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">net.ipv4.ip_forward = 1                  # &#21551;&#29992; IP &#36716;&#21457;&#65292;&#36825;&#26159;&#23481;&#22120;&#32593;&#32476;&#36890;&#20449;&#30340;&#22522;&#30784;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">net.bridge.bridge-nf-call-iptables = 1   # &#35753;&#32593;&#26725;&#19978;&#30340;&#27969;&#37327;&#32463;&#36807; iptables&#35268;&#21017;&#65292;&#29992;&#20110; service &#21644;&#32593;&#32476;&#31574;&#30053;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">net.bridge.bridge-nf-call-ip6tables = 1  # &#35753;&#32593;&#26725;&#19978;&#30340;&#27969;&#37327;&#32463;&#36807; iptables&#35268;&#21017;&#65292;&#29992;&#20110; service &#21644;&#32593;&#32476;&#31574;&#30053;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992;&#20869;&#26680;&#37197;&#32622;&#29983;&#25928;
+</span>sysctl --system
+</pre>
+</div>
+</div>
+<div id="outline-container-h:a4817068-d11c-47f4-b398-b82242818ef3" class="outline-5">
+<h5 id="h:a4817068-d11c-47f4-b398-b82242818ef3"><a href="#h:a4817068-d11c-47f4-b398-b82242818ef3">内核升级</a></h5>
+<div class="outline-text-5" id="text-h:a4817068-d11c-47f4-b398-b82242818ef3">
+<p>
+所有节点升级系统并重启，此处升级没有升级内核，下节会单独升级内核：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">yum update -y --exclude=kernel* &amp;&amp; reboot <span class="org-comment-delimiter">#</span><span class="org-comment">CentOS7&#38656;&#35201;&#21319;&#32423;&#65292;CentOS8&#21487;&#20197;&#25353;&#38656;&#21319;&#32423;&#31995;&#32479;</span>
+</pre>
+</div>
+
+
+<p>
+CentOS7 需要升级内核至4.18+，本次升级的版本为4.19
+</p>
+
+<p>
+在master01节点下载内核：(购买架构师课程的可以从百度网盘下载)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">cd</span> /root
+wget http://193.49.22.109/elrepo/kernel/el7/x86_64/RPMS/kernel-ml-devel-4.19.12-1.el7.elrepo.x86_64.rpm
+wget http://193.49.22.109/elrepo/kernel/el7/x86_64/RPMS/kernel-ml-4.19.12-1.el7.elrepo.x86_64.rpm
+</pre>
+</div>
+
+<p>
+从master01节点传到其他节点：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-keyword">for</span> i<span class="org-keyword"> in</span> master02.jasper.org master03.jasper.org node01.jasper.org node02.jasper.org;<span class="org-keyword">do</span> scp kernel-ml-4.19.12-1.el7.elrepo.x86_64.rpm kernel-ml-devel-4.19.12-1.el7.elrepo.x86_64.rpm $<span class="org-variable-name">i</span>:/root/ ; <span class="org-keyword">done</span>
+</pre>
+</div>
+
+<p>
+所有节点安装内核
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">cd</span> /root &amp;&amp; yum localinstall -y kernel-ml*
+</pre>
+</div>
+
+<p>
+所有节点更改内核启动顺序
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">grub2-set-default  0 &amp;&amp; grub2-mkconfig -o /etc/grub2.cfg
+
+grubby --args=<span class="org-string">"user_namespace.enable=1"</span> --update-kernel=<span class="org-string">"$(grubby --default-kernel)"</span>
+</pre>
+</div>
+
+<p>
+检查默认内核是不是4.19
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@master02.jasper.org ~]# grubby --default-kernel
+/boot/vmlinuz-4.19.12-1.el7.elrepo.x86_64
+</pre>
+</div>
+
+<p>
+所有节点重启，然后检查内核是不是4.19
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@master02.jasper.org ~]# uname -a
+Linux master02.jasper.org 4.19.12-1.el7.elrepo.x86_64 <span class="org-comment-delimiter">#</span><span class="org-comment">1 SMP Fri Dec 21 11:06:36 EST 2018 x86_64 x86_64 x86_64 GNU/Linux</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1161B07C-FEE0-42DD-9D2B-054E6CBB2717" class="outline-3">
+<h3 id="h:1161B07C-FEE0-42DD-9D2B-054E6CBB2717"><a href="#h:1161B07C-FEE0-42DD-9D2B-054E6CBB2717">安装容器运行时（所有节点执行）</a></h3>
+<div class="outline-text-3" id="text-h:1161B07C-FEE0-42DD-9D2B-054E6CBB2717">
+</div>
+<div id="outline-container-h:1292D041-9587-40D4-8033-CDFBA4025A1F" class="outline-4">
+<h4 id="h:1292D041-9587-40D4-8033-CDFBA4025A1F"><a href="#h:1292D041-9587-40D4-8033-CDFBA4025A1F">安装容器运行时 containerd</a></h4>
+<div class="outline-text-4" id="text-h:1292D041-9587-40D4-8033-CDFBA4025A1F">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/docs/setup/production-environment/container-runtimes/#container-runtimes">Container runtimes</a></li>
+<li><a href="https://containerd.io/docs/2.3/getting-started/#installing-containerd">Installing containerd</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+<span class="org-variable-name">CONTAINERD_VERSION</span>=2.3.5
+curl -SL -o containerd-${<span class="org-variable-name">CONTAINERD_VERSION</span>}-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz https://github.com/containerd/containerd/releases/download/v${<span class="org-variable-name">CONTAINERD_VERSION</span>}/containerd-${<span class="org-variable-name">CONTAINERD_VERSION</span>}-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+
+tar tf containerd-${<span class="org-variable-name">CONTAINERD_VERSION</span>}-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+tar Cxzvf /usr/local containerd-${<span class="org-variable-name">CONTAINERD_VERSION</span>}-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20462;&#25913; containerd &#37197;&#32622;&#22522;&#20110; toml(Tom's Obvious Minim1Language)&#26684;&#24335;:toml.io
+</span>mkdir /etc/containerd/
+containerd config default &gt;/etc/containerd/config.toml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">1) &#23558; sandbox &#38236;&#20687;&#28304;&#35774;&#32622;&#20026;&#38463;&#37324;&#20113; google_containers &#38236;&#20687;&#28304;(&#22269;&#20869;&#32593;&#32476;&#38656;&#35201;)
+</span>grep sandbox /etc/containerd/config.toml
+
+sed -i <span class="org-string">"s#registry.k8s.io/pause#registry.aliyuncs.com/google_containers/pause#g"</span> /etc/containerd/config.toml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21551; systemd cgroup
+</span>sed -i <span class="org-string">'s/SystemdCgroup = false/SystemdCgroup = true/g'</span> /etc/containerd/config.toml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2) &#37197;&#32622; docker &#23448;&#26041;&#38236;&#20687;&#20195;&#29702;&#65288;&#21487;&#36873;&#65289;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">registry &#22359;&#37324;&#38754;&#30340; config_path
+</span>sed -rn <span class="org-string">'/config_path = .*/p'</span> /etc/containerd/config.toml
+
+sed -ri <span class="org-string">"/\[plugins.'io.containerd.cri.v1.images'.registry/,/\[/s@config_path = .*@config_path = '/etc/containerd/certs.d'@g"</span> /etc/containerd/config.toml
+
+
+mkdir -p /etc/containerd/certs.d/docker.io
+mkdir -p /etc/containerd/certs.d/registry.k8s.io
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">docker.io &#21152;&#36895;&#25991;&#20214;
+</span>cat &gt; /etc/containerd/certs.d/docker.io/hosts.toml &lt;&lt;EOF<span class="org-sh-heredoc">
+server = "https://registry-1.docker.io"
+[host."https://docker.m.daocloud.io"]
+  capabilities = ["pull","resolve"]
+
+[host."https://docker.lpanel.live"]
+  capabilities = ["pull","resolve"]
+
+[host."https://docker.lms.run"]
+  capabilities = ["pull","resolve"]
+
+[host."https://docker.xuanyuan.me"]
+  capabilities = ["pull","resolve"]
+EOF
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">registry.k8s.io&#65288;pause&#12289;metrics-server&#65289;&#21152;&#36895;
+</span>cat &gt; /etc/containerd/certs.d/registry.k8s.io/hosts.toml &lt;&lt;EOF<span class="org-sh-heredoc">
+server = "https://registry-1.k8s.io"
+[host."https://k8s.m.daocloud.io"]
+  capabilities = ["pull","resolve"]
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314; systemd service&#65288;&#37325;&#28857;&#21152;&#20837; LimitNOFILE&#65292;&#35299;&#20915; limits &#22833;&#25928;&#65289;
+</span>cat &gt; /lib/systemd/system/containerd.service &lt;&lt;EOF<span class="org-sh-heredoc">
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target
+
+[Service]
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/local/bin/containerd
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+#&#35299;&#20915;ulimit&#19981;&#29983;&#25928;&#65292;systemd&#30452;&#25509;&#35774;&#32622;&#19978;&#38480;
+LimitNOFILE=1000000
+LimitNPROC=1000000
+LimitMEMLOCK=infinity
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+
+systemctl daemon-reload &amp;&amp; systemctl enable --now containerd
+systemctl status containerd
+<span class="org-comment-delimiter">#</span><span class="org-comment">journalctl -u containerd -f
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;&#36827;&#31243;&#30495;&#23454; limit
+</span>pidof containerd
+cat /proc/$(pidof containerd)/limits
+</pre>
+</div>
+</div>
+<div id="outline-container-h:6141889D-EF9E-4402-9155-3E5036E691B8" class="outline-5">
+<h5 id="h:6141889D-EF9E-4402-9155-3E5036E691B8"><a href="#h:6141889D-EF9E-4402-9155-3E5036E691B8">安装依赖 runc</a></h5>
+<div class="outline-text-5" id="text-h:6141889D-EF9E-4402-9155-3E5036E691B8">
+<p>
+containerd 本身只是容器管理守护进程，runc 是 OCI runtime，用来真正启动容器进程。
+</p>
+
+<p>
+Ubuntu 系统安装 containerd 包， 不会自动附带 runc，必须手动安装。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">RUNC_VERSION</span>=1.5.0
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+wget https://github.com/opencontainers/runc/releases/download/v${<span class="org-variable-name">RUNC_VERSION</span>}/runc.${<span class="org-variable-name">ARCH</span>}
+install -m 755 runc.${<span class="org-variable-name">ARCH</span>} /usr/local/bin/runc
+runc --version
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597; containerd &#37197;&#32622;&#65292;&#30830;&#35748; runc &#36335;&#24452;
+</span>cp /etc/containerd/config.toml{,.bak}
+sed -i <span class="org-string">'s@BinaryName =.*@BinaryName = "/usr/local/bin/runc"@g'</span> /etc/containerd/config.toml
+
+systemctl restart containerd
+systemctl status containerd
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:DD691C9C-E2E7-4755-9140-231A123C9DB5" class="outline-4">
+<h4 id="h:DD691C9C-E2E7-4755-9140-231A123C9DB5"><a href="#h:DD691C9C-E2E7-4755-9140-231A123C9DB5">安装 crictl（CRI 客户端，k8s 运维必备）</a></h4>
+<div class="outline-text-4" id="text-h:DD691C9C-E2E7-4755-9140-231A123C9DB5">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/tasks/debug/debug-cluster/crictl/">https://kubernetes.io/zh-cn/docs/tasks/debug/debug-cluster/crictl/</a></li>
+<li>github <a href="https://github.com/kubernetes-sigs/cri-tools">https://github.com/kubernetes-sigs/cri-tools</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">VERSION</span>=<span class="org-string">"v1.37.0"</span>
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/kubernetes-sigs/cri-tools/releases/download/${<span class="org-variable-name">VERSION</span>}/crictl-${<span class="org-variable-name">VERSION</span>}-linux-$<span class="org-variable-name">ARCH</span>.tar.gz
+
+sudo tar zxvf crictl-${<span class="org-variable-name">VERSION</span>}-linux-$<span class="org-variable-name">ARCH</span>.tar.gz -C /usr/local/bin
+<span class="org-comment-delimiter">#</span><span class="org-comment">rm -f crictl-${VERSION}-linux-$ARCH.tar.gz
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;crictl&#23458;&#25143;&#31471;&#36830;&#25509;
+</span>cat &gt; /etc/crictl.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+debug: false
+EOF
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">crictl info</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:31474281-9c84-4e14-99a6-c1f2bd741f6a" class="outline-3">
+<h3 id="h:31474281-9c84-4e14-99a6-c1f2bd741f6a"><a href="#h:31474281-9c84-4e14-99a6-c1f2bd741f6a">所有主机安装 kubeadm、kubelet和kubectl</a></h3>
+<div class="outline-text-3" id="text-h:31474281-9c84-4e14-99a6-c1f2bd741f6a">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/">https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/</a></li>
+</ul>
+
+<p>
+所有节点安装最新版本kubeadm
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">yum list kubeadm.x86_64 --showduplicates | sort -r
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#38463;&#37324;&#28304;&#23433;&#35013;&#26041;&#27861; https://developer.aliyun.com/mirror/kubernetes
+</span><span class="org-variable-name">KUBE_VERSION</span>=1.37.1
+<span class="org-variable-name">KUBE_RELEASE</span>=${<span class="org-variable-name">KUBE_VERSION</span>}-1.1
+<span class="org-variable-name">KUBE_MAJOR_VERSION</span>=<span class="org-sh-quoted-exec">`echo ${KUBE_VERSION}| cut -d . -f 1,2`</span>
+
+apt-get update &amp;&amp; apt-get install -y apt-transport-https
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">curl -fsSL https://pkgs.k8s.io/core:/stable:/v${KUBE_MAJOR_VERSION}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${KUBE_MAJOR_VERSION}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+</span>curl -fsSL https://mirrors.aliyun.com/kubernetes-new/core/stable/v${<span class="org-variable-name">KUBE_MAJOR_VERSION</span>}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+<span class="org-builtin">echo</span> <span class="org-string">"deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://mirrors.aliyun.com/kubernetes-new/core/stable/v${KUBE_MAJOR_VERSION}/deb/ /"</span> &gt; /etc/apt/sources.list.d/kubernetes.list
+
+apt-get update
+apt-cache madison kubeadm |head <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26377;&#21738;&#20123;&#29256;&#26412;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;&#25351;&#23450;&#29256;&#26412;
+</span>apt install -y  <span class="org-variable-name">kubeadm</span>=${<span class="org-variable-name">KUBE_RELEASE</span>} <span class="org-variable-name">kubelet</span>=${<span class="org-variable-name">KUBE_RELEASE</span>} <span class="org-variable-name">kubectl</span>=${<span class="org-variable-name">KUBE_RELEASE</span>}
+<span class="org-comment-delimiter">#</span><span class="org-comment">apt install -y  kubeadm kubelet kubectl
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#23454;&#29616;kubectl&#21629;&#20196;&#33258;&#21160;&#34917;&#20840;&#21151;&#33021;
+</span>kubectl completion bash &gt; /etc/profile.d/kubectl_completion.sh
+
+kubeadm version
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#20934;&#22791;&#25152;&#38656;&#35201;&#30340;&#38236;&#20687;(&#19981;&#29992;&#20570;)
+</span><span class="org-variable-name">KUBE_VERSION</span>=1.37.1
+kubeadm config images list --kubernetes-version=v${<span class="org-variable-name">KUBE_VERSION</span>}
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21487;&#20197;&#25552;&#21069;&#25226;&#38236;&#20687;&#19979;&#36733;&#22909;&#65292;&#36825;&#26679;&#23433;&#35013;&#24555;&#65288;&#21487;&#36873;&#27493;&#39588;&#65289;
+</span>crictl pull registry.aliyuncs.com/google_containers/kube-apiserver:v${<span class="org-variable-name">KUBE_VERSION</span>}
+crictl pull registry.aliyuncs.com/google_containers/kube-controller-manager:v${<span class="org-variable-name">KUBE_VERSION</span>}
+crictl pull registry.aliyuncs.com/google_containers/kube-scheduler:v${<span class="org-variable-name">KUBE_VERSION</span>}
+crictl pull registry.aliyuncs.com/google_containers/kube-proxy:v${<span class="org-variable-name">KUBE_VERSION</span>}
+crictl pull registry.aliyuncs.com/google_containers/pause:3.10.2
+crictl pull registry.aliyuncs.com/google_containers/etcd:3.7.0-0
+crictl pull registry.aliyuncs.com/google_containers/coredns:v1.14.6
+</pre>
+</div>
+
+
+<p>
+由于还未初始化，没有kubelet的配置文件，此时kubelet无法启动，无需管理
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:415bccff-b785-4ea8-9d60-a6cce023f710" class="outline-2">
+<h2 id="h:415bccff-b785-4ea8-9d60-a6cce023f710"><a href="#h:415bccff-b785-4ea8-9d60-a6cce023f710">高可用实现(弃用，这里使用kube-vip)</a></h2>
+<div class="outline-text-2" id="text-h:415bccff-b785-4ea8-9d60-a6cce023f710">
+<p>
+高可用配置（注意：如果不是高可用集群，haproxy 和 keepalived 无需安装）
+</p>
+
+<p>
+如果在云上安装也无需执行此章节的步骤，可以直接使用云上的 lb，比如阿里云 slb，腾讯云 elb 等
+</p>
+
+<p>
+公有云要用公有云自带的负载均衡，比如阿里云的 SLB，腾讯云的 ELB，用来替代 haproxy 和 keepalived，因为公有云大部分都是不支持 keepalived的，另外如果用阿里云的话，kubectl 控制端不能放在 master 节点，推荐使用腾讯云，因为阿里云的 slb 有回环的问题，也就是 slb 代理的服务器不能反向访问 SLB，但是腾讯云修复了这个问题。
+</p>
+
+
+<p>
+Slb -&gt; haproxy -&gt; apiserver
+</p>
+
+<p>
+所有 Master 节点安装 keepalived 和 haproxy
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">apt install keepalived haproxy -y
+</pre>
+</div>
+</div>
+<div id="outline-container-h:60BA0E88-E6C5-4FBB-B16F-318747853BC0" class="outline-3">
+<h3 id="h:60BA0E88-E6C5-4FBB-B16F-318747853BC0"><a href="#h:60BA0E88-E6C5-4FBB-B16F-318747853BC0">Master 节点 HAProxy</a></h3>
+<div class="outline-text-3" id="text-h:60BA0E88-E6C5-4FBB-B16F-318747853BC0">
+<p>
+所有 Master 配置 HAProxy，配置一样
+</p>
+
+<p>
+vim /etc/haproxy/haproxy.cfg 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cp /etc/haproxy/haproxy.cfg{,.bak}
+
+cat &gt; /etc/haproxy/haproxy.cfg &lt;&lt; EOF<span class="org-sh-heredoc">
+global
+  maxconn  2000
+  ulimit-n  16384
+  log  127.0.0.1 local0 err
+  stats timeout 30s
+
+defaults
+  log global
+  mode  http
+  option  httplog
+  timeout connect 5000
+  timeout client  50000
+  timeout server  50000
+  timeout http-request 15s
+  timeout http-keep-alive 15s
+
+frontend k8s-master
+  bind 0.0.0.0:8443
+  bind 127.0.0.1:8443
+  mode tcp
+  option tcplog
+  tcp-request inspect-delay 5s
+  default_backend k8s-master
+
+backend k8s-master
+  mode tcp
+  option tcplog
+  option tcp-check
+  balance roundrobin
+  default-server inter 10s downinter 5s rise 2 fall 2 slowstart 60s maxconn 250 maxqueue 256 weight 100
+  server master01.jasper.org    10.0.0.101:6443  check
+  server master02.jasper.org    10.0.0.102:6443  check
+  server master03.jasper.org    10.0.0.103:6443  check
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:f00eac7a-b4f5-40bc-92a2-83973b516d30" class="outline-3">
+<h3 id="h:f00eac7a-b4f5-40bc-92a2-83973b516d30"><a href="#h:f00eac7a-b4f5-40bc-92a2-83973b516d30">master01 keepalived</a></h3>
+<div class="outline-text-3" id="text-h:f00eac7a-b4f5-40bc-92a2-83973b516d30">
+<p>
+所有 Master 节点配置 KeepAlived，配置不一样，注意区分 :
+</p>
+
+<ul class="org-ul">
+<li>网卡名称 interface</li>
+<li>mcast_src_ip 地址</li>
+<li>virtual_ipaddress 虚拟 vip 地址，与主机在同一网段内</li>
+<li>注意每个节点的IP和网卡（interface参数）</li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; /etc/keepalived/keepalived.conf &lt;&lt; EOF<span class="org-sh-heredoc">
+! Configuration File for keepalived
+global_defs {
+    router_id LVS_DEVEL
+}
+vrrp_script chk_apiserver {
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 5 
+    weight -5
+    fall 2
+    rise 1
+}
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    mcast_src_ip 10.0.0.101
+    virtual_router_id 61
+    priority 101
+    nopreempt
+    advert_int 2
+    authentication {
+        auth_type PASS
+        auth_pass K8SHA_KA_AUTH
+    }
+    virtual_ipaddress {
+        10.0.0.236
+    }
+    track_script {
+      chk_apiserver 
+} }
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:29e428cb-d0dc-454e-a714-5d1f63db468a" class="outline-3">
+<h3 id="h:29e428cb-d0dc-454e-a714-5d1f63db468a"><a href="#h:29e428cb-d0dc-454e-a714-5d1f63db468a">master02 keepalived</a></h3>
+<div class="outline-text-3" id="text-h:29e428cb-d0dc-454e-a714-5d1f63db468a">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; /etc/keepalived/keepalived.conf &lt;&lt; EOF<span class="org-sh-heredoc">
+! Configuration File for keepalived
+global_defs {
+    router_id LVS_DEVEL
+}
+vrrp_script chk_apiserver {
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 5 
+    weight -5
+    fall 2
+    rise 1
+ 
+}
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    mcast_src_ip 10.0.0.102
+    virtual_router_id 61
+    priority 100
+    nopreempt
+    advert_int 2
+    authentication {
+        auth_type PASS
+        auth_pass K8SHA_KA_AUTH
+    }
+    virtual_ipaddress {
+        10.0.0.236
+    }
+    track_script {
+      chk_apiserver 
+} }
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:80cb9b3c-3aa9-4892-8f21-b62ed302f90b" class="outline-3">
+<h3 id="h:80cb9b3c-3aa9-4892-8f21-b62ed302f90b"><a href="#h:80cb9b3c-3aa9-4892-8f21-b62ed302f90b">master03 keepalived</a></h3>
+<div class="outline-text-3" id="text-h:80cb9b3c-3aa9-4892-8f21-b62ed302f90b">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; /etc/keepalived/keepalived.conf &lt;&lt; EOF<span class="org-sh-heredoc">
+! Configuration File for keepalived
+global_defs {
+    router_id LVS_DEVEL
+}
+vrrp_script chk_apiserver {
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 5
+    weight -5
+    fall 2  
+    rise 1
+}
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    mcast_src_ip 10.0.0.103
+    virtual_router_id 61
+    priority 100
+    nopreempt
+    advert_int 2
+    authentication {
+        auth_type PASS
+        auth_pass K8SHA_KA_AUTH
+    }
+    virtual_ipaddress {
+        10.0.0.236
+    }
+    track_script {
+      chk_apiserver 
+} }
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:c6bfa594-e662-4ad7-b055-320cf7af0345" class="outline-3">
+<h3 id="h:c6bfa594-e662-4ad7-b055-320cf7af0345"><a href="#h:c6bfa594-e662-4ad7-b055-320cf7af0345">健康检查配置</a></h3>
+<div class="outline-text-3" id="text-h:c6bfa594-e662-4ad7-b055-320cf7af0345">
+<p>
+所有master节点
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; /etc/keepalived/check_apiserver.sh &lt;&lt;\EOF<span class="org-sh-heredoc">
+#!/bin/bash
+
+err=0
+for k in $(seq 1 3)
+do
+    check_code=$(pgrep haproxy)
+    if [[ $check_code == "" ]]; then
+        err=$(expr $err + 1)
+        sleep 1
+        continue
+    else
+        err=0
+        break
+    fi
+done
+
+if [[ $err != "0" ]]; then
+    echo "systemctl stop keepalived"
+    /usr/bin/systemctl stop keepalived
+    exit 1
+else
+    exit 0
+fi
+EOF
+</span>
+chmod +x /etc/keepalived/check_apiserver.sh
+</pre>
+</div>
+
+<p>
+所有 master 节点启动 haproxy 和 keepalived
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">systemctl daemon-reload
+systemctl enable --now haproxy
+systemctl enable --now keepalived
+systemctl restart haproxy keepalived
+</pre>
+</div>
+
+<p>
+VIP测试
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">[root@master01.jasper.org pki]# ping 10.0.0.236
+PING 10.0.0.236 (10.0.0.236) 56(84) bytes of data.
+64 bytes from 10.0.0.236: <span class="org-variable-name">icmp_seq</span>=1 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=1.39 ms
+64 bytes from 10.0.0.236: <span class="org-variable-name">icmp_seq</span>=2 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=2.46 ms
+64 bytes from 10.0.0.236: <span class="org-variable-name">icmp_seq</span>=3 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=1.68 ms
+64 bytes from 10.0.0.236: <span class="org-variable-name">icmp_seq</span>=4 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=1.08 ms
+</pre>
+</div>
+
+<p>
+重要：如果安装了 keepalived 和 haproxy，需要测试 keepalived 是否是正常的
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">nc -zv 10.0.0.236 8443
+Connection to 10.0.0.236 8443 port [tcp/*] succeeded!
+</pre>
+</div>
+
+<p>
+如果 ping 不通且 telnet/nc 没有出现 ]，则认为 VIP 不可以，不可在继续往下执行，需要排查 keepalived 的问题，比如防火墙和 selinux，haproxy 和 keepalived 的状态，监听端口等
+</p>
+
+<p>
+所有节点查看防火墙状态必须为 disable 和 inactive：systemctl status firewalld
+</p>
+
+<p>
+所有节点查看 selinux 状态，必须为 disable：getenforce
+</p>
+
+<p>
+master节点查看 haproxy 和 keepalived 状态：systemctl status keepalived haproxy
+</p>
+
+<p>
+master节点查看监听端口：netstat -lntp 
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:05ce7887-a24c-47db-a03b-6944fe20dfa5" class="outline-2">
+<h2 id="h:05ce7887-a24c-47db-a03b-6944fe20dfa5"><a href="#h:05ce7887-a24c-47db-a03b-6944fe20dfa5">集群初始化</a></h2>
+<div class="outline-text-2" id="text-h:05ce7887-a24c-47db-a03b-6944fe20dfa5">
+<p>
+官方初始化文档：
+</p>
+
+<p>
+<a href="https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/">https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/</a>
+</p>
+</div>
+<div id="outline-container-h:4e2afd45-6d9c-49e1-ab7f-170ffc410611" class="outline-3">
+<h3 id="h:4e2afd45-6d9c-49e1-ab7f-170ffc410611"><a href="#h:4e2afd45-6d9c-49e1-ab7f-170ffc410611">kubeadm 命令使用</a></h3>
+<div class="outline-text-3" id="text-h:4e2afd45-6d9c-49e1-ab7f-170ffc410611">
+<div class="org-src-container">
+<pre class="src src-shell">Available Commands:
+    alpha <span class="org-comment-delimiter">#</span><span class="org-comment">kubeadm &#22788;&#20110;&#27979;&#35797;&#38454;&#27573;&#30340;&#21629;&#20196;
+</span>    completion <span class="org-comment-delimiter">#</span><span class="org-comment">bash &#21629;&#20196;&#34917;&#20840;&#65292;&#38656;&#35201;&#23433;&#35013; bash-completion
+</span>        <span class="org-comment-delimiter">#</span><span class="org-comment">mkdir /data/scripts -p
+</span>        <span class="org-comment-delimiter">#</span><span class="org-comment">kubeadm completion bash &gt; /data/scripts/kubeadm_completion.sh
+</span>        <span class="org-comment-delimiter">#</span><span class="org-comment">source /data/scripts/kubeadm_completion.sh
+</span>        <span class="org-comment-delimiter">#</span><span class="org-comment">vim /etc/profile #&#28155;&#21152;&#20869;&#23481;
+</span>        <span class="org-builtin">source</span> /data/scripts/kubeadm_completion.sh
+    config <span class="org-comment-delimiter">#</span><span class="org-comment">&#31649;&#29702; kubeadm &#38598;&#32676;&#30340;&#37197;&#32622;&#65292;&#35813;&#37197;&#32622;&#20445;&#30041;&#22312;&#38598;&#32676;&#30340; ConfigMap &#20013;
+</span>        <span class="org-comment-delimiter">#</span><span class="org-comment">kubeadm config print init-defaults
+</span>    help Help about any command
+    init    <span class="org-comment-delimiter">#</span><span class="org-comment">&#21551;&#21160;&#19968;&#20010; Kubernetes &#20027;&#33410;&#28857;
+</span>    join    <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;&#33410;&#28857;&#21152;&#20837;&#21040;&#24050;&#32463;&#23384;&#22312;&#30340; k8s master
+</span>    reset   <span class="org-comment-delimiter">#</span><span class="org-comment">&#36824;&#21407;&#20351;&#29992; kubeadm init &#25110;&#32773; kubeadm join &#23545;&#31995;&#32479;&#20135;&#29983;&#30340;&#29615;&#22659;&#21464;&#21270;&#12290;&#28165;&#31354;&#33410;&#28857;&#25968;&#25454;
+</span>    token   <span class="org-comment-delimiter">#</span><span class="org-comment">&#31649;&#29702; token
+</span>    upgrade <span class="org-comment-delimiter">#</span><span class="org-comment">&#21319;&#32423; k8s &#29256;&#26412;
+</span>    version <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#29256;&#26412;&#20449;&#24687;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8459c629-b142-43a1-9db8-fb123646c0c7" class="outline-3">
+<h3 id="h:8459c629-b142-43a1-9db8-fb123646c0c7"><a href="#h:8459c629-b142-43a1-9db8-fb123646c0c7">kubeadm init 命令简介</a></h3>
+<div class="outline-text-3" id="text-h:8459c629-b142-43a1-9db8-fb123646c0c7">
+<p>
+命令使用：
+<a href="https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/">https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/</a>
+</p>
+
+<p>
+集群初始化：
+<a href="https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/kubeadm-init/">https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/kubeadm-init/</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">root@docker-k8s-node1:~# kubeadm init --help
+--apiserver-advertise-address string    <span class="org-comment-delimiter">#</span><span class="org-comment">K8S API Server &#23558;&#35201;&#30417;&#21548;&#30340;&#30417;&#21548;&#30340;&#26412;&#26426; IP
+</span>--apiserver-bind-port int32             <span class="org-comment-delimiter">#</span><span class="org-comment">API Server &#32465;&#23450;&#30340;&#31471;&#21475;,&#40664;&#35748;&#20026; 6443
+</span>
+--apiserver-cert-extra-sans stringSlice <span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#36873;&#30340;&#35777;&#20070;&#39069;&#22806;&#20449;&#24687;&#65292;&#29992;&#20110;&#25351;&#23450; API Server &#30340;&#26381;&#21153;&#22120;&#35777;&#20070;&#12290;&#21487;&#20197;&#26159; IP &#22320;&#22336;&#20063;&#21487;&#20197;&#26159; DNS &#21517;&#31216;&#12290;
+</span>--cert-dir string                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#35777;&#20070;&#30340;&#23384;&#20648;&#36335;&#24452;&#65292;&#32570;&#30465;&#36335;&#24452;&#20026; /etc/kubernetes/pki
+</span>--certificate-key string                <span class="org-comment-delimiter">#</span><span class="org-comment">&#23450;&#20041;&#19968;&#20010;&#29992;&#20110;&#21152;&#23494; kubeadm-certs Secret &#20013;&#30340;&#25511;&#21046;&#24179;&#21488;&#35777;&#20070;&#30340;&#23494;&#38053;
+</span>--config string <span class="org-comment-delimiter">#</span><span class="org-comment">kubeadm                #&#37197;&#32622;&#25991;&#20214;&#30340;&#36335;&#24452;
+</span>--control-plane-endpoint string         <span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#25511;&#21046;&#24179;&#21488;&#25351;&#23450;&#19968;&#20010;&#31283;&#23450;&#30340; IP &#22320;&#22336;&#25110; DNS &#21517;&#31216;&#65292;&#21363;&#37197;&#32622;&#19968;&#20010;&#21487;&#20197;&#38271;&#26399;&#20351;&#29992;&#20999;&#26159;&#39640;&#21487;&#29992;&#30340; VIP &#25110;&#32773;&#22495;&#21517;&#65292;
+</span>                                        k8s&#22810;master &#39640;&#21487;&#29992;&#22522;&#20110;&#27492;&#21442;&#25968;&#23454;&#29616;
+--cri-socket string                     <span class="org-comment-delimiter">#</span><span class="org-comment">&#35201;&#36830;&#25509;&#30340; CRI(&#23481;&#22120;&#36816;&#34892;&#26102;&#25509;&#21475;&#65292;Container Runtime Interface, &#31616;&#31216; CRI)&#22871;&#25509;&#23383;&#30340;&#36335;&#24452;&#65292;&#22914;&#26524;&#20026;&#31354;&#65292;&#21017; kubeadm 
+</span>                                        &#23558;&#23581;&#35797;&#33258;&#21160;&#26816;&#27979;&#27492;&#20540;&#65292;<span class="org-string">"&#20165;&#24403;&#23433;&#35013;&#20102;&#22810;&#20010; CRI &#25110;&#20855;&#26377;&#38750;&#26631;&#20934; CRI &#25554;&#27133;&#26102;&#65292;&#25165;&#20351;&#29992;&#27492;&#36873;&#39033;"</span>
+--dry-run                               <span class="org-comment-delimiter">#</span><span class="org-comment">&#19981;&#35201;&#24212;&#29992;&#20219;&#20309;&#26356;&#25913;&#65292;&#21482;&#26159;&#36755;&#20986;&#23558;&#35201;&#25191;&#34892;&#30340;&#25805;&#20316;&#65292;&#20854;&#23454;&#23601;&#26159;&#27979;&#35797;&#36816;&#34892;&#12290;
+</span>--experimental-kustomize string         <span class="org-comment-delimiter">#</span><span class="org-comment">&#29992;&#20110;&#23384;&#20648; kustomize &#20026;&#38745;&#24577; pod &#28165;&#21333;&#25152;&#25552;&#20379;&#30340;&#34917;&#19969;&#30340;&#36335;&#24452;&#12290;
+</span>--feature-gates string                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#19968;&#32452;&#29992;&#26469;&#25551;&#36848;&#21508;&#31181;&#21151;&#33021;&#29305;&#24615;&#30340;&#38190;&#20540;&#65288;key=value&#65289;&#23545;&#65292;&#36873;&#39033;&#26159;&#65306;IPv6DualStack=true|false (ALPHA - default=false)
+</span>--ignore-preflight-errors strings       <span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#20197;&#24573;&#30053;&#26816;&#26597;&#36807;&#31243; &#20013;&#20986;&#29616;&#30340;&#38169;&#35823;&#20449;&#24687;&#65292;&#27604;&#22914;&#24573;&#30053; swap&#65292;&#22914;&#26524;&#20026; all &#23601;&#24573;&#30053;&#25152;&#26377;
+</span>--image-repository string               <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#19968;&#20010;&#38236;&#20687;&#20179;&#24211;&#65292;&#40664;&#35748;&#20026; k8s.gcr.io
+</span>--kubernetes-version string             <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#23433;&#35013; k8s &#29256;&#26412;&#65292;&#40664;&#35748;&#20026; stable-1
+</span>--node-name string                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450; node &#33410;&#28857;&#21517;&#31216;
+</span>--pod-network-cidr                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622; pod ip &#22320;&#22336;&#33539;&#22260;
+</span>--service-cidr                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622; service &#32593;&#32476;&#22320;&#22336;&#33539;&#22260;&#65292;&#40664;&#35748;&#20540;&#65306;"10.96.0.0/12"
+</span>--service-dns-domain string             <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622; k8s&#20869;&#37096;&#22495;&#21517;&#65292;&#40664;&#35748;&#20026; cluster.local&#65292;&#20250;&#26377;&#30456;&#24212;&#30340; DNS &#26381;&#21153;(kube-dns/coredns)&#35299;&#26512;&#29983;&#25104;&#30340;&#22495;&#21517;&#35760;&#24405;&#12290;&#21487;&#20197;&#25442;&#25104;&#20844;&#21496;&#20869;&#37096;&#20351;&#29992;&#30340;&#22495;&#21517;&#65292;&#22914;me.local
+</span>--skip-certificate-key-print            <span class="org-comment-delimiter">#</span><span class="org-comment">&#19981;&#25171;&#21360;&#29992;&#20110;&#21152;&#23494;&#30340;key &#20449;&#24687;
+</span>--skip-phases strings                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#35201;&#36339;&#36807;&#21738;&#20123;&#38454;&#27573;
+</span>--skip-token-print                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#36339;&#36807;&#25171;&#21360; token &#20449;&#24687;
+</span>--token                                 <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450; token
+</span>--token-ttl                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450; token &#36807;&#26399;&#26102;&#38388;&#65292;&#40664;&#35748;&#20026; 24 &#23567;&#26102;&#65292;0 &#20026;&#27704;&#19981;&#36807;&#26399;
+</span>--upload-certs                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#35777;&#20070;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20840;&#23616;&#21487;&#36873;&#39033;&#65306;
+</span>--add-dir-header                        <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#20026; true&#65292;&#22312;&#26085;&#24535;&#22836;&#37096;&#28155;&#21152;&#26085;&#24535;&#30446;&#24405;
+</span>--log-file string                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#19981;&#20026;&#31354;&#65292;&#23558;&#20351;&#29992;&#27492;&#26085;&#24535;&#25991;&#20214;
+</span>--log-file-max-size uint                <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#26085;&#24535;&#25991;&#20214;&#30340;&#26368;&#22823;&#22823;&#23567;&#65292;&#21333;&#20301;&#20026;&#20806;&#65292;&#40664;&#35748;&#20026; 1800 &#20806;&#65292;0 &#20026;&#27809;&#26377;&#38480;&#21046;
+</span>--rootfs                                <span class="org-comment-delimiter">#</span><span class="org-comment">&#23487;&#20027;&#26426;&#30340;&#26681;&#36335;&#24452;&#65292;&#20063;&#23601;&#26159;&#32477;&#23545;&#36335;&#24452;
+</span>--skip-headers                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#20026; true&#65292;&#22312; log &#26085;&#24535;&#37324;&#38754;&#19981;&#26174;&#31034;&#26631;&#39064;&#21069;&#32512;
+</span>--skip-log-headers                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#20026; true&#65292;&#22312; log &#26085;&#24535;&#37324;&#37324;&#19981;&#26174;&#31034;&#26631;&#39064;</span>
+</pre>
+</div>
+
+<p>
+验证前 当前 kubeadm 版本
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubeadm version <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#24403;&#21069; kubeadm &#29256;&#26412;</span>
+</pre>
+</div>
+
+<p>
+准备镜像：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#23433;&#35013;&#25351;&#23450;&#29256;&#26412; k8s &#38656;&#35201;&#30340;&#38236;&#20687;&#26377;&#21738;&#20123;
+</span><span class="org-variable-name">KUBE_VERSION</span>=1.37.1
+kubeadm config images list --kubernetes-version=v${<span class="org-variable-name">KUBE_VERSION</span>}
+
+k8s.gcr.io/kube-apiserver:
+k8s.gcr.io/kube-controller-manager:
+k8s.gcr.io/kube-scheduler:
+k8s.gcr.io/kube-proxy:
+k8s.gcr.io/pause: <span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#27599;&#20010;pod&#23553;&#35013;&#19968;&#20010;&#24213;&#23618;&#30340;&#32593;&#32476;
+</span>k8s.gcr.io/etcd:
+k8s.gcr.io/coredns/coredns:
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:10a34219-ecbf-4307-9819-3197cd660ea6" class="outline-3">
+<h3 id="h:10a34219-ecbf-4307-9819-3197cd660ea6"><a href="#h:10a34219-ecbf-4307-9819-3197cd660ea6">高可用 master 初始化</a></h3>
+<div class="outline-text-3" id="text-h:10a34219-ecbf-4307-9819-3197cd660ea6">
+<p>
+Master01节点执行
+</p>
+
+<p>
+以下文件内容，宿主机网段、podSubnet网段、serviceSubnet网段不能重复
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">KUBE_VERSION</span>=1.37.1
+<span class="org-variable-name">IMAGES_URL</span>=<span class="org-string">"registry.aliyuncs.com/google_containers"</span>
+<span class="org-variable-name">POD_NETWORK</span>=<span class="org-string">"10.244.0.0/16"</span>
+<span class="org-variable-name">SERVICE_NETWORK</span>=<span class="org-string">"10.96.0.0/12"</span>
+<span class="org-variable-name">DOMAIN</span>=jasper.org
+<span class="org-comment-delimiter">#</span><span class="org-comment">CONTROL_PLAN="kubeapi.${DOMAIN}:8443"
+</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">kubeadm init --control-plane-endpoint="kubeapi.${DOMAIN}" \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--control-plane-endpoint=${CONTROL_PLAN} \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--kubernetes-version=v${KUBE_VERSION} \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--pod-network-cidr=${POD_NETWORK} \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--service-cidr=${SERVICE_NETWORK} \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--token-ttl=0 \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--upload-certs \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--image-repository=${IMAGES_URL} \
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">--skip-phases=addon/kube-proxy
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>kubeadm init --control-plane-endpoint=<span class="org-string">"kubeapi.${DOMAIN}"</span> <span class="org-sh-escaped-newline">\</span>
+        --kubernetes-version=v${<span class="org-variable-name">KUBE_VERSION</span>} <span class="org-sh-escaped-newline">\</span>
+        --pod-network-cidr=${<span class="org-variable-name">POD_NETWORK</span>} <span class="org-sh-escaped-newline">\</span>
+        --service-cidr=${<span class="org-variable-name">SERVICE_NETWORK</span>} <span class="org-sh-escaped-newline">\</span>
+        --token-ttl=0 <span class="org-sh-escaped-newline">\</span>
+        --upload-certs <span class="org-sh-escaped-newline">\</span>
+        --image-repository=${<span class="org-variable-name">IMAGES_URL</span>} <span class="org-sh-escaped-newline">\</span>
+        --skip-phases=addon/kube-proxy
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#27880;&#24847;:--skip-phases=addon/kube-proxy&#34920;&#31034;&#19981;&#23433;&#35013;kube-proxy
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#26377;&#22914;&#19979;&#36755;&#20986;&#32467;&#26524;</span>
+</pre>
+</div>
+
+<p>
+初始化成功以后，会产生Token值，用于其他节点加入时使用，因此要记录下初始化成功生成的token值（令牌值）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $<span class="org-variable-name">HOME</span>/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $<span class="org-variable-name">HOME</span>/.kube/config
+  sudo chown $(id -u):$(id -g) $<span class="org-variable-name">HOME</span>/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  <span class="org-builtin">export</span> <span class="org-variable-name">KUBECONFIG</span>=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run <span class="org-string">"kubectl apply -f [podnetwork].yaml"</span> with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now join any number of control-plane nodes running the following command on each as root:
+
+  kubeadm join kubeapi.jasper.org:6443 --token dziprk.vq9csjpsvpqthw7l <span class="org-sh-escaped-newline">\</span>
+        --discovery-token-ca-cert-hash sha256:de98d23307d8d730734a461cc6ecb715f301daf9ecbfeabf266467440e81af0b <span class="org-sh-escaped-newline">\</span>
+        --control-plane --certificate-key 723fd45230337a0ef7d5dcd990a19815ac3bddbc3e5dc6d45dea1fc6e7402031
+
+Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+As a safeguard, uploaded-certs will be deleted<span class="org-keyword"> in</span> two hours; If necessary, you can use
+<span class="org-string">"kubeadm init phase upload-certs --upload-certs"</span> to reload certs afterward.
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join kubeapi.jasper.org:6443 --token dziprk.vq9csjpsvpqthw7l <span class="org-sh-escaped-newline">\</span>
+        --discovery-token-ca-cert-hash sha256:de98d23307d8d730734a461cc6ecb715f301daf9ecbfeabf266467440e81af0b
+</pre>
+</div>
+
+
+<p>
+如果初始化失败，重置后再次初始化，命令如下（没有失败不要执行）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubeadm reset -f ; ipvsadm --clear  ; rm -rf ~/.kube
+</pre>
+</div>
+
+
+
+<p>
+Master01节点配置环境变量，用于访问Kubernetes集群：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25191;&#34892;&#25480;&#26435;
+</span>mkdir -p $<span class="org-variable-name">HOME</span>/.kube
+sudo cp -i /etc/kubernetes/admin.conf $<span class="org-variable-name">HOME</span>/.kube/config
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622; kubectl &#21629;&#20196;&#34917;&#20840;
+</span>apt update &amp;&amp; apt -y install bash-completion
+<span class="org-builtin">echo</span> <span class="org-string">'source &lt;(kubeadm completion bash)'</span> &gt;&gt; ~/.bashrc &amp;&amp; <span class="org-keyword">exit</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">source ~/.bashrc</span>
+</pre>
+</div>
+
+<p>
+查看状态：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">vim /etc/hosts &#30417;&#25511;&#25226; kubeapi &#35299;&#26512;&#21040; 10.0.0.101 &#19978;&#65292;&#24182;&#26597;&#30475;&#20197;&#19979;&#29366;&#24577;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22240;&#20026;&#27809;&#26377;&#32593;&#32476;&#25554;&#20214;&#65292;&#33410;&#28857;&#22788;&#20110; NotReady &#29366;&#24577;
+</span>root@master01:~# kubectl  get node
+NAME                  STATUS     ROLES           AGE     VERSION
+master01.jasper.org   NotReady   control-plane   7m31s   v1.37.1
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22240;&#20026;&#27809;&#26377;&#32593;&#32476;&#25554;&#20214;&#65292;coredns &#30340; Pod &#22788;&#20110; NotReady &#29366;&#24577;
+</span>root@master01:~# kubectl  get pod -A
+NAMESPACE     NAME                                          READY   STATUS    RESTARTS   AGE
+kube-system   coredns-558f5766d5-c4r5k                      0/1     Pending   0          2m22s
+kube-system   coredns-558f5766d5-vh87l                      0/1     Pending   0          2m22s
+kube-system   etcd-master01.jasper.org                      1/1     Running   1          2m29s
+kube-system   kube-apiserver-master01.jasper.org            1/1     Running   1          2m29s
+kube-system   kube-controller-manager-master01.jasper.org   1/1     Running   1          2m29s
+kube-system   kube-scheduler-master01.jasper.org            1/1     Running   1          2m29s
+</pre>
+</div>
+
+
+<p>
+<b>kubeadm init 创建 k8s 集群流程</b> <a href="https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/kubeadm-init/">https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/kubeadm-init/</a>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7FBE5F9F-11EA-4B20-8A94-80C1E8608479" class="outline-2">
+<h2 id="h:7FBE5F9F-11EA-4B20-8A94-80C1E8608479"><a href="#h:7FBE5F9F-11EA-4B20-8A94-80C1E8608479">在 master1 节点生成 kube-vip Static Pod</a></h2>
+<div class="outline-text-2" id="text-h:7FBE5F9F-11EA-4B20-8A94-80C1E8608479">
+<ul class="org-ul">
+<li><a href="https://kube-vip.io/docs/installation/static">https://kube-vip.io/docs/installation/static</a></li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">export</span> <span class="org-variable-name">VIP</span>=10.0.0.236
+<span class="org-builtin">export</span> <span class="org-variable-name">INTERFACE</span>=eth0
+<span class="org-variable-name">KVVERSION</span>=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r <span class="org-string">".[0].name"</span>)
+<span class="org-builtin">export</span> <span class="org-variable-name">KVVERSION</span>=v1.2.4
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#38656;&#35201;&#25552;&#21069;&#19979;&#36733;&#38236;&#20687;
+</span>ctr -n k8s.io image pull ghcr.io/kube-vip/kube-vip:$<span class="org-variable-name">KVVERSION</span>
+
+ctr -n k8s.io run --rm --net-host ghcr.io/kube-vip/kube-vip:$<span class="org-variable-name">KVVERSION</span> vip <span class="org-sh-escaped-newline">\</span>
+    /kube-vip manifest pod <span class="org-sh-escaped-newline">\</span>
+    --interface $<span class="org-variable-name">INTERFACE</span> <span class="org-sh-escaped-newline">\</span>
+    --address $<span class="org-variable-name">VIP</span> <span class="org-sh-escaped-newline">\</span>
+    --controlplane <span class="org-sh-escaped-newline">\</span>
+    --leaderElection <span class="org-sh-escaped-newline">\</span>
+    --arp <span class="org-sh-escaped-newline">\</span>
+    &gt; /etc/kubernetes/manifests/kube-vip.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20250;&#33258;&#21160;&#21551;&#21160;
+</span>root@master01:~# kubectl  get pod -A
+NAMESPACE     NAME                                          READY   STATUS    RESTARTS   AGE
+kube-system   coredns-558f5766d5-c4r5k                      0/1     Pending   0          4m47s
+kube-system   coredns-558f5766d5-vh87l                      0/1     Pending   0          4m47s
+kube-system   etcd-master01.jasper.org                      1/1     Running   1          4m54s
+kube-system   kube-apiserver-master01.jasper.org            1/1     Running   1          4m54s
+kube-system   kube-controller-manager-master01.jasper.org   1/1     Running   1          4m54s
+kube-system   kube-scheduler-master01.jasper.org            1/1     Running   1          4m54s
+kube-system   kube-vip-master01.jasper.org                  1/1     Running   0          7s
+
+
+root@master01:~# ip a
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 00:0c:29:11:d3:79 brd ff:ff:ff:ff:ff:ff
+    altname enp2s0
+    altname enx000c2911d379
+    inet 10.0.0.101/24 brd 10.0.0.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet 10.0.0.236/32 scope global deprecated eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe11:d379/64 scope link proto kernel_ll
+       valid_lft forever preferred_lft forever
+
+
+root@master01:~# ping kubeapi.jasper.org
+PING kubeapi.jasper.org (10.0.0.236) 56(84) bytes of data.
+64 bytes from kubeapi.jasper.org (10.0.0.236): <span class="org-variable-name">icmp_seq</span>=1 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=0.089 ms
+root@master03:~# ping kubeapi.jasper.org
+PING kubeapi.jasper.org (10.0.0.236) 56(84) bytes of data.
+64 bytes from kubeapi.jasper.org (10.0.0.236): <span class="org-variable-name">icmp_seq</span>=1 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=0.475 ms
+64 bytes from kubeapi.jasper.org (10.0.0.236): <span class="org-variable-name">icmp_seq</span>=2 <span class="org-variable-name">ttl</span>=64 <span class="org-variable-name">time</span>=0.405 ms
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">pod vip &#39640;&#21487;&#29992;&#12290;&#23558; kube-vip &#21551;&#21160;&#37197;&#32622;&#25512;&#36865;&#21040;&#20854;&#20182; master &#33410;&#28857;&#19978;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#26377;&#20010; vip pod &#22351;&#65292;&#20250;&#22312;&#23545;&#24212;&#30340;&#20027;&#26426;&#19978;&#21551;&#21160; vip ip &#22320;&#22336;&#12290;
+</span>scp /etc/kubernetes/manifests/kube-vip.yaml master02:/etc/kubernetes/manifests/
+scp /etc/kubernetes/manifests/kube-vip.yaml master03:/etc/kubernetes/manifests/
+
+
+root@master01:~# kubectl  get pod -A
+NAMESPACE     NAME                                          READY   STATUS              RESTARTS   AGE
+kube-system   kube-vip-master01.jasper.org                  1/1     Running             0          34m
+kube-system   kube-vip-master02.jasper.org                  0/1     ContainerCreating   0          33s
+kube-system   kube-vip-master03.jasper.org                  0/1     ContainerCreating   0          27s
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:3e5773ea-b8d7-45a0-8596-2cd2f595158b" class="outline-2">
+<h2 id="h:3e5773ea-b8d7-45a0-8596-2cd2f595158b"><a href="#h:3e5773ea-b8d7-45a0-8596-2cd2f595158b">加入其他 Master 节点到集群</a></h2>
+<div class="outline-text-2" id="text-h:3e5773ea-b8d7-45a0-8596-2cd2f595158b">
+<p>
+初始化其他master加入集群, master02, 03加上
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#20854;&#20182; maseter &#33410;&#28857;&#21152;&#20837;&#38598;&#32676;
+</span>kubeadm join kubeapi.jasper.org:6443 --token dziprk.vq9csjpsvpqthw7l <span class="org-sh-escaped-newline">\</span>
+        --discovery-token-ca-cert-hash sha256:de98d23307d8d730734a461cc6ecb715f301daf9ecbfeabf266467440e81af0b <span class="org-sh-escaped-newline">\</span>
+        --control-plane --certificate-key 723fd45230337a0ef7d5dcd990a19815ac3bddbc3e5dc6d45dea1fc6e7402031
+
+
+root@master01:~# kubectl get node
+NAME                  STATUS     ROLES           AGE    VERSION
+master01.jasper.org   NotReady   control-plane   23m    v1.37.1
+master02.jasper.org   NotReady   control-plane   15s    v1.37.1
+master03.jasper.org   NotReady   control-plane   3m3s   v1.37.1
+</pre>
+</div>
+</div>
+<div id="outline-container-h:7711fe4b-3916-43e2-aaf3-0018d9a71bf5" class="outline-3">
+<h3 id="h:7711fe4b-3916-43e2-aaf3-0018d9a71bf5"><a href="#h:7711fe4b-3916-43e2-aaf3-0018d9a71bf5">token 过期处理</a></h3>
+<div class="outline-text-3" id="text-h:7711fe4b-3916-43e2-aaf3-0018d9a71bf5">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">Token&#36807;&#26399;&#21518;&#29983;&#25104;&#26032;&#30340;token&#65306;
+</span>root@master01:~# kubeadm token create --print-join-command
+kubeadm join kubeapi.jasper.org:6443 --token an2oq3.7o47k0ukbljgwvz4 --discovery-token-ca-cert-hash sha256:de98d23307d8d730734a461cc6ecb715f301daf9ecbfeabf266467440e81af0b
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Master&#38656;&#35201;&#29983;&#25104; --certificate-key
+</span>root@master01:~#  kubeadm init phase upload-certs  --upload-certs
+[upload-certs] Storing the certificates<span class="org-keyword"> in</span> Secret <span class="org-string">"kubeadm-certs"</span><span class="org-keyword"> in</span> the <span class="org-string">"kube-system"</span> Namespace
+[upload-certs] Using certificate key:
+cefdae80b20e904ef61ee93a860bea139be3e2df8dae95c13ee62e3841a45471
+</pre>
+</div>
+
+
+<p>
+查看 token 过期时间
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597;&#21021;&#22987;&#38598;&#32676;&#26102;&#30340;&#37197;&#32622;&#25991;&#20214;&#65292;&#25214;&#21040; token: 7t2weq.bjbawausm0jaxury
+</span><span class="org-variable-name">secret</span>=$(kubectl get secret -n kube-system|grep bootstrap |grep an2oq3 | awk <span class="org-string">'{print $1}'</span>)
+kubectl -n kube-system get secret $<span class="org-variable-name">secret</span> -o json | jq -r <span class="org-string">'.data["expiration"]'</span> | base64 -d
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7e6ce312-429c-4991-820e-37ed40f5b234" class="outline-2">
+<h2 id="h:7e6ce312-429c-4991-820e-37ed40f5b234"><a href="#h:7e6ce312-429c-4991-820e-37ed40f5b234">添加Node节点</a></h2>
+<div class="outline-text-2" id="text-h:7e6ce312-429c-4991-820e-37ed40f5b234">
+<div class="org-src-container">
+<pre class="src src-shell">kubeadm join kubeapi.jasper.org:6443 --token an2oq3.7o47k0ukbljgwvz4 <span class="org-sh-escaped-newline">\</span>
+        --discovery-token-ca-cert-hash sha256:de98d23307d8d730734a461cc6ecb715f301daf9ecbfeabf266467440e81af0b
+</pre>
+</div>
+
+<p>
+查看集群状态：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">root@master01:~# kubectl get node
+NAME                  STATUS     ROLES           AGE     VERSION
+master01.jasper.org   NotReady   control-plane   32m     v1.37.1
+master02.jasper.org   NotReady   control-plane   9m32s   v1.37.1
+master03.jasper.org   NotReady   control-plane   12m     v1.37.1
+node01.jasper.org     NotReady   &lt;none&gt;          28s     v1.37.1
+node02.jasper.org     NotReady   &lt;none&gt;          3s      v1.37.1
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31227;&#38500;&#33410;&#28857;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">kubectl drain node01.jasper.org
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">kubectl delete node node01.jasper.org</span>
+</pre>
+</div>
+
+<p>
+在没安装网络组件时，节点状态都是noready的
+</p>
+</div>
+<div id="outline-container-h:fad58a69-70dd-43bc-9654-741226b45332" class="outline-3">
+<h3 id="h:fad58a69-70dd-43bc-9654-741226b45332"><a href="#h:fad58a69-70dd-43bc-9654-741226b45332">k8s 安装失败故障排查</a></h3>
+<div class="outline-text-3" id="text-h:fad58a69-70dd-43bc-9654-741226b45332">
+<p>
+如果 kubelet无法启动
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">systemctl stop containerd kubelet
+rm -fr /etc/kubernetes
+rm -fr /var/lib/containerd /var/lib/kubelet <span class="org-comment-delimiter"># </span><span class="org-comment">umount /var/lib/kubelet/pods/xxx
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#26032;&#37197;&#32622;&#33410;&#28857; Containerd &#30340;&#37197;&#32622;&#25991;&#20214;
+</span>systemctl daemon-reload
+systemctl restart containerd
+systemctl restart kubelet
+tail /var/log/message
+<span class="org-comment-delimiter"># </span><span class="org-comment">kubeadmin join ....</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:d63e7df5-cb97-4e4c-b68e-0f74d0adea30" class="outline-3">
+<h3 id="h:d63e7df5-cb97-4e4c-b68e-0f74d0adea30"><a href="#h:d63e7df5-cb97-4e4c-b68e-0f74d0adea30">给node节点打标签（可选）</a></h3>
+<div class="outline-text-3" id="text-h:d63e7df5-cb97-4e4c-b68e-0f74d0adea30">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl label nodes node01.jasper.org node-role.kubernetes.io/worker=
+kubectl label nodes node02.jasper.org node-role.kubernetes.io/worker=
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:defb103a-7c80-46e6-b274-872135fe041d" class="outline-2">
+<h2 id="h:defb103a-7c80-46e6-b274-872135fe041d"><a href="#h:defb103a-7c80-46e6-b274-872135fe041d">安装网络插件</a></h2>
+<div class="outline-text-2" id="text-h:defb103a-7c80-46e6-b274-872135fe041d">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/docs/concepts/cluster-administration/addons/">https://kubernetes.io/docs/concepts/cluster-administration/addons/</a></li>
+</ul>
+</div>
+<div id="outline-container-h:23BC19D9-C051-4975-BF5F-5240FFAAC2F5" class="outline-3">
+<h3 id="h:23BC19D9-C051-4975-BF5F-5240FFAAC2F5"><a href="#h:23BC19D9-C051-4975-BF5F-5240FFAAC2F5">Cilium</a></h3>
+<div class="outline-text-3" id="text-h:23BC19D9-C051-4975-BF5F-5240FFAAC2F5">
+</div>
+<div id="outline-container-h:B38E9875-2F4B-4B84-89BC-C149D8A0DE7B" class="outline-4">
+<h4 id="h:B38E9875-2F4B-4B84-89BC-C149D8A0DE7B"><a href="#h:B38E9875-2F4B-4B84-89BC-C149D8A0DE7B">master01 节点执行安装 cilium-cli</a></h4>
+<div class="outline-text-4" id="text-h:B38E9875-2F4B-4B84-89BC-C149D8A0DE7B">
+<ul class="org-ul">
+<li><a href="https://github.com/cilium/cilium-cli">https://github.com/cilium/cilium-cli</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25552;&#20379;&#20102; 4 &#31181;&#21151;&#33021;
+</span>CNI
+kube-proxy
+ingress-controller
+loadBalancer: &#20998;&#37197; IP
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">CILIUM_VERSION</span>=0.20.1
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/cilium/cilium-cli/releases/download/v${<span class="org-variable-name">CILIUM_VERSION</span>}/cilium-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+tar xf cilium-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz -C /usr/local/bin
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21629;&#20196;&#34917;&#20840;
+</span>cilium completion bash &gt; /etc/bash_completion.d/cilium &amp;&amp; <span class="org-keyword">exit</span>
+
+cilium version
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:684BC13F-AACD-4E8B-BF53-E03DF38BD493" class="outline-4">
+<h4 id="h:684BC13F-AACD-4E8B-BF53-E03DF38BD493"><a href="#h:684BC13F-AACD-4E8B-BF53-E03DF38BD493">安装 Cilium</a></h4>
+<div class="outline-text-4" id="text-h:684BC13F-AACD-4E8B-BF53-E03DF38BD493">
+</div>
+<div id="outline-container-h:5FF133C4-ACF4-4038-9A53-F91DA2BB4EED" class="outline-5">
+<h5 id="h:5FF133C4-ACF4-4038-9A53-F91DA2BB4EED"><a href="#h:5FF133C4-ACF4-4038-9A53-F91DA2BB4EED">原生路由模式</a></h5>
+<div class="outline-text-5" id="text-h:5FF133C4-ACF4-4038-9A53-F91DA2BB4EED">
+<p>
+适用于裸机环境
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;&#35828;&#26126;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">native routing &#21407;&#29983;&#36335;&#30001;&#27169;&#24335;: &#20844;&#26377;&#20113;&#25110; Openstack &#34394;&#25311;&#32593;&#32476;&#20013;&#21487;&#33021;&#19981;&#25903;&#25345;&#27492;&#27169;&#24335;
+</span>cilium install <span class="org-sh-escaped-newline">\</span>
+   <span class="org-sh-quoted-exec">`#--dry-run`</span> <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#20808;&#26174;&#24335;&#24320;&#21551;kube-proxy&#26367;&#25442;(&#22522;&#30784;&#24320;&#20851;)`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">kubeProxyReplacement</span>=true <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#20877;&#25351;&#23450;&#20026;strict&#27169;&#24335;(1.18+&#26032;&#26684;&#24335;)`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">kubeProxyReplacementMode</span>=strict <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#21407;&#29983;&#36335;&#30001;&#27169;&#24335;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">routingMode</span>=native <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#33258;&#21160;&#21019;&#24314;&#33410;&#28857;&#30452;&#36830;&#36335;&#30001;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">autoDirectNodeRoutes</span>=true <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#36335;&#30001;&#29983;&#25928;&#32593;&#27573;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">ipv4NativeRoutingCIDR</span>=10.244.0.0/16 <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#38598;&#32676;&#27744; IPAM &#27169;&#24335;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ipam.mode=cluster-pool <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#38598;&#32676; Pod &#24635;&#32593;&#27573;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ipam.operator.clusterPoolIPv4PodCIDRList=10.244.0.0/16 <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#27599;&#20010;&#33410;&#28857;&#20998;&#37197; /24 &#23376;&#32593;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ipam.operator.clusterPoolIPv4MaskSize=24 <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#BPF &#27169;&#24335; SNAT &#20266;&#35013;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set bpf.masquerade=true <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#24320;&#21551; ingress &#21151;&#33021;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ingressController.enabled=true <span class="org-sh-escaped-newline">\</span>
+  --set ingressController.loadbalancerMode=shared <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#24320;&#21551; LoadBalancer &#21151;&#33021;`</span> <span class="org-sh-escaped-newline">\</span>
+   --set loadBalancer.enabled=true
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24536;&#35760;&#24320;&#21551; L2 Announcements&#65288; &#20108;&#23618;&#19978;&#30495;&#27491;&#21487;&#36798;&#65288;&#24212;&#31572; ARP&#65289;&#8212;&#8212; &#36825;&#20010;&#40664;&#35748;&#20851;&#38381;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#24178;&#36305;&#30475;&#19968;&#30524;&#21512;&#24182;&#21518;&#30340;&#20540;
+</span>cilium upgrade --dry-run-helm-values <span class="org-sh-escaped-newline">\</span>
+    --set l2announcements.enabled=true <span class="org-sh-escaped-newline">\</span>
+    --set k8sClientRateLimit.qps=50 <span class="org-sh-escaped-newline">\</span>
+    --set k8sClientRateLimit.burst=200
+
+cilium upgrade <span class="org-sh-escaped-newline">\</span>
+    --set l2announcements.enabled=true <span class="org-sh-escaped-newline">\</span>
+    --set k8sClientRateLimit.qps=50 <span class="org-sh-escaped-newline">\</span>
+    --set k8sClientRateLimit.burst=200
+
+cilium status --wait
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#21551; cilium
+</span>kubectl -n kube-system rollout restart ds/cilium
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#39564;&#35777;
+</span>kubectl -n kube-system get cm cilium-config -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">'{.data.enable-l2-announcements}'</span>
+
+<span class="org-comment-delimiter">#  </span><span class="org-comment">&#30830;&#20445;&#25152;&#26377; cilium &#30340; pod &#27491;&#24120;&#36816;&#34892;
+</span>kubectl get pod -A
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">cilium &#30340;&#30456;&#20851; pod &#27491;&#24120;&#21551;&#21160;&#21518;&#65292;node &#33410;&#28857;&#20063;&#22788;&#20110; ready &#29366;&#24577;
+</span>kubectl get node
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:34886C7E-4A59-4D1C-917F-FD2E00AE9D8B" class="outline-5">
+<h5 id="h:34886C7E-4A59-4D1C-917F-FD2E00AE9D8B"><a href="#h:34886C7E-4A59-4D1C-917F-FD2E00AE9D8B">XVLAN 模式</a></h5>
+<div class="outline-text-5" id="text-h:34886C7E-4A59-4D1C-917F-FD2E00AE9D8B">
+<p>
+适用于云环境方案
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;&#35828;&#26126;
+</span>cilium install <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#20808;&#26174;&#24335;&#24320;&#21551; kube-proxy &#26367;&#25442;(&#22522;&#30784;&#24320;&#20851;)`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">kubeProxyReplacement</span>=true <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#20005;&#26684;&#26367;&#25442;&#27169;&#24335;(&#24378;&#21046;&#21024;&#38500; kube-proxy)`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">kubeProxyReplacementMode</span>=strict <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#20108;&#23618;&#19978;&#30495;&#27491;&#21487;&#36798;&#65288;&#24212;&#31572; ARP&#65289;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set l2announcements.enabled=true <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#21551;&#29992;&#38567;&#36947;&#27169;&#24335;(&#26367;&#20195;&#26087;&#30340; tunnel=vx1an)`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">routingMode</span>=tunnel <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#25351;&#23450;&#38567;&#36947;&#21327;&#35758;&#20026;VXLAN(&#26680;&#24515;&#34917;&#20805;)`</span> <span class="org-sh-escaped-newline">\</span>
+  --set <span class="org-variable-name">tunnelProtocol</span>=vxlan <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#38598;&#32676;&#27744; IPAM &#27169;&#24335;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ipam.mode=cluster-pool <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#38598;&#32676; Pod &#24635;&#32593;&#27573;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ipam.operator.clusterPoolIPv4PodCIDRList=10.244.0.0/16 <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#27599;&#20010;&#33410;&#28857;&#20998;&#37197; /24 &#23376;&#32593;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ipam.operator.clusterPoolIPv4MaskSize=24 <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#BPF &#27169;&#24335; SNAT &#20266;&#35013;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set bpf.masquerade=true <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#24320;&#21551; ingress &#21151;&#33021;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set ingressController.enabled=true <span class="org-sh-escaped-newline">\</span>
+  --set ingressController.loadbalancerMode=shared <span class="org-sh-escaped-newline">\</span>
+  <span class="org-sh-quoted-exec">`#&#24320;&#21551; LoadBalancer &#21151;&#33021;`</span> <span class="org-sh-escaped-newline">\</span>
+  --set loadBalancer.enabled=true
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:E4423BFE-B4B1-4CF9-AAD2-4B68EF77FEC9" class="outline-4">
+<h4 id="h:E4423BFE-B4B1-4CF9-AAD2-4B68EF77FEC9"><a href="#h:E4423BFE-B4B1-4CF9-AAD2-4B68EF77FEC9">检查状态</a></h4>
+<div class="outline-text-4" id="text-h:E4423BFE-B4B1-4CF9-AAD2-4B68EF77FEC9">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475; cilium &#24037;&#20316;&#29366;&#24577;
+</span>cilium status
+root@master01:~# cilium status
+    /&#175;&#175;<span class="org-sh-escaped-newline">\</span>
+ /&#175;&#175;<span class="org-string">\_</span>_/&#175;&#175;<span class="org-string">\ </span>   Cilium:             OK
+ <span class="org-string">\_</span>_/&#175;&#175;<span class="org-string">\_</span>_/    Operator:           OK
+ /&#175;&#175;<span class="org-string">\_</span>_/&#175;&#175;<span class="org-string">\ </span>   Envoy DaemonSet:    OK
+ <span class="org-string">\_</span>_/&#175;&#175;<span class="org-string">\_</span>_/    Hubble Relay:       disabled
+    <span class="org-string">\_</span>_/       ClusterMesh:        disabled
+
+DaemonSet              cilium                   Desired: 5, Ready: 5/5, Available: 5/5
+DaemonSet              cilium-envoy             Desired: 5, Ready: 5/5, Available: 5/5
+Deployment             cilium-operator          Desired: 1, Ready: 1/1, Available: 1/1
+Containers:            cilium                   Running: 5
+                       cilium-envoy             Running: 5
+                       cilium-operator          Running: 1
+                       clustermesh-apiserver
+                       hubble-relay
+Cluster Pods:          2/2 managed by Cilium
+Helm chart version:    1.20.1
+Image versions         cilium             quay.io/cilium/cilium:v1.20.1@sha256:ae9ea21f7427fe24bc6ea7247eb552157a1b0a431744045d3f641545ca71d11b: 5
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.37.5-1786810558-766ccfb37260a43e9d228837aa84ce3faf9f64e7@sha256:75b8094c7127736a2ffd2dce3945e0931cb6df21b0372ff661940eca26730b91: 5
+                       cilium-operator    quay.io/cilium/operator-generic:v1.20.1@sha256:6c3885fc7b629099fdbe2a5c87869c86feb825fa18fae299eac0f61918d16ecf: 1
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#36335;&#30001;
+</span>root@master01:~# ip route show
+default via 10.0.0.2 dev eth0 proto static
+10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.101
+10.244.0.0/24 via 10.244.0.184 dev cilium_host proto kernel src 10.244.0.184
+10.244.0.184 dev cilium_host proto kernel scope link
+10.244.1.0/24 via 10.0.0.104 dev eth0 proto kernel
+10.244.2.0/24 via 10.0.0.103 dev eth0 proto kernel
+10.244.3.0/24 via 10.0.0.102 dev eth0 proto kernel
+10.244.4.0/24 via 10.0.0.105 dev eth0 proto kernel
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:F0F7C102-C2B8-42FD-9F9C-CA4122F59E0F" class="outline-4">
+<h4 id="h:F0F7C102-C2B8-42FD-9F9C-CA4122F59E0F"><a href="#h:F0F7C102-C2B8-42FD-9F9C-CA4122F59E0F">定义地址池</a></h4>
+<div class="outline-text-4" id="text-h:F0F7C102-C2B8-42FD-9F9C-CA4122F59E0F">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;cilium-lb-pool.yaml&lt;&lt;\EOF<span class="org-sh-heredoc">
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: default-pool
+  namespace: kube-system
+spec:
+  #allowFirstLastIPs: No # &#25490;&#38431;&#32593;&#32476;&#22320;&#22336;&#21644;&#24191;&#25773;&#22320;&#22336;
+  blocks:
+  # &#20351;&#29992;&#36215;&#27490; IP &#33539;&#22260;&#65292;&#36991;&#24320;&#33410;&#28857; IP
+  - start: "10.0.0.10"
+    stop: "10.0.0.50"
+  # &#21487;&#36873;&#65306;&#21487;&#20197;&#28155;&#21152;&#22810;&#20010;&#33539;&#22260;
+  #- start: "10.0.0.220"
+  #  stop: "10.0.0.250"
+  #- cidr: "10.0.0.0/24"
+EOF
+</span>
+cat &gt;cilium-l2-announcement.yaml&lt;&lt;\EOF<span class="org-sh-heredoc">
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: default-l2
+  namespace: kube-system
+spec:
+  #&#21305;&#37197;&#25152;&#26377;&#33410;&#28857;
+  nodeSelector: {}
+  #&#21305;&#37197;&#25152;&#26377; Service
+  serviceSelector: {}
+  externalIPs: true
+  loadBalancerIPs: true
+  # &#25351;&#23450;&#32593;&#32476;&#25509;&#21475;&#65288;&#26681;&#25454;&#23454;&#38469;&#24773;&#20917;&#35843;&#25972;&#65289;
+  interfaces:
+  - "eth0"
+  - "enp*"
+  - "ens*"
+EOF
+</span>
+kubectl apply -f cilium-lb-pool.yaml
+kubectl apply -f cilium-l2-announcement.yaml
+</pre>
+</div>
+
+<p>
+创建应用
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">root@master01:~# kubectl get ingressclasses
+NAME     CONTROLLER                     PARAMETERS   AGE
+cilium   cilium.io/ingress-controller   &lt;none&gt;       14m
+
+kubectl create deploy nginx --image=nginx:latest --replicas=1 -oyaml --dry-run=client |kubectl apply -f -
+kubectl create service loadbalancer nginx --tcp=80:80
+kubectl create ingress nginx --rule=<span class="org-string">'ng.jasper.org/*=nginx:80'</span> --class=<span class="org-string">'cilium'</span>
+
+
+root@master01:~# kubectl get svc
+kubectl get ingress
+NAME         TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP      10.96.0.1       &lt;none&gt;        443/TCP        109m
+nginx        LoadBalancer   10.98.236.209   10.0.0.11     80:31595/TCP   106s
+NAME    CLASS    HOSTS           ADDRESS     PORTS   AGE
+nginx   cilium   ng.jasper.org   10.0.0.10   80      94s
+
+curl -I  10.0.0.11
+curl -I -H <span class="org-string">'HOST: ng.jasper.org'</span> 10.0.0.10
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:ACC78EAE-F5ED-4BE8-B9F4-E7870771CC82" class="outline-2">
+<h2 id="h:ACC78EAE-F5ED-4BE8-B9F4-E7870771CC82"><a href="#h:ACC78EAE-F5ED-4BE8-B9F4-E7870771CC82">部署 Metrics Server （Master 节点）</a></h2>
+<div class="outline-text-2" id="text-h:ACC78EAE-F5ED-4BE8-B9F4-E7870771CC82">
+</div>
+<div id="outline-container-h:7e083d0d-272b-4cb1-bd40-633f6b994159" class="outline-3">
+<h3 id="h:7e083d0d-272b-4cb1-bd40-633f6b994159"><a href="#h:7e083d0d-272b-4cb1-bd40-633f6b994159">Metrics Server</a></h3>
+<div class="outline-text-3" id="text-h:7e083d0d-272b-4cb1-bd40-633f6b994159">
+<ul class="org-ul">
+<li><a href="https://kubernetes.io/zh-cn/docs/tasks/debug/debug-cluster/resource-usage-monitoring/">资源监控工具</a></li>
+<li>github <a href="https://github.com/kubernetes-sigs/metrics-server">metric-server</a></li>
+</ul>
+
+<p>
+在新版的 Kubernetes 中系统资源的采集均使用 Metrics-server，可以通过 Metrics 采集节点和 Pod 的内存、磁盘、CPU 和网络的使用率。
+</p>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">curl -LO https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38381; tls &#26816;&#39564;&#65292;&#26356;&#25442;&#22269;&#20869;&#38236;&#20687;&#12290;
+</span>vim components.yaml
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls <span class="org-comment-delimiter"># </span><span class="org-comment">HTTPS &#21152;&#23494;&#65292;&#36339;&#36807;&#35777;&#20070;&#26657;&#39564;&#65307;&#37492;&#26435;&#65288;token&#65289;&#20173;&#28982;&#20445;&#30041;
+</span>        image: registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.9.0
+        imagePullPolicy: IfNotPresent
+
+
+kubectl  apply -f components.yaml
+
+root@master01:/data/k8s# kubectl  get pod -n kube-system
+NAME                                      READY   STATUS    RESTARTS   AGE
+metrics-server-74ccf797cb-4zm25           1/1     Running   0          47s
+</pre>
+</div>
+
+
+<p>
+等待metrics server启动然后查看状态
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">kubectl  top node
+</span>NAME           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+master01.jasper.org   231m         5%     1620Mi          42%
+master02.jasper.org   274m         6%     1203Mi          31%
+master03.jasper.org   202m         5%     1251Mi          32%
+node01.jasper.org     69m          1%     667Mi           17%
+node02.jasper.org     73m          1%     650Mi           16%
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:d4deb790-db57-4d09-a8c1-14203ad88961" class="outline-2">
+<h2 id="h:d4deb790-db57-4d09-a8c1-14203ad88961"><a href="#h:d4deb790-db57-4d09-a8c1-14203ad88961">Dashboard</a></h2>
+<div class="outline-text-2" id="text-h:d4deb790-db57-4d09-a8c1-14203ad88961">
+<p>
+Dashboard 用于展示集群中的各类资源，同时也可以通 过Dashboard 实时查看 Pod 的日志和在容器中执行一些命令等。
+</p>
+</div>
+<div id="outline-container-h:a0b3571f-873e-4c64-9c39-0b98ae009f39" class="outline-3">
+<h3 id="h:a0b3571f-873e-4c64-9c39-0b98ae009f39"><a href="#h:a0b3571f-873e-4c64-9c39-0b98ae009f39">Headlamp</a></h3>
+<div class="outline-text-3" id="text-h:a0b3571f-873e-4c64-9c39-0b98ae009f39">
+<p>
+<a href="https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/">https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/</a>
+</p>
+
+<p>
+官方GitHub地址：<a href="https://headlamp.dev/">https://headlamp.dev/</a>
+</p>
+
+<p>
+使用 <a href="https://helm.sh/docs/intro/quickstart/">helm</a> 安装
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;1 yaml &#25991;&#20214;
+</span>kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/headlamp/main/kubernetes-headlamp.yaml
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26041;&#27861;2 helm
+</span>helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/
+helm search repo -l  headlamp <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#29256;&#26412;
+</span>helm pull headlamp/headlamp --version 0.45.0
+
+tar xf headlamp-0.45.0.tgz
+<span class="org-builtin">cd</span> headlamp/
+
+cat &gt; my-values.yaml &lt;&lt; EOF<span class="org-sh-heredoc">
+service:
+  type: NodePort
+  nodePort: 30080
+
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits:   { cpu: 500m, memory: 512Mi }
+EOF
+</span>
+helm install my-headlamp  . <span class="org-sh-escaped-newline">\</span>
+  -f my-values.yaml <span class="org-sh-escaped-newline">\</span>
+  --create-namespace -n kube-system 
+
+root@master01:~/hdp/headlamp# kubectl  -n kube-system get svc  my-headlamp
+NAME          TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+my-headlamp   NodePort   192.168.249.40   &lt;none&gt;        80:30080/TCP   2m51s
+</pre>
+</div>
+
+
+<p>
+创建管理员用户vim admin.yaml
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; admin.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"   
+type: kubernetes.io/service-account-token  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding 
+metadata: 
+  name: admin-user
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25191;&#34892;
+</span>kubectl apply -f admin.yaml
+</pre>
+</div>
+</div>
+<div id="outline-container-h:07e5b985-82e4-4535-a085-4cd1ced6abb8" class="outline-4">
+<h4 id="h:07e5b985-82e4-4535-a085-4cd1ced6abb8"><a href="#h:07e5b985-82e4-4535-a085-4cd1ced6abb8">登录 dashboard</a></h4>
+<div class="outline-text-4" id="text-h:07e5b985-82e4-4535-a085-4cd1ced6abb8">
+<p>
+访问 页面，使用 token 登录。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#33719;&#24471;&#31649;&#29702;&#21592; token
+</span><span class="org-builtin">echo</span> $(kubectl -n kube-system get secret admin-user -o <span class="org-variable-name">jsonpath</span>={.data.token} | base64 -d)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25110;&#32773;
+</span>kubectl -n kube-system describe secrets admin-user  |awk <span class="org-string">'/^token/{print $2}'</span>
+</pre>
+</div>
+
+
+
+<figure id="org21a38b3">
+<img style="aspect-ratio:1897/1029" decoding="async" loading="lazy" src="./images/img_20260913_182316.webp" alt="img_20260913_182316.webp" width="800">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:8424F0BC-82AF-4927-81A9-65EC327D8CCD" class="outline-4">
+<h4 id="h:8424F0BC-82AF-4927-81A9-65EC327D8CCD"><a href="#h:8424F0BC-82AF-4927-81A9-65EC327D8CCD">多集群管理</a></h4>
+<div class="outline-text-4" id="text-h:8424F0BC-82AF-4927-81A9-65EC327D8CCD">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25226;&#36828;&#31471;&#38598;&#32676;&#30340; kubeconfig &#20570;&#25104; Secret &#25346;&#36827;&#21435;&#12290;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">kubeconfig &#29992; ServiceAccount token &#25110;&#23458;&#25143;&#31471;&#35777;&#20070;&#26368;&#31283;&#12290;
+</span>
+  config:
+    extraArgs:
+      - -kubeconfig=/headlamp/kubeconfig/config
+  volumeMounts:
+    - name: kubeconfig
+      mountPath: /headlamp/kubeconfig
+      readOnly: true
+  volumes:
+    - name: kubeconfig
+      secret:
+        secretName: headlamp-kubeconfig
+
+  &#22810;&#20010; kubeconfig &#25991;&#20214;&#29992; : &#20998;&#38548;&#65306;
+
+  config:
+    extraArgs:
+      - -kubeconfig=/headlamp/kubeconfig/cluster-a:/headlamp/kubeconfig/cluster-b
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#19968;&#20010; kubeconfig &#37324;&#26377;&#22810;&#20010; context &#20063;&#34892;&#65292;Headlamp &#20250;&#25226;&#27599;&#20010; context &#37117;&#21015;&#25104;&#19968;&#20010;&#38598;&#32676;
+</span>
+
+kubectl -n kube-system rollout restart deploy/headlamp
+</pre>
+</div>
+
+<p>
+插件
+</p>
+<ul class="org-ul">
+<li><a href="https://artifacthub.io/packages/search?ts_query_web=headlamp&amp;sort=relevance&amp;page=1">headlamp plugins on Artifact Hub</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26700;&#38754;&#29256;&#21487;&#20197;&#22312; UI &#37324;&#28857;&#30528;&#35013;&#12290;&#38598;&#32676;&#20869;&#37096;&#32626;&#19981;&#34892;&#65292;&#24471;&#22768;&#26126;&#24335;&#37197;&#65292;&#29992; chart &#30340; pluginsManager&#65306;
+</span>
+pluginsManager:
+  enabled: true
+  configContent: |
+    plugins:
+      - name: metallb
+        <span class="org-builtin">source</span>: https://artifacthub.io/packages/headlamp/headlamp-metallb/headlamp-metallb-plugin
+        version: 0.5.1
+    installOptions:
+      parallel: true
+      maxConcurrent: 3
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7239c867-fe95-49e4-ad97-78862adb1563" class="outline-2">
+<h2 id="h:7239c867-fe95-49e4-ad97-78862adb1563"><a href="#h:7239c867-fe95-49e4-ad97-78862adb1563">收尾工作</a></h2>
+<div class="outline-text-2" id="text-h:7239c867-fe95-49e4-ad97-78862adb1563">
+</div>
+<div id="outline-container-h:739033d5-1c6a-4b43-b750-378cb34ae156" class="outline-3">
+<h3 id="h:739033d5-1c6a-4b43-b750-378cb34ae156"><a href="#h:739033d5-1c6a-4b43-b750-378cb34ae156">注意事项</a></h3>
+<div class="outline-text-3" id="text-h:739033d5-1c6a-4b43-b750-378cb34ae156">
+<p>
+注意：kubeadm安装的集群，证书有效期默认是一年。master节点的kube-apiserver、kube-scheduler、kube-controller-manager、etcd都是以容器运行的。可以通过kubectl get po -n kube-system查看。
+</p>
+
+<p>
+启动和二进制不同的是，kubelet的配置文件在/etc/sysconfig/kubelet和/var/lib/kubelet/config.yaml
+</p>
+
+<p>
+其他组件的配置文件在/etc/Kubernetes/manifests目录下，比如kube-apiserver.yaml，该yaml文件更改后，kubelet会自动刷新配置，也就是会重启pod。不能再次创建该文件。如果不想等可重启 kubelet
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">systemctl restart kubelet
+</pre>
+</div>
+
+<p>
+kube-proxy的配置在kube-system命名空间下的configmap中，可以通过
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl edit cm kube-proxy -n kube-system
+</pre>
+</div>
+
+<p>
+进行更改，更改完成后，可以通过patch重启kube-proxy
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl patch daemonset kube-proxy -p <span class="org-string">"{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"date\":\"`date +'%s'`\"}}}}}"</span> -n kube-system
+</pre>
+</div>
+
+<p>
+Kubeadm安装后，master节点默认不允许部署pod，可以通过以下方式打开：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;Taints&#65306;
+</span>root@master01:~# kubectl describe node -l node-role.kubernetes.io/control-plane=  |grep Taints
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;Taint&#65306;
+</span>kubectl taint node -l node-role.kubernetes.io/master node-role.kubernetes.io/control-plane:NoSchedule-
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a4b8287b-e1f0-4a76-8651-121b261a6273" class="outline-3">
+<h3 id="h:a4b8287b-e1f0-4a76-8651-121b261a6273"><a href="#h:a4b8287b-e1f0-4a76-8651-121b261a6273">集群检测</a></h3>
+<div class="outline-text-3" id="text-h:a4b8287b-e1f0-4a76-8651-121b261a6273">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get po --al-namespaces
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#30417;&#25511;&#25968;&#25454;
+</span>kubectl top po -n kube-system
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#32593;&#32476;
+</span>kubectl get svc  <span class="org-comment-delimiter"># </span><span class="org-comment">k8s&#30340;svc&#19968;&#33324;&#20026; servic ip &#27573;&#30340;&#31532;&#19968;&#20010; ip
+</span>kubectl get svc -n kube-system <span class="org-comment-delimiter"># </span><span class="org-comment">coredns &#19968;&#33324;&#20026; cluster ip &#30340;&#31532; 10 &#20010; ip
+</span>
+telnet 10.96.0.1 443
+telnet 10.96.0.10 53
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;&#36328;&#26381;&#21153;&#22120;&#35775;&#38382; pod &#26159;&#21542;&#36890;
+</span>kubectl get po --all-namespaces -owide
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#28982;&#21518;&#20854;&#20182;&#33410;&#28857;&#21435;&#35775;&#38382;
+</span>ping 172.168.32.130
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;pod&#20043;&#38388;&#26159;&#21542;&#36890;
+</span>kubectl get po --all-namespaces -owide
+kubectl exec -it calico-node-qxs56 -n kube-system -- sh <span class="org-comment-delimiter"># </span><span class="org-comment">&#36827;&#20837;&#23481;&#22120;&#20869;&#35775;&#38382;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">dashboard
+</span>kubectl get po -n kubernetes-dashboard
+kubectl get svc -n kubernetes-dashboard
+
+kubectl edit svc  kubernetes-dashboard -n kubernetes-dashboard
+<span class="org-builtin">type</span>: NodePort <span class="org-comment-delimiter">#</span><span class="org-comment">&#20462;&#25913;&#20026; NodePort
+</span>kubectl get po -n kubernetes-dashboard
+https://10.0.0.101:32534 <span class="org-comment-delimiter"># </span><span class="org-comment">&#27983;&#35272;&#22120;&#35775;&#38382;
+</span>
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:e95f990c-63ec-4d6e-95b7-4025a17487ca" class="outline-3">
+<h3 id="h:e95f990c-63ec-4d6e-95b7-4025a17487ca"><a href="#h:e95f990c-63ec-4d6e-95b7-4025a17487ca">删除集群</a></h3>
+<div class="outline-text-3" id="text-h:e95f990c-63ec-4d6e-95b7-4025a17487ca">
+<div class="org-src-container">
+<pre class="src src-shell">systemctl stop containerd kubelet
+rm -fr /etc/kubernetes
+rm -f /var/lib/containerd /var/lib/kubelet
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a6a25d02-e454-4664-a352-2d4452b0af06" class="outline-3">
+<h3 id="h:a6a25d02-e454-4664-a352-2d4452b0af06"><a href="#h:a6a25d02-e454-4664-a352-2d4452b0af06">kubeadm 证书更新</a></h3>
+<div class="outline-text-3" id="text-h:a6a25d02-e454-4664-a352-2d4452b0af06">
+<p>
+<a href="https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/kubeadm-certs/">https://kubernetes.io/zh/docs/reference/setup-tools/kubeadm/kubeadm-certs/</a>
+</p>
+
+<p>
+使用kubeadm创建的集群默认证书有效期为1年，所以要及时更新证书。或者重新编译源码来设置证书时间
+</p>
+
+<p>
+生产环境推荐一年更新一次 kubernetes 版本。
+</p>
+</div>
+<div id="outline-container-h:54aaad72-6794-4141-afda-04d8f36e4f88" class="outline-4">
+<h4 id="h:54aaad72-6794-4141-afda-04d8f36e4f88"><a href="#h:54aaad72-6794-4141-afda-04d8f36e4f88">更新一年</a></h4>
+<div class="outline-text-4" id="text-h:54aaad72-6794-4141-afda-04d8f36e4f88">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597; kubeadm &#31649;&#29702;&#30340;&#26412;&#22320; PKI &#20013;&#35777;&#20070;&#30340;&#21040;&#26399;&#26102;&#38388;
+</span>kubeadm certs check-expiration 
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26816;&#26597;&#35777;&#20070;&#36807;&#26399;&#26102;&#38388;
+</span>kubeadm alpha certs check-expiration
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#35777;&#20070;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#22791;&#20221;&#38598;&#32676;&#37197;&#32622;
+</span>kubectl -n kube-system get cm kubeadm-config -o yaml &gt; kubeadm-config.yaml
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#35777;&#20070;
+</span>kubeadm alpha certs renew all
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20877;&#27425;&#26816;&#26597;&#35777;&#20070;
+</span>kubeadm alpha certs check-expiration
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551; kubelet &#26381;&#21153;
+</span>systemctl restart kubelet
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#37197;&#32622;
+</span>cp /etc/kubernetes/admin.conf ~/.kube/config
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;&#38598;&#32676;
+</span>kubectl get node
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4d59fc88-cb69-4cb8-b2cc-a523b99051e2" class="outline-4">
+<h4 id="h:4d59fc88-cb69-4cb8-b2cc-a523b99051e2"><a href="#h:4d59fc88-cb69-4cb8-b2cc-a523b99051e2">更新为 99 年</a></h4>
+<div class="outline-text-4" id="text-h:4d59fc88-cb69-4cb8-b2cc-a523b99051e2">
+<p>
+修改源码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubeadm version
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#19979;&#36733;&#28304;&#30721;&#65292;&#20999;&#25442;&#38598;&#32676;&#19968;&#33268;&#30340;&#29256;&#26412;
+</span>git clone https://gitee.com/mirrors/kubernetes.git 
+git checkout v1.26.0
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#26032;&#32534;&#35793;
+</span>docker run -it --rm -v <span class="org-sh-quoted-exec">`pwd`</span>:/go/src/ registry.cn-beijing.aliyuncs.com/dotbalo/golang:kubeadm bash
+<span class="org-builtin">cd</span> /go/src
+go env -w <span class="org-variable-name">GOPROXY</span>=https://goproxy.cn,direct
+go env -w <span class="org-variable-name">GOSUMDB</span>=off
+grep <span class="org-string">"365"</span> cmd/kubeadm/app/constants/constants.go
+sed -i <span class="org-string">'s@365@365 * 100@g'</span> cmd/kubeadm/app/constants/constants.go
+grep <span class="org-string">'365'</span>  cmd/kubeadm/app/constants/constants.go
+mkdir -p _output/
+chmod 777 -R _output/
+make <span class="org-variable-name">WHAT</span>=cmd/kubeadm
+cp _output/bin/kubeadm ./kubeadm
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26356;&#26032;&#35777;&#20070;&#65292;&#21508;&#20010; mater &#33410;&#28857;&#25805;&#20316;
+</span>cp ./kubeadm /opt/
+/opt/kubeadm verson
+/opt/kubeadm certs renew all
+kubeadm certs check-expiration
+systemctl restart kubelet
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:427eaf49-db05-4a2f-a3e7-690ac9e11f0b" class="outline-2">
+<h2 id="h:427eaf49-db05-4a2f-a3e7-690ac9e11f0b"><a href="#h:427eaf49-db05-4a2f-a3e7-690ac9e11f0b">参考</a></h2>
+<div class="outline-text-2" id="text-h:427eaf49-db05-4a2f-a3e7-690ac9e11f0b">
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

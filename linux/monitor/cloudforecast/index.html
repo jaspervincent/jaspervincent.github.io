@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Cloudforecast</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="CloudForecast 的是一个系统管理员的工具或监控的框架,以监测服务器和其它资源,作为内部是使用了 Perl 和 RRDtool 加 Gearman 的分布调度支持,设计的主要目录是为了管理监控小型和大型企业中的服务器.也很合适二次开发." />
+<link rel="canonical" href="https://xuchangwei.com/linux/monitor/cloudforecast/index.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: Cloudforecast" />
+<meta property="og:description" content="CloudForecast 的是一个系统管理员的工具或监控的框架,以监测服务器和其它资源,作为内部是使用了 Perl 和 RRDtool 加 Gearman 的分布调度支持,设计的主要目录是为了管理监控小型和大型企业中的服务器.也很合适二次开发." />
+<meta property="og:url" content="https://xuchangwei.com/linux/monitor/cloudforecast/index.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/monitor/cloudforecast/index.html","@type":"WebPage","name":"Linux: Cloudforecast","description":"CloudForecast 的是一个系统管理员的工具或监控的框架,以监测服务器和其它资源,作为内部是使用了 Perl 和 RRDtool 加 Gearman 的分布调度支持,设计的主要目录是为了管理监控小型和大型企业中的服务器.也很合适二次开发."}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Cloudforecast</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:ecd9827b-8725-41e4-93fe-4592d5902b70">CloudForecast</a>
+<ul>
+<li><a href="#h:eff9075a-b49e-4158-a197-5f7fc400b07a">CloudForecast 简介</a></li>
+<li><a href="#h:71b972ad-8333-4718-a88f-bc420007dbdb">CloudForecast 安装</a></li>
+<li><a href="#h:f1621514-edd1-45da-b334-87ed4dda8964">配置CloudForecast</a></li>
+<li><a href="#h:971c963e-d500-4636-8c74-891e1554a4fa">深入 CloudForecast</a></li>
+<li><a href="#h:cad13858-7012-425f-b917-dd49444e0612">范例</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-h:ecd9827b-8725-41e4-93fe-4592d5902b70" class="outline-2">
+<h2 id="h:ecd9827b-8725-41e4-93fe-4592d5902b70"><a href="#h:ecd9827b-8725-41e4-93fe-4592d5902b70">CloudForecast</a></h2>
+<div class="outline-text-2" id="text-h:ecd9827b-8725-41e4-93fe-4592d5902b70">
+</div>
+<div id="outline-container-h:eff9075a-b49e-4158-a197-5f7fc400b07a" class="outline-3">
+<h3 id="h:eff9075a-b49e-4158-a197-5f7fc400b07a"><a href="#h:eff9075a-b49e-4158-a197-5f7fc400b07a">CloudForecast 简介</a></h3>
+<div class="outline-text-3" id="text-h:eff9075a-b49e-4158-a197-5f7fc400b07a">
+<p>
+CloudForecast 的是一个系统管理员的工具或监控的框架,以监测服务器和其它资源,作为内部是使用了 Perl 和 RRDtool 加 Gearman 的分布调度支持,设计的主要目录是为了管理监控小型和大型企业中的服务器.也很合适二次开发.
+</p>
+
+<p>
+这个软件的架构如下。使用了gearman 来任务调度,所以可以无限增加监控机器.
+</p>
+
+
+
+<figure id="orgeca1859">
+<img style="aspect-ratio:378/454" decoding="async" loading="lazy" src="./images/img_20240220_040934.webp" alt="img_20240220_040934.webp" width="80%">
+
+</figure>
+
+<p>
+git 的项目地址： <a href="http://github.com/kazeburo/cloudforecast">http://github.com/kazeburo/cloudforecast</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:71b972ad-8333-4718-a88f-bc420007dbdb" class="outline-3">
+<h3 id="h:71b972ad-8333-4718-a88f-bc420007dbdb"><a href="#h:71b972ad-8333-4718-a88f-bc420007dbdb">CloudForecast 安装</a></h3>
+<div class="outline-text-3" id="text-h:71b972ad-8333-4718-a88f-bc420007dbdb">
+<p>
+<b>CloudForecast 相关依赖的安装：</b>
+</p>
+
+<p>
+在简短的介绍
+</p>
+
+<p>
+安装这个软件前,需要 rrdtool 和 perl 还需要有 SNMP 的支持
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">ubuntu &#30340;&#23433;&#35013;
+</span>sudo apt-get install librrds-perl libsnmp-perl
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">CentOS &#30340;&#23433;&#35013;
+</span>sudo yum install net-snmp-perl
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">rrdtool &#30340;&#23433;&#35013;,&#38656;&#35201;&#20351;&#29992; EPEL &#30340; rpm &#25193;&#23637;,&#35265;&#25105;&#21478;&#19968;&#20010;&#25991;&#31456; yum &#39640;&#32423;&#20351;&#29992;&#25216;&#24039;
+</span>sudo yum install rrdtool-perl
+</pre>
+</div>
+
+
+<p>
+<b>CloudForecast 的安装</b>
+</p>
+
+<p>
+使用 git 下载这个项目的源码,在使用 cpanm 来安装依赖关系
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ git clone git://github.com/kazeburo/cloudforecast.git
+$ cd cloudforecast
+$ cpanm -l extlib --installdeps .
+</pre>
+</div>
+
+<p>
+注：目录是本地目录,cpanm 安装到 extlib 目录,然后使用 local::lib 来加载进这个项目中的.
+</p>
+
+<p>
+如果要监控 MySQL 的状态,这个模块是必须的 DBD::mysql.
+</p>
+</div>
+</div>
+<div id="outline-container-h:f1621514-edd1-45da-b334-87ed4dda8964" class="outline-3">
+<h3 id="h:f1621514-edd1-45da-b334-87ed4dda8964"><a href="#h:f1621514-edd1-45da-b334-87ed4dda8964">配置CloudForecast</a></h3>
+<div class="outline-text-3" id="text-h:f1621514-edd1-45da-b334-87ed4dda8964">
+<p>
+下面是配置文件，复制并编辑示例
+</p>
+
+<p>
+<b>配置文件</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cp cloudforecast_sample.yaml cloudforecast.yaml
+</pre>
+</div>
+
+<p>
+<b>服务器列表文件</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cp server_list_sample.yaml server_list.yaml
+</pre>
+</div>
+
+<p>
+示例配置文件(cloudforecast_sample.yaml)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">---
+config:
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#26524;&#24744;&#20351;&#29992; gearman ,&#38656;&#35201;&#22312;&#36825;&#25351;&#23450; germand &#20027;&#26426;&#21517;&#21644;&#31471;&#21475;
+</span>  gearman_enable: 0
+  gearman_server:
+    host: localhost
+    port: 7003
+<span class="org-comment-delimiter"># </span><span class="org-comment">RRD &#30340;&#23384;&#25918;&#22320;&#22336;. &#22914;&#26524;&#20351;&#29992; / &#23601;&#20351;&#29992;&#32477;&#23545;&#36335;&#24452;
+</span>  data_dir: data
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;data_dir: /usr/local/cloudforecast/rra
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#30417;&#25511;&#37197;&#32622;&#25991;&#20214;&#26465;&#30446;
+</span>  host_config_dir: host_config
+
+  component_config:
+<span class="org-comment-delimiter"># </span><span class="org-comment">SNMP &#30340;&#19968;&#20123;&#35774;&#32622; community &#21644; version &#30340;&#20449;&#24687;
+</span>  SNMP:
+    community: public   <span class="org-comment-delimiter">#</span><span class="org-comment">snmp&#22806;&#37096;&#23454;&#29992;&#21517;&#23383;
+</span>    version: 2
+<span class="org-comment-delimiter"># </span><span class="org-comment">MySQL &#30417;&#25511;&#30340;&#29992;&#25143;&#21644;&#23494;&#30721;
+</span>  MySQL:
+    user: root
+    password: <span class="org-string">""</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-sh">&#30417;&#25511;&#26465;&#30446;
+[root@rabbit-hd-212216 cloudforecast]# ll  host_config/
+total 16
+-rw-r--r-- 1 root root 473 Nov  6  2015 basic.yaml
+-rw-r--r-- 1 root root  95 Nov  6  2015 httpd8080.yaml
+-rw-r--r-- 1 root root 113 Nov  6  2015 httpd.yaml
+-rw-r--r-- 1 root root  75 Mar 22  2016 mysql.yaml
+
+[root@rabbit-hd-212216 cloudforecast]# cat host_config/basic.yaml
+---
+<span class="org-comment-delimiter"># </span><span class="org-comment">component_config&#12399;&#12371;&#12398;&#30435;&#35222;&#38917;&#30446;&#12398;&#35373;&#23450;&#20869;&#12384;&#12369;&#12391;&#21033;&#29992;&#12373;&#12428;&#12414;&#12377;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#37096;&#20998;&#30340;&#12395;SNMP&#12398;community&#21517;&#12364;&#30064;&#12394;&#12427;&#22580;&#21512;&#12394;&#12393;&#12395;&#21033;&#29992;&#12391;&#12365;&#12414;&#12377;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">resource&#12395;&#12399;&#12289;&#30435;&#35222;&#38917;&#30446;&#12434;&#36861;&#21152;&#12375;&#12390;&#12365;&#12414;&#12377;&#12290;&#23455;&#38555;&#12398;&#30435;&#35222;&#20869;&#23481;&#12399;&#12289;CloudForecast::Data::Foo &#12391;&#23450;&#32681;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#12373;&#12428;&#12390;&#12356;&#12414;&#12377;&#12290;&#12300;:&#12301;&#12391;&#21306;&#20999;&#12387;&#12383;&#20516;&#12399;&#12458;&#12503;&#12471;&#12519;&#12531;&#12392;&#12375;&#12390;&#23450;&#32681;&#12514;&#12472;&#12517;&#12540;&#12523;&#12395;&#28193;&#12373;&#12428;&#12414;&#12377;
+</span>component_config:
+resources:
+  - traffic:eth0
+  - traffic:eth1
+  - basic
+
+[root@rabbit-hd-212216 cloudforecast]# cat host_config/httpd.yaml
+---
+component_config:
+resources:
+  - traffic:2:eth0
+  - traffic:3:eth1
+  - basic
+  - http:80
+  - memcached:11211
+
+ [root@rabbit-hd-212216 cloudforecast]# cat host_config/mysql.yaml
+---
+component_config:
+resources:
+  <span class="org-comment-delimiter">#</span><span class="org-comment">- traffic:2:eth0
+</span>  - mysql
+  - innodb
+</pre>
+</div>
+
+<p>
+示例服务器列表文件(serverlistsample.yaml)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">--- <span class="org-comment-delimiter">#</span><span class="org-comment">Dev
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">--- #Hoge&#12392;&#26360;&#12367;&#12371;&#12392;&#12391;&#12469;&#12540;&#12496;&#19968;&#35239;&#12434;&#21306;&#20999;&#12427;&#12371;&#12392;&#12364;&#12391;&#12365;&#12414;&#12377;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">config &#26159;&#25351;&#20027;&#26426;&#38656;&#35201;&#37197;&#32622;&#20160;&#20040;&#30417;&#27979;&#39033;&#30446;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#20027;&#26426;&#30340;&#37197;&#32622;&#26159;&#8220;IP&#22320;&#22336;[&#31354;&#26684;]&#20027;&#26426;&#21517;[&#31354;&#26684;]&#22791;&#27880;&#8220;
+</span>servers:
+- config: basic.yaml
+hosts:
+- 192.168.55.10 dev1 develop
+- 192.168.55.11 dev2 develop
+
+servers:
+- config: httpd.yaml
+label: DB <span class="org-comment-delimiter">#</span><span class="org-comment">&#23567;&#26631;&#39064;
+</span>hosts:
+- 192.168.51.10 web1 web memcached
+- 192.168.51.11 web2 web memcached
+- config: mysql.yaml
+hosts:
+- 192.168.51.60 db1 mysql master
+- 192.168.51.61 db2 mysql slave
+- 192.168.51.62 db2 mysql slave
+- config: basic.yaml
+hosts:
+- 192.168.51.90 batch1 batch
+
+servers:
+  - config: basic.yaml
+    hosts:
+      - 192.168.55.10 dev1 develop
+      - 192.168.55.11 dev2 develop
+
+--- <span class="org-comment-delimiter">#</span><span class="org-comment">Production &#21517;&#23376;&#21487;&#38543;&#24847;&#22635;&#20889;
+</span>servers:
+  - config: httpd.yaml
+    label: DB <span class="org-comment-delimiter">#</span><span class="org-comment">&#23567;&#26631;&#39064;
+</span>    hosts:
+      - 192.168.51.10 web1 web memcached
+      - 192.168.51.11 web2 web memcached
+  - config: mysql.yaml
+    hosts:
+      - 192.168.51.60 db1 mysql master
+      - 192.168.51.61 db2 mysql slave
+      - 192.168.51.62 db2 mysql slave
+  - config: basic.yaml
+    hosts:
+      - 192.168.51.90 batch1 batch
+</pre>
+</div>
+
+<p>
+<b>启动CloudForecast</b>
+</p>
+
+<p>
+守护进程.对远程的资源和数据进行检索 每5分钟一次
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">./cloudforecast_radar -c cloudforecast.yaml -l server_list.yaml
+</pre>
+</div>
+
+<p>
+Web 显示用的服务器 5000 的端口
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">./cloudforecast_web -p 5000 -c cloudforecast.yaml -l server_list.yaml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:971c963e-d500-4636-8c74-891e1554a4fa" class="outline-3">
+<h3 id="h:971c963e-d500-4636-8c74-891e1554a4fa"><a href="#h:971c963e-d500-4636-8c74-891e1554a4fa">深入 CloudForecast</a></h3>
+<div class="outline-text-3" id="text-h:971c963e-d500-4636-8c74-891e1554a4fa">
+<p>
+CloudForecast 由RRDTool工具包装而成、被设计作为信息检索的框架.
+</p>
+
+<p>
+CloudForecast 一共有四个大的部分.
+</p>
+
+<ol class="org-ol">
+<li>一个不断循环守护进程</li>
+<li>HTTPD 用来显示信息</li>
+<li>Gearman 的 worker 采集的信息</li>
+<li>Gearman 的 进行 RRD文件的更新工作</li>
+</ol>
+
+<p>
+在比较小的规模的时候 ,可以不使用 Gearman 就能达到性能的要求,如果你想看看架构图,可以看这个 blog 上的显示的这个
+</p>
+
+<p>
+<b>1. 不断循环守护进程</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./cloudforecast_radar -r -c cloudforecast.yaml -l server_list.yaml
+</pre>
+</div>
+
+
+<p>
+从启动开始每5分钟更新一次
+</p>
+<ul class="org-ul">
+<li>-r 重新启动选项,重新启动时自动更新配置文件和库</li>
+<li>-c 配置文件</li>
+<li>-l 服务器列表</li>
+</ul>
+
+<p>
+<b>2. web server</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./cloudforecast_web -r -p 5000 -c cloudforecast.yaml -l server_list.yaml
+</pre>
+</div>
+
+<p>
+查看图表,通过类 HTTPD
+</p>
+<ul class="org-ul">
+<li>-p 指定 httpd 的 port</li>
+<li>-o | -host httpd 的 Listen 主机 IP.默认为本机所有 IP</li>
+<li>–allow-from 客户端IP/被访问的IP段,您可以指定多个 192.168.0.1 or 192.168.0.1/24 如果你不指定,就是不控制任何访问</li>
+<li>–front-proxy 如果您前面使用的是反向代理,您可以指定多个,IP地址/ IP段.</li>
+</ul>
+
+<p>
+<b>3. 采集远程 snmp 的信息,通过 Gearman 来调度</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./cf_fetcher_worker -r -c cloudforecast.yaml -max-workers 2 -max-request-per-child 100 -max-exection-time 60
+</pre>
+</div>
+
+
+<p>
+geamarn 调度 worker 进行远程信息检索采集
+</p>
+
+<ul class="org-ul">
+<li>-max-worker prefork 多少个 worker 同来</li>
+<li>-max-request-per-child 在处理时间的这个工作进程.如果处理的任务超过了这个数,这个进程重新启动</li>
+<li>-max-exection-time 如果你的 worker 超时,停止掉 worker</li>
+</ul>
+
+<p>
+<b>4. Gearman 调度 worker进行 RRD 的文件更新</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./cf_updater_worker -r -c cloudforecast.yaml -max-workers 2 -max-request-per-child 100 -max-exection-time 60
+</pre>
+</div>
+
+<p>
+Gearman 让 worker 对 RRD 文件写入信息
+</p>
+
+<p>
+环境变量
+CF_DEBUG=1 当这个成立时.输出调试日志
+</p>
+</div>
+</div>
+<div id="outline-container-h:cad13858-7012-425f-b917-dd49444e0612" class="outline-3">
+<h3 id="h:cad13858-7012-425f-b917-dd49444e0612"><a href="#h:cad13858-7012-425f-b917-dd49444e0612">范例</a></h3>
+<div class="outline-text-3" id="text-h:cad13858-7012-425f-b917-dd49444e0612">
+
+<figure id="orgc5cba40">
+<img style="aspect-ratio:1359/92" decoding="async" loading="lazy" src="./images/img_20240220_041827.webp" alt="img_20240220_041827.webp" width="80%">
+
+</figure>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@rabbit-hd-212216 ~]# cat /usr/local/cloudforecast/cloudforecast.yaml
+---
+config:
+<span class="org-comment-delimiter"># </span><span class="org-comment">gearman&#12434;&#21033;&#29992;&#12377;&#12427;?&#21512;&#12289;enable&#12434;1&#12395;&#12375;&#12390;&#12289;germand&#12398;host&#21517;&#12392;port&#12434;&#25351;&#23450;&#12375;&#12414;&#12377;
+</span>  gearman_enable: 0
+  gearman_server:
+    host: localhost
+    port: 7003
+<span class="org-comment-delimiter"># </span><span class="org-comment">rrd&#12398;&#12501;&#12449;&#12452;&#12523;&#12434;?&#32622;&#12377;&#12427;?&#25152;&#12290;&#12300;/&#12301;&#12363;&#12425;&#22987;&#12414;&#12427;&#12392;??&#12497;&#12473;&#12392;&#12394;&#12426;&#12414;&#12377;
+</span>  data_dir: /usr/local/cloudforecast/rra
+<span class="org-comment-delimiter"># </span><span class="org-comment">???&#30446;&#12398;?&#23450;&#12501;&#12449;&#12452;&#12523;&#12434;?&#32622;&#12377;&#12427;&#12487;&#12451;&#12524;&#12463;&#12488;&#12522;&#12290;&#12300;/&#12301;&#12363;&#12425;&#22987;&#12414;&#12427;&#12392;??&#12497;&#12473;
+</span>  host_config_dir: host_config
+
+component_config:
+<span class="org-comment-delimiter"># </span><span class="org-comment">SNMP&#12391;&#12487;?&#12479;&#12434;&#21462;&#24471;&#12377;&#12427;?&#12398;&#12458;&#12503;&#12471;&#12519;&#12531;&#12290;community&#12392;version
+</span>  SNMP:
+    community: public
+    version: 2
+<span class="org-comment-delimiter"># </span><span class="org-comment">MySQL&#12434;??&#12377;&#12427;?&#21512;&#12398;user&#21517;&#12392;&#12497;&#12473;&#12527;?&#12489;
+</span>  MySQL:
+    user: sql_read1
+    password: <span class="org-string">"hd^R+O%ZU(5@oy#E"</span>
+
+
+[root@rabbit-hd-212216 ~]# cat /usr/local/cloudforecast/server_list.yaml
+--- <span class="org-comment-delimiter">#</span><span class="org-comment">Dev
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">--- #Hoge&#12392;&#26360;&#12367;&#12371;&#12392;&#12391;&#12469;&#12540;&#12496;&#19968;&#35239;&#12434;&#21306;&#20999;&#12427;&#12371;&#12392;&#12364;&#12391;&#12365;&#12414;&#12377;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">config&#12399;host_config&#20869;&#12398;&#30435;&#35222;&#38917;&#30446;&#12398;&#35373;&#23450;&#12501;&#12449;&#12452;&#12523;&#21517;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">hosts&#12399; &#12300;IP&#12450;&#12489;&#12524;&#12473;[space]&#12507;&#12473;&#12488;&#21517;[space]&#12467;&#12513;&#12531;&#12488;&#12301;&#12391;&#12377;&#12290;&#12467;&#12513;&#12531;&#12488;&#20869;&#12395;&#12399;&#12473;&#12506;&#12540;&#12473;&#12364;&#12354;&#12387;&#12390;&#12418;&#12363;&#12414;&#12356;&#12414;&#12379;&#12435;
+</span>servers:
+  - config: basic.yaml
+    hosts:
+      - 10.132.41.88 nginx01 nginx01
+      - 10.162.53.143  nginx02 nginx02
+      - 10.132.28.169 pic01  pic01
+      - 10.175.205.8 handler1 handler1
+      - 10.132.83.125 handler2 handler2
+      - 10.168.22.215 handler3 handler3
+      - 10.51.33.223  handler4 handler4
+      - 10.117.45.230 handler5 handler5
+      - 10.117.40.155 handler6 handler6
+      - 10.132.84.68 handler7 handler7
+      - 10.47.94.79  handler8 handler8
+      - 10.117.25.240 handler9 handler9
+      - 10.51.30.157 handler10 handler10
+      - 10.117.77.82 handler11 handler11
+      - 10.51.32.26 handler12 handler12
+      - 10.45.33.170 handler15 handler15
+      - 10.26.199.53 handler16 handler16
+      - 10.26.199.48 handler17 handler17
+      - 10.47.132.41 handler27 handler27
+      <span class="org-comment-delimiter">#</span><span class="org-comment">- 10.252.101.75 hdweb hdweb
+</span>
+--- <span class="org-comment-delimiter">#</span><span class="org-comment">MFS
+</span>servers:
+  - config: basic.yaml
+    hosts:
+     - 10.162.57.46 mfs-master mfs-mater
+     - 10.162.59.176 mfs-chunkserver1 mfs-chunkserver1
+     - 10.51.4.0 mfs-chunkserver2 mfs-chunkserver2
+     - 10.162.82.161 mfs-chunkserver3 mfs-chunkserver3
+     - 10.117.6.87 mfs-chunkserver4 mfs-chunkserver4
+
+
+--- <span class="org-comment-delimiter">#</span><span class="org-comment">Elasticsearch
+</span>servers:
+  - config: basic.yaml
+    hosts:
+      - 10.168.118.189 Elasticsearch01 Elasticsearch01
+      - 10.168.28.38 Elasticsearch02 Elasticsearch02
+      - 10.26.233.77 Elasticsearch03 Elasticsearch03
+
+--- <span class="org-comment-delimiter">#</span><span class="org-comment">Production
+</span>servers:
+<span class="org-comment-delimiter">#  </span><span class="org-comment">- config: httpd.yaml
+</span><span class="org-comment-delimiter">#    </span><span class="org-comment">label: Application Servers
+</span><span class="org-comment-delimiter">#    </span><span class="org-comment">hosts:
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.10 web1 web memcached
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.11 web2 web memcached
+</span><span class="org-comment-delimiter">#  </span><span class="org-comment">- config: httpd8080.yaml
+</span><span class="org-comment-delimiter">#    </span><span class="org-comment">hosts:
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.12 web3 mobile web
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.13 web4 mobile web
+</span>  - config: mysql.yaml
+    label: DB
+    hosts:
+      - rdsjmlwvb.mysql.rds.aliyuncs.com db1 mysql master
+<span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.61 db2 mysql slave
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.62 db2 mysql slave
+</span><span class="org-comment-delimiter">#  </span><span class="org-comment">- config: basic.yaml
+</span><span class="org-comment-delimiter">#    </span><span class="org-comment">label: ETC
+</span><span class="org-comment-delimiter">#    </span><span class="org-comment">hosts:
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">- 192.168.51.90 batch1 batch
+</span>--- <span class="org-comment-delimiter">#</span><span class="org-comment">PC h5.cici.com
+</span>servers:
+  - config: basic.yaml
+    hosts:
+       - 10.47.74.25 pc-haproxy01 pc-haproxy01
+       - 10.252.101.75 pc-web01 pc-web01
+       - 10.168.68.175 pc-web02 pc-web02
+       - 10.24.255.220 pc-mysql01 pc-mysql01
+
+
+[root@rabbit-hd-212216 ~]# cat   /usr/local/cloudforecast/host_config/basic.yaml
+---
+<span class="org-comment-delimiter"># </span><span class="org-comment">component_config&#12399;&#12371;&#12398;&#30435;&#35222;&#38917;&#30446;&#12398;&#35373;&#23450;&#20869;&#12384;&#12369;&#12391;&#21033;&#29992;&#12373;&#12428;&#12414;&#12377;&#12290;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#37096;&#20998;&#30340;&#12395;SNMP&#12398;community&#21517;&#12364;&#30064;&#12394;&#12427;&#22580;&#21512;&#12394;&#12393;&#12395;&#21033;&#29992;&#12391;&#12365;&#12414;&#12377;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">resource&#12395;&#12399;&#12289;&#30435;&#35222;&#38917;&#30446;&#12434;&#36861;&#21152;&#12375;&#12390;&#12365;&#12414;&#12377;&#12290;&#23455;&#38555;&#12398;&#30435;&#35222;&#20869;&#23481;&#12399;&#12289;CloudForecast::Data::Foo &#12391;&#23450;&#32681;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#12373;&#12428;&#12390;&#12356;&#12414;&#12377;&#12290;&#12300;:&#12301;&#12391;&#21306;&#20999;&#12387;&#12383;&#20516;&#12399;&#12458;&#12503;&#12471;&#12519;&#12531;&#12392;&#12375;&#12390;&#23450;&#32681;&#12514;&#12472;&#12517;&#12540;&#12523;&#12395;&#28193;&#12373;&#12428;&#12414;&#12377;
+</span>component_config:
+resources:
+  - traffic:eth0
+  - traffic:eth1
+  - basic
+[root@rabbit-hd-212216 ~]# cat   /usr/local/cloudforecast/host_config/httpd8080.yaml
+---
+component_config:
+resources:
+  - traffic:2:eth0
+  - traffic:3:eth1
+  - basic
+  - http:8080
+[root@rabbit-hd-212216 ~]# cat   /usr/local/cloudforecast/host_config/httpd.yaml
+---
+component_config:
+resources:
+  - traffic:2:eth0
+  - traffic:3:eth1
+  - basic
+  - http:80
+  - memcached:11211
+[root@rabbit-hd-212216 ~]# cat   /usr/local/cloudforecast/host_config/mysql.yaml
+---
+component_config:
+resources:
+  <span class="org-comment-delimiter">#</span><span class="org-comment">- traffic:2:eth0
+</span>  - mysql
+  - innodb
+</pre>
+</div>
+
+
+
+<figure id="orgbcc7262">
+<img style="aspect-ratio:593/1019" decoding="async" loading="lazy" src="./images/img_20240220_043336.webp" alt="img_20240220_043336.webp" width="80%">
+
+</figure>
+
+
+<p>
+snmp 安装
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum list all | grep snmp
+yum install net-snmp.x86_64 -y
+<span class="org-builtin">cd</span> /etc/snmp/
+cp snmpd.conf snmpd.conf.bak
+cat snmpd.conf.bak |grep -vE <span class="org-string">'^$|^#'</span> &gt; snmpd.conf
+</pre>
+</div>
+
+<p>
+配合使用cloudforse 的snmpd.conf配置
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@datanode03 snmp]# vim snmpd.conf
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31532;&#19968;&#27493;&#65292;&#23450;&#20041;&#23433;&#20840;&#20307;&#21517;&#31216;&#65292;&#23558;&#19968;&#20010;&#20849;&#21516;&#20307;&#26144;&#23556;&#21040;&#19968;&#20010;&#23433;&#20840;&#20307;&#21517;&#31216;&#37324;&#65306;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">com2sec &#26159;net-snmp&#20013;&#23450;&#20041;&#23433;&#20840;&#20307;&#21517;&#23383;&#30340;&#20851;&#38190;&#23383;&#65292;&#34920;&#31034;&#36825;&#19968;&#34892;&#23450;&#20041;&#19968;&#20010;&#23433;&#20840;&#20307;&#21517;&#23383;&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">sec.name&#65306; &#23433;&#20840;&#20307;&#21517;&#31216;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">source&#65306;&#21487;&#20197;&#35775;&#38382;&#30340;ip&#22320;&#22336;&#33539;&#22260;&#65292;&#40664;&#35748;&#20540;"default&#8221;&#65292;&#21363;&#20219;&#20309;ip&#37117;&#21487;&#20197;&#35775;&#38382;&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">community&#65306;&#20849;&#21516;&#20307;&#21517;&#31216;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">sec.name    souce            community
+</span>com2sec cici  10.161.212.216       public
+com2sec cici  114.215.191.163      public
+com2sec cici  10.161.171.134      public
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31532;&#20108;&#27493;&#65292;&#23450;&#20041;&#23433;&#20840;&#32452;&#65292;&#23558;&#23433;&#20840;&#20307;&#21517;&#31216;&#21152;&#36827;&#19968;&#20010;&#23433;&#20840;&#32452;&#20013;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">groupName  &#23433;&#20840;&#32452;&#21517;&#31216;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">securityModel &#23433;&#20840;&#27169;&#22411;&#65292;&#21487;&#36873;&#20540;&#65306;v1&#65292;v2c&#65292;usm
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">securityName  &#23433;&#20840;&#20307;&#21517;&#31216;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#      </span><span class="org-comment">groupName    securityModel  securityName
+</span>group   ciciGroup v1           cici
+group   ciciGroup v2c          cici
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31532;&#19977;&#27493;&#65292;&#23450;&#20041;&#35270;&#22270;&#65292;&#20379;&#23433;&#20840;&#32452;&#20351;&#29992;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">view.name  &#35270;&#22270;&#21517;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">incl/excl  &#23545;&#19979;&#38754;&#30340;MIB&#23376;&#26641;&#26159;&#21253;&#25324;&#36824;&#26159;&#25490;&#38500;(included/excluded)
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">subtree    &#35270;&#22270;&#20013;&#25152;&#28041;&#21450;&#30340;mib&#23376;&#26641;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">mask(optional)  &#25513;&#30721;
+</span><span class="org-comment-delimiter">#        </span><span class="org-comment">view.name    incl/excl       subtree                    [mask]
+</span>view    systemview    included   .1.3.6.1.2.1.1
+view    systemview    included   .1.3.6.1.2.1.25.1.1
+view    systemview    included .1.3.6.1.2.1.2
+view    all           included  .1                      80
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#31532;&#22235;&#27493;&#65292;&#21521;&#23433;&#20840;&#32452;&#25480;&#26435;&#30456;&#24212;&#30340;&#35270;&#22270;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">group &#23433;&#20840;&#32452;&#21517;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">context &#19978;&#19979;&#25991;v1&#65292;v2&#20013;&#22987;&#32456;&#20026;&#31354;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">sec.model &#23433;&#20840;&#27169;&#22411;&#65292;&#21487;&#36873;&#20540;&#65306;v1&#65292;v2&#65292;usm
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">sec.level &#23433;&#20840;&#32423;&#21035;  &#21487;&#36873;&#20540;&#65306;auth,noauth,priv,      v1,v2c&#20013;&#21482;&#33021;&#20026;noauth
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">prefix &#21069;&#32512;&#12290;&#25351;&#23450;context&#22914;&#20309;&#19982;PDU&#20013;&#30340;context&#21305;&#37197;&#65292;V3&#20351;&#29992;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">read   &#25480;&#26435;&#30340;&#35835;&#35270;&#22270;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">write  &#25480;&#26435;&#30340;&#20889;&#35270;&#22270;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">notif  &#25480;&#26435;&#30340;trap&#35270;&#22270;
+</span><span class="org-comment-delimiter">#       </span><span class="org-comment">group    context  sec.model  sec.level  prefix read write notif
+</span>
+access  ciciGroup <span class="org-string">""</span>      any       noauth    exact  all none none
+view all    included  .1
+syslocation Unknown (edit /etc/snmp/snmpd.conf)
+syscontact Root <a href="mailto:root%40localhost">&lt;root@localhost&gt;</a> (configure /etc/snmp/snmp.local.conf)
+dontLogTCPWrappersConnects yes
+
+[root@datanode03 snmp]# systemctl start snmpd
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 高效linux工具</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="输入tmux命令，就会自动新建一个会话。这个会话默认有一个Window（也即窗 口）。Tmux中可以拥有多个会话，多个会话之间可以来回无缝切换。" />
+<link rel="canonical" href="https://xuchangwei.com/linux/linux/linux-tools.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: 高效linux工具" />
+<meta property="og:description" content="输入tmux命令，就会自动新建一个会话。这个会话默认有一个Window（也即窗 口）。Tmux中可以拥有多个会话，多个会话之间可以来回无缝切换。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/linux/linux-tools.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/linux/linux-tools.html","@type":"WebPage","name":"Linux: 高效linux工具","description":"输入tmux命令，就会自动新建一个会话。这个会话默认有一个Window（也即窗 口）。Tmux中可以拥有多个会话，多个会话之间可以来回无缝切换。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 高效linux工具</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:3dee8563-2079-463a-a834-1a696b55ac9d">tmux-会话管理</a>
+<ul>
+<li><a href="#h:056691c3-2a29-4e37-87a3-55e1cd86083b">tmux基本结构</a></li>
+<li><a href="#h:966c40df-049c-4996-a34a-ba8ad3cd1194">会话管理</a></li>
+<li><a href="#h:58ddd29b-bfaf-4314-b7f8-fd914655cb9b">窗口管理</a></li>
+<li><a href="#h:9cd74958-535e-4868-8bde-f50d521be480">窗格管理</a></li>
+<li><a href="#h:92abc111-2327-48c6-8d6e-5c833fb3fab5">配置文件</a>
+<ul>
+<li><a href="#h:414b4d5a-0a93-426b-985c-904c30a56401">常用插件</a></li>
+</ul>
+</li>
+<li><a href="#h:486ad1b0-b460-4192-9ac7-9ebe914966fa">常用操作</a></li>
+</ul>
+</li>
+<li><a href="#h:3f2fc70d-d8b0-40e9-ae13-1d643ccb14ac">fish-shell终端</a></li>
+<li><a href="#h:c5d99449-4d35-47e0-b3b4-6cfab3e6a1e7">fzf-快速的文件列表浏览</a></li>
+<li><a href="#h:7aa001cb-ba24-4ad2-a99e-df8e1e3fdb68">starship-终端美化神器</a>
+<ul>
+<li><a href="#h:f11d4c6a-5e2e-4195-8987-249696973773">安装</a>
+<ul>
+<li><a href="#h:e6fff8a1-2c22-4df4-968b-a66f9c7c7e4c">解决字体问题：</a></li>
+</ul>
+</li>
+<li><a href="#h:73525474-2fe0-4334-b62e-478244c3e5d3">预设</a></li>
+<li><a href="#h:14c7401e-1542-446f-b98c-2dcecc538622">自定义</a></li>
+</ul>
+</li>
+<li><a href="#h:14138dda-6334-4fc0-acf1-f307a6444362">浏览器插件</a>
+<ul>
+<li><a href="#h:401d47eb-fe3b-4c48-9765-6f3fadf220f8">vim插件</a></li>
+</ul>
+</li>
+<li><a href="#h:f1a62b35-019a-407a-a7fb-f7be9ecac2f3">linux环境配置</a></li>
+<li><a href="#h:204ad81d-7107-49af-ac39-826cddd71d66">终端效率工具记录</a>
+<ul>
+<li><a href="#h:b1b22e78-3e45-49b7-b876-fc19f007d31e">tldr</a></li>
+<li><a href="#h:4b830aa0-8f36-43bb-96db-5dcca872f3cf">zshell</a></li>
+<li><a href="#h:e41d08a1-00dd-4fd8-b479-fb4d7d18471f">ranger</a></li>
+<li><a href="#h:2a307084-8b67-4877-9daf-29c337fa85e1">lazygit</a></li>
+<li><a href="#h:f4894b9d-2b26-4b87-8471-7ca245beb710">tmux</a></li>
+<li><a href="#h:8d89e4c8-0a62-471d-87d8-75cc0648e7a1">expect</a></li>
+<li><a href="#h:9ff3b1f8-e4c0-4c94-85db-d7467ca9acce">sudo</a></li>
+<li><a href="#h:b1d4ff90-1391-4509-819d-52721d0f3c17">glances</a></li>
+<li><a href="#h:aee372ff-3e7a-4018-b542-f3003c926301">lazydocker</a>
+<ul>
+<li><a href="#h:341330e3-b40b-475a-9a82-dac98d0b77ea">docker</a></li>
+</ul>
+</li>
+<li><a href="#h:21bee9e8-bf58-4ff9-9bf7-23920f86f5e2">ncdu</a></li>
+<li><a href="#h:11980061-71dc-4b5a-93fc-b6dabfa8802f">tig</a></li>
+<li><a href="#h:f7cf899a-7505-41a5-bcc6-cc4ebc976e07">ack</a></li>
+<li><a href="#h:739629af-e240-4f53-8892-ef3a9264b4cc">ag</a></li>
+<li><a href="#h:ec993297-2395-478e-9a79-12edfc182512">bat</a></li>
+<li><a href="#h:1a7ed35b-379e-4a30-86f3-89d93cd33dea">zenity</a></li>
+<li><a href="#h:6b675ecf-9fc1-4d42-b738-2883d47609b2">fzf</a></li>
+<li><a href="#h:fdf5aef3-11b6-4daa-ba19-fc3817073057">shc</a></li>
+<li><a href="#h:0867a5ab-1747-4fdc-8acc-44542fc9f83b">colorls</a></li>
+<li><a href="#h:9e72a248-c0b3-4c3d-840f-d7954c487ff8">Linux命令行多线程、断点续传下载工具</a></li>
+</ul>
+</li>
+<li><a href="#h:b8c704cb-cd7c-489a-bd21-4e991d3cf1b3">其他</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Linux</a><br></li>
+</ul>
+<section id="outline-container-h:3dee8563-2079-463a-a834-1a696b55ac9d" class="outline-2">
+<h2 id="h:3dee8563-2079-463a-a834-1a696b55ac9d"><a href="#h:3dee8563-2079-463a-a834-1a696b55ac9d">tmux-会话管理</a></h2>
+<div class="outline-text-2" id="text-h:3dee8563-2079-463a-a834-1a696b55ac9d">
+<ul class="org-ul">
+<li>手册 <a href="http://man.openbsd.org/OpenBSD-current/man1/tmux.1">http://man.openbsd.org/OpenBSD-current/man1/tmux.1</a><br></li>
+<li>官方 <a href="https://github.com/tmux/tmux/wiki">https://github.com/tmux/tmux/wiki</a><br></li>
+</ul>
+
+<p>
+安装：<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">yum install tmux
+</pre>
+</div>
+</div>
+<div id="outline-container-h:056691c3-2a29-4e37-87a3-55e1cd86083b" class="outline-3">
+<h3 id="h:056691c3-2a29-4e37-87a3-55e1cd86083b"><a href="#h:056691c3-2a29-4e37-87a3-55e1cd86083b">tmux基本结构</a></h3>
+<div class="outline-text-3" id="text-h:056691c3-2a29-4e37-87a3-55e1cd86083b">
+
+<figure id="orgfcefc97">
+<img style="aspect-ratio:820/276" decoding="async" loading="lazy" src="./images/image-20210215172815264.webp" alt="image-20210215172815264.webp" width="50%"><br>
+
+</figure>
+
+<ul class="org-ul">
+<li><p>
+Session 会话<br>
+</p>
+
+<p>
+输入tmux命令，就会自动新建一个会话。这个会话默认有一个Window（也即窗<br>
+口）。Tmux中可以拥有多个会话，多个会话之间可以来回无缝切换。<br>
+</p></li>
+
+<li><p>
+Window 窗口<br>
+</p>
+
+<p>
+一个 Session 中，可以开启多个 window。这些 window 同属一个Session，<br>
+并由其管理。<br>
+</p></li>
+
+<li><p>
+Panel 窗格(面板)<br>
+</p>
+
+<p>
+Panel是比 Window 更小的界面元素。由 window分割出来的单位就叫做 Panel。<br>
+在同一个 window 中，通过控制光标在分割出的Panel 中随意移动用来选定当<br>
+前激活状态的 Panel。<br>
+</p></li>
+</ul>
+
+<p>
+三者之间的关系是：Session -&gt; Window -&gt; Panel<br>
+</p>
+
+<p>
+<b>启动与退出</b><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">tmux <span class="org-comment-delimiter"># </span><span class="org-comment">&#36755;&#20837;tmux&#21629;&#20196;&#65292;&#23601;&#36827;&#20837;&#20102; Tmux &#31383;&#21475;&#12290;
+</span><span class="org-keyword">exit</span> <span class="org-comment-delimiter"># </span><span class="org-comment">&#36755;&#20837;exit&#21629;&#20196;&#65292;&#23601;&#21487;&#20197;&#36864;&#20986; Tmux &#31383;&#21475;&#12290;&#21363;&#26432;&#27515;&#20250;&#35805;</span>
+</pre>
+</div>
+
+<p>
+<b>前缀键、命令模式</b><br>
+</p>
+
+<ul class="org-ul">
+<li>在窗口中，默认的前缀键prefix是Ctrl+b，即先按下Ctrl+b，快捷键才会生效。<br></li>
+<li>在窗口中，ctrl+b输入:冒号进入命令模式，类似vim中的扩展模式<br></li>
+</ul>
+
+<p>
+帮助命令的快捷键: Ctrl+b ? 按下 ESC 键或q键<br>
+</p>
+</div>
+</div>
+<div id="outline-container-h:966c40df-049c-4996-a34a-ba8ad3cd1194" class="outline-3">
+<h3 id="h:966c40df-049c-4996-a34a-ba8ad3cd1194"><a href="#h:966c40df-049c-4996-a34a-ba8ad3cd1194">会话管理</a></h3>
+<div class="outline-text-3" id="text-h:966c40df-049c-4996-a34a-ba8ad3cd1194">
+<p>
+<b>常用命令</b><br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">tmux new &#21019;&#24314;&#40664;&#35748;&#21517;&#31216;&#30340;&#20250;&#35805;&#65288;&#22312;tmux&#21629;&#20196;&#27169;&#24335;&#20351;&#29992;new&#21629;&#20196;&#21487;&#23454;&#29616;&#21516;&#26679;&#30340;&#21151;&#33021;&#65292;&#20854;&#20182;&#21629;&#20196;&#21516;&#29702;&#65292;&#21518;&#25991;&#19981;&#20877;&#21015;&#20986;tmux&#32456;&#31471;&#21629;&#20196;&#65289;
+tmux [new -s &#20250;&#35805;&#21517; -n &#31383;&#21475;&#21517;] <span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#20250;&#35805;
+</span>tmux ls <span class="org-comment-delimiter"># </span><span class="org-comment">&#26174;&#31034;&#20250;&#35805;&#21015;&#34920;
+</span>tmux a  <span class="org-comment-delimiter"># </span><span class="org-comment">&#36830;&#25509;&#19978;&#19968;&#20010;&#20250;&#35805; attach-session&#21487;&#32553;&#20889;&#20026;attach at a
+</span>tmux a -t  &lt;&#20250;&#35805;&#21517;&#31216;|&#20250;&#35805;&#32534;&#21495;&gt; <span class="org-comment-delimiter"># </span><span class="org-comment">&#36830;&#25509;&#25351;&#23450;&#20250;&#35805;
+</span>tmux rename -t s1 s2 <span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#21629;&#21517;&#20250;&#35805;s1&#20026;s2
+</span>tmux kill-session <span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38381;&#19978;&#27425;&#25171;&#24320;&#30340;&#20250;&#35805;
+</span>tmux kill-session -t s1 <span class="org-comment-delimiter">#</span><span class="org-comment">&#20851;&#38381;&#20250;&#35805;s1
+</span>tmux kill-session -a -t s1 &#65283; &#20851;&#38381;&#38500;s1&#22806;&#30340;&#25152;&#26377;&#20250;&#35805;
+tmux kill-server <span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38381;&#25152;&#26377;&#20250;&#35805;</span>
+</pre>
+</div>
+
+<p>
+<b>快捷键</b><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#24555;&#25463;&#38190;&#21069;&#32512;Ctrl+b
+</span>s  &#21015;&#20986;&#20250;&#35805;&#65292;&#20351;&#29992;&#19978;&#19979;&#26041;&#21521;&#38190;&#21487;&#36827;&#34892;&#20250;&#35805;&#20999;&#25442;&#12290;&#21516;&#26102;&#20351;&#29992;&#24038;&#21491;&#26041;&#21521;&#24314;&#21487;&#20197;&#36873;&#25321;&#31383;&#21475;&#12290;(&#25512;&#33616;)
+$  &#37325;&#21629;&#21517;&#20250;&#35805;
+d  &#20998;&#31163;&#65288;&#36864;&#20986;&#65289;&#24403;&#21069;&#20250;&#35805;
+D  &#20998;&#31163;&#65288;&#36864;&#20986;&#65289;&#25351;&#23450;&#20250;&#35805;
+(     &#20999;&#25442;&#21040;&#21069;&#19968;&#20010;&#20250;&#35805;
+)     &#20999;&#25442;&#21040;&#19979;&#19968;&#20010;&#20250;&#35805;
+L     &#20999;&#25442;&#21040;&#26368;&#36817;&#20351;&#29992;&#30340;&#20250;&#35805;
+
+~      &#21015;&#20986;&#25552;&#31034;&#20449;&#24687;&#32531;&#23384;&#65307;&#20854;&#20013;&#21253;&#21547;&#20102;&#20043;&#21069;tmux&#36820;&#22238;&#30340;&#21508;&#31181;&#25552;&#31034;&#20449;&#24687;
+Ctrl+z &#25346;&#36215;&#24403;&#21069;&#20250;&#35805;
+?     &#21629;&#20196;&#38754;&#26495;
+</pre>
+</div>
+
+<p>
+<b>命令模式</b><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">:new&lt;&#22238;&#36710;&gt;  &#21551;&#21160;&#26032;&#20250;&#35805;
+</pre>
+</div>
+
+<p>
+范例：会话开始到结束<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">1 &#26032;&#24314;&#20250;&#35805;
+</span>tmux <span class="org-comment-delimiter"># </span><span class="org-comment">&#26032;&#24314;&#19968;&#20010;&#26080;&#21517;&#31216;&#30340;&#20250;&#35805;
+</span>tmux new -s demo <span class="org-comment-delimiter"># </span><span class="org-comment">&#26032;&#24314;&#19968;&#20010;&#21517;&#31216;&#20026;demo&#30340;&#20250;&#35805;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">2 &#26029;&#24320;&#24403;&#21069;&#20250;&#35805;
+</span>tmux detach <span class="org-comment-delimiter"># </span><span class="org-comment">&#26029;&#24320;&#24403;&#21069;&#20250;&#35805;&#65292;&#20250;&#35805;&#22312;&#21518;&#21488;&#36816;&#34892;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#25110;&#32773;&#24555;&#25463;&#38190;&#32452;&#21512; Ctrl+b + d
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">2 &#36827;&#20837;&#20250;&#35805;
+</span>tmux a <span class="org-comment-delimiter"># </span><span class="org-comment">&#40664;&#35748;&#36827;&#20837;&#31532;&#19968;&#20010;&#20250;&#35805;
+</span>tmux a -t demo <span class="org-comment-delimiter"># </span><span class="org-comment">&#36827;&#20837;&#21040;&#21517;&#31216;&#20026;demo&#30340;&#20250;&#35805;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">4 &#20851;&#38381;&#20250;&#35805;
+</span>tmux kill-session -t demo <span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38381;demo&#20250;&#35805;
+</span>tmux kill-server <span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38381;&#26381;&#21153;&#22120;&#65292;&#25152;&#26377;&#30340;&#20250;&#35805;&#37117;&#23558;&#20851;&#38381;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:58ddd29b-bfaf-4314-b7f8-fd914655cb9b" class="outline-3">
+<h3 id="h:58ddd29b-bfaf-4314-b7f8-fd914655cb9b"><a href="#h:58ddd29b-bfaf-4314-b7f8-fd914655cb9b">窗口管理</a></h3>
+<div class="outline-text-3" id="text-h:58ddd29b-bfaf-4314-b7f8-fd914655cb9b">
+<p>
+在当前会话中使用<br>
+</p>
+
+<p>
+<b>快捷键</b><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#24555;&#25463;&#38190;&#21069;&#32512;Ctrl+b
+</span>c   &#21019;&#24314;&#26032;&#31383;&#21475;
+n   &#20999;&#21040;&#21518;&#19968;&#20010;&#31383;&#21475;
+p   &#20999;&#21040;&#21069;&#19968;&#20010;&#31383;&#21475;
+,   &#37325;&#21629;&#21517;&#24403;&#21069;&#31383;&#21475;
+w   &#21015;&#20986;&#24403;&#21069;&#20250;&#35805;&#25152;&#26377;&#31383;&#21475;&#12290;&#20351;&#29992;j k&#25110;&#19978;&#19979;&#26041;&#21521;&#38190;&#36873;&#25321;&#31383;&#21475;
+0~9 &#36873;&#25321;&#32534;&#21495;0~9&#23545;&#24212;&#30340;&#31383;&#21475;
+&amp;   &#20851;&#38381;&#24403;&#21069;&#31383;&#21475; &#25110; exit
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20854;&#23427;&#65306;
+</span>. &#20462;&#25913;&#24403;&#21069;&#31383;&#21475;&#32034;&#24341;&#32534;&#21495;
+<span class="org-string">' &#20999;&#25442;&#33267;&#25351;&#23450;&#32534;&#21495;&#65288;&#21487;&#22823;&#20110;9&#65289;&#30340;&#31383;&#21475;
+f   &#26597;&#25214;&#31383;&#21475;</span>
+</pre>
+</div>
+
+<p>
+<b>命令模式</b><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">swap-window -s 3 -t 1  &#20132;&#25442; 3 &#21495;&#21644; 1 &#21495;&#31383;&#21475;
+swap-window -t 1       &#20132;&#25442;&#24403;&#21069;&#21644; 1 &#21495;&#31383;&#21475;
+move-window -t 1       &#31227;&#21160;&#24403;&#21069;&#31383;&#21475;&#21040; 1 &#21495;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9cd74958-535e-4868-8bde-f50d521be480" class="outline-3">
+<h3 id="h:9cd74958-535e-4868-8bde-f50d521be480"><a href="#h:9cd74958-535e-4868-8bde-f50d521be480">窗格管理</a></h3>
+<div class="outline-text-3" id="text-h:9cd74958-535e-4868-8bde-f50d521be480">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#24555;&#25463;&#38190;&#21069;&#32512;Ctrl+b
+</span>%         &#22402;&#30452;&#20998;&#21106;
+<span class="org-string">"         &#27700;&#24179;&#20998;&#21106;
+&lt;space&gt;   &#31354;&#26684;&#38190; - &#20999;&#25442;&#40664;&#35748;&#24067;&#23616;&#65292;&#37325;&#26032;&#25490;&#21015;&#24403;&#21069;&#31383;&#21475;&#19979;&#30340;&#25152;&#26377;&#31383;&#26684;&#65292;&#27178;&#21644;&#31446;2&#31181;&#24067;&#23616;
+&#26041;&#21521;&#38190;    &#26681;&#25454;&#26041;&#21521;&#38190;&#20999;&#25442;&#31383;&#26684;
+q         &#26174;&#31034;&#31383;&#26684;&#32534;&#21495;&#65292;&#22312;&#24207;&#21495;&#20986;&#29616;&#26399;&#38388;&#25353;&#19979;&#23545;&#24212;&#30340;&#25968;&#23383;&#65292;&#21363;&#21487;&#36339;&#36716;&#33267;&#23545;&#24212;&#30340;&#31383;&#26684;
+z         &#20999;&#25442;&#31383;&#26684;&#26368;&#22823;&#21270;/&#26368;&#23567;&#21270;&#12290;&#30028;&#38754;&#19979;&#26041;&#26174;&#31034;`*Z`&#23383;&#26679;&#34920;&#31034;&#35813;&#31383;&#26684;&#22312;&#31383;&#21475;&#20013;&#26368;&#22823;&#21270;&#12290;
+t         &#26174;&#31034;&#26102;&#38047;&#12290;&#28982;&#21518;&#25353;enter&#38190;&#21518;&#23601;&#20250;&#24674;&#22797;&#21040;shell&#32456;&#31471;&#29366;&#24577;
+x         &#20851;&#38381;&#31383;&#26684; &#25110; exit
+[      &#36827;&#20837;&#22797;&#21046;&#27169;&#24335;&#65292;&#28378;&#23631;&#26597;&#30475;&#65292;&#25903;&#25345; vim &#19978;&#19979;&#32763;&#39029;&#24555;&#25463;&#38190;&#12290;ctrl+n&#21521;&#19979; ctrl+p&#21521;&#19978;&#21516;&#26102;&#25903;&#25345;&#26041;&#21521;&#38190;&#65292;&#25353;q&#36864;&#20986;&#22797;&#21046;&#27169;&#24335;
+
+Ctrl+&#26041;&#21521;&#38190; &#20197;1&#20010;&#21333;&#20803;&#26684;&#20026;&#21333;&#20301;&#31227;&#21160;&#36793;&#32536;&#20197;&#35843;&#25972;&#24403;&#21069;&#38754;&#26495;&#22823;&#23567;
+o      &#39034;&#26102;&#38024;&#20999;&#25442;&#31383;&#26684;
+{      &#19982;&#19978;&#19968;&#20010;&#31383;&#26684;&#20132;&#25442;&#20301;&#32622;
+}      &#19982;&#19979;&#19968;&#20010;&#31383;&#26684;&#20132;&#25442;&#20301;&#32622;&#65292;&#20809;&#26631;&#36319;&#38543;&#21040;&#19979;&#19968;&#20010;&#31383;&#26684;
+; &#36873;&#25321;&#19978;&#27425;&#20351;&#29992;&#30340;&#31383;&#26684;
+Ctrl+o &#36870;&#26102;&#38024;&#26059;&#36716;&#24403;&#21069;&#31383;&#21475;&#20013;&#31383;&#26684;&#65292;&#20809;&#26631;&#20301;&#32622;&#19981;&#21160;
+!      &#23558;&#24403;&#21069;&#31383;&#26684;&#32622;&#20110;&#26032;&#31383;&#21475;
+i   &#26174;&#31034;&#24403;&#21069;&#31383;&#26684;&#20449;&#24687;</span>
+</pre>
+</div>
+
+<p>
+<b>命令模式</b><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#35843;&#25972;&#31383;&#26684;&#23610;&#23544;
+</span>: resize-pane -D          &#24403;&#21069;&#31383;&#26684;&#21521;&#19979;&#25193;&#22823; 1 &#26684;
+: resize-pane -U          &#24403;&#21069;&#31383;&#26684;&#21521;&#19978;&#25193;&#22823; 1 &#26684;
+: resize-pane -L          &#24403;&#21069;&#31383;&#26684;&#21521;&#24038;&#25193;&#22823; 1 &#26684;
+: resize-pane -R          &#24403;&#21069;&#31383;&#26684;&#21521;&#21491;&#25193;&#22823; 1 &#26684;
+: resize-pane -D 20       &#24403;&#21069;&#31383;&#26684;&#21521;&#19979;&#25193;&#22823; 20 &#26684;
+: resize-pane -t 2 -L 20  &#32534;&#21495;&#20026; 2 &#30340;&#31383;&#26684;&#21521;&#24038;&#25193;&#22823; 20 &#26684;
+: resize-pane -t 2 -U 20  &#32534;&#21495;&#20026; 2 &#30340;&#31383;&#26684;&#21521;&#19978;&#25193;&#22823; 20 &#26684;
+</pre>
+</div>
+
+<p>
+复制模式特殊说明<br>
+</p>
+
+<p>
+如果想滚动一个空格的内容可以使用复制模式。参考：<a href="https://qastack.cn/superuser/209437/how-do-i-scroll-in-tmux">https://qastack.cn/superuser/209437/how-do-i-scroll-in-tmux</a><br>
+</p>
+</div>
+</div>
+<div id="outline-container-h:92abc111-2327-48c6-8d6e-5c833fb3fab5" class="outline-3">
+<h3 id="h:92abc111-2327-48c6-8d6e-5c833fb3fab5"><a href="#h:92abc111-2327-48c6-8d6e-5c833fb3fab5">配置文件</a></h3>
+<div class="outline-text-3" id="text-h:92abc111-2327-48c6-8d6e-5c833fb3fab5">
+<div class="org-src-container">
+<pre class="src src-sh">vim ~/.tmux.conf 
+<span class="org-builtin">set</span> -g mouse on <span class="org-comment-delimiter">#</span><span class="org-comment">&#24320;&#21551;&#40736;&#26631;&#25903;&#25345;&#65292;&#26041;&#20415;&#20999;&#25442;&#28966;&#28857;&#12289;&#25913;&#21464;&#31383;&#21475;&#22823;&#23567;
+</span><span class="org-builtin">set</span> -g prefix C-s <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;C-b&#21069;&#32512;&#25442;&#25104;C-s  &#21487;&#36873;</span>
+</pre>
+</div>
+
+<p>
+使用别人的配置<br>
+</p>
+
+<p>
+<a href="https://github.com/pangliang/oh-my-tmux">https://github.com/pangliang/oh-my-tmux</a><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">https://github.com/gpakosz/.tmux
+</span><span class="org-builtin">cd</span>
+git clone https://github.com/gpakosz/.tmux.git
+ln -s -f .tmux/.tmux.conf
+cp .tmux/.tmux.conf.local .
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">https://github.com/namtzigla/oh-my-tmux</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>=&lt;prefix&gt;=意味着您必须按Ctrl+a或Ctrl+b<br></li>
+<li><code>&lt;prefix&gt; m</code> 打开或关闭鼠标模式<br></li>
+</ul>
+
+<p>
+按vim方式来行动窗口<br>
+</p>
+
+
+
+<figure id="orgde3ff0b">
+<img style="aspect-ratio:345/345" decoding="async" loading="lazy" src="./images/image-20210615132701340.webp" alt="image-20210615132701340.webp"><br>
+
+</figure>
+</div>
+<div id="outline-container-h:414b4d5a-0a93-426b-985c-904c30a56401" class="outline-4">
+<h4 id="h:414b4d5a-0a93-426b-985c-904c30a56401"><a href="#h:414b4d5a-0a93-426b-985c-904c30a56401">常用插件</a></h4>
+<div class="outline-text-4" id="text-h:414b4d5a-0a93-426b-985c-904c30a56401">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm , use prefix + I install plugins
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">List of plugins
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tpm'</span>               <span class="org-comment-delimiter">#</span><span class="org-comment">&#25554;&#20214;&#31649;&#29702;&#22120; tpm
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tmux-sensible'</span>     <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'christoomey/vim-tmux-navigator'</span> <span class="org-comment-delimiter"># </span><span class="org-comment">vim tmux&#33258;&#30001;&#20999;&#25442;
+</span>
+<span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tmux-resurrect'</span>    <span class="org-comment-delimiter"># </span><span class="org-comment">&#20445;&#23384;/&#24674;&#22797; tmux &#25171;&#24320;&#30340;&#20250;&#35805;
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tmux-continuum'</span>    <span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#21160;&#23450;&#26102;&#20445;&#23384;&#21644;&#33258;&#21160;&#24674;&#22797;&#20250;&#35805;</span>
+</pre>
+</div>
+
+<p>
+1自动保存和恢复 tmux 会话<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013; tmux &#30340;&#25554;&#20214;&#31649;&#29702;&#22120; tpm&#65292;&#26377;&#20102;&#23427;&#23433;&#35013;&#25554;&#20214;&#23601;&#20250;&#38750;&#24120;&#31616;&#21333;&#20102;
+</span>git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20043;&#21518;&#38656;&#35201;&#23433;&#35013;&#20004;&#20010;&#25554;&#20214;:</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><a href="https://github.com/tmux-plugins/tmux-resurrect">tmux-resurrect</a><br>
+保存/恢复 tmux 打开的会话<br></li>
+<li><a href="https://github.com/tmux-plugins/tmux-continuum">tmux-continum</a><br>
+自动定时保存和自动恢复会话<br></li>
+</ul>
+
+<p>
+第一个插件其实就可以了，安装完之后用 <code>prefix + Ctrl-s</code> 和 <code>prefix +
+Ctrl-r</code> 就可以保存和恢复了 (s/r 表示save和restore, 这里 tmux默认的<br>
+prefix 前缀是 ctrl+b)。<br>
+</p>
+
+<p>
+自动定时保存，只需要在你的 <code>~/.tmux.conf</code> 最下边加上如下配置就好了<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm , use prefix + I install plugins
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">List of plugins
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tpm'</span> <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">plugins
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">prefix + Ctrl-s - save;  prefix + Ctrl-r - restore.  https://github.com/tmux-plugins/tmux-resurrect
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tmux-resurrect'</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#20445;&#23384;/&#24674;&#22797; tmux &#25171;&#24320;&#30340;&#20250;&#35805;
+</span><span class="org-builtin">set</span> -g @plugin <span class="org-string">'tmux-plugins/tmux-continuum'</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#21160;&#23450;&#26102;&#20445;&#23384;&#21644;&#33258;&#21160;&#24674;&#22797;&#20250;&#35805;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">restore vim/neovim session
+</span><span class="org-builtin">set</span> -g @resurrect-strategy-vim <span class="org-string">'session'</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20445;&#23384;vim  
+</span><span class="org-builtin">set</span> -g @resurrect-strategy-nvim <span class="org-string">'session'</span>
+<span class="org-builtin">set</span> -g @continuum-restore <span class="org-string">'on'</span>
+<span class="org-builtin">set</span> -g @resurrect-capture-pane-contents <span class="org-string">'on'</span> <span class="org-comment-delimiter">#</span><span class="org-comment">&#25429;&#33719;&#31383;&#21475;&#20869;&#23481;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
+</span>run <span class="org-string">'~/.tmux/plugins/tpm/tpm'</span>
+</pre>
+</div>
+
+<p>
+之后重新加载一下你的 tmux 配置执行 <code>tmux source ~/.tmux.conf</code> 就可以了。<br>
+tpm 安装插件的方式是 <code>prefix+I=， 就是在你的 tmux 里使用 =ctrl+b+I</code> 就<br>
+可以自动安装插件了。<br>
+</p>
+
+<p>
+范例：恢复会话<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26432;&#27515;&#25152;&#26377;&#20250;&#35805;
+</span>tmux kill-server&#12288;&#12288;# &#20851;&#38381;&#25152;&#26377;&#20250;&#35805;
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24674;&#22797;
+</span>tmux  <span class="org-comment-delimiter">#</span><span class="org-comment">&#33258;&#21160;&#24674;&#22797;</span>
+</pre>
+</div>
+
+<p>
+tmux-resurrect参考：<a href="https://zhuanlan.zhihu.com/p/259640277">https://zhuanlan.zhihu.com/p/259640277</a><br>
+</p>
+
+<p>
+其它优秀博文：<a href="https://kuops.com/2020/03/22/tmux-quick-start/">https://kuops.com/2020/03/22/tmux-quick-start/</a><br>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:486ad1b0-b460-4192-9ac7-9ebe914966fa" class="outline-3">
+<h3 id="h:486ad1b0-b460-4192-9ac7-9ebe914966fa"><a href="#h:486ad1b0-b460-4192-9ac7-9ebe914966fa">常用操作</a></h3>
+<div class="outline-text-3" id="text-h:486ad1b0-b460-4192-9ac7-9ebe914966fa">
+<div class="org-src-container">
+<pre class="src src-sh">tmux new -s go-demo <span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#20250;&#35805;
+</span>tmux a <span class="org-comment-delimiter"># </span><span class="org-comment">ssh &#36830;&#25509;&#26029;&#24320;&#26102;&#65292;&#23427;&#24456;&#26377;&#29992;&#65292;&#24744;&#20877;&#27425;&#30331;&#24405;&#24182;&#23581;&#35797;&#38468;&#21152;&#24744;&#25152;&#22312;&#30340;&#19978;&#19968;&#20010;&#20250;&#35805;&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#21069;&#32512;C-b
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b ?  # &#21629;&#20196;&#38754;&#26495;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#31383;&#26684;&#25805;&#20316;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b %  # &#22402;&#30452;&#20998;&#23631;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b "  # &#27700;&#24179;&#20998;&#23631;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b o  # &#39034;&#26102;&#38024;&#20999;&#25442;&#31383;&#26684;&#12290;&#21487;&#26144;&#23556;&#24555;&#25463;&#38190;C-h j k l
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b Ctrl+&#26041;&#21521;&#38190; # &#20197;1&#20010;&#21333;&#20803;&#26684;&#20026;&#21333;&#20301;&#31227;&#21160;&#36793;&#32536;&#20197;&#35843;&#25972;&#24403;&#21069;&#38754;&#26495;&#22823;&#23567;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b l # &#22312;&#26368;&#21518;&#20004;&#20010;&#31383;&#21475;&#20043;&#38388;&#20999;&#25442;&#24456;&#26377;&#29992;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#31383;&#21475;&#25805;&#20316;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b c  # &#21019;&#24314;&#26032;&#31383;&#21475;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b n  # &#20999;&#21040;&#21518;&#19968;&#20010;&#31383;&#21475;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b p  # &#20999;&#21040;&#21069;&#19968;&#20010;&#31383;&#21475;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b ,  # &#37325;&#21629;&#21517;&#24403;&#21069;&#31383;&#21475;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b w  # &#21015;&#20986;&#24403;&#21069;&#20250;&#35805;&#25152;&#26377;&#31383;&#21475;&#12290; j k&#25110;&#19978;&#19979;&#26041;&#21521;&#38190;&#36873;&#25321;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#20250;&#35805;&#25805;&#20316;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b d # &#36864;&#20986;&#24403;&#21069;&#20250;&#35805;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b s # &#21015;&#20986;&#20250;&#35805;&#65292;&#20351;&#29992;&#19978;&#19979;&#26041;&#21521;&#38190;&#21487;&#36827;&#34892;&#20250;&#35805;&#20999;&#25442;&#12290;&#21516;&#26102;&#20351;&#29992;&#24038;&#21491;&#26041;&#21521;&#24314;&#21487;&#20197;&#36873;&#25321;&#31383;&#21475;&#12290;(&#25512;&#33616;)
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">C-b $  &#37325;&#21629;&#21517;&#20250;&#35805;
+</span>tmux ls <span class="org-comment-delimiter"># </span><span class="org-comment">&#26174;&#31034;&#20250;&#35805;&#21015;&#34920;
+</span>tmux a -t go-demo <span class="org-comment-delimiter"># </span><span class="org-comment">&#36827;&#20837;&#21040;&#21517;&#31216;&#20026;go-demo&#30340;&#20250;&#35805;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#39640;&#32423;&#29992;&#27861;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;.tmux.conf
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">1. &#22312;&#26641;&#35270;&#22270;&#20013;&#26174;&#31034;&#25152;&#26377; tmux &#20250;&#35805;/&#31383;&#21475;&#24182;&#36339;&#36716;&#21040;&#20219;&#24847;&#31383;&#21475;
+</span>vim ~/.tmux.conf
+unbind t
+bind t choose-tree
+&#25353;C-b t&#26174;&#31034;&#31383;&#21475;&#26641;
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:3f2fc70d-d8b0-40e9-ae13-1d643ccb14ac" class="outline-2">
+<h2 id="h:3f2fc70d-d8b0-40e9-ae13-1d643ccb14ac"><a href="#h:3f2fc70d-d8b0-40e9-ae13-1d643ccb14ac">fish-shell终端</a></h2>
+<div class="outline-text-2" id="text-h:3f2fc70d-d8b0-40e9-ae13-1d643ccb14ac">
+<p>
+<a href="https://fishshell.com/">https://fishshell.com/</a><br>
+</p>
+
+<p>
+特点<br>
+</p>
+<ul class="org-ul">
+<li>智能补全<br></li>
+<li>语法高亮<br></li>
+<li>UI配置<br></li>
+<li>快捷键<br></li>
+</ul>
+
+<p>
+安装<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">apt install fish
+chsh -s $(<span class="org-builtin">which</span> fish)
+</pre>
+</div>
+
+<p>
+配置<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">fish <span class="org-comment-delimiter">#</span><span class="org-comment">&#36827;&#20837;fish
+</span>fish_config <span class="org-comment-delimiter">#</span><span class="org-comment">&#20986;&#24377;&#20986;web&#37197;&#32622;&#30028;&#38754;&#65292;&#37197;&#32622;&#22909;&#65292;&#22312;&#21629;&#20196;&#30028;&#38754;&#25353;&#22238;&#36710;&#23601;&#37197;&#32622;&#22909;&#20102;</span>
+</pre>
+</div>
+
+<p>
+使用<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cdh &#21629;&#20196;&#65292;&#21015;&#20986;&#36827;&#20837;&#36807;&#30340;&#30446;&#24405;&#65292;&#25353;&#32534;&#21495;&#36873;&#25321;&#36827;&#20837;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21629;&#20196;&#34892;&#24555;&#25463;&#38190;
+</span>ctlr+a/ctrl+e &#20809;&#26631;&#36801;&#31227;&#21040;&#34892;&#21069;&#25110;&#34892;&#23614;
+alt+b / alt+f &#25353;&#21333;&#35789;&#24038;&#21491;&#36801;&#31227;&#20809;&#26631;&#12290;
+ctrl+w &#21024;&#38500;&#21069;&#38754;&#19968;&#20010;&#21333;&#35789;
+alt+s &#34892;&#39318;&#21152;sudo
+ctlr+z &#25764;&#38144;&#20043;&#21069;&#30340;&#21024;&#38500;&#25805;&#20316;&#25110;alt+/&#26469;&#37325;&#20570;
+
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#29615;&#22659;&#21464;&#26356;
+</span><span class="org-builtin">set</span> EDITOR vim <span class="org-comment-delimiter">#</span><span class="org-comment">&#38543;&#20415;&#20889;&#20010;&#21629;&#20196;&#65292;&#32534;&#36753;&#21629;&#20196;&#25353;alt+e &#23601;&#21487;&#20197;&#20174;&#32534;&#36753;&#22120;&#20013;&#20462;&#25913;&#21629;&#20196;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#21487;&#20197;&#20445;&#23384;&#21040;fish&#37197;&#32622;&#25991;&#20214;&#20013; ~/.config/fish/config.fish</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:c5d99449-4d35-47e0-b3b4-6cfab3e6a1e7" class="outline-2">
+<h2 id="h:c5d99449-4d35-47e0-b3b4-6cfab3e6a1e7"><a href="#h:c5d99449-4d35-47e0-b3b4-6cfab3e6a1e7">fzf-快速的文件列表浏览</a></h2>
+<div class="outline-text-2" id="text-h:c5d99449-4d35-47e0-b3b4-6cfab3e6a1e7">
+<p>
+特点<br>
+</p>
+<ul class="org-ul">
+<li>查找文件<br></li>
+<li>列出进程名<br></li>
+<li>遍历执行过的命令<br></li>
+<li>浏览登录过的主机<br></li>
+<li>当前环境变量、别名<br></li>
+</ul>
+
+<p>
+安装<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">apt install fzf
+</pre>
+</div>
+
+<p>
+使用<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">fzf <span class="org-comment-delimiter"># </span><span class="org-comment">&#20351;&#29992;&#20851;&#38190;&#35760;&#26469;&#36807;&#28388;&#25991;&#20214;&#21517;&#65292;ctrl+k, ctrl+j&#26469;&#19978;&#19979;&#36873;&#25321;&#12290;&#19981;&#36807;&#21482;&#20250;&#36755;&#20986;&#25991;&#20214;&#21517;&#65292;&#24182;&#19981;&#20250;&#25171;&#24320;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#32467;&#21512;&#20854;&#20182;&#21629;&#20196;&#20351;&#29992;
+</span>vim $(fzf)
+fzf | xargs ls
+
+fzf --preview <span class="org-string">"cat {}"</span> <span class="org-comment-delimiter"># </span><span class="org-comment">&#39044;&#35272;&#25991;&#20214;&#12290;{}&#20195;&#34920;&#36873;&#20013;&#30340;&#25991;&#20214;&#21517;</span>
+</pre>
+</div>
+
+<p>
+集成fzf<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">bash
+</span>vim ~/.bashrc
+<span class="org-builtin">eval</span> <span class="org-string">"${fzf --bash}"</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">zsh
+</span>vim ~/.zshrc
+<span class="org-builtin">source</span> &lt;(fzf --zsh)
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">fish
+</span>vim ~/.config/fish/config.d/fzf.fish
+<span class="org-keyword">if</span> command -v fzf &gt;/dev/null
+   <span class="org-keyword">if</span> fzf --fish &gt;/dev/null
+      fzf --fish |<span class="org-builtin">source</span>
+      end
+end
+</pre>
+</div>
+
+<p>
+这里时候使用ctrl+r，fzf就会替代shell自带的命令历史搜索功能。<br>
+</p>
+
+<ul class="org-ul">
+<li>ctrl+t 列出当前目录中所有文件，可以直接回车选择，或tab键多选。如 cat 后ctrl+t<br>
+<ul class="org-ul">
+<li>或者 cat ** 按tab键<br></li>
+</ul></li>
+<li>alt+c 列出当前目录下的所有子目录<br></li>
+</ul>
+
+<p>
+补全命令**<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">ssh ** <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25152;&#26377;&#30331;&#24405;&#36807;&#30340;&#20027;&#26426;
+</span><span class="org-builtin">kill</span> ** <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#24403;&#21069;&#36827;&#31243;
+</span><span class="org-builtin">unset</span> ** <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#24403;&#21069;shell&#20013;&#25152;&#26377;&#21464;&#37327;
+</span><span class="org-builtin">unalias</span> ** <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25152;&#26377;&#21035;&#21517;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#33258;&#23450;&#20041;&#34917;&#20840;
+</span><span class="org-function-name">_fzf_comprun</span>() {
+    <span class="org-builtin">local</span> <span class="org-variable-name">command</span>=$<span class="org-variable-name">1</span>
+    shfit
+    <span class="org-keyword">case</span> <span class="org-string">"$command"</span><span class="org-keyword"> in</span>
+        <span class="org-builtin">cd</span>) fzf --preview <span class="org-string">'tree {}'</span> <span class="org-string">"$@"</span> ;;
+        *) fzf <span class="org-string">"$@"</span> ;;
+   <span class="org-keyword">esac</span>
+
+ <span class="org-comment-delimiter">##</span><span class="org-comment">&#25928;&#26524;
+</span> <span class="org-builtin">cd</span> **
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:7aa001cb-ba24-4ad2-a99e-df8e1e3fdb68" class="outline-2">
+<h2 id="h:7aa001cb-ba24-4ad2-a99e-df8e1e3fdb68"><a href="#h:7aa001cb-ba24-4ad2-a99e-df8e1e3fdb68">starship-终端美化神器</a></h2>
+<div class="outline-text-2" id="text-h:7aa001cb-ba24-4ad2-a99e-df8e1e3fdb68">
+<ul class="org-ul">
+<li>starship 下載與配置：<a href="https://starship.rs/guide/">https://starship.rs/guide/</a><br></li>
+<li>starship preset: <a href="https://starship.rs/presets/">https://starship.rs/presets/</a><br></li>
+<li>starship module: <a href="https://starship.rs/config/">https://starship.rs/config/</a><br></li>
+<li>nerdfonts: <a href="https://www.nerdfonts.com/">https://www.nerdfonts.com/</a><br></li>
+</ul>
+
+<p>
+特点<br>
+</p>
+<ul class="org-ul">
+<li>支持所有常见的shell，如bash,zsh,fish,nushell,甚至是windows中的powershell, cmd<br></li>
+</ul>
+</div>
+<div id="outline-container-h:f11d4c6a-5e2e-4195-8987-249696973773" class="outline-3">
+<h3 id="h:f11d4c6a-5e2e-4195-8987-249696973773"><a href="#h:f11d4c6a-5e2e-4195-8987-249696973773">安装</a></h3>
+<div class="outline-text-3" id="text-h:f11d4c6a-5e2e-4195-8987-249696973773">
+<ul class="org-ul">
+<li>starship 下載與配置：<a href="https://starship.rs/guide/">https://starship.rs/guide/</a><br></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">apt update
+apt install starship
+</pre>
+</div>
+
+<p>
+初始化<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">starship&#35753;&#19981;&#21516;&#30340;shell&#20849;&#29992;&#21516;&#19968;&#22871;&#37197;&#32622;&#25991;&#20214;&#65292;&#20351;&#29992;&#36890;&#29992;&#30340;&#37197;&#32622;&#26684;&#24335;.toml&#25991;&#20214;&#12290;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#24403;&#25191;&#34892;starship init bash&#26102;&#65292;&#20250;&#25226;&#37197;&#32622;&#25991;&#20214;&#36716;&#21270;&#25104;bash&#33021;&#35782;&#21035;&#30340;&#35821;&#27861;&#65292;&#20877;&#29992;eval&#20989;&#25968;&#35753;&#20854;&#29983;&#25928;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">bash
+</span>vim ~/.bashrc
+<span class="org-builtin">eval</span> <span class="org-string">"$(starship init bash)"</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">zsh
+</span>vim ~/.zshrc
+<span class="org-builtin">eval</span> <span class="org-string">"$(starship init zsh)"</span>
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#30331;&#25110;&#25191;&#34892;&#21629;&#20196;&#29983;&#25928;
+</span><span class="org-builtin">source</span> ~/.zshrc
+</pre>
+</div>
+</div>
+<div id="outline-container-h:e6fff8a1-2c22-4df4-968b-a66f9c7c7e4c" class="outline-4">
+<h4 id="h:e6fff8a1-2c22-4df4-968b-a66f9c7c7e4c"><a href="#h:e6fff8a1-2c22-4df4-968b-a66f9c7c7e4c">解决字体问题：</a></h4>
+<div class="outline-text-4" id="text-h:e6fff8a1-2c22-4df4-968b-a66f9c7c7e4c">
+<ul class="org-ul">
+<li>nerdfonts: <a href="https://www.nerdfonts.com/">https://www.nerdfonts.com/</a> 下载并安装字体<br></li>
+<li>随便下载字体，解压 <a href="https://www.nerdfonts.com/font-downloads">https://www.nerdfonts.com/font-downloads</a><br></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/0xProto.zip
+unzip -d downfonts 0xProto.zip
+<span class="org-builtin">cd</span> downfonts
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#31243;&#30340;&#35805;&#65292;&#21482;&#38656;&#23433;&#35013;&#24102;mono&#21518;&#32512;&#30340;&#23383;&#20307;&#23601;&#34892;&#20102;&#65292;mono&#23383;&#20307;&#27599;&#20010;&#23383;&#31526;&#30340;&#23485;&#24230;&#37117;&#26159;&#30456;&#21516;&#30340;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#25152;&#26377;&#29992;&#25143;&#23433;&#35013;&#65288;&#31995;&#32479;&#32423;&#23433;&#35013;&#65289;
+</span>sudo mkdir -p /usr/share/fonts/custom
+sudo cp *.ttf /usr/share/fonts/custom/
+sudo chmod 644 /usr/share/fonts/custom/*.ttf
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#31995;&#32479;&#23383;&#20307;&#32531;&#23384;
+</span>sudo fc-cache -fv
+fc-list | grep -i <span class="org-string">"0xProto"</span> <span class="org-comment-delimiter">#</span><span class="org-comment">&#39564;&#35777;&#23433;&#35013;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#25913;&#32456;&#31471;&#23383;&#20307;&#65292;&#26681;&#25454;&#19981;&#21516;&#30340;&#32456;&#31471;&#65292;&#22312;&#35774;&#32622;&#39029;&#38754;&#37324;&#25214;&#21040;&#23383;&#20307;&#36873;&#25321;&#21018;&#23433;&#35013;&#30340;mono&#23383;&#20307;&#26679;&#24335;&#21363;&#21487;
+</span>nvim . <span class="org-comment-delimiter">#</span><span class="org-comment">&#27979;&#35797;&#19968;&#19979;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#20026;&#24403;&#21069;&#29992;&#25143;&#23433;&#35013;&#23383;&#20307;
+</span>mkdir -p ~/.fonts
+cp /path/to/your/a.ttf ~/.fonts/
+fc-cache -fv
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:73525474-2fe0-4334-b62e-478244c3e5d3" class="outline-3">
+<h3 id="h:73525474-2fe0-4334-b62e-478244c3e5d3"><a href="#h:73525474-2fe0-4334-b62e-478244c3e5d3">预设</a></h3>
+<div class="outline-text-3" id="text-h:73525474-2fe0-4334-b62e-478244c3e5d3">
+<p>
+配置文件：<br>
+</p>
+<ul class="org-ul">
+<li>~/.config/starship.toml 或执行命令 starship config<br></li>
+</ul>
+
+<p>
+官方提供了很预设，我们可以直接复制代码到配置文件中<br>
+</p>
+<ul class="org-ul">
+<li>starship preset: <a href="https://starship.rs/presets/">https://starship.rs/presets/</a><br></li>
+<li>如gruvbox-rainbow, tokyo-night<br></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#25110;&#32773;&#29992;&#21629;&#20196;&#34892;&#65292;&#20063;&#26159;&#31435;&#21363;&#29983;&#25928;&#30340;
+</span>starship preset tokyo-night -o ~/.config/starship.toml
+</pre>
+</div>
+
+<p>
+配置文件编码问题<br>
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597;&#25991;&#20214;&#32534;&#30721;
+</span>file ~/.config/starship.toml
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#25991;&#20214;&#19981;&#26159; UTF-8 &#32534;&#30721;&#65292;&#21487;&#20197;&#36716;&#25442;&#23427;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#22791;&#20221;&#21407;&#25991;&#20214;
+</span>cp ~/.config/starship.toml ~/.config/starship.toml.backup
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36716;&#25442;&#32534;&#30721;&#20026; UTF-8
+</span>iconv -f &lt;&#21407;&#32534;&#30721;&gt; -t UTF-8 ~/.config/stoml.backup &gt; ~/.config/starship.toml
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#26524;&#19981;&#30830;&#23450;&#21407;&#32534;&#30721;&#65292;&#21487;&#20197;&#23581;&#35797;
+</span>iconv -f ISO-8859-1 -t UTF-8 ~/.config/starship.toml.backup &gt; ~/.config/starship.toml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:14c7401e-1542-446f-b98c-2dcecc538622" class="outline-3">
+<h3 id="h:14c7401e-1542-446f-b98c-2dcecc538622"><a href="#h:14c7401e-1542-446f-b98c-2dcecc538622">自定义</a></h3>
+<div class="outline-text-3" id="text-h:14c7401e-1542-446f-b98c-2dcecc538622">
+<p>
+format 提示符的整体布局<br>
+</p>
+<ul class="org-ul">
+<li>$directory 模块，显示目录信息。下面的[dirctory]中是具体配置内容<br></li>
+</ul>
+
+<p>
+官方支持的所有module<br>
+</p>
+<ul class="org-ul">
+<li>starship module: <a href="https://starship.rs/config/">https://starship.rs/config/</a><br></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-variable-name">format</span> = <span class="org-string">"""
+$time\
+$python\
+[&#57524; ](fg:#1d2230)\
+\n$character"""</span>
+
+[python]
+<span class="org-variable-name">symbol</span> = <span class="org-string">"sss"</span>
+
+[time]
+<span class="org-variable-name">disabled</span> = false
+<span class="org-variable-name">time_format</span> = <span class="org-string">"%R"</span> <span class="org-comment-delimiter"># </span><span class="org-comment">Hour:Minute Format
+</span><span class="org-variable-name">style</span> = <span class="org-string">"bg:#1d2230"</span>
+<span class="org-variable-name">format</span> = <span class="org-string">'[[ &#62522; $time ](fg:#a0a9cb bg:#1d2230)]($style)'</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:14138dda-6334-4fc0-acf1-f307a6444362" class="outline-2">
+<h2 id="h:14138dda-6334-4fc0-acf1-f307a6444362"><a href="#h:14138dda-6334-4fc0-acf1-f307a6444362">浏览器插件</a></h2>
+<div class="outline-text-2" id="text-h:14138dda-6334-4fc0-acf1-f307a6444362">
+</div>
+<div id="outline-container-h:401d47eb-fe3b-4c48-9765-6f3fadf220f8" class="outline-3">
+<h3 id="h:401d47eb-fe3b-4c48-9765-6f3fadf220f8"><a href="#h:401d47eb-fe3b-4c48-9765-6f3fadf220f8">vim插件</a></h3>
+<div class="outline-text-3" id="text-h:401d47eb-fe3b-4c48-9765-6f3fadf220f8">
+<ul class="org-ul">
+<li>Vimium<br></li>
+<li>surfingkeys<br></li>
+</ul>
+
+<p>
+surfingkeys，使用vim方式纯键盘操作<br>
+</p>
+
+<p>
+<a href="https://github.com/brookhong/Surfingkeys">https://github.com/brookhong/Surfingkeys</a><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">?  <span class="org-comment-delimiter"># </span><span class="org-comment">&#23637;&#31034;&#20351;&#29992;&#24110;&#21161;
+</span>gi <span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#36753;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#36873;&#25321;
+</span>jk <span class="org-comment-delimiter"># </span><span class="org-comment">&#19978;&#19979;&#28378;&#21160;
+</span>f  <span class="org-comment-delimiter"># </span><span class="org-comment">&#39640;&#20142;&#36873;&#25321;&#65292;&#25805;&#20316;
+</span>&#31354;&#26684; <span class="org-comment-delimiter"># </span><span class="org-comment">&#24555;&#36895;&#32763;&#39029;
+</span>E   <span class="org-comment-delimiter"># </span><span class="org-comment">&#36339;&#21040;&#24038;&#20391;&#26631;&#31614;&#39029;
+</span>R   <span class="org-comment-delimiter"># </span><span class="org-comment">&#36339;&#21040;&#21491;&#20391;&#26631;&#31614;&#39029;
+</span>x   <span class="org-comment-delimiter"># </span><span class="org-comment">&#20851;&#38381;&#24403;&#21069;&#26631;&#31614;&#39029;
+</span>X   <span class="org-comment-delimiter"># </span><span class="org-comment">&#24674;&#22797;&#21018;&#20851;&#38381;&#30340;&#26631;&#31614;&#39029;
+</span>T   <span class="org-comment-delimiter"># </span><span class="org-comment">&#36873;&#25321;&#26631;&#31614;&#39029;
+</span>b   <span class="org-comment-delimiter"># </span><span class="org-comment">&#25171;&#24320;&#19968;&#20010;&#25910;&#34255;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#32534;&#36753;
+</span>i   <span class="org-comment-delimiter"># </span><span class="org-comment">&#36873;&#25321;&#36755;&#20837;&#26694;&#32534;&#36753;
+</span>ctrl+i <span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#36753;&#26694;&#20013;&#36755;&#20837;
+</span>v   <span class="org-comment-delimiter"># </span><span class="org-comment">&#35270;&#22270;&#27169;&#26679;&#32534;&#36753; &#20877;&#25353;v
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#24555;&#25463;&#38190;
+</span>sg <span class="org-comment-delimiter">#</span><span class="org-comment">google&#25628;&#32034;&#65292;&#36873;&#20013;&#25991;&#26412;sg</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f1a62b35-019a-407a-a7fb-f7be9ecac2f3" class="outline-2">
+<h2 id="h:f1a62b35-019a-407a-a7fb-f7be9ecac2f3"><a href="#h:f1a62b35-019a-407a-a7fb-f7be9ecac2f3">linux环境配置</a></h2>
+<div class="outline-text-2" id="text-h:f1a62b35-019a-407a-a7fb-f7be9ecac2f3">
+<p>
+初始化步骤<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sudo apt install git
+git clone https://gitee.com/karl1864/linux
+
+mkdir ~/.config
+cp -r zshrc ~/.zshrc
+cp -r ranger ~/.config/
+ln -s ~/.tmux/.tmux.conf ~/.tmux.conf
+ln -s ~/linux/tmux.conf  ~/.tmux.conf.local
+
+sudo apt install zsh
+chsh -s /usr/bin/zsh
+
+git clone https://gitee.com/mirrors/oh-my-zsh ~/.oh-my-zsh
+git clone https://github.com/gpakosz/.tmux ~/.tmux
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#21551;shell
+</span>installzplug
+<span class="org-comment-delimiter"># </span><span class="org-comment">zpluginstall</span>
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:204ad81d-7107-49af-ac39-826cddd71d66" class="outline-2">
+<h2 id="h:204ad81d-7107-49af-ac39-826cddd71d66"><a href="#h:204ad81d-7107-49af-ac39-826cddd71d66">终端效率工具记录</a></h2>
+<div class="outline-text-2" id="text-h:204ad81d-7107-49af-ac39-826cddd71d66">
+</div>
+<div id="outline-container-h:b1b22e78-3e45-49b7-b876-fc19f007d31e" class="outline-3">
+<h3 id="h:b1b22e78-3e45-49b7-b876-fc19f007d31e"><a href="#h:b1b22e78-3e45-49b7-b876-fc19f007d31e">tldr</a></h3>
+<div class="outline-text-3" id="text-h:b1b22e78-3e45-49b7-b876-fc19f007d31e">
+<p>
+命令的使用用例<br>
+</p>
+
+<ul class="org-ul">
+<li>sudo apt install tldr<br></li>
+
+<li>tldr tldr<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:4b830aa0-8f36-43bb-96db-5dcca872f3cf" class="outline-3">
+<h3 id="h:4b830aa0-8f36-43bb-96db-5dcca872f3cf"><a href="#h:4b830aa0-8f36-43bb-96db-5dcca872f3cf">zshell</a></h3>
+<div class="outline-text-3" id="text-h:4b830aa0-8f36-43bb-96db-5dcca872f3cf">
+<ul class="org-ul">
+<li>Ctrl+R: 搜索命令历史<br></li>
+<li>Ctrl+U: 删除命令<br></li>
+<li>Ctrl+W: 删除一个词<br></li>
+<li>Ctrl+D: exit<br></li>
+<li>Ctrl+A: 回到行首<br></li>
+<li>Ctrl+E: 回到行末<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:e41d08a1-00dd-4fd8-b479-fb4d7d18471f" class="outline-3">
+<h3 id="h:e41d08a1-00dd-4fd8-b479-fb4d7d18471f"><a href="#h:e41d08a1-00dd-4fd8-b479-fb4d7d18471f">ranger</a></h3>
+<div class="outline-text-3" id="text-h:e41d08a1-00dd-4fd8-b479-fb4d7d18471f">
+<p>
+文件管理<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">sudo apt install ranger
+ra
+ra path
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2a307084-8b67-4877-9daf-29c337fa85e1" class="outline-3">
+<h3 id="h:2a307084-8b67-4877-9daf-29c337fa85e1"><a href="#h:2a307084-8b67-4877-9daf-29c337fa85e1">lazygit</a></h3>
+<div class="outline-text-3" id="text-h:2a307084-8b67-4877-9daf-29c337fa85e1">
+<p>
+<a href="https://github.com/jesseduffield/lazygit">https://github.com/jesseduffield/lazygit</a><br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; /etc/yum.repos.d/copr.repo<span class="org-sh-heredoc">
+[copr:copr.fedorainfracloud.org:atim:lazygit]
+name=Copr repo for lazygit owned by atim
+baseurl=https://download.copr.fedorainfracloud.org/results/atim/lazygit/epel-7-$basearch/
+type=rpm-md
+skip_if_unavailable=True
+gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/atim/lazygit/pubkey.gpg
+repo_gpgcheck=0
+enabled=1
+enabled_metadata=1
+EOF
+</span>
+yum install lazygit -y
+
+?&#21628;&#20986;&#24110;&#21161;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>时区选择 6 70<br></li>
+<li>sudo apt install golang<br></li>
+<li>go get github.com/jesseduffield/lazygit<br></li>
+<li>lg<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:f4894b9d-2b26-4b87-8471-7ca245beb710" class="outline-3">
+<h3 id="h:f4894b9d-2b26-4b87-8471-7ca245beb710"><a href="#h:f4894b9d-2b26-4b87-8471-7ca245beb710">tmux</a></h3>
+<div class="outline-text-3" id="text-h:f4894b9d-2b26-4b87-8471-7ca245beb710">
+<ul class="org-ul">
+<li>sudo apt install tmux<br></li>
+<li>retmux $name<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:8d89e4c8-0a62-471d-87d8-75cc0648e7a1" class="outline-3">
+<h3 id="h:8d89e4c8-0a62-471d-87d8-75cc0648e7a1"><a href="#h:8d89e4c8-0a62-471d-87d8-75cc0648e7a1">expect</a></h3>
+<div class="outline-text-3" id="text-h:8d89e4c8-0a62-471d-87d8-75cc0648e7a1">
+<ul class="org-ul">
+<li>sudo apt install expect<br></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
+</span>
+expect &lt;&lt;EOF<span class="org-sh-heredoc">
+    set timeout 3600
+    spawn $*
+    expect {
+        "Username" {
+            send "xxxuser\r";
+            exp_continue;
+        }
+        "Password" {
+            send "xxxpass\r";
+        }
+    }
+    expect eof
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9ff3b1f8-e4c0-4c94-85db-d7467ca9acce" class="outline-3">
+<h3 id="h:9ff3b1f8-e4c0-4c94-85db-d7467ca9acce"><a href="#h:9ff3b1f8-e4c0-4c94-85db-d7467ca9acce">sudo</a></h3>
+<div class="outline-text-3" id="text-h:9ff3b1f8-e4c0-4c94-85db-d7467ca9acce">
+<ul class="org-ul">
+<li>sudo vim /etc/sudoers<br></li>
+<li>luwh ALL=(ALL) NOPASSWD: ALL<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:b1d4ff90-1391-4509-819d-52721d0f3c17" class="outline-3">
+<h3 id="h:b1d4ff90-1391-4509-819d-52721d0f3c17"><a href="#h:b1d4ff90-1391-4509-819d-52721d0f3c17">glances</a></h3>
+<div class="outline-text-3" id="text-h:b1d4ff90-1391-4509-819d-52721d0f3c17">
+<ul class="org-ul">
+<li>mkdir ~/.pip<br></li>
+<li>vim ~/.pip/pip.conf<br></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-conf">[<span class="org-type">global</span>]
+<span class="org-variable-name">index-url</span> = https://pypi.tuna.tsinghua.edu.cn/simple
+[<span class="org-type">install</span>]
+<span class="org-variable-name">trusted-host</span> = https://pypi.tuna.tsinghua.edu.cn
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>sudo apt install python3-pip<br></li>
+<li>pip3 install glances<br></li>
+<li>iotop + htop<br></li>
+<li>tldr glances<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:aee372ff-3e7a-4018-b542-f3003c926301" class="outline-3">
+<h3 id="h:aee372ff-3e7a-4018-b542-f3003c926301"><a href="#h:aee372ff-3e7a-4018-b542-f3003c926301">lazydocker</a></h3>
+<div class="outline-text-3" id="text-h:aee372ff-3e7a-4018-b542-f3003c926301">
+<ul class="org-ul">
+<li>go get github.com/jesseduffield/lazydocker<br></li>
+<li>类似lazygit的docker管理工具<br></li>
+<li>我主要拿来查看当前docker状态<br></li>
+<li>github.com/jesseduffield/lazydocker<br></li>
+<li></li>
+</ul>
+
+<pre class="example" id="orgaef1018">
+docker run --rm -it -v \
+/var/run/docker.sock:/var/run/docker.sock \
+-v /yourpath:/.config/jesseduffield/lazydocker \
+lazyteam/lazydocker
+</pre>
+</div>
+<div id="outline-container-h:341330e3-b40b-475a-9a82-dac98d0b77ea" class="outline-4">
+<h4 id="h:341330e3-b40b-475a-9a82-dac98d0b77ea"><a href="#h:341330e3-b40b-475a-9a82-dac98d0b77ea">docker</a></h4>
+<div class="outline-text-4" id="text-h:341330e3-b40b-475a-9a82-dac98d0b77ea">
+<div class="org-src-container">
+<pre class="src src-sh">sudo apt install apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+
+curl -fsSL https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/gpg |
+sudo apt-key add -
+
+sudo add-apt-repository <span class="org-string">"deb [arch=amd64] https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/ $(lsb_release -cs) stable"</span>
+
+sudo apt update
+
+sudo apt install docker-ce
+sudo systemctl start docker
+sudo usermod -aG docker $(whoami)
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:21bee9e8-bf58-4ff9-9bf7-23920f86f5e2" class="outline-3">
+<h3 id="h:21bee9e8-bf58-4ff9-9bf7-23920f86f5e2"><a href="#h:21bee9e8-bf58-4ff9-9bf7-23920f86f5e2">ncdu</a></h3>
+<div class="outline-text-3" id="text-h:21bee9e8-bf58-4ff9-9bf7-23920f86f5e2">
+<ul class="org-ul">
+<li>sudo apt install ncdu<br></li>
+<li>文件大小查看器<br></li>
+<li>磁盘清理工具<br></li>
+<li>tldr ncdu<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:11980061-71dc-4b5a-93fc-b6dabfa8802f" class="outline-3">
+<h3 id="h:11980061-71dc-4b5a-93fc-b6dabfa8802f"><a href="#h:11980061-71dc-4b5a-93fc-b6dabfa8802f">tig</a></h3>
+<div class="outline-text-3" id="text-h:11980061-71dc-4b5a-93fc-b6dabfa8802f">
+<ul class="org-ul">
+<li><a href="https://github.com/jonas/tig">https://github.com/jonas/tig</a><br></li>
+<li>sudo apt install tig<br></li>
+<li>git 历史查看器<br></li>
+<li>tldr tig<br></li>
+</ul>
+
+<pre class="example" id="orga3ab9a0">
+tig --all #可以看到包括远程分支的情况
+
+常用快捷命令
+h 帮助
+t
+</pre>
+</div>
+</div>
+<div id="outline-container-h:f7cf899a-7505-41a5-bcc6-cc4ebc976e07" class="outline-3">
+<h3 id="h:f7cf899a-7505-41a5-bcc6-cc4ebc976e07"><a href="#h:f7cf899a-7505-41a5-bcc6-cc4ebc976e07">ack</a></h3>
+<div class="outline-text-3" id="text-h:f7cf899a-7505-41a5-bcc6-cc4ebc976e07">
+<ul class="org-ul">
+<li>sudo apt install ack<br></li>
+<li>tldr ack<br></li>
+
+<li>非侵入式着色器<br></li>
+</ul>
+
+<p>
+ack &#x2013;flush &#x2013;passthru &#x2013;color &#x2013;color-match="red on_yellow blink italic underline bold" $keyword<br>
+</p>
+
+<ul class="org-ul">
+<li>ack -g filename 搜索文件名<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:739629af-e240-4f53-8892-ef3a9264b4cc" class="outline-3">
+<h3 id="h:739629af-e240-4f53-8892-ef3a9264b4cc"><a href="#h:739629af-e240-4f53-8892-ef3a9264b4cc">ag</a></h3>
+<div class="outline-text-3" id="text-h:739629af-e240-4f53-8892-ef3a9264b4cc">
+<p>
+<a href="https://github.com/ggreer/the_silver_searcher">https://github.com/ggreer/the_silver_searcher</a><br>
+</p>
+
+<pre class="example" id="orgbe61b40">
+ag &gt; pt &gt; ack &gt; grep
+</pre>
+
+<ul class="org-ul">
+<li>sudo apt install silversearcher-ag<br></li>
+<li>yum install the_silver_searcher<br></li>
+<li>grep的优化版<br></li>
+<li>tldr ag<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:ec993297-2395-478e-9a79-12edfc182512" class="outline-3">
+<h3 id="h:ec993297-2395-478e-9a79-12edfc182512"><a href="#h:ec993297-2395-478e-9a79-12edfc182512">bat</a></h3>
+<div class="outline-text-3" id="text-h:ec993297-2395-478e-9a79-12edfc182512">
+<ul class="org-ul">
+<li>sudo apt install bat<br></li>
+<li>cat的高亮版<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:1a7ed35b-379e-4a30-86f3-89d93cd33dea" class="outline-3">
+<h3 id="h:1a7ed35b-379e-4a30-86f3-89d93cd33dea"><a href="#h:1a7ed35b-379e-4a30-86f3-89d93cd33dea">zenity</a></h3>
+<div class="outline-text-3" id="text-h:1a7ed35b-379e-4a30-86f3-89d93cd33dea">
+<ul class="org-ul">
+<li>sudo apt install zenity<br></li>
+<li>电脑给你发中断<br></li>
+<li>zenity &#x2013;info &#x2013;text="$1"<br></li>
+<li>zenity &#x2013;question &#x2013;text="番茄钟${total_min}分钟到了"<br>
+&#x2013;ok-label="跳过休息" &#x2013;cancel-label="休息继续"<br></li>
+<li>zenity &#x2013;question &#x2013;text="番茄钟休息完毕" &#x2013;ok-label="继续奋战"<br>
+&#x2013;cancel-label="算了算了"<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:6b675ecf-9fc1-4d42-b738-2883d47609b2" class="outline-3">
+<h3 id="h:6b675ecf-9fc1-4d42-b738-2883d47609b2"><a href="#h:6b675ecf-9fc1-4d42-b738-2883d47609b2">fzf</a></h3>
+<div class="outline-text-3" id="text-h:6b675ecf-9fc1-4d42-b738-2883d47609b2">
+<ul class="org-ul">
+<li>sudo apt install fzf<br></li>
+<li>交互式grep<br></li>
+<li>用法和grep一样<br></li>
+<li>tldr fzf<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:fdf5aef3-11b6-4daa-ba19-fc3817073057" class="outline-3">
+<h3 id="h:fdf5aef3-11b6-4daa-ba19-fc3817073057"><a href="#h:fdf5aef3-11b6-4daa-ba19-fc3817073057">shc</a></h3>
+<div class="outline-text-3" id="text-h:fdf5aef3-11b6-4daa-ba19-fc3817073057">
+<ul class="org-ul">
+<li>sudo apt install shc<br></li>
+<li>shell加密工具<br></li>
+<li>shc -f script<br></li>
+<li>shc &#x2013;help<br></li>
+<li>tldr shc<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:0867a5ab-1747-4fdc-8acc-44542fc9f83b" class="outline-3">
+<h3 id="h:0867a5ab-1747-4fdc-8acc-44542fc9f83b"><a href="#h:0867a5ab-1747-4fdc-8acc-44542fc9f83b">colorls</a></h3>
+<div class="outline-text-3" id="text-h:0867a5ab-1747-4fdc-8acc-44542fc9f83b">
+<ul class="org-ul">
+<li>gem install colorls<br></li>
+<li>华丽胡哨ls<br></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:9e72a248-c0b3-4c3d-840f-d7954c487ff8" class="outline-3">
+<h3 id="h:9e72a248-c0b3-4c3d-840f-d7954c487ff8"><a href="#h:9e72a248-c0b3-4c3d-840f-d7954c487ff8">Linux命令行多线程、断点续传下载工具</a></h3>
+<div class="outline-text-3" id="text-h:9e72a248-c0b3-4c3d-840f-d7954c487ff8">
+<p>
+线程下载<br>
+运维工作中常会在linux命令行下载外网文件或内网进行大文件传输，经常使用的文本下载工具wget、curl，今天给大家推荐支持Linux命令行多线程、断点续传下载工具axel和myget。<br>
+</p>
+
+<p>
+1 安装axel<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum -y install epel-release
+yum install axel
+</pre>
+</div>
+
+<p>
+参考选项<br>
+</p>
+
+<pre class="example" id="org3cab189">
+--max-speed=x    #限速值最高速度  
+ -s x 
+Specify maximum speed (bytes per second)
+ --num-connections=x
+ -n x #连接数
+Specify maximum number of connections
+ --output=f #下载为本地文件
+ -o f 
+Specify local output file
+ --search[=x] #搜索镜像
+ -S [x]
+Search for mirrors and download from x servers
+ --header=x
+ -H x     #添加头文件字符串
+Add header string
+ --user-agent=x #设置UA
+ -U x
+Set user agent
+ --no-proxy     #不使用代理服务器
+ -N
+Just don't use any proxy server --quiet         
+ --quiet, -q  
+No output to stdout. #静默模式，不输出到标准输出
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">axel -n 100 http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.2.2.0/ambari-2.2.2.0-centos7.tar.gz
+</pre>
+</div>
+
+<p>
+其它安装<br>
+</p>
+
+<p>
+也可以安装yum-axelget插件，默认 yum使用单线程下载，安装该插件后，会使用多线程下载。<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">yum -y install yum-axelget
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>myget 下载、安装<br></li>
+</ol>
+
+<p>
+安装<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">wget http://myget.sourceforge.net/release/myget-0.1.2.tar.gz
+tar zxf myget-0.1.2.tar.gz
+<span class="org-builtin">cd</span> myget-0.1.2
+./configure &amp;&amp; make &amp;&amp; make install
+</pre>
+</div>
+
+<p>
+选项参数<br>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">-b, --debug          Show the debug message <span class="org-comment-delimiter">#</span><span class="org-comment">&#30475;&#35843;&#35797;&#20449;&#24687;
+</span> -c, --count=num      Set the retry count to [num], no limit when <span class="org-string">"0"</span>, the default is <span class="org-string">"99"</span> <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#37325;&#35797;&#27425;&#25968;&#65292;0&#20026;&#26080;&#38480;&#65292;&#40664;&#35748;&#26159;99&#27425;&#12290;
+</span> -d, --directory=dir Set the local direcotry to [dir], the default is <span class="org-string">"."</span> <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#19979;&#36733;&#26412;&#22320;&#30446;&#24405;&#65292;&#40664;&#35748;&#26159;&#24403;&#21069;&#30446;&#24405;
+</span> -f, --file=file      Rename the file to [file] <span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21629;&#21517;&#19979;&#36733;&#21040;&#26412;&#22320;&#30340;&#25991;&#20214;&#21517;
+</span> -h, --help           A brief summary of all the options <span class="org-comment-delimiter">#</span><span class="org-comment">&#31616;&#30701;&#30340;&#24110;&#21161;&#25688;&#35201;
+</span> -i, --interval=num   Set the ftp retry interval to [num] seconds, the default is <span class="org-string">"5"</span> <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;ftp&#37325;&#35797;&#38388;&#38548;&#65292;&#21333;&#20301;s&#65292;&#40664;&#35748;5&#31186;
+</span> -n, --number=num     Use [num] connections instead of the default (4) <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#36830;&#25509;&#25968;&#65292;&#40664;&#35748;4
+</span> -r, --referer=URL    Include <span class="org-sh-quoted-exec">`Referer: [URL]' header in HTTP request. #&#21253;&#21547;&#35831;&#27714;&#22836; Referer
+ -t, --timeout=num    Set the connection timeout to [num] seconds, the default is "30" #&#35774;&#32622;&#36830;&#25509;&#36229;&#26102;&#26102;&#38388;&#65292;&#40664;&#35748;30&#31186;
+ -v, --version        Show the version of the myget and exit #&#26597;&#30475;&#29256;&#26412;&#20449;&#24687;
+ -x, --proxy=URL      Set the proxy [URL]  #&#35774;&#32622;&#20195;&#29702;</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">mytget -n 10 http://url/iso/Centos/x86_64/CentOS-6.4-x86_64-bin-DVD1.iso  
+Begin to download: CentOS-6.4-x86_64-bin-DVD1.iso
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>断点续传<br></li>
+</ol>
+
+<p>
+三个工具都支持，但wget需要增加-c参数，axel、myget再次执行命令即可。<br>
+</p>
+
+<p>
+综上对比推荐大家工作中使用axel或myget提高效率，个人比较喜欢axel。<br>
+</p>
+
+<p>
+注意内网传输根据隧道带宽进行限速，别影响线上生产服务数据传输。<br>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:b8c704cb-cd7c-489a-bd21-4e991d3cf1b3" class="outline-2">
+<h2 id="h:b8c704cb-cd7c-489a-bd21-4e991d3cf1b3"><a href="#h:b8c704cb-cd7c-489a-bd21-4e991d3cf1b3">其他</a></h2>
+<div class="outline-text-2" id="text-h:b8c704cb-cd7c-489a-bd21-4e991d3cf1b3">
+<ul class="org-ul">
+<li>linux终端使用心得<br></li>
+</ul>
+<p>
+包括bash，tmux，fzf，zoxide，ssh等工具。<br>
+<a href="http://luajit.io/post/my-shell-tips/">http://luajit.io/post/my-shell-tips/</a><br>
+</p>
+
+<ul class="org-ul">
+<li>vim极简主义<br></li>
+</ul>
+<p>
+使用vim自带的功能，大部分情况下都够用了，除非你不知道有这样的内置功能。极简主义，能使得你将精力关注在代码本身而非工具上面。<br>
+<a href="http://luajit.io/post/2022/vim-minimalist/">http://luajit.io/post/2022/vim-minimalist/</a><br>
+</p>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 应用程序性能监控工具-SkyWalking</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="官方网站：https://skywalking.apache.org/" />
+<link rel="canonical" href="https://xuchangwei.com/linux/middleware-config/skywalking.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: 应用程序性能监控工具-SkyWalking" />
+<meta property="og:description" content="官方网站：https://skywalking.apache.org/" />
+<meta property="og:url" content="https://xuchangwei.com/linux/middleware-config/skywalking.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/middleware-config/skywalking.html","@type":"WebPage","name":"Linux: 应用程序性能监控工具-SkyWalking","description":"官方网站：https://skywalking.apache.org/"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 应用程序性能监控工具-SkyWalking</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:b52323f4-8bac-4fdb-b7d0-f4a736504f14">安装</a>
+<ul>
+<li><a href="#h:cc9b98b2-07c9-48ba-b8b5-a3d49d4b6f17">docker-compose 安装 skywalking</a></li>
+<li><a href="#h:0c3a0d8e-7365-4e1f-9589-36299a5d1856">k8s 安装</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Middleware</a></li>
+</ul>
+
+<p>
+官方网站：<a href="https://skywalking.apache.org/">https://skywalking.apache.org/</a>
+</p>
+<section id="outline-container-h:b52323f4-8bac-4fdb-b7d0-f4a736504f14" class="outline-2">
+<h2 id="h:b52323f4-8bac-4fdb-b7d0-f4a736504f14"><a href="#h:b52323f4-8bac-4fdb-b7d0-f4a736504f14">安装</a></h2>
+<div class="outline-text-2" id="text-h:b52323f4-8bac-4fdb-b7d0-f4a736504f14">
+</div>
+<div id="outline-container-h:cc9b98b2-07c9-48ba-b8b5-a3d49d4b6f17" class="outline-3">
+<h3 id="h:cc9b98b2-07c9-48ba-b8b5-a3d49d4b6f17"><a href="#h:cc9b98b2-07c9-48ba-b8b5-a3d49d4b6f17">docker-compose 安装 skywalking</a></h3>
+<div class="outline-text-3" id="text-h:cc9b98b2-07c9-48ba-b8b5-a3d49d4b6f17">
+<p>
+docker-compose 安装
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">yum install docker-compose-plugin -y
+</pre>
+</div>
+
+<p>
+创建 es 数据目录
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">mkdir /data/elasticsearch/{data,logs}
+
+docker run --rm elasticsearch:7.17.5 id elasticsearch
+<span class="org-variable-name">uid</span>=1000(elasticsearch) <span class="org-variable-name">gid</span>=1000(elasticsearch) <span class="org-variable-name">groups</span>=1000(elasticsearch),0(root)
+
+chwon -R 1000.1000 /data/elasticsearch/
+</pre>
+</div>
+
+<p>
+skywalking
+</p>
+
+<p>
+创建启动文件
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">$ cat docker-compose.yaml
+version: <span class="org-string">'3.8'</span>
+services:
+  elasticsearch:
+    image: elasticsearch:7.17.5
+    container_name: elasticsearch
+    ports:
+      - <span class="org-string">"9200:9200"</span>
+    healthcheck:
+      test: [ <span class="org-string">"CMD-SHELL"</span>, <span class="org-string">"curl --silent --fail localhost:9200/_cluster/health || exit 1"</span> ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - <span class="org-string">"ES_JAVA_OPTS=-Xms512m -Xmx512m"</span>
+      - <span class="org-variable-name">TZ</span>=Asia/Shanghai
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - /data/elasticsearch/data:/usr/share/elasticsearch/data
+      - /data/elasticsearch/logs:/usr/share/elasticsearch/logs
+
+  oap:
+    image: apache/skywalking-oap-server:9.1.0
+    container_name: oap
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    links:
+      - elasticsearch
+    ports:
+      - <span class="org-string">"11800:11800"</span>
+      - <span class="org-string">"12800:12800"</span>
+    healthcheck:
+      test: [ <span class="org-string">"CMD-SHELL"</span>, <span class="org-string">"/skywalking/bin/swctl ch"</span> ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    environment:
+      SW_STORAGE: elasticsearch
+      SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
+      SW_HEALTH_CHECKER: default
+      SW_TELEMETRY: prometheus
+      JAVA_OPTS: <span class="org-string">"-Xms2048m -Xmx2048m"</span>
+      TZ: Asia/Shanghai
+  ui:
+    image: apache/skywalking-ui:9.1.0
+    container_name: ui
+    depends_on:
+      oap:
+        condition: service_healthy
+    links:
+      - oap
+    ports:
+      - <span class="org-string">"8080:8080"</span>
+    environment:
+      SW_OAP_ADDRESS: http://oap:12800
+      TZ: Asia/Shanghai
+</pre>
+</div>
+
+
+<p>
+启动 skywalking
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">docker compose up -d
+</pre>
+</div>
+
+<p>
+nginx 配置
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"> cat qa-skywalking.conf
+server {
+    listen 80;
+    listen 443 ssl http2;
+
+    server_name qa-apm.xxx.com;
+
+    ssl_certificate      ssl/xxx.pem;
+    ssl_certificate_key  ssl/xxx.key;
+    ssl_protocols        TLSv1 TLSv1.1 TLSv1.2;
+    ssl_ciphers          HIGH:!aNULL:!MD5:!DH;
+
+    <span class="org-keyword">if</span> ( $<span class="org-variable-name">scheme</span> = <span class="org-string">'http'</span> ) {
+        <span class="org-keyword">return</span> 302 https://$<span class="org-variable-name">server_name</span>$<span class="org-variable-name">request_uri</span>;
+    }
+
+    location / {
+      proxy_set_header Host $<span class="org-variable-name">Host</span>;
+      proxy_set_header X-Real-IP $<span class="org-variable-name">remote_addr</span>;
+      proxy_set_header X-Real-PORT $<span class="org-variable-name">remote_port</span>;
+      proxy_set_header X-Forwarded-For $<span class="org-variable-name">proxy_add_x_forwarded_for</span>;
+      proxy_set_header X-Forwarded-Proto <span class="org-string">"https"</span>;
+      proxy_pass http://172.17.16.32:8080;
+    }
+
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:0c3a0d8e-7365-4e1f-9589-36299a5d1856" class="outline-3">
+<h3 id="h:0c3a0d8e-7365-4e1f-9589-36299a5d1856"><a href="#h:0c3a0d8e-7365-4e1f-9589-36299a5d1856">k8s 安装</a></h3>
+<div class="outline-text-3" id="text-h:0c3a0d8e-7365-4e1f-9589-36299a5d1856">
+<p>
+添加 Helm 仓库
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">export</span> <span class="org-variable-name">REPO</span>=skywalking
+helm repo add ${<span class="org-variable-name">REPO</span>} https://apache.jfrog.io/artifactory/skywalking-helm  
+</pre>
+</div>
+
+<p>
+配置变量
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">oap:
+  image:
+    tag: 8.7.0-es7      <span class="org-comment-delimiter"># </span><span class="org-comment">Set the right tag according to the existing Elasticsearch version
+</span>  storageType: elasticsearch7
+  env:
+    SW_NAMESPACE: <span class="org-string">"skywalking-prod"</span>
+    SW_STORAGE_ES_FLUSH_INTERVAL: 30
+    SW_STORAGE_ES_QUERY_MAX_SIZE: 10000
+    SW_STORAGE_ES_BULK_ACTIONS: 4000
+    <span class="org-comment-delimiter"># </span><span class="org-comment">SW_STORAGE_ES_ADVANCED: '"{\"index.lifecycle.name\":\"skywalking-prod-policy\"}"'
+</span>  nodeSelector:
+    eks.amazonaws.com/nodegroup: AGT-PFGC-EKS-NewRummy-SC
+  resources:
+    limits:
+      cpu: 2
+      memory: 8Gi
+    requests:
+      cpu: 1
+      memory: 8Gi
+
+ui:
+  image:
+    tag: 8.7.0
+
+elasticsearch:
+  enabled: false
+  config:               <span class="org-comment-delimiter"># </span><span class="org-comment">For users of an existing elasticsearch cluster,takes effect when `elasticsearch.enabled` is false
+</span>    host: PFGC-Devops-Internal-NLB-3f391eabefdedb68.elb.ap-south-1.amazonaws.com
+    port:
+      http: 9200
+</pre>
+</div>
+
+<p>
+安装服务
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm --create-namespace skywalking -n skywalking install skywalking -f values-my-es2.yaml
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#26381;&#21153;
+</span>helm --create-namespace skywalking -n skywalking install skywalking -f values-my-es2.yaml
+</pre>
+</div>
+
+
+<p>
+参考：<a href="https://www.linuxea.com/2908.html">https://www.linuxea.com/2908.html</a>
+</p>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

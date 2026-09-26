@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>归档：按标签浏览与搜索</title>
+<meta name="description" content="按标签浏览全站文章，支持标题的即时搜索。 关于 Jasper Hsu 和 xuchangwei.com：一个用 Emacs Org-mode 搭建的个人技术博客，记录 Linux 运维、Kubernetes、编程语言与 Emacs 的学习笔记。" />
+<meta name="keywords" content="归档, 标签, 搜索, Jasper, xuchangwei" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/archives.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="归档：按标签浏览与搜索" />
+<meta property="og:description" content="按标签浏览全站文章，支持标题的即时搜索。 关于 Jasper Hsu 和 xuchangwei.com：一个用 Emacs Org-mode 搭建的个人技术博客，记录 Linux 运维、Kubernetes、编程语言与 Emacs 的学习笔记。" />
+<meta property="og:url" content="https://xuchangwei.com/archives.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/archives.html","@type":"WebPage","name":"归档：按标签浏览与搜索","description":"按标签浏览全站文章，支持标题的即时搜索。 关于 Jasper Hsu 和 xuchangwei.com：一个用 Emacs Org-mode 搭建的个人技术博客，记录 Linux 运维、Kubernetes、编程语言与 Emacs 的学习笔记。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<p>
+Email: <a href="mailto:xcwhome@163.com">点我</a> (给我发邮件)
+</p>
+
+<hr />
+
+<div class="archive">
+  <div class="archive-controls">
+    <input type="search" id="archive-q" class="form-control archive-search"
+           placeholder="搜索标题…" autocomplete="off" aria-label="搜索文章">
+    <div class="archive-summary">
+      <span id="archive-count">加载中…</span>
+      <button type="button" id="archive-clear" class="archive-clear" hidden>清除筛选</button>
+    </div>
+  </div>
+
+  <div class="archive-facet">
+    <div id="archive-tags" class="archive-chips"></div>
+  </div>
+
+  <ul id="archive-list" class="archive-list"></ul>
+  <p id="archive-empty" class="archive-empty" hidden>没有匹配的文章。</p>
+</div>
+
+<script>
+(function () {
+  var UNTAGGED = 'Untagged';   // 与 build-site.el 的 my/untagged-label 保持一致
+  var idx = [];
+  var selTag = null;
+  var qEl     = document.getElementById('archive-q');
+  var listEl  = document.getElementById('archive-list');
+  var countEl = document.getElementById('archive-count');
+  var emptyEl = document.getElementById('archive-empty');
+  var clearEl = document.getElementById('archive-clear');
+  var tagsEl  = document.getElementById('archive-tags');
+
+  function tally() {
+    var m = Object.create(null);
+    idx.forEach(function (it) {
+      (it.g || []).forEach(function (v) { m[v] = (m[v] || 0) + 1; });
+    });
+    return Object.keys(m)
+      .map(function (k) { return { name: k, n: m[k] }; })
+      .sort(function (a, b) {
+        // Untagged 固定排最后，不参与按数量排序 —— 它不是一个真主题
+        if (a.name === UNTAGGED) return 1;
+        if (b.name === UNTAGGED) return -1;
+        return b.n - a.n || a.name.localeCompare(b.name);
+      });
+  }
+
+  function renderTags(items) {
+    tagsEl.textContent = '';
+    items.forEach(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'archive-chip';
+      b.dataset.name = it.name;
+      b.textContent = it.name;
+      var c = document.createElement('span');
+      c.className = 'archive-chip-n';
+      c.textContent = it.n;
+      b.appendChild(c);
+      tagsEl.appendChild(b);
+    });
+  }
+
+  // 只搜标题。
+  //
+  // 曾经把描述也纳入搜索，结果是搜 "linux" 会命中 "Safe: 07-风险评估"
+  // 这类正文里顺带提过 Linux 的文章 —— 噪音太大。标题才是可预期的信号。
+  // 分类筛选交给标签，不靠搜索。
+  function matches(it, q) {
+    if (selTag && (it.g || []).indexOf(selTag) === -1) return false;
+    if (!q) return true;
+    var title = it.t.toLowerCase();
+    // 按空格拆词、每个词都要在标题里出现，这样 "linux pandoc" 也能命中
+    // "Linux: Pandoc文件转换器"，不受词序和中间字符影响
+    return q.split(/\s+/).every(function (w) { return title.indexOf(w) !== -1; });
+  }
+
+  function render() {
+    var q = qEl.value.trim().toLowerCase();
+    // 索引本身已按日期倒序，不再额外排序
+    var hits = idx.filter(function (it) { return matches(it, q); });
+
+    listEl.textContent = '';
+    hits.forEach(function (it) {
+      var li = document.createElement('li');
+      li.className = 'archive-item';
+
+      var t = document.createElement('time');
+      t.className = 'archive-date';
+      t.textContent = it.d || '';
+      li.appendChild(t);
+
+      var a = document.createElement('a');
+      a.href = '/' + it.u;
+      a.textContent = it.t;
+      li.appendChild(a);
+
+      (it.g || []).forEach(function (g) {
+        var s = document.createElement('span');
+        s.className = 'archive-badge';
+        s.textContent = g;
+        li.appendChild(s);
+      });
+      listEl.appendChild(li);
+    });
+
+    countEl.textContent = hits.length + ' / ' + idx.length + ' 篇';
+    emptyEl.hidden = hits.length !== 0;
+    clearEl.hidden = !(q || selTag);
+
+    document.querySelectorAll('.archive-chip').forEach(function (b) {
+      b.classList.toggle('is-on', b.dataset.name === selTag);
+    });
+  }
+
+  tagsEl.addEventListener('click', function (e) {
+    var b = e.target.closest('.archive-chip');
+    if (!b) return;
+    // 再点一次同一个标签即取消筛选
+    selTag = (selTag === b.dataset.name) ? null : b.dataset.name;
+    render();
+  });
+
+  qEl.addEventListener('input', render);
+  clearEl.addEventListener('click', function () {
+    qEl.value = ''; selTag = null; render();
+  });
+
+  fetch('/search-index.json')
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      idx = data;
+      renderTags(tally());
+      render();
+    })
+    .catch(function (err) {
+      countEl.textContent = '索引加载失败：' + err.message;
+      console.error('search-index.json 加载失败', err);
+    });
+})();
+</script>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

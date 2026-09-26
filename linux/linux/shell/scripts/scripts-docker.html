@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-docker</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="docker-jvm-check · docker镜像清理 · TAGS: Script · 该指令默认会清除所有如下资源： 已停止的容器（container） · 未被任何容器所使用的卷（volume） · 未被任何容器所关联的网络（network）" />
+<link rel="canonical" href="https://xuchangwei.com/linux/linux/shell/scripts/scripts-docker.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="scripts-docker" />
+<meta property="og:description" content="docker-jvm-check · docker镜像清理 · TAGS: Script · 该指令默认会清除所有如下资源： 已停止的容器（container） · 未被任何容器所使用的卷（volume） · 未被任何容器所关联的网络（network）" />
+<meta property="og:url" content="https://xuchangwei.com/linux/linux/shell/scripts/scripts-docker.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/linux/shell/scripts/scripts-docker.html","@type":"WebPage","name":"scripts-docker","description":"docker-jvm-check · docker镜像清理 · TAGS: Script · 该指令默认会清除所有如下资源： 已停止的容器（container） · 未被任何容器所使用的卷（volume） · 未被任何容器所关联的网络（network）"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-docker</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org551e8fa">docker-jvm-check</a></li>
+<li><a href="#org0dac75d">docker镜像清理</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-org551e8fa" class="outline-2">
+<h2 id="org551e8fa"><a href="#org551e8fa">docker-jvm-check</a></h2>
+<div class="outline-text-2" id="text-org551e8fa">
+<div class="org-src-container">
+<pre class="src src-sh">[root@mesos-capacity-9 sh]# cat  docker_jvm_check.sh
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">check xypayget jvm
+</span><span class="org-keyword">function</span> <span class="org-function-name">check_jvm</span>() {
+  <span class="org-builtin">local</span> <span class="org-variable-name">docker_id</span>=$<span class="org-variable-name">1</span>
+  <span class="org-builtin">local</span> <span class="org-variable-name">docker_jname</span>=$<span class="org-variable-name">2</span>
+  <span class="org-builtin">local</span> <span class="org-variable-name">docker_jpid</span>=$(docker exec ${<span class="org-variable-name">docker_id</span>} ps -ef|grep ${<span class="org-variable-name">docker_jname</span>}|awk <span class="org-string">'{print $2}'</span>)
+  <span class="org-builtin">local</span> <span class="org-variable-name">jlog_dir</span>=${<span class="org-variable-name">docker_jvm_log</span>}/${<span class="org-variable-name">docker_id</span>}
+  mkdir -pv $<span class="org-variable-name">jlog_dir</span>
+  <span class="org-keyword">if</span>  [[ $(docker exec ${<span class="org-variable-name">docker_id</span>} ps -ef|grep $<span class="org-variable-name">docker_jpid</span>|grep jstat |wc -l) <span class="org-negation-char">!</span>= 1 ]] ; <span class="org-keyword">then</span>
+      docker exec ${<span class="org-variable-name">docker_id</span>} killall jstat
+      nohup docker exec ${<span class="org-variable-name">docker_id</span>} /usr/java/jdk1.8.0_181/bin/jstat -gc -h 20 -t  ${<span class="org-variable-name">docker_jpid</span>} 1000 &gt;&gt; $<span class="org-variable-name">jlog_dir</span>/jvm_${<span class="org-variable-name">docker_jname</span>}.log &amp;
+  <span class="org-keyword">fi</span>
+}
+
+<span class="org-variable-name">docker_name</span>=xypaygate
+<span class="org-variable-name">jname</span>=gc_xypaygate_yzprod
+<span class="org-variable-name">docker_jvm_log</span>=/data/check_docker_jvm
+
+<span class="org-keyword">for</span> did<span class="org-keyword"> in</span> $(docker ps |grep $<span class="org-variable-name">docker_name</span> |awk <span class="org-string">'{print $1}'</span>); <span class="org-keyword">do</span>
+  check_jvm $<span class="org-variable-name">did</span> $<span class="org-variable-name">jname</span>
+<span class="org-keyword">done</span>
+
+
+[root@mesos-capacity-9 sh]# tail  /data/check_docker_jvm/700679dc04c3/jvm_gc_xypaygate_yzprod.log
+       419284.6 32768.0 32768.0 1901.9  0.0   196608.0 92652.1  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419285.6 32768.0 32768.0 1901.9  0.0   196608.0 95269.8  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419286.6 32768.0 32768.0 1901.9  0.0   196608.0 96592.1  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419287.6 32768.0 32768.0 1901.9  0.0   196608.0 96932.8  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419288.6 32768.0 32768.0 1901.9  0.0   196608.0 97033.6  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419289.6 32768.0 32768.0 1901.9  0.0   196608.0 97602.1  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419290.6 32768.0 32768.0 1901.9  0.0   196608.0 97962.2  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+       419291.6 32768.0 32768.0 1901.9  0.0   196608.0 98063.4  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+Timestamp        S0C    S1C    S0U    S1U      EC       EU        OC         OU       MC     MU    CCSC   CCSU   YGC     YGCT    FGC    FGCT     GCT
+       419292.4 32768.0 32768.0 1901.9  0.0   196608.0 98130.9  1835008.0   867524.9  102144.0 97619.1 11520.0 10748.6  40438  301.337   6      1.396  302.733
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-org0dac75d" class="outline-2">
+<h2 id="org0dac75d"><a href="#org0dac75d">docker镜像清理</a></h2>
+<div class="outline-text-2" id="text-org0dac75d">
+<p>
+自动清理命令
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">docker system prune -a
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>该指令默认会清除所有如下资源：
+<ul class="org-ul">
+<li>已停止的容器（container）</li>
+<li>未被任何容器所使用的卷（volume）</li>
+<li>未被任何容器所关联的网络（network）</li>
+<li>所有悬空镜像（image）。</li>
+</ul></li>
+<li>该指令默认只会清除悬空镜像，未被使用的镜像不会被删除。</li>
+<li>添加  -a 或 &#x2013;all  参数后，可以一并清除所有未使用的镜像和悬空镜像。</li>
+<li>可以添加  -f 或 &#x2013;force  参数用以忽略相关告警确认信息。</li>
+<li>指令结尾处会显示总计清理释放的空间大小。</li>
+</ul>
+
+<p>
+清理脚本
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt;&gt;/var/spool/cron/root<span class="org-sh-heredoc">
+# &#28165;&#29702;&#26412;&#22320;&#23481;&#22120;&#38236;&#20687;
+0 2 * * * bash /data/ops/clean_docker_img.sh
+EOF
+</span>
+mkdir /data/ops -p
+cat   &lt;&lt;\EOF&gt; /data/ops/clean_docker_img.sh<span class="org-sh-heredoc">
+#!/bin/bash
+# &#21024;&#38500;&#25152;&#26377;&#24748;&#31354;&#38236;&#20687;
+images=$(docker images -f "dangling=true" -q)
+[ -z "$images" ] || docker rmi -f $images
+# &#21024;&#38500;&#25152;&#26377;&#26410;&#34987;&#20219;&#20309;&#23481;&#22120;&#20851;&#32852;&#24341;&#29992;&#30340;&#21367;&#65306;
+images=$(docker volume ls -qf dangling=true)
+[ -z "$images" ] || docker volume rm $images
+# &#21024;&#38500;&#25152;&#26377;&#24050;&#36864;&#20986;&#30340;&#23481;&#22120;
+images=$(docker ps -aq -f status=exited)
+[ -z "$images" ] || docker rm -v $images
+# &#21024;&#38500;&#25152;&#26377;&#29366;&#24577;&#20026; dead &#30340;&#23481;&#22120;
+images=$(docker ps -aq -f status=dead)
+[ -z "$images" ] || docker rm -v $images
+# &#21024;&#38500;&#25351;&#23450;&#38236;&#20687;
+images=`docker images | egrep "10.0.1.84|english-qa|chinese-qa|chinese-new-qa" | awk '{print $3}'`
+echo $images
+[ -z "$images" ] || docker rmi -f $images
+EOF</span>
+</pre>
+</div>
+
+<p>
+脚本2
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker_image_rm.sh<span class="org-sh-heredoc">
+
+#!/bin/bash
+# this script requires bash version 4
+
+#delete all stopped containers
+docker rm $(docker ps -f status=exited -q)
+
+
+# get list of (tagged) images that are used by running containers
+declare -A usedimages
+for i in $(docker ps | awk '{ print $2; }' | grep -v "^ID$") ; do ID=$(docker inspect  --format="{{.Id}}" $i) ; usedimages[$ID]=$i ; done
+
+for i in "${!usedimages[@]}"
+do
+  echo "key  : $i"
+  echo "value: ${usedimages[$i]}"
+done
+          
+         
+# delete all unused (tagged) images
+for i in $(docker images --no-trunc -q | sort -u)
+  do    
+  if [[ ${usedimages[$i]}x != "x" ]] ; then
+    echo "image is used: $i"
+    echo "by ${usedimages[$i]}"
+  else
+    if [[ $(docker ps -a | grep "registrator"| grep -v grep | awk '{print $1}')X == $i"X" ]] ; then
+       continue
+    fi
+    echo "image is not used: $i"
+  #  docker rmi $i
+    spark=$(echo $i | grep spark)
+    if [[ "$spark" != "" ]]; then
+      echo "spark iamges: $1"
+    else
+      docker rmi $i
+    fi
+  fi
+done
+EOF</span>
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

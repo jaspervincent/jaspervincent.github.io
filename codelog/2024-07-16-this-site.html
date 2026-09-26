@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Emacs: 使用org-mode制作网站</title>
+<meta name="description" content="使用 ox-publish 导出我的网站。 如果你折腾过各种建站方式，一定少不了这个。本文介绍一种org-mode自带的网页导出器来生成网站，希望你感觉兴趣！" />
+<meta name="keywords" content="计算机, 博客, Codelog" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/codelog/2024-07-16-this-site.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Emacs: 使用org-mode制作网站" />
+<meta property="og:description" content="使用 ox-publish 导出我的网站。 如果你折腾过各种建站方式，一定少不了这个。本文介绍一种org-mode自带的网页导出器来生成网站，希望你感觉兴趣！" />
+<meta property="og:url" content="https://xuchangwei.com/codelog/2024-07-16-this-site.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/codelog/2024-07-16-this-site.html","@type":"BlogPosting","headline":"Emacs: 使用org-mode制作网站","datePublished":"2024-07-16","author":{"@type":"Person","name":"Jasper Hsu"},"mainEntityOfPage":"https://xuchangwei.com/codelog/2024-07-16-this-site.html","description":"使用 ox-publish 导出我的网站。 如果你折腾过各种建站方式，一定少不了这个。本文介绍一种org-mode自带的网页导出器来生成网站，希望你感觉兴趣！"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Emacs: 使用org-mode制作网站</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:f3467ddb-5824-4571-8746-22fa8a29d767">关于这个网站</a></li>
+<li><a href="#h:24e8462d-936a-4d4d-b02c-a0da4ef887a6">网站结构</a></li>
+<li><a href="#h:a35fd5e3-6d99-413d-8c23-d96142b04dbd">提前准备</a></li>
+<li><a href="#h:7bfee72f-d1ca-4f75-976e-b91ca44d0836">build-site.el 配置</a>
+<ul>
+<li><a href="#h:f21aedf4-6c01-45de-a799-1b15ce1f0ebf">emacs 加载配置文件</a></li>
+<li><a href="#h:8a128737-c314-4ab5-968e-bd374d18d7f2">生成站点地图</a></li>
+<li><a href="#h:281ace8a-a4c0-4c8e-b55b-fd29fd08c1a4">配置网页统一样式</a>
+<ul>
+<li><a href="#h:d212ed1e-9b60-481b-8bfb-d96beac01bdf">默认配置</a></li>
+<li><a href="#h:10ecdcc8-55bd-471e-bf36-500b280884b3">自定义页面展出配置</a></li>
+</ul>
+</li>
+<li><a href="#h:68e53add-1c19-4bfb-a08e-1e882119699e">结束</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAG: <a href="../jcodelogv.html">编码</a></li>
+</ul>
+
+<div class="PREVIEW" id="orgc684b7f">
+<p>
+使用 <code>ox-publish</code> 导出我的网站。
+如果你折腾过各种建站方式，一定少不了这个。本文介绍一种org-mode自带的网页导出器来生成网站，希望你感觉兴趣！
+</p>
+
+</div>
+<section id="outline-container-h:f3467ddb-5824-4571-8746-22fa8a29d767" class="outline-2">
+<h2 id="h:f3467ddb-5824-4571-8746-22fa8a29d767"><a href="#h:f3467ddb-5824-4571-8746-22fa8a29d767">关于这个网站</a></h2>
+<div class="outline-text-2" id="text-h:f3467ddb-5824-4571-8746-22fa8a29d767">
+<p>
+org-mode 很强大，可以写作、做计划、做幻灯片、做网站。本站就是用org-mode内置的 <code>ox-publish</code> 导出器制作而成。
+</p>
+
+<p>
+以下是制作过程，希望对感兴趣的朋友有所帮助。
+</p>
+</div>
+</section>
+<section id="outline-container-h:24e8462d-936a-4d4d-b02c-a0da4ef887a6" class="outline-2">
+<h2 id="h:24e8462d-936a-4d4d-b02c-a0da4ef887a6"><a href="#h:24e8462d-936a-4d4d-b02c-a0da4ef887a6">网站结构</a></h2>
+<div class="outline-text-2" id="text-h:24e8462d-936a-4d4d-b02c-a0da4ef887a6">
+<div class="org-src-container">
+<pre class="src src-shell">.
+&#9500;&#9472;&#9472; Makefile                      <span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#35793;&#25991;&#20214;
+</span>&#9500;&#9472;&#9472; Org-mode        <span class="org-comment-delimiter"># </span><span class="org-comment">&#25991;&#31456;&#30446;&#24405;
+</span>&#9474;   &#9500;&#9472;&#9472; 404.org
+&#9474;   &#9500;&#9472;&#9472; about.org
+&#9474;   &#9500;&#9472;&#9472; index.org                 <span class="org-comment-delimiter"># </span><span class="org-comment">&#39318;&#39029;
+</span>&#9474;   &#9500;&#9472;&#9472; microtalk
+&#9474;   &#9500;&#9472;&#9472; microtalk.org
+&#9474;   &#9500;&#9472;&#9472; reading
+&#9474;   &#9500;&#9472;&#9472; rss.org                   <span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#21160;&#29983;&#20135;&#30340;rss&#25991;&#20214;
+</span>&#9474;   &#9500;&#9472;&#9472; sitemap.org               <span class="org-comment-delimiter"># </span><span class="org-comment">&#32593;&#31449;&#22320;&#22270;
+</span>&#9474;   &#9500;&#9472;&#9472; skills.org                <span class="org-comment-delimiter"># </span><span class="org-comment">&#25216;&#33021;&#26641;
+</span>&#9474;   &#9492;&#9472;&#9472; talk.org
+&#9500;&#9472;&#9472; assets          <span class="org-comment-delimiter"># </span><span class="org-comment">&#38745;&#24577;&#25991;&#20214;
+</span>&#9474;   &#9500;&#9472;&#9472; distro-head.html
+&#9474;   &#9500;&#9472;&#9472; distro-html_preamble.html
+&#9474;   &#9500;&#9472;&#9472; dj-head.html
+&#9474;   &#9500;&#9472;&#9472; dj-html_preamble.html
+&#9474;   &#9500;&#9472;&#9472; favicon.ico
+&#9474;   &#9500;&#9472;&#9472; fonts                     <span class="org-comment-delimiter"># </span><span class="org-comment">&#23383;&#20307;&#25991;&#20214;&#30446;&#24405;
+</span>&#9474;   &#9500;&#9472;&#9472; prot-head.html            <span class="org-comment-delimiter"># </span><span class="org-comment">&#39029;&#38754;&#22836;&#37096;&#20449;&#24687;&#65292;&#22914;&#23548;&#33322;&#26639;&#12289;&#21152;&#36733;&#30340;css&#25991;&#20214;&#23383;&#20307;&#25991;&#20214;&#12289;&#24191;&#21578;&#20195;&#30721;&#31561;
+</span>&#9474;   &#9500;&#9472;&#9472; prot-html_postamble.html  <span class="org-comment-delimiter"># </span><span class="org-comment">&#39029;&#33050;&#20449;&#24687;
+</span>&#9474;   &#9500;&#9472;&#9472; prot-html_preamble.html   <span class="org-comment-delimiter"># </span><span class="org-comment">&#39029;&#39318;&#20449;&#24687;
+</span>&#9474;   &#9500;&#9472;&#9472; rss.png
+&#9474;   &#9500;&#9472;&#9472; static                    <span class="org-comment-delimiter"># </span><span class="org-comment">css&#25991;&#20214;&#30446;&#24405;
+</span>&#9474;   &#9500;&#9472;&#9472; systemcrafters-head.html
+&#9474;   &#9500;&#9472;&#9472; systemcrafters-html_postamble.html
+&#9474;   &#9492;&#9472;&#9472; systemcrafters-html_preamble.html
+&#9500;&#9472;&#9472; build-site.el                 <span class="org-comment-delimiter"># </span><span class="org-comment">&#20027;&#37197;&#32622;&#65292;&#32593;&#39029;&#23548;&#20986;
+</span>&#9500;&#9472;&#9472; build.sh                      <span class="org-comment-delimiter"># </span><span class="org-comment">&#21629;&#20196;&#34892;&#32593;&#39029;&#23548;&#20986;
+</span>
+assets/static       <span class="org-comment-delimiter"># </span><span class="org-comment">&#32593;&#31449;&#26679;&#24335;&#26681;&#25454;&#20852;&#36259;&#25910;&#38598;
+</span>$ tree
+.
+&#9500;&#9472;&#9472; distro-htmlize.css            <span class="org-comment-delimiter"># </span><span class="org-comment">&#20195;&#30721;&#39640;&#20142;
+</span>&#9500;&#9472;&#9472; distro-jquery.stickytableheaders.min.js
+&#9500;&#9472;&#9472; distro-readtheorg.css
+&#9500;&#9472;&#9472; distro-readtheorg.js
+&#9500;&#9472;&#9472; dj-style.css
+&#9500;&#9472;&#9472; font.css
+&#9500;&#9472;&#9472; images
+&#9474;   &#9500;&#9472;&#9472; header_bg.png
+&#9474;   &#9500;&#9472;&#9472; icon-beian.png
+&#9474;   &#9500;&#9472;&#9472; made-with-emacs.png
+&#9474;   &#9492;&#9472;&#9472; made-with-emacs.webp
+&#9500;&#9472;&#9472; orgcss-style.css
+&#9500;&#9472;&#9472; prot-style-print.css
+&#9500;&#9472;&#9472; prot-style.css
+&#9500;&#9472;&#9472; systemcrafters-style-code.css
+&#9500;&#9472;&#9472; systemcrafters-style.css
+&#9492;&#9472;&#9472; worg-style.css
+
+assets/fonts        <span class="org-comment-delimiter"># </span><span class="org-comment">&#32593;&#31449;&#23383;&#20307;&#20351;&#29992;&#20179;&#32819;&#20170;&#26999;
+</span>$ tree
+.
+&#9500;&#9472;&#9472; angelina.ttf
+&#9500;&#9472;&#9472; jinkai.ttf
+&#9492;&#9472;&#9472; jinkai.woff2
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:a35fd5e3-6d99-413d-8c23-d96142b04dbd" class="outline-2">
+<h2 id="h:a35fd5e3-6d99-413d-8c23-d96142b04dbd"><a href="#h:a35fd5e3-6d99-413d-8c23-d96142b04dbd">提前准备</a></h2>
+<div class="outline-text-2" id="text-h:a35fd5e3-6d99-413d-8c23-d96142b04dbd">
+<ul class="org-ul">
+<li><p>
+安装emacs软件
+</p>
+
+<p>
+可参考<a href="https://xuchangwei.com/emacs/index.html#Unix/MacOS">我的文章</a>或者<a href="https://www.gnu.org/software/emacs/">官方</a>提供的方法
+</p></li>
+
+<li><p>
+准备统一引用的html文件关联css样式文件、js文件
+</p>
+
+<p>
+自己写或者浏览器F12拷贝样式。放到assets目录里
+</p></li>
+
+<li><p>
+准备字体文件(可选)
+</p>
+
+<p>
+放到assets/fonts目录里
+</p></li>
+
+<li><p>
+准备网站图标
+</p>
+
+<p>
+搜索一下有很多免费在线生成的。 命名为favicon.ico文件
+</p></li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:7bfee72f-d1ca-4f75-976e-b91ca44d0836" class="outline-2">
+<h2 id="h:7bfee72f-d1ca-4f75-976e-b91ca44d0836"><a href="#h:7bfee72f-d1ca-4f75-976e-b91ca44d0836">build-site.el 配置</a></h2>
+<div class="outline-text-2" id="text-h:7bfee72f-d1ca-4f75-976e-b91ca44d0836">
+</div>
+<div id="outline-container-h:f21aedf4-6c01-45de-a799-1b15ce1f0ebf" class="outline-3">
+<h3 id="h:f21aedf4-6c01-45de-a799-1b15ce1f0ebf"><a href="#h:f21aedf4-6c01-45de-a799-1b15ce1f0ebf">emacs 加载配置文件</a></h3>
+<div class="outline-text-3" id="text-h:f21aedf4-6c01-45de-a799-1b15ce1f0ebf">
+<p>
+emacs仅使用 <code>build-site.el</code> 做配置导出网页。所以配置文件包含初始化包源、引用 <code>ox-publish</code> 包导出网页、引用 <code>ox-rss</code> 生成rss文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;; </span><span class="org-comment">packages
+</span><span class="org-comment-delimiter">;;;; </span><span class="org-comment">Initialize the package system
+</span>(<span class="org-keyword">setq</span> make-backup-files nil)
+
+(<span class="org-keyword">require</span> '<span class="org-constant">package</span>)
+(<span class="org-keyword">setq</span> package-user-dir (expand-file-name <span class="org-string">"./.packages"</span>))
+<span class="org-comment-delimiter">;; </span><span class="org-comment">(setq package-archives '(("melpa" . "https://melpa.org/packages/")
+</span><span class="org-comment-delimiter">;;                          </span><span class="org-comment">("elpa" . "https://elpa.gnu.org/packages/")))
+</span>(<span class="org-keyword">setq</span> package-archives '(
+    (<span class="org-string">"melpa"</span> . <span class="org-string">"http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/"</span>)
+    (<span class="org-string">"gnu"</span> . <span class="org-string">"http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/"</span>)
+    (<span class="org-string">"org"</span> . <span class="org-string">"http://mirrors.tuna.tsinghua.edu.cn/elpa/org/"</span>)))
+
+
+(<span class="org-keyword">unless</span> (<span class="org-keyword">bound-and-true-p</span> package--initialized)
+  (package-initialize))
+
+(<span class="org-keyword">when</span> (not package-archive-contents)
+  (package-refresh-contents))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Check and install dependencies
+</span>(<span class="org-keyword">dolist</span> (package '(htmlize ox-rss))
+  (<span class="org-keyword">unless</span> (package-installed-p package)
+    (package-install package)))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Load publishing system
+</span>(<span class="org-keyword">require</span> '<span class="org-constant">ox-publish</span>)
+<span class="org-comment-delimiter">;; </span><span class="org-comment">(require 'htmlize)
+</span>(<span class="org-keyword">require</span> '<span class="org-constant">ox-rss</span>)
+
+(<span class="org-keyword">setq</span> org-export-html-coding-system 'utf-8-unix)
+(<span class="org-keyword">setq</span> org-publish-use-timestamps-flag t
+      org-publish-timestamp-directory <span class="org-string">"./.org-cache/"</span>
+      <span class="org-comment-delimiter">;; </span><span class="org-comment">&#23548;&#20986;&#30340;&#28304;&#20195;&#30721;&#20869;&#23481;&#20351;&#29992;&#21333;&#29420;&#30340;css&#25991;&#20214;&#25511;&#21046;&#26679;&#24335;
+</span>      org-html-htmlize-output-type 'css       <span class="org-comment-delimiter">; </span><span class="org-comment">&#40664;&#35748; inline-css&#65292;&#20195;&#30721;&#39640;&#20142;&#23884;&#20837;&#22312; html &#25991;&#20214;&#20013;
+</span>      org-html-head-include-default-style nil <span class="org-comment-delimiter">; </span><span class="org-comment">&#19981;&#21253;&#21547; Org-mode &#40664;&#35748;&#30340; CSS &#26679;&#24335;
+</span>      make-backup-files nil)                  <span class="org-comment-delimiter">; </span><span class="org-comment">&#20851;&#38381; Emacs &#33258;&#21160;&#29983;&#25104;&#22791;&#20221;&#25991;&#20214;&#65288;&#22914; file~&#65289;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:8a128737-c314-4ab5-968e-bd374d18d7f2" class="outline-3">
+<h3 id="h:8a128737-c314-4ab5-968e-bd374d18d7f2"><a href="#h:8a128737-c314-4ab5-968e-bd374d18d7f2">生成站点地图</a></h3>
+<div class="outline-text-3" id="text-h:8a128737-c314-4ab5-968e-bd374d18d7f2">
+<p>
+<code>os-publish</code> 自带生成站点地图配置，且支持自定义方法。这里使用自定方法生成站点地图。包含文章预览功能
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;; </span><span class="org-comment">Sitemap preprocessing
+</span><span class="org-comment-delimiter">;;;; </span><span class="org-comment">Get Preview
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my/get-preview</span> (file)
+  <span class="org-doc">"get preview text from a file
+
+Uses the function here as a starting point:
+https://ogbe.net/blog/blogging_with_org.html"</span>
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (<span class="org-keyword">when</span> (re-search-forward <span class="org-string">"^#\\+BEGIN_PREVIEW$"</span> nil 1)
+      (goto-char (point-min))
+      (<span class="org-keyword">let</span> ((beg (+ 1 (re-search-forward <span class="org-string">"^#\\+BEGIN_PREVIEW$"</span> nil 1)))
+            (end (<span class="org-keyword">progn</span> (re-search-forward <span class="org-string">"^#\\+END_PREVIEW$"</span> nil 1)
+                        (match-beginning 0))))
+        (buffer-substring beg end)))))
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">Format Sitemap
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my/org-publish-org-sitemap</span> (title list)
+  <span class="org-doc">"Sitemap generation function."</span>
+  (concat <span class="org-string">"#+OPTIONS: toc:nil"</span>)
+  (org-list-to-subtree list))
+
+(<span class="org-keyword">setq</span> org-export-global-macros
+      '((<span class="org-string">"timestamp"</span> . <span class="org-string">"@@html:&lt;span class=\"timestamp\"&gt;$1&lt;/span&gt;@@"</span>)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">my/org-publish-org-sitemap-format</span> (entry style project)
+  <span class="org-doc">"Custom sitemap entry formatting: add date"</span>
+  (<span class="org-keyword">cond</span> ((not (directory-name-p entry))
+         (<span class="org-keyword">let</span> ((filename (org-publish-find-title entry project))
+               (preview (<span class="org-keyword">if</span> (my/get-preview (concat <span class="org-string">"Org-mode/"</span> entry))
+                            (my/get-preview (concat <span class="org-string">"Org-mode/"</span> entry))
+                          <span class="org-string">""</span>)))
+         (format <span class="org-string">"{{{timestamp(%s)}}} [[file:%s][%s]]\n%s"</span>
+                 (format-time-string <span class="org-string">"%Y-%m-%d"</span>
+                                     (org-publish-find-date entry project))
+                 entry
+                 filename
+                 preview)
+         ))
+        ((eq style 'tree)
+         (file-name-nondirectory (directory-file-name entry)))
+        (t entry)))
+</pre>
+</div>
+
+<p>
+只需要把方法添加到网页导出配置里就可以了，如
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;; </span><span class="org-comment">define publishing project
+</span>(<span class="org-keyword">setq</span> org-publish-project-alist
+      `(
+        (<span class="org-string">"org-site:main"</span>
+         <span class="org-builtin">:recursive</span> t
+...
+         <span class="org-builtin">:auto-sitemap</span> t
+         <span class="org-builtin">:sitemap-title</span> nil<span class="org-comment-delimiter">;</span><span class="org-comment">"Blog"
+</span>         <span class="org-builtin">:sitemap-format-entry</span> my/org-publish-org-sitemap-format
+         <span class="org-builtin">:sitemap-function</span> my/org-publish-org-sitemap
+         <span class="org-builtin">:sitemap-sort-files</span> anti-chronologically
+         <span class="org-builtin">:sitemap-filename</span> <span class="org-string">"sitemap.org"</span>
+         <span class="org-builtin">:sitemap-style</span> tree
+...
+</pre>
+</div>
+
+<p>
+载入生成的站点地图的方法，只需要在文件中输入 <code>#INCLUDE</code> 指定加载的范围。 如加载sitemap.org文件中microtalk标题下前100个主题
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">+INCLUDE: sitemap.org::*microtalk :lines "-100" :only-contents t</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:281ace8a-a4c0-4c8e-b55b-fd29fd08c1a4" class="outline-3">
+<h3 id="h:281ace8a-a4c0-4c8e-b55b-fd29fd08c1a4"><a href="#h:281ace8a-a4c0-4c8e-b55b-fd29fd08c1a4">配置网页统一样式</a></h3>
+<div class="outline-text-3" id="text-h:281ace8a-a4c0-4c8e-b55b-fd29fd08c1a4">
+<p>
+<code>ox-publish</code>  默认导出的网页样式并不好看。你完全可以自己设计。
+</p>
+</div>
+<div id="outline-container-h:d212ed1e-9b60-481b-8bfb-d96beac01bdf" class="outline-4">
+<h4 id="h:d212ed1e-9b60-481b-8bfb-d96beac01bdf"><a href="#h:d212ed1e-9b60-481b-8bfb-d96beac01bdf">默认配置</a></h4>
+<div class="outline-text-4" id="text-h:d212ed1e-9b60-481b-8bfb-d96beac01bdf">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;; </span><span class="org-comment">&#35774;&#32622; org-publish &#30340;&#39033;&#30446;&#21015;&#34920;
+</span>(<span class="org-keyword">setq</span> org-publish-project-alist
+      '(
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">&#31508;&#35760;&#37096;&#20998;
+</span>        (<span class="org-string">"org-notes"</span>
+         <span class="org-builtin">:base-directory</span> <span class="org-string">"~/org/"</span>
+         <span class="org-builtin">:base-extension</span> <span class="org-string">"org"</span>
+         <span class="org-builtin">:exclude</span> <span class="org-string">"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">tasks</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">test</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">scratch</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">diary</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">capture</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">mail</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">habits</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">resume</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">meetings</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">personal</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">org-beamer-example</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">\\.org</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">test</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">article</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">roam</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">hugo"</span>
+         <span class="org-builtin">:publishing-directory</span> <span class="org-string">"~/public_html/"</span>
+         <span class="org-builtin">:recursive</span> t                 <span class="org-comment-delimiter">; </span><span class="org-comment">include subdirectories if t
+</span>         <span class="org-builtin">:publishing-function</span> org-html-publish-to-html
+         <span class="org-builtin">:headline-levels</span> 6
+         <span class="org-builtin">:auto-preamble</span> t
+         <span class="org-builtin">:auto-sitemap</span> t
+         <span class="org-builtin">:sitemap-filename</span> <span class="org-string">"sitemap.org"</span>
+         <span class="org-builtin">:sitemap-title</span> <span class="org-string">"Sitemap"</span>
+
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">&#38745;&#24577;&#36164;&#28304;&#37096;&#20998;
+</span>        (<span class="org-string">"org-static"</span>
+         <span class="org-builtin">:base-directory</span> <span class="org-string">"~/org/"</span>
+         <span class="org-builtin">:base-extension</span> <span class="org-string">"css</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">js</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">png</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">jpg</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">gif</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">pdf</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">mp3</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">ogg</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">swf</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">mov"</span>
+         <span class="org-builtin">:publishing-directory</span> <span class="org-string">"~/public_html/"</span>
+         <span class="org-builtin">:recursive</span> t
+         <span class="org-builtin">:publishing-function</span> org-publish-attachment)
+
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">&#39033;&#30446;&#38598;&#21512;
+</span>        (<span class="org-string">"org"</span>
+         <span class="org-builtin">:components</span> (<span class="org-string">"org-notes"</span> <span class="org-string">"org-static"</span>))
+        ))
+)
+</pre>
+</div>
+
+<p>
+<b>配置说明：</b>
+</p>
+
+<p>
+这将配置变量 <code>org-publish-project-alist</code> 以定义我们网站的发布项目。阅读此变量的文档， <code>M-x describe-variable</code> 以获取更多信息！
+</p>
+
+<p>
+这里最重要的两个配置是： <code>sitemap-format-entry</code> 以及 <code>org-publish-project-alist</code> 。前者是生成 sitemap 的方式，后者是定义publish要到哪个文件夹，把哪些org文件进行发布。
+</p>
+
+<p>
+指定源和目标:
+</p>
+
+<ul class="org-ul">
+<li><code>:base-directory</code> 指定包含源文件的目录，即需要发布文件的基本目录</li>
+<li><code>:publishing-directory</code> 指定转化后存放的目录</li>
+<li><code>:preparation-function</code> 指定转化文件前需要调用的函数， 例如发布前需要 make 一下源文件</li>
+<li><code>:completion-function</code> 指定转化文件完成后需要调用的函数</li>
+</ul>
+
+<p>
+选择文件（用于识别需要发布的文件）：
+</p>
+<ul class="org-ul">
+<li><code>:base-extension</code> 指定识别的文件拓展名， 不需要点(.)后缀 ，如：*:base-extension “css”*</li>
+<li><code>:exclude</code> 用于排除指定文件</li>
+<li><code>:include</code> 引入指定文件，存在该文件都会进行发布转化</li>
+<li><code>:recursive</code> 为真时， 将递归检查发布 base-directory 指定目录下的文件</li>
+</ul>
+
+<p>
+发布触发执行动作:
+</p>
+<ul class="org-ul">
+<li><code>:publishing-function</code> 执行发布操作将触发指定函数来完成工作
+<ul class="org-ul">
+<li><code>org-html-publish-to-htm</code> 默认 org 文件转化成 HTML</li>
+<li><code>org-publish-attachment</code> 复制操作</li>
+</ul></li>
+</ul>
+
+<p>
+我们配置完 ox-publish 后，可以通过两种方式来发布静态站点：
+</p>
+
+<p>
+<b>发布</b>
+</p>
+
+<ul class="org-ul">
+<li>M-x org-publish-all 来发布（全部）站点</li>
+<li>按 C-c C-e 后，再按 P a 来发布（全部）站点</li>
+</ul>
+
+<p>
+当写完一篇文章之后需要手动调用 <code>org-export-dispatch</code> 选择 <code>p f</code> ，将当前 org 文档生成 HTML 网页文件。
+</p>
+
+<p>
+<b>测试</b>
+</p>
+
+<p>
+一个简单的网页就生成了，可以使用浏览器打开此 HTML 文件进行预览，也可以使用 <code>Simple-Httpd</code> 这个插件在 website-directory 文件下启动一个 server，之后在浏览器中打开 127.0.0.1:19999 就可以查看生成的博客内容啦。
+</p>
+
+<p>
+使用如下命令生成网站，也可以将命令添加到 <code>build.sh</code> 文件中执行
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">emacs -Q --script build-site.el
+</pre>
+</div>
+
+<p>
+本地测试：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">python3 -m http.server --directory=~/public_html
+Open http://localhost:8000/<span class="org-keyword"> in</span> the Web browser
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:10ecdcc8-55bd-471e-bf36-500b280884b3" class="outline-4">
+<h4 id="h:10ecdcc8-55bd-471e-bf36-500b280884b3"><a href="#h:10ecdcc8-55bd-471e-bf36-500b280884b3">自定义页面展出配置</a></h4>
+<div class="outline-text-4" id="text-h:10ecdcc8-55bd-471e-bf36-500b280884b3">
+<p>
+与手动写 html，css 一样这些在 org 里都是可自定义的，修改 <code>org-publish</code> 中的属性参
+数和直接修改对应的 org 的 html 页面展出参数是等效的，请仔细阅读官方文档：<a href="https://orgmode.org/manual/Publishing-options.html">https://orgmode.org/manual/Publishing-options.html</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;; </span><span class="org-comment">Formatting
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">file-contents</span> (file)
+  (<span class="org-keyword">with-temp-buffer</span>
+    (insert-file-contents file)
+    (buffer-string)))
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">define publishing project
+</span>(<span class="org-keyword">setq</span> org-publish-project-alist
+      `(
+        (<span class="org-string">"org-site:main"</span>
+         <span class="org-builtin">:recursive</span> t
+         <span class="org-builtin">:base-directory</span> <span class="org-string">"./Org-mode"</span>
+         <span class="org-builtin">:publishing-directory</span> <span class="org-string">"./public"</span>
+         <span class="org-builtin">:publishing-function</span> org-html-publish-to-html
+         <span class="org-builtin">:auto-sitemap</span> t
+         <span class="org-builtin">:sitemap-title</span> nil<span class="org-comment-delimiter">;</span><span class="org-comment">"Blog"
+</span>         <span class="org-builtin">:sitemap-format-entry</span> my/org-publish-org-sitemap-format
+         <span class="org-builtin">:sitemap-function</span> my/org-publish-org-sitemap
+         <span class="org-builtin">:sitemap-sort-files</span> anti-chronologically
+         <span class="org-builtin">:sitemap-filename</span> <span class="org-string">"sitemap.org"</span>
+         <span class="org-builtin">:sitemap-style</span> tree
+         <span class="org-builtin">:exclude</span> <span class="org-string">"^demo.org</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">^up.org</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">.*/homework/.*"</span>  <span class="org-comment-delimiter">; </span><span class="org-comment">Exclude drafts directory from publishing
+</span>
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">https://orgmode.org/manual/Publishing-options.html#Generic-properties-1
+</span>         <span class="org-builtin">:with-author</span> nil            <span class="org-comment-delimiter">;; </span><span class="org-comment">Don't include author name
+</span>         <span class="org-builtin">:with-creator</span> t             <span class="org-comment-delimiter">;; </span><span class="org-comment">Include Emacs and Org versions in footer
+</span>         <span class="org-builtin">:with-toc</span> t                 <span class="org-comment-delimiter">;; </span><span class="org-comment">Include a table of contents
+</span>         <span class="org-builtin">:section-numbers</span> nil        <span class="org-comment-delimiter">;; </span><span class="org-comment">Don't include section numbers
+</span>         <span class="org-builtin">:time-stamp-file</span> nil        <span class="org-comment-delimiter">;; </span><span class="org-comment">Don't include time stamp in file
+</span>         <span class="org-builtin">:headline-levels</span> 4          <span class="org-comment-delimiter">;; </span><span class="org-comment">Number of headline levels for export
+</span>         <span class="org-builtin">:with-sub-superscript</span> nil   <span class="org-comment-delimiter">;; </span><span class="org-comment">Don't include TeX-like syntax for sub- and superscripts
+</span>
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">https://orgmode.org/manual/Publishing-options.html#ASCII-specific-properties-1
+</span>
+         <span class="org-comment-delimiter">;;; </span><span class="org-comment">prot
+</span>         <span class="org-builtin">:html-preamble</span> ,(file-contents <span class="org-string">"assets/prot-html_preamble.html"</span>)
+         <span class="org-builtin">:html-postamble</span> ,(file-contents <span class="org-string">"assets/prot-html_postamble.html"</span>)
+         <span class="org-builtin">:html-head</span> ,(file-contents <span class="org-string">"assets/prot-head.html"</span>)
+
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">;;; dj
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-preamble ,(file-contents "assets/dj-html_preamble.html")
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-postamble ,(file-contents "assets/prot-html_postamble.html")
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-head ,(file-contents "assets/dj-head.html")
+</span>
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">;;; systemcrafters
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-preamble ,(file-contents "assets/systemcrafters-html_preamble.html")
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-postamble ,(file-contents "assets/systemcrafters-html_postamble.html")
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-head ,(file-contents "assets/systemcrafters-head.html")
+</span>
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">;;; distro
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-preamble ,(file-contents "assets/distro-html_preamble.html")
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-postamble ,(file-contents "assets/systemcrafters-html_postamble.html")
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-head ,(file-contents "assets/distro-head.html")
+</span>
+         <span class="org-builtin">:html-head-include-default-style</span> nil
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">;;; https://emacs.stackexchange.com/questions/76599/how-to-adjust-html-elements-using-org-publish-in-emacs
+</span>         <span class="org-comment-delimiter">;; </span><span class="org-comment">:html-container "div class=\"container\""
+</span>         <span class="org-builtin">:html-divs</span> ((preamble <span class="org-string">"header"</span> <span class="org-string">"preamble"</span>)
+                     (content <span class="org-string">"main class=\"container\""</span> <span class="org-string">"content"</span>)
+                     (postamble <span class="org-string">"footer"</span> <span class="org-string">"postamble"</span>))
+         <span class="org-builtin">:html-container</span> <span class="org-string">"section"</span>
+         <span class="org-builtin">:html-validation-link</span> nil
+         <span class="org-builtin">:html-html5-fancy</span> t
+         <span class="org-builtin">:html-doctype</span> <span class="org-string">"html5"</span>
+
+
+         <span class="org-comment-delimiter">;; </span><span class="org-comment">:time-stamp-file nil
+</span>         <span class="org-builtin">:htmlized-source</span> t
+         )
+        (<span class="org-string">"org-site:static"</span>
+         <span class="org-builtin">:base-directory</span> <span class="org-string">"./Org-mode/"</span>
+         <span class="org-builtin">:base-extension</span> <span class="org-string">"png</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">jpg</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">webp</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">gif</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">mp3</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">m4a</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">ogg</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">swf</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">ico"</span>
+         <span class="org-builtin">:publishing-directory</span> <span class="org-string">"./public"</span>
+         <span class="org-builtin">:recursive</span> t
+         <span class="org-builtin">:publishing-function</span> org-publish-attachment
+         <span class="org-builtin">:exclude</span> <span class="org-string">"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">^demo</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">^up</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">\\.org</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">.*/homework/.*"</span>  <span class="org-comment-delimiter">; </span><span class="org-comment">Exclude drafts directory from publishing
+</span>         )
+        (<span class="org-string">"org-site:assets"</span>
+         <span class="org-builtin">:base-directory</span> <span class="org-string">"./assets/"</span>
+         <span class="org-builtin">:base-extension</span> <span class="org-string">"css</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">js</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">ttf</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">woff2</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">png</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">jpg</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">webp</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">gif</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">pdf</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">mp3</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">m4a</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">ogg</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">swf</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">ico"</span>
+         <span class="org-builtin">:publishing-directory</span> <span class="org-string">"./public/"</span>
+         <span class="org-builtin">:recursive</span> t
+         <span class="org-builtin">:publishing-function</span> org-publish-attachment)
+
+        (<span class="org-string">"org-site:rss"</span>
+         <span class="org-builtin">:recursive</span> nil
+         <span class="org-builtin">:base-directory</span> <span class="org-string">"./Org-mode/"</span>
+         <span class="org-builtin">:base-extension</span> <span class="org-string">"org"</span>
+         <span class="org-builtin">:exclude</span> <span class="org-string">".*"</span>
+         <span class="org-builtin">:include</span> (<span class="org-string">"talk.org"</span>)
+         <span class="org-builtin">:publishing-function</span> my/org-rss-publish-to-rss
+         <span class="org-builtin">:publishing-directory</span> <span class="org-string">"./public"</span>
+         <span class="org-builtin">:rss-extension</span> <span class="org-string">"xml"</span>
+         <span class="org-builtin">:auto-sitemap</span> t
+         <span class="org-builtin">:sitemap-filename</span> <span class="org-string">"rss.org"</span>
+         <span class="org-builtin">:sitemap-title</span> <span class="org-string">"Jasper Hsu' Blog"</span>
+         <span class="org-builtin">:sitemap-style</span> list
+         <span class="org-builtin">:sitemap-sort-files</span> anti-chronologically
+         <span class="org-builtin">:sitemap-function</span> my/format-rss-feed
+         <span class="org-comment-delimiter">;;</span><span class="org-comment">:sitemap-format-entry my/format-rss-feed-entry
+</span>         <span class="org-builtin">:html-link-home</span> <span class="org-string">"https://xuchangwei.com/"</span>
+         <span class="org-builtin">:html-link-use-abs-url</span> t
+         <span class="org-builtin">:html-link-org-files-as-html</span> t
+         )
+
+        (<span class="org-string">"site"</span> <span class="org-builtin">:components</span> (<span class="org-string">"org-site:main"</span> <span class="org-string">"org-site:static"</span> <span class="org-string">"org-site:assets"</span> <span class="org-string">"org-site:rss"</span>))
+       ))
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">generate site output
+</span><span class="org-comment-delimiter">;;</span><span class="org-comment">(org-publish-all t)
+</span>(org-publish-project <span class="org-string">"site"</span>) <span class="org-comment-delimiter">;; </span><span class="org-comment">del cache org-publish-timestamp-directory  ~/.org-timestamps/
+</span>
+(message <span class="org-string">"Build Complete!"</span>)
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:68e53add-1c19-4bfb-a08e-1e882119699e" class="outline-3">
+<h3 id="h:68e53add-1c19-4bfb-a08e-1e882119699e"><a href="#h:68e53add-1c19-4bfb-a08e-1e882119699e">结束</a></h3>
+<div class="outline-text-3" id="text-h:68e53add-1c19-4bfb-a08e-1e882119699e">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">provide</span> '<span class="org-constant">build-site</span>)
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">C-x C-c
+</span><span class="org-comment-delimiter">;;</span><span class="org-comment">(save-buffers-kill-terminal)
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">build-site.el ends here</span>
+</pre>
+</div>
+
+<p>
+我们可以在配置文件的开头部分加入一些开源协议，如
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;; </span><span class="org-comment">build-site.el --- Building a website -*- lexical-binding: t -*-
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Copyright (C) 2024 Jasper Hsu
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Author: Jasper Hsu <a href="mailto:xcwhome%40163.com">&lt;xcwhome@163.com&gt;</a>
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Maintainer: Jasper Hsu <a href="mailto:xcwhome%40163.com">&lt;xcwhome@163.com&gt;</a>
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">URL: https://xuchangwei.com
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Version: 0.1
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Keywords:
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">This file is NOT part of GNU Emacs.
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">This program is free software; you can redistribute it and/or modify
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">it under the terms of the GNU General Public License as published by
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">the Free Software Foundation, either version 3 of the License, or (at
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">your option) any later version.
+</span><span class="org-comment-delimiter">;;</span><span class="org-comment">
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">This program is distributed in the hope that it will be useful,
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">but WITHOUT ANY WARRANTY; without even the implied warranty of
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">GNU General Public License for more details.
+</span><span class="org-comment-delimiter">;;</span><span class="org-comment">
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">You should have received a copy of the GNU General Public License
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">along with this program.  If not, see <a href="https://www.gnu.org/licenses/">&lt;https://www.gnu.org/licenses/&gt;</a>.
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Commentary:
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Comand: emacs -Q --script build-site.el
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">Code:</span>
+</pre>
+</div>
+
+<p>
+参考：<a href="https://www.danliden.com/posts/20211203-this-site.html">Made with Org-mode</a>
+</p>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Emacs: 定义前缀键</title>
+<meta name="description" content="本文介绍在Emacs中，如何定义前缀键、如何设置嵌套键映射。它将为你提供更多键的访问权限。" />
+<meta name="keywords" content="计算机, 博客, Codelog" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/codelog/2024-07-31-emacs-prefix-map.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Emacs: 定义前缀键" />
+<meta property="og:description" content="本文介绍在Emacs中，如何定义前缀键、如何设置嵌套键映射。它将为你提供更多键的访问权限。" />
+<meta property="og:url" content="https://xuchangwei.com/codelog/2024-07-31-emacs-prefix-map.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/codelog/2024-07-31-emacs-prefix-map.html","@type":"BlogPosting","headline":"Emacs: 定义前缀键","datePublished":"2024-07-31","author":{"@type":"Person","name":"Jasper Hsu"},"mainEntityOfPage":"https://xuchangwei.com/codelog/2024-07-31-emacs-prefix-map.html","description":"本文介绍在Emacs中，如何定义前缀键、如何设置嵌套键映射。它将为你提供更多键的访问权限。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Emacs: 定义前缀键</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:3de5902f-d2ba-45d1-a35e-352091cc74c8">定义一个前缀键</a></li>
+<li><a href="#h:4f55c3fe-7600-43a2-bdb0-c689ac8344c6">嵌套键映射</a>
+<ul>
+<li><a href="#h:11fba667-feca-4501-8b45-5c0fbbadf82e">解决嵌套键时，which-key展示问题</a></li>
+</ul>
+</li>
+<li><a href="#h:36db25e4-c24a-4eab-ae2c-38108da12c84">use-package 的绑定键</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAG: <a href="../jcodelogv.html">编码</a></li>
+</ul>
+
+<div class="PREVIEW" id="orgaa36ca9">
+<p>
+本文介绍在Emacs中，如何定义前缀键、如何设置嵌套键映射。它将为你提供更多键的访问权限。
+</p>
+
+</div>
+
+<p>
+如果安装了 <code>which-key</code> 软件包，请打开 <code>which-key-mode</code>, 它会帮助你展示
+有哪些前缀键。如果没有安装可以使用所绑定的键前缀后 <code>C-h</code> (<code>&lt;keymap&gt; C-h</code>) 来显示。
+</p>
+
+<p>
+我们要实现如下键绑定：
+</p>
+
+<pre class="example" id="org0b36560">
+C-t
+   t &lt;Command&gt;
+   f find-file
+   d dired
+   b "Buffer"
+     m buffer-menu
+     s switch-to-buffer
+</pre>
+
+<p>
+以下是在emacs 29之后的版本实现，29之前的版本可能有些函数名不一样。
+</p>
+<section id="outline-container-h:3de5902f-d2ba-45d1-a35e-352091cc74c8" class="outline-2">
+<h2 id="h:3de5902f-d2ba-45d1-a35e-352091cc74c8"><a href="#h:3de5902f-d2ba-45d1-a35e-352091cc74c8">定义一个前缀键</a></h2>
+<div class="outline-text-2" id="text-h:3de5902f-d2ba-45d1-a35e-352091cc74c8">
+<p>
+<code>keymap-set</code> 接收3个参数，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(keymap-set KEYMAP KEY DEFINITION)
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;; </span><span class="org-comment">Emacs 29  `</span><span class="org-comment"><span class="org-constant">keymap-set</span></span><span class="org-comment">', `</span><span class="org-comment"><span class="org-constant">defvar-keymap</span></span><span class="org-comment">'
+</span>
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#23450;&#20041;&#20840;&#23616;&#38190;&#26144;&#23556; C-t&#65292; &#21160;&#20316;&#20026;nil&#65292;&#19981;&#20570;&#20219;&#20309;&#20107;
+</span>
+(keymap-set global-map <span class="org-string">"C-t"</span> nil)
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#23450;&#20041;&#20840;&#23616;&#38190;&#26144;&#23556;C-t&#65292;&#25191;&#34892;test-command&#20989;&#25968;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#23450;&#20041;&#20132;&#20114;&#24335;&#20989;&#25968;&#65292;&#22238;&#26174;&#19968;&#26465;&#28040;&#24687;This is a test!
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">test-command</span> ()
+  (<span class="org-keyword">interactive</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#36825;&#20351;&#29992;&#20989;&#25968;&#25104;&#20026;&#19968;&#20010;&#21629;&#20196;
+</span>  (message <span class="org-string">"This is a test!"</span>))
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  'test-command)
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">keymap-set&#30340;&#21464;&#20307;&#21450;&#22312;&#21253;&#31649;&#29702;(`</span><span class="org-comment"><span class="org-constant">use-package</span></span><span class="org-comment">')&#20013;&#30340;&#20351;&#29992;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#22312;&#26087;&#29256;&#26412;&#20013;&#20250;&#20351;&#29992; keymap-set &#21464;&#20307; define-key
+</span>
+(define-key global-map (kbd <span class="org-string">"C-t"</span>) 'test-command)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">use-package &#20013;&#30340;&#38190;&#26144;&#23556;, 29&#29256;&#26412;&#21518;&#20026;&#20869;&#32622;&#21253;
+</span>
+(<span class="org-keyword">use-package</span> xxx
+  <span class="org-builtin">:bind</span> (<span class="org-string">"C-t"</span> . test-command))
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:4f55c3fe-7600-43a2-bdb0-c689ac8344c6" class="outline-2">
+<h2 id="h:4f55c3fe-7600-43a2-bdb0-c689ac8344c6"><a href="#h:4f55c3fe-7600-43a2-bdb0-c689ac8344c6">嵌套键映射</a></h2>
+<div class="outline-text-2" id="text-h:4f55c3fe-7600-43a2-bdb0-c689ac8344c6">
+<p>
+当我们想要定义前缀键映射时，不想使用命令，而是绑定键映射。键映射是一个变量，像字符串一样保存键。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">defun</span> <span class="org-function-name">test-command</span> ()
+  (<span class="org-keyword">interactive</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#36825;&#20351;&#29992;&#20989;&#25968;&#25104;&#20026;&#19968;&#20010;&#21629;&#20196;
+</span>  (message <span class="org-string">"This is a test!"</span>))
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#20351;&#29992;defvar-keymap&#23450;&#20041;&#38190;&#26144;&#23556;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">C-t t &#25191;&#34892;test-command&#20989;&#25968;
+</span>(<span class="org-keyword">defvar-keymap</span> my-test-prefix-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map."</span>
+  <span class="org-string">"t"</span> 'test-command)
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  my-test-prefix-map)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">C-t &#22810;&#20010;&#38190;&#26144;&#23556; f d t
+</span>(<span class="org-keyword">defvar-keymap</span> my-test-prefix-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map."</span>
+  <span class="org-string">"f"</span> 'find-file
+  <span class="org-string">"d"</span> 'dired
+  <span class="org-string">"t"</span> 'test-command)
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  my-test-prefix-map)
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#20351;&#29992;defvar-keymap&#23450;&#20041;&#38190;&#26144;&#23556;&#65292;&#26356;&#21451;&#22909;&#20889;&#27861;
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">&#26356;&#21451;&#22909;&#30340;&#20889;&#27861;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">#'&#20117;&#21495;&#21152;&#21333;&#24341;&#21495;&#20889;&#27861;&#21644;&#19978;&#38754;&#8216;&#21333;&#24341;&#21495;&#30340;&#21151;&#33021;&#26159;&#30456;&#21516;&#30340;&#65292;&#21482;&#35821;&#20041;&#19978;&#26377;&#20123;&#19981;&#21516;&#12290;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">#'&#21578;&#35785;&#38405;&#35835;&#27492;&#20869;&#23481;&#30340;&#20154;&#25110;&#32534;&#35793;&#22120;&#25509;&#19979;&#26469;&#26159;&#19968;&#20010;&#20989;&#25968;&#65292;&#19981;&#26159;&#20219;&#20309;&#24418;&#24335;&#30340;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#31526;&#21495;&#65292;&#32780;&#26159;&#19968;&#20010;&#29305;&#23450;&#30340;&#20989;&#25968;
+</span>(<span class="org-keyword">defvar-keymap</span> my-test-prefix-buffer-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map for buffers."</span>
+  <span class="org-string">"s"</span> #'switch-to-buffer
+  <span class="org-string">"m"</span> #'buffer-menu)
+</pre>
+</div>
+
+<p>
+现在我希望能够从我的前缀映射内部访问 <code>my-test-prefix-buffer-map</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">defvar-keymap</span> my-test-prefix-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map."</span>
+  <span class="org-string">"f"</span> 'find-file
+  <span class="org-string">"b"</span> my-test-prefix-buffer-map
+  <span class="org-string">"d"</span> 'dired
+  <span class="org-string">"h"</span> help-map
+  <span class="org-string">"t"</span> 'test-command)
+</pre>
+</div>
+
+<p>
+<code>C-t</code> 时which-key  b 显示 <code>+prefix</code> , 而没展示b的作用。
+</p>
+
+
+<figure id="orge5635b6">
+<img src="https://cdn.jsdelivr.net/gh/jaspervincent/pic/microtalk/img_20240731_224534.png" alt="img_20240731_224534.png" width="90%">
+
+</figure>
+
+
+<figure id="org649803e">
+<img src="https://cdn.jsdelivr.net/gh/jaspervincent/pic/microtalk/img_20240731_224649.png" alt="img_20240731_224649.png">
+
+</figure>
+</div>
+<div id="outline-container-h:11fba667-feca-4501-8b45-5c0fbbadf82e" class="outline-3">
+<h3 id="h:11fba667-feca-4501-8b45-5c0fbbadf82e"><a href="#h:11fba667-feca-4501-8b45-5c0fbbadf82e">解决嵌套键时，which-key展示问题</a></h3>
+<div class="outline-text-3" id="text-h:11fba667-feca-4501-8b45-5c0fbbadf82e">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(which-key-add-keymap-based-replacements my-test-prefix-map
+  <span class="org-string">"b"</span> `(<span class="org-string">"Buffer"</span> .  ,my-test-prefix-buffer-map))
+</pre>
+</div>
+
+
+<figure id="orga6a0527">
+<img src="https://cdn.jsdelivr.net/gh/jaspervincent/pic/microtalk/img_20240731_231128.png" alt="img_20240731_231128.png">
+
+</figure>
+
+
+<p>
+<code>`( ,&lt;var/function&gt;)</code> 是动态展示来的用法
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">setq</span> test-hello <span class="org-string">"Hello!"</span>)
+
+test-hello
+<span class="org-string">"Hello!"</span>
+
+(message <span class="org-string">"The value is: %s"</span> '(one two test-hello))
+<span class="org-string">"The value is: (one two test-hello)"</span>
+
+(message <span class="org-string">"The value is: %s"</span> `(one two ,test-hello))
+<span class="org-string">"The value is: (one two Hello!)"</span>
+</pre>
+</div>
+
+<p>
+<b>添加帮助信息</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">defvar-keymap</span> my-test-prefix-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map."</span>
+  <span class="org-string">"f"</span> 'find-file
+  <span class="org-string">"b"</span> my-test-prefix-buffer-map
+  <span class="org-string">"d"</span> 'dired
+  <span class="org-string">"h"</span> help-map
+  <span class="org-string">"t"</span> 'test-command)
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  my-test-prefix-map)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">which-key&#20013;&#26174;&#31034;&#23884;&#22871;&#38190;&#30340;&#27880;&#37322;
+</span>(which-key-add-keymap-based-replacements my-test-prefix-map
+  <span class="org-string">"b"</span> `(<span class="org-string">"Buffer"</span> .  ,my-test-prefix-buffer-map)
+  <span class="org-string">"h"</span> `(<span class="org-string">"Help"</span> .  ,help-map))
+</pre>
+</div>
+
+<p>
+which-key 适合做演示。一般我们忘记快捷前缀有哪些嵌套键，可以在后面追加 <code>C-h</code> .
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-h:36db25e4-c24a-4eab-ae2c-38108da12c84" class="outline-2">
+<h2 id="h:36db25e4-c24a-4eab-ae2c-38108da12c84"><a href="#h:36db25e4-c24a-4eab-ae2c-38108da12c84">use-package 的绑定键</a></h2>
+<div class="outline-text-2" id="text-h:36db25e4-c24a-4eab-ae2c-38108da12c84">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">use-package</span> xxx
+  <span class="org-builtin">:bind</span> (<span class="org-string">"C-t"</span> . test-command)) <span class="org-comment-delimiter">; </span><span class="org-comment">&#30456;&#24403;&#20110;&#20840;&#23616;&#26144;&#23556; global-map
+</span>
+(<span class="org-keyword">use-package</span> xxx
+  <span class="org-builtin">:bind</span>
+  ( <span class="org-builtin">:map</span> global-map
+    (<span class="org-string">"C-t"</span> . test-command)
+    (<span class="org-string">"C-c l"</span> . org-store-link)
+    <span class="org-builtin">:map</span> org-mode-map
+    (<span class="org-string">"C-c C-M-l"</span> . org-toggle-link-display)
+    ))
+</pre>
+</div>
+
+
+<p>
+<b>完整内容</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;; </span><span class="org-comment">This buffer is for text that is not saved, and for Lisp evaluation.
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">To create a file, visit it with &#8216;C-x C-f&#8217; and enter text in its buffer.
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Emacs 29  `</span><span class="org-comment"><span class="org-constant">keymap-set</span></span><span class="org-comment">', `</span><span class="org-comment"><span class="org-constant">defvar-keymap</span></span><span class="org-comment">'
+</span>
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#23450;&#20041;&#20840;&#23616;&#38190;&#26144;&#23556; C-t&#65292; &#21160;&#20316;&#20026;nil&#65292;&#19981;&#20570;&#20219;&#20309;&#20107;
+</span>
+(keymap-set global-map <span class="org-string">"C-t"</span> nil)
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#23450;&#20041;&#20840;&#23616;&#38190;&#26144;&#23556;C-t&#65292;&#25191;&#34892;test-command&#20989;&#25968;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#23450;&#20041;&#20132;&#20114;&#24335;&#20989;&#25968;&#65292;&#22238;&#26174;&#19968;&#26465;&#28040;&#24687;This is a test!
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">test-command</span> ()
+  (<span class="org-keyword">interactive</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#36825;&#20351;&#29992;&#20989;&#25968;&#25104;&#20026;&#19968;&#20010;&#21629;&#20196;
+</span>  (message <span class="org-string">"This is a test!"</span>))
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  'test-command)
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">keymap-set&#30340;&#21464;&#20307;&#21450;&#22312;&#21253;&#31649;&#29702;(`</span><span class="org-comment"><span class="org-constant">use-package</span></span><span class="org-comment">')&#20013;&#30340;&#20351;&#29992;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#22312;&#26087;&#29256;&#26412;&#20013;&#20250;&#20351;&#29992; keymap-set &#21464;&#20307; define-key
+</span>
+(define-key global-map (kbd <span class="org-string">"C-t"</span>) 'test-command)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">use-package &#20013;&#30340;&#38190;&#26144;&#23556;, 29&#29256;&#26412;&#21518;&#20026;&#20869;&#32622;&#21253;
+</span>
+(<span class="org-keyword">use-package</span> xxx
+  <span class="org-builtin">:bind</span> (<span class="org-string">"C-t"</span> . test-command)) <span class="org-comment-delimiter">; </span><span class="org-comment">&#30456;&#24403;&#20110;&#20840;&#23616;&#26144;&#23556; global-map
+</span>
+(<span class="org-keyword">use-package</span> xxx
+  <span class="org-builtin">:bind</span>
+  ( <span class="org-builtin">:map</span> global-map
+    (<span class="org-string">"C-t"</span> . test-command)
+    (<span class="org-string">"C-c l"</span> . org-store-link)
+    <span class="org-builtin">:map</span> org-mode-map
+    (<span class="org-string">"C-c C-M-l"</span> . org-toggle-link-display)
+    ))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">test-command</span> ()
+  (<span class="org-keyword">interactive</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#36825;&#20351;&#29992;&#20989;&#25968;&#25104;&#20026;&#19968;&#20010;&#21629;&#20196;
+</span>  (message <span class="org-string">"This is a test!"</span>))
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#20351;&#29992;defvar-keymap&#23450;&#20041;&#38190;&#26144;&#23556;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">C-t t &#25191;&#34892;test-command&#20989;&#25968;
+</span>(<span class="org-keyword">defvar-keymap</span> my-test-prefix-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map."</span>
+  <span class="org-string">"t"</span> 'test-command)
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  my-test-prefix-map)
+
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#20351;&#29992;defvar-keymap&#23450;&#20041;&#38190;&#26144;&#23556;&#65292;&#26356;&#21451;&#22909;&#20889;&#27861;
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">&#26356;&#21451;&#22909;&#30340;&#20889;&#27861;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">#'&#20117;&#21495;&#21152;&#21333;&#24341;&#21495;&#20889;&#27861;&#21644;&#19978;&#38754;&#8216;&#21333;&#24341;&#21495;&#30340;&#21151;&#33021;&#26159;&#30456;&#21516;&#30340;&#65292;&#21482;&#35821;&#20041;&#19978;&#26377;&#20123;&#19981;&#21516;&#12290;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">#'&#21578;&#35785;&#38405;&#35835;&#27492;&#20869;&#23481;&#30340;&#20154;&#25110;&#32534;&#35793;&#22120;&#25509;&#19979;&#26469;&#26159;&#19968;&#20010;&#20989;&#25968;&#65292;&#19981;&#26159;&#20219;&#20309;&#24418;&#24335;&#30340;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#31526;&#21495;&#65292;&#32780;&#26159;&#19968;&#20010;&#29305;&#23450;&#30340;&#20989;&#25968;
+</span>(<span class="org-keyword">defvar-keymap</span> my-test-prefix-buffer-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map for buffers."</span>
+  <span class="org-string">"s"</span> #'switch-to-buffer
+  <span class="org-string">"m"</span> #'buffer-menu)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">C-t &#22810;&#20010;&#38190;&#26144;&#23556; f d t
+</span>(<span class="org-keyword">defvar-keymap</span> my-test-prefix-map
+  <span class="org-builtin">:doc</span> <span class="org-doc">"My prefix map."</span>
+  <span class="org-string">"f"</span> 'find-file
+  <span class="org-string">"b"</span> my-test-prefix-buffer-map
+  <span class="org-string">"d"</span> 'dired
+  <span class="org-string">"h"</span> help-map
+  <span class="org-string">"t"</span> 'test-command)
+
+(keymap-set global-map <span class="org-string">"C-t"</span>  my-test-prefix-map)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">which-key&#20013;&#26174;&#31034;&#23884;&#22871;&#38190;&#30340;&#27880;&#37322;
+</span>(which-key-add-keymap-based-replacements my-test-prefix-map
+  <span class="org-string">"b"</span> `(<span class="org-string">"Buffer"</span> .  ,my-test-prefix-buffer-map)
+  <span class="org-string">"h"</span> `(<span class="org-string">"Help"</span> .  ,help-map))
+
+(<span class="org-keyword">setq</span> test-hello <span class="org-string">"Hello!"</span>)
+
+test-hello
+<span class="org-string">"Hello!"</span>
+
+(message <span class="org-string">"The value is: %s"</span> '(one two test-hello))
+<span class="org-string">"The value is: (one two test-hello)"</span>
+
+(message <span class="org-string">"The value is: %s"</span> `(one two ,test-hello))
+<span class="org-string">"The value is: (one two Hello!)"</span>
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

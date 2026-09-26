@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 高级篇-中间件容器化-k8s包管理工具Operator和helm</title>
+<meta name="description" content="包管理工具：一句话总结功能就是可以很方便管理一些比较复杂的应用，比如MySQL集群、Redis集群等，可以一键式创建集群、扩容、备份等。常用的两种包管理工具是Operator和Helm。" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/linux/kubernetes/04-k8s-advanced-02-helm-operator.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Kubernetes: k8s 高级篇-中间件容器化-k8s包管理工具Operator和helm" />
+<meta property="og:description" content="包管理工具：一句话总结功能就是可以很方便管理一些比较复杂的应用，比如MySQL集群、Redis集群等，可以一键式创建集群、扩容、备份等。常用的两种包管理工具是Operator和Helm。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/kubernetes/04-k8s-advanced-02-helm-operator.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/kubernetes/04-k8s-advanced-02-helm-operator.html","@type":"WebPage","name":"Kubernetes: k8s 高级篇-中间件容器化-k8s包管理工具Operator和helm","description":"包管理工具：一句话总结功能就是可以很方便管理一些比较复杂的应用，比如MySQL集群、Redis集群等，可以一键式创建集群、扩容、备份等。常用的两种包管理工具是Operator和Helm。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 高级篇-中间件容器化-k8s包管理工具Operator和helm</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:58324cfb-f031-4bf8-9d5f-955b3f6e8350">中间件容器化说明</a>
+<ul>
+<li><a href="#h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9">部署应用至K8s通用步骤</a></li>
+<li><a href="#h:160b6313-1bf9-4c77-ba02-8cfd0871318b">部署单实例中间件至K8s</a></li>
+<li><a href="#h:6b08530f-a9df-43c8-b474-80f9b7aa625d">K8s和传统架构管理中间件集群区别</a>
+<ul>
+<li><a href="#h:ddb6d388-3909-4a6e-84d3-7e70cd702710">传统架构如何管理中间件集群？</a></li>
+<li><a href="#h:c2ee2751-ea80-43f6-9d3d-829a507bca41">K8s如何管理中间件集群？</a></li>
+<li><a href="#h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a">K8s如何管理集群？</a></li>
+</ul>
+</li>
+<li><a href="#h:98043c12-8524-4387-8577-c6d0f378ca14">中间件到底要不要部署至K8s集群</a></li>
+<li><a href="#h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3">Helm创建Kafka、Zookeeper集群</a>
+<ul>
+<li><a href="#h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e">Kafka集群测试</a></li>
+<li><a href="#h:031a2e5f-4cec-4387-818b-523469f72184">Kafka集群扩容及删除</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195">k8s包管理工具Operator</a>
+<ul>
+<li><a href="#h:d36f6110-84ad-40d1-b280-c919e0d0d237">使用Operator创建Redis集群</a>
+<ul>
+<li><a href="#h:4e1e37f5-104e-4757-b9da-cd4a69951c40">Redis集群使用和扩容</a>
+<ul>
+<li><a href="#h:0c020990-1b8c-466c-af85-f999afa2836b">redis-cluster-operator 安装</a></li>
+</ul>
+</li>
+<li><a href="#h:04b69da3-5f7c-4a86-a04c-4a4a810beacc">Redis集群扩容注意事项及删除</a>
+<ul>
+<li><a href="#h:75171941-9c35-40b7-9ff1-b037400d9a7f">redis-cluster扩容缩容</a></li>
+<li><a href="#h:780c7771-b162-433f-a458-5ae874fef1fa">清除</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462">k8s 包管理工具helm</a>
+<ul>
+<li><a href="#h:46b1dc46-41b0-4d11-868b-bdf466febc3c">helm 基础命令</a></li>
+<li><a href="#h:30d8ac79-6857-46e3-b26b-a21afaa17163">Helm v3 Chart目录层级解析</a></li>
+<li><a href="#h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d">Helm内置变量的使用</a></li>
+<li><a href="#h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517">Helm常用函数的使用</a></li>
+<li><a href="#h:47d527e6-cd62-40ef-ac9a-77a366775d66">Helm逻辑控制</a></li>
+<li><a href="#h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2">helm 模板</a></li>
+<li><a href="#h:9a8d2294-2a5e-4442-b20f-eb078623281e">使用StatefulSet安装RabbitMQ集群</a></li>
+<li><a href="#h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4">编写Chart一键安装RabbitMQ集群</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:58324cfb-f031-4bf8-9d5f-955b3f6e8350" class="outline-2">
+<h2 id="h:58324cfb-f031-4bf8-9d5f-955b3f6e8350"><a href="#h:58324cfb-f031-4bf8-9d5f-955b3f6e8350">中间件容器化说明</a></h2>
+<div class="outline-text-2" id="text-h:58324cfb-f031-4bf8-9d5f-955b3f6e8350">
+<p>
+中间件：
+</p>
+<ul class="org-ul">
+<li>rabbitmq</li>
+<li>zookeeper</li>
+<li>redis</li>
+<li>mysql</li>
+<li>kafka</li>
+<li>mongoDB</li>
+</ul>
+
+<p>
+每个中间件都有单实例模式和集群模式。
+</p>
+</div>
+<div id="outline-container-h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9" class="outline-3">
+<h3 id="h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9"><a href="#h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9">部署应用至K8s通用步骤</a></h3>
+<div class="outline-text-3" id="text-h:8ea53dd9-106a-4084-929b-eb0f29c8ddc9">
+<p>
+如何部署一个应用至K8s？
+</p>
+<ul class="org-ul">
+<li>必须要了解你要部署的这个东西
+<ul class="org-ul">
+<li>架构</li>
+<li>配置</li>
+<li>端口号</li>
+<li>启动命令</li>
+</ul></li>
+<li>其次要有这个东西的镜像
+<ul class="org-ul">
+<li>镜像谁来做</li>
+</ul></li>
+<li>找到最合适的部署方式
+<ul class="org-ul">
+<li>是否是有状态</li>
+<li>配置分离</li>
+<li>部署文件来源</li>
+<li>如何部署</li>
+</ul></li>
+<li>这个程序如何被使用
+<ul class="org-ul">
+<li>什么协议</li>
+<li>内部还是外部</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:160b6313-1bf9-4c77-ba02-8cfd0871318b" class="outline-3">
+<h3 id="h:160b6313-1bf9-4c77-ba02-8cfd0871318b"><a href="#h:160b6313-1bf9-4c77-ba02-8cfd0871318b">部署单实例中间件至K8s</a></h3>
+<div class="outline-text-3" id="text-h:160b6313-1bf9-4c77-ba02-8cfd0871318b">
+<ol class="org-ol">
+<li>找到官方镜像：<a href="https://hub.docker.com/">https://hub.docker.com/</a></li>
+<li>确认需要的配置：环境变量或配置文件</li>
+<li>选择部署方式：Deployment或其他的</li>
+<li>配置访问：TCP或HTTP</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-h:6b08530f-a9df-43c8-b474-80f9b7aa625d" class="outline-3">
+<h3 id="h:6b08530f-a9df-43c8-b474-80f9b7aa625d"><a href="#h:6b08530f-a9df-43c8-b474-80f9b7aa625d">K8s和传统架构管理中间件集群区别</a></h3>
+<div class="outline-text-3" id="text-h:6b08530f-a9df-43c8-b474-80f9b7aa625d">
+</div>
+<div id="outline-container-h:ddb6d388-3909-4a6e-84d3-7e70cd702710" class="outline-4">
+<h4 id="h:ddb6d388-3909-4a6e-84d3-7e70cd702710"><a href="#h:ddb6d388-3909-4a6e-84d3-7e70cd702710">传统架构如何管理中间件集群？</a></h4>
+<div class="outline-text-4" id="text-h:ddb6d388-3909-4a6e-84d3-7e70cd702710">
+<ul class="org-ul">
+<li>新建集群</li>
+<li>申请服务器</li>
+<li>下载软件包</li>
+<li>配置相关配置文件</li>
+<li>启动服务</li>
+<li>建立集群</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:c2ee2751-ea80-43f6-9d3d-829a507bca41" class="outline-4">
+<h4 id="h:c2ee2751-ea80-43f6-9d3d-829a507bca41"><a href="#h:c2ee2751-ea80-43f6-9d3d-829a507bca41">K8s如何管理中间件集群？</a></h4>
+<div class="outline-text-4" id="text-h:c2ee2751-ea80-43f6-9d3d-829a507bca41">
+<p>
+包管理工具：一句话总结功能就是可以很方便管理一些比较复杂的应用，比如MySQL集群、Redis集群等，可以一键式创建集群、扩容、备份等。常用的两种包管理工具是Operator和Helm。
+</p>
+
+<ul class="org-ul">
+<li>Helm：更倾向于无状态应用的部署，比如公司的服务、某些不需要持久化数据的中间件、不需要实现额外功能的服务，比如备份、回滚等。</li>
+<li>Operator：管理更为复杂的有状态服务，比如MySQL集群、Redis集群、Rook等。并且可以利用Operator实现扩容、备份、回滚等功能。这些功能需要自己开发。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a" class="outline-4">
+<h4 id="h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a"><a href="#h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a">K8s如何管理集群？</a></h4>
+<div class="outline-text-4" id="text-h:caa1363d-4b0e-4bff-a4a4-2123e740cb9a">
+<p>
+选择部署方式：helm、operator
+</p>
+
+<p>
+helm
+</p>
+<ul class="org-ul">
+<li>安装 helm 客户端工具</li>
+<li>添加 helm 仓库</li>
+<li>helm install 一键启动</li>
+</ul>
+
+<p>
+operator
+</p>
+<ul class="org-ul">
+<li>创建 operator 控制器</li>
+<li>创建自定义资源</li>
+<li>执行相关逻辑</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:98043c12-8524-4387-8577-c6d0f378ca14" class="outline-3">
+<h3 id="h:98043c12-8524-4387-8577-c6d0f378ca14"><a href="#h:98043c12-8524-4387-8577-c6d0f378ca14">中间件到底要不要部署至K8s集群</a></h3>
+<div class="outline-text-3" id="text-h:98043c12-8524-4387-8577-c6d0f378ca14">
+<p>
+非生产环境：使用K8s管理比较推荐
+</p>
+
+<p>
+生产环境：需要考虑性能、持久化、稳定性等问题。
+</p>
+</div>
+</div>
+<div id="outline-container-h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3" class="outline-3">
+<h3 id="h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3"><a href="#h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3">Helm创建Kafka、Zookeeper集群</a></h3>
+<div class="outline-text-3" id="text-h:87c7c6b6-f362-4a56-afa3-d4cb5a0e5bf3">
+<p>
+Helm客户端安装：<a href="https://helm.sh/docs/intro/install/">https://helm.sh/docs/intro/install/</a>
+</p>
+
+<p>
+添加bitnami和官方helm仓库：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add stable https://charts.helm.sh/stable
+helm repo list
+</pre>
+</div>
+
+<p>
+安装方式一：先下载后安装
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#19979;&#36733;&#21253;
+</span>helm pull bitnami/zookeeper
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;values.yaml&#30456;&#24212;&#37197;&#32622;&#65306;&#21103;&#26412;&#25968;&#12289;auth&#12289;&#25345;&#20037;&#21270;
+</span>helm install -n public-service zookeeper .
+</pre>
+</div>
+
+<p>
+安装方式二：直接安装
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm install kafka bitnami/kafka --set zookeeper.enabled=false --set <span class="org-variable-name">replicaCount</span>=3 --set externalZookeeper.servers=zookeeper --set persistence.enabled=false -n public-service
+</pre>
+</div>
+</div>
+<div id="outline-container-h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e" class="outline-4">
+<h4 id="h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e"><a href="#h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e">Kafka集群测试</a></h4>
+<div class="outline-text-4" id="text-h:28ced291-ea67-4c3a-a1bf-138b8a49bd2e">
+<p>
+svc 中 kafka 是外部连接地址，kafka-headless 是内部通信使用的。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl run kafka-client --restart=<span class="org-string">'Never'</span> --image docker.io/bitnami/kafka:2.8.0-debian-10-r30 --namespace public-service --command -- sleep infinity
+
+kubectl exec --tty -i kafka-client --namespace public-service -- bash
+&#29983;&#20135;&#32773;:
+kafka-console-producer.sh <span class="org-sh-escaped-newline">\</span>
+--broker-list kafka-0.kafka-headless.public-service.svc.cluster.local:9092,kafka-1.kafka-headless.public&#2;service.svc.cluster.local:9092,kafka-2.kafka-headless.public-service.svc.cluster.local:9092 <span class="org-sh-escaped-newline">\</span>
+--topic test
+
+&#28040;&#36153;&#32773;:
+kafka-console-consumer.sh <span class="org-sh-escaped-newline">\</span>
+--bootstrap-server kafka.public-service.svc.cluster.local:9092 <span class="org-sh-escaped-newline">\</span>
+--topic test <span class="org-sh-escaped-newline">\</span>
+--from-beginning
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:031a2e5f-4cec-4387-818b-523469f72184" class="outline-4">
+<h4 id="h:031a2e5f-4cec-4387-818b-523469f72184"><a href="#h:031a2e5f-4cec-4387-818b-523469f72184">Kafka集群扩容及删除</a></h4>
+<div class="outline-text-4" id="text-h:031a2e5f-4cec-4387-818b-523469f72184">
+<div class="org-src-container">
+<pre class="src src-shell">helm upgrade kafka bitnami/kafka --set zookeeper.enabled=false --set <span class="org-variable-name">replicaCount</span>=5 --set externalZookeeper.servers=zookeeper --set persistence.enabled=false -n public-service
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195" class="outline-2">
+<h2 id="h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195"><a href="#h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195">k8s包管理工具Operator</a></h2>
+<div class="outline-text-2" id="text-h:ec4e7c8b-57a1-4bfd-b8c5-03e82afca195">
+<p>
+Operator 模板 <a href="https://github.com/operator-framework/awesome-operators">https://github.com/operator-framework/awesome-operators</a>
+</p>
+</div>
+<div id="outline-container-h:d36f6110-84ad-40d1-b280-c919e0d0d237" class="outline-3">
+<h3 id="h:d36f6110-84ad-40d1-b280-c919e0d0d237"><a href="#h:d36f6110-84ad-40d1-b280-c919e0d0d237">使用Operator创建Redis集群</a></h3>
+<div class="outline-text-3" id="text-h:d36f6110-84ad-40d1-b280-c919e0d0d237">
+</div>
+<div id="outline-container-h:4e1e37f5-104e-4757-b9da-cd4a69951c40" class="outline-4">
+<h4 id="h:4e1e37f5-104e-4757-b9da-cd4a69951c40"><a href="#h:4e1e37f5-104e-4757-b9da-cd4a69951c40">Redis集群使用和扩容</a></h4>
+<div class="outline-text-4" id="text-h:4e1e37f5-104e-4757-b9da-cd4a69951c40">
+</div>
+<div id="outline-container-h:0c020990-1b8c-466c-af85-f999afa2836b" class="outline-5">
+<h5 id="h:0c020990-1b8c-466c-af85-f999afa2836b"><a href="#h:0c020990-1b8c-466c-af85-f999afa2836b">redis-cluster-operator 安装</a></h5>
+<div class="outline-text-5" id="text-h:0c020990-1b8c-466c-af85-f999afa2836b">
+<p>
+文档：<a href="https://github.com/ucloud/redis-cluster-operator">https://github.com/ucloud/redis-cluster-operator</a>
+</p>
+
+<p>
+master01
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">1&#12289;&#21019;&#24314;Operator
+</span>git clone https://github.com/ucloud/redis-cluster-operator.git
+kubectl create -f deploy/crds/redis.kun_distributedredisclusters_crd.yaml
+kubectl create -f deploy/crds/redis.kun_redisclusterbackups_crd.yaml
+kubectl create ns redis-cluster
+kubectl create -f deploy/service_account.yaml -n redis-cluster
+kubectl create -f deploy/namespace/role.yaml -n redis-cluster
+kubectl create -f deploy/namespace/role_binding.yaml -n redis-cluster
+kubectl create -f deploy/namespace/operator.yaml -n redis-cluster
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">2&#12289;&#21019;&#24314;Redis&#38598;&#32676;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">Namespace&#32423;&#21035;&#30340;&#38656;&#35201;&#26356;&#25913;&#37197;&#32622;&#65306;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">if your operator run as cluster-scoped, add this annotations
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">redis.kun/scope: cluster-scoped
+</span>kubectl create -f deploy/example/redis.kun_v1alpha1_distributedrediscluster_cr.yaml -n redis-cluster
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#12304;&#21487;&#36873;&#12305;&#25552;&#31034;&#65306;&#22914;&#26524;&#38598;&#32676;&#35268;&#27169;&#19981;&#22823;&#65292;&#36164;&#28304;&#23569;&#65292;&#21487;&#20197;&#33258;&#23450;&#20041;&#36164;&#28304;&#65292;&#25226;&#35831;&#27714;&#30340;&#36164;&#28304;&#38477;&#20302;
+</span>kubectl create -f deploy/example/custom-resources.yaml -n redis-cluster
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">3&#12289;&#26597;&#30475;&#38598;&#32676;&#29366;&#24577;
+</span>kubectl get distributedrediscluster -n redis-cluster
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">view
+</span>$ kubectl get distributedrediscluster
+$ kubectl get all -l redis.kun/name=example-distributedrediscluster
+
+$  kubectl get po
+$  kubectl get svc
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">entry
+</span>$ kubectl get svc
+$ kubectl exec -it pod/drc-example-distributedrediscluster-0-0 -- sh
+$ redis-cli -h example-distributedrediscluster
+$ redis-cli -h 10.244.58.255
+$ 10.244.58.255:6379&gt; set a b
+$ 10.244.58.255:6379&gt; get a
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:04b69da3-5f7c-4a86-a04c-4a4a810beacc" class="outline-4">
+<h4 id="h:04b69da3-5f7c-4a86-a04c-4a4a810beacc"><a href="#h:04b69da3-5f7c-4a86-a04c-4a4a810beacc">Redis集群扩容注意事项及删除</a></h4>
+<div class="outline-text-4" id="text-h:04b69da3-5f7c-4a86-a04c-4a4a810beacc">
+</div>
+<div id="outline-container-h:75171941-9c35-40b7-9ff1-b037400d9a7f" class="outline-5">
+<h5 id="h:75171941-9c35-40b7-9ff1-b037400d9a7f"><a href="#h:75171941-9c35-40b7-9ff1-b037400d9a7f">redis-cluster扩容缩容</a></h5>
+<div class="outline-text-5" id="text-h:75171941-9c35-40b7-9ff1-b037400d9a7f">
+<p>
+扩容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl edit Distributedrediscluster example-distributedrediscluster
+</pre>
+</div>
+
+
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: redis.kun/v1alpha1
+kind: DistributedRedisCluster
+metadata:
+  annotations:
+    <span class="org-comment-delimiter"># </span><span class="org-comment">if your operator run as cluster-scoped, add this annotations
+</span>    redis.kun/scope: cluster-scoped
+  name: example-distributedrediscluster
+spec:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Increase the masterSize to trigger the scaling.
+</span>  masterSize: 4 <span class="org-comment-delimiter"># </span><span class="org-comment">&#25214;&#21040;&#36825;&#20010;&#65292;&#20462;&#25913;&#20026;4
+</span>  ClusterReplicas: 1
+  image: redis:5.0.4-alpine
+</pre>
+</div>
+
+<p>
+缩容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: redis.kun/v1alpha1
+kind: DistributedRedisCluster
+metadata:
+  annotations:
+    <span class="org-comment-delimiter"># </span><span class="org-comment">if your operator run as cluster-scoped, add this annotations
+</span>    redis.kun/scope: cluster-scoped
+  name: example-distributedrediscluster
+spec:
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Increase the masterSize to trigger the scaling.
+</span>  masterSize: 3  <span class="org-comment-delimiter"># </span><span class="org-comment">&#25214;&#21040;&#36825;&#20010;&#65292;&#20462;&#25913;&#20026;3
+</span>  ClusterReplicas: 1
+  image: redis:5.0.4-alpine
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:780c7771-b162-433f-a458-5ae874fef1fa" class="outline-5">
+<h5 id="h:780c7771-b162-433f-a458-5ae874fef1fa"><a href="#h:780c7771-b162-433f-a458-5ae874fef1fa">清除</a></h5>
+<div class="outline-text-5" id="text-h:780c7771-b162-433f-a458-5ae874fef1fa">
+<div class="org-src-container">
+<pre class="src src-shell">kubectl delete -f deploy/example/redis.kun_v1alpha1_distributedrediscluster_cr.yaml -n redis-cluster
+kubectl delete -f deploy/cluster/operator.yaml -n redis-cluster
+kubectl delete -f deploy/cluster/cluster_role_binding.yaml -n redis-cluster
+kubectl delete -f deploy/cluster/cluster_role.yaml -n redis-cluster
+kubectl delete -f deploy/service_account.yaml -n redis-cluster
+kubectl delete -f deploy/crds/redis.kun_redisclusterbackups_crd.yaml -n redis-cluster
+kubectl delete -f deploy/crds/redis.kun_distributedredisclusters_crd.yaml -n redis-cluster
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462" class="outline-2">
+<h2 id="h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462"><a href="#h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462">k8s 包管理工具helm</a></h2>
+<div class="outline-text-2" id="text-h:28080ef1-a8b3-4a39-b94e-f5b1ec76d462">
+</div>
+<div id="outline-container-h:46b1dc46-41b0-4d11-868b-bdf466febc3c" class="outline-3">
+<h3 id="h:46b1dc46-41b0-4d11-868b-bdf466febc3c"><a href="#h:46b1dc46-41b0-4d11-868b-bdf466febc3c">helm 基础命令</a></h3>
+<div class="outline-text-3" id="text-h:46b1dc46-41b0-4d11-868b-bdf466febc3c">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21152;&#20837;&#28304;
+</span>helm repo add headlamp https://kubernetes-sigs.github.io/headlamp
+helm repo update headlamp
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#23545;&#24212;&#29256;&#26412;&#65306;
+</span>helm search repo -l gitlab/gitlab-runner
+helm search repo headlamp/headlamp --versions
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25289;&#21462;&#25351;&#23450;&#29256;&#26412;&#65288;&#21482;&#19979; tgz&#65289;
+</span>helm pull headlamp/headlamp --version 0.45.0
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#25110;&#32773;&#25289;&#19979;&#26469;&#30452;&#25509;&#35299;&#21253;&#25104;&#30446;&#24405;
+</span>helm pull headlamp/headlamp --version 0.45.0 --untar --untardir ./charts
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#19981;&#21152; repo&#65292;&#30452;&#25509;&#19979;&#36733;
+</span>helm pull headlamp --repo https://kubernetes-sigs.github.io/headlamp
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#31163;&#32447;&#29615;&#22659;&#30452;&#25509; curl
+</span>curl -LO https://github.com/kubernetes-sigs/headlamp/releases/download/headlamp-helm-0.45.0/headlamp-0.45.0.tgz
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#21019;&#24314;&#19968;&#20010;&#21253;
+</span>helm create
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23433;&#35013;&#19968;&#20010;&#21253;
+</span>helm install
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;
+</span>helm list
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#23433;&#35013;&#21442;&#25968;
+</span>helm get values
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#21407;&#22987;&#21442;&#25968;
+</span>helm show values prometheus-community/kube-prometheus-stack
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#65306;helm upgrade
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#65306;helm delete</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#19981;&#28155;&#21152;&#20179;&#24211;&#65292;&#19981;&#23454;&#38469;&#23433;&#35013;&#27979;&#35797;
+</span>helm show values ingress-nginx <span class="org-sh-escaped-newline">\</span>
+  --repo https://kubernetes.github.io/ingress-nginx
+
+helm upgrade --install ingress-nginx ingress-nginx <span class="org-sh-escaped-newline">\</span>
+  --repo https://kubernetes.github.io/ingress-nginx <span class="org-sh-escaped-newline">\</span>
+  --timeout 600s <span class="org-sh-escaped-newline">\</span>
+  --dry-run <span class="org-sh-escaped-newline">\</span>
+  --namespace ingress-nginx --create-namespace
+
+helm upgrade --install -n gitlab-xcw gitlab . <span class="org-sh-escaped-newline">\</span>
+     --timeout 600s <span class="org-sh-escaped-newline">\</span>
+     --dry-run <span class="org-sh-escaped-newline">\</span>
+     -f customize_conf/values-prod.yaml <span class="org-sh-escaped-newline">\</span>
+     --set global.hosts.gitlab.name=<span class="org-string">'git-xcw.tech.com'</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--&#22806;&#37096;postgresql--`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set postgresql.install=false`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set global.psql.host=production.postgress.hostname.local`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set global.psql.password.secret=gitlab-pg`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set global.psql.password.key='password'`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--&#22806;&#37096;redis--`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set redis.enabled=false`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set global.redis.host='redis.example.com'`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set global.redis.password.secret=gitlab-redis`</span> <span class="org-sh-escaped-newline">\</span>
+     <span class="org-sh-quoted-exec">`#--set global.redis.password.key='password'`</span> <span class="org-sh-escaped-newline">\</span>
+     --set gitlab.migrations.enabled=true 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:30d8ac79-6857-46e3-b26b-a21afaa17163" class="outline-3">
+<h3 id="h:30d8ac79-6857-46e3-b26b-a21afaa17163"><a href="#h:30d8ac79-6857-46e3-b26b-a21afaa17163">Helm v3 Chart目录层级解析</a></h3>
+<div class="outline-text-3" id="text-h:30d8ac79-6857-46e3-b26b-a21afaa17163">
+<p>
+创建一个Chart： <code>helm create helm-test</code>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">&#9500;&#9472;&#9472; charts <span class="org-comment-delimiter"># </span><span class="org-comment">&#20381;&#36182;&#25991;&#20214;&#65292;&#22914;&#26524;&#20381;&#36182;&#20854;&#23427;&#21253;&#21487;&#25226;&#23545;&#24212;&#21253;&#25918;&#36825;&#37324;
+</span>&#9500;&#9472;&#9472; Chart.yaml <span class="org-comment-delimiter"># </span><span class="org-comment">&#24403;&#21069;chart&#30340;&#22522;&#26412;&#20449;&#24687;
+</span>apiVersion&#65306;Chart&#30340;apiVersion&#65292;&#30446;&#21069;&#40664;&#35748;&#37117;&#26159;v2
+name&#65306;Chart&#30340;&#21517;&#31216;
+<span class="org-builtin">type</span>&#65306;&#22270;&#34920;&#30340;&#31867;&#22411;[&#21487;&#36873;]
+version&#65306;Chart&#33258;&#24049;&#30340;&#29256;&#26412;&#21495;
+appVersion&#65306;Chart&#20869;&#24212;&#29992;&#30340;&#29256;&#26412;&#21495;[&#21487;&#36873;]
+description&#65306;Chart&#25551;&#36848;&#20449;&#24687;[&#21487;&#36873;]
+&#9500;&#9472;&#9472; templates <span class="org-comment-delimiter"># </span><span class="org-comment">&#27169;&#26495;&#20301;&#32622;
+</span>&#9474; &#9500;&#9472;&#9472; deployment.yaml
+&#9474; &#9500;&#9472;&#9472; _helpers.tpl <span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#23450;&#20041;&#30340;&#27169;&#26495;&#25110;&#32773;&#20989;&#25968;
+</span>&#9474; &#9500;&#9472;&#9472; ingress.yaml
+&#9474; &#9500;&#9472;&#9472; NOTES.txt <span class="org-comment-delimiter">#</span><span class="org-comment">Chart&#23433;&#35013;&#23436;&#27605;&#21518;&#30340;&#25552;&#37266;&#20449;&#24687;
+</span>&#9474; &#9500;&#9472;&#9472; serviceaccount.yaml
+&#9474; &#9500;&#9472;&#9472; service.yaml
+&#9474; &#9492;&#9472;&#9472; tests <span class="org-comment-delimiter"># </span><span class="org-comment">&#27979;&#35797;&#25991;&#20214;
+</span>&#9474; &#9492;&#9472;&#9472; test-connection.yaml
+&#9492;&#9472;&#9472; values.yaml <span class="org-comment-delimiter">#</span><span class="org-comment">&#37197;&#32622;&#20840;&#23616;&#21464;&#37327;&#25110;&#32773;&#19968;&#20123;&#21442;&#25968;</span>
+</pre>
+</div>
+
+<p>
+如 templates/deployment.yaml 中 <code>.Values.podAnnotations</code> 代表使用values.yaml文件中 podAnnotations  变量。
+</p>
+</div>
+</div>
+<div id="outline-container-h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d" class="outline-3">
+<h3 id="h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d"><a href="#h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d">Helm内置变量的使用</a></h3>
+<div class="outline-text-3" id="text-h:a0a0219c-aa7c-42c3-8d0e-a4c3602ca95d">
+<ul class="org-ul">
+<li>Release.Name: 实例的名称，helm install指定的名字</li>
+<li>Release.Namespace: 应用实例的命名空间</li>
+<li>Release.IsUpgrade: 如果当前对实例的操作是更新或者回滚，这个变量的值就会被置为true</li>
+<li>Release.IsInstall: 如果当前对实例的操作是安装，则这边变量被置为true</li>
+<li>Release.Revision: 此次修订的版本号，从1开始，每次升级回滚都会增加1</li>
+<li>Chart: Chart.yaml文件中的内容，可以使用Chart.Version表示应用版本，Chart.Name表示Chart的名称</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517" class="outline-3">
+<h3 id="h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517"><a href="#h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517">Helm常用函数的使用</a></h3>
+<div class="outline-text-3" id="text-h:29697fa0-0ca6-44aa-9caa-e03bc8fc4517">
+<p>
+<a href="https://helm.sh/zh/docs/chart_template_guide/function_list/">https://helm.sh/zh/docs/chart_template_guide/function_list/</a>
+</p>
+
+<p>
+<a href="https://masterminds.github.io/sprig/strings.html">https://masterminds.github.io/sprig/strings.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:47d527e6-cd62-40ef-ac9a-77a366775d66" class="outline-3">
+<h3 id="h:47d527e6-cd62-40ef-ac9a-77a366775d66"><a href="#h:47d527e6-cd62-40ef-ac9a-77a366775d66">Helm逻辑控制</a></h3>
+<div class="outline-text-3" id="text-h:47d527e6-cd62-40ef-ac9a-77a366775d66">
+<p>
+<a href="https://helm.sh/docs/chart_template_guide/control_structures/">https://helm.sh/docs/chart_template_guide/control_structures/</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2" class="outline-3">
+<h3 id="h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2"><a href="#h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2">helm 模板</a></h3>
+<div class="outline-text-3" id="text-h:4cf421ab-9b61-4fd3-8aba-8288aafb38a2">
+<p>
+查看所有安装的服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm list -A
+</pre>
+</div>
+
+<p>
+Helm检索版本并查看实际加载的模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm get manifest &lt;ReleaseName&gt;
+</pre>
+</div>
+
+<p>
+模板命令要括在 {{ 和 }} 之间
+</p>
+
+<p>
+<code>{{ .Release.Name }}</code> 将发布名称注入了模板 。值作为一个 命名空间对象 传给了模板，用点 ( <code>.</code> ) 分隔每个命名空间的元素。
+</p>
+
+<p>
+Release前面的点表示从作用域最顶层的命名空间开始.  <code>.Release.Name</code> 就可解读为“通顶层命名空间开始查找 Release对象，然后在其中找Name对象”。
+</p>
+
+<p>
+<code>helm install --debug --dry-run goodly-guppy ./mychart</code>  测试模板渲染的内容但又不想安装任何实际应用
+</p>
+
+<p>
+<b>内置对象</b>
+</p>
+
+<p>
+官方文档: <a href="https://helm.sh/docs/chart_template_guide/builtin_objects/">https://helm.sh/docs/chart_template_guide/builtin_objects/</a>
+</p>
+
+
+<ul class="org-ul">
+<li>Release： Release对象描述了版本发布本身。包含了以下对象：
+<ul class="org-ul">
+<li>Release.Name： release名称</li>
+<li>Release.Namespace： 版本中包含的命名空间(如果manifest没有覆盖的话)</li>
+<li>Release.IsUpgrade： 如果当前操作是升级或回滚的话，该值将被设置为true</li>
+<li>Release.IsInstall： 如果当前操作是安装的话，该值将被设置为true</li>
+<li>Release.Revision： 此次修订的版本号。安装时是1，每次升级或回滚都会自增</li>
+<li>Release.Service： 该service用来渲染当前模板。在helm中,这个值始终为 <code>Helm</code></li>
+</ul></li>
+<li>Values： Values对象是从values.yaml文件和用户提供的文件传进模板的。默认为空</li>
+<li>Chart： Chart.yaml文件内容. 访问Chart.yaml中的数据如 <code>{{ .Chart.Name }}</code></li>
+<li>Files： 在chart中提供访问所有的非特殊文件的对象</li>
+<li>Capabilities： 提供关于Kubernetes集群支持功能的信息</li>
+<li>Template： 包含当前被执行的当前模板信息
+<ul class="org-ul">
+<li>Template.Name: 当前模板的命名空间文件路径 (e.g. mychart/templates/mytemplate.yaml)</li>
+<li>Template.BasePath: 当前chart模板目录的路径 (e.g. mychart/templates)</li>
+</ul></li>
+</ul>
+
+<p>
+include 引用.tpl中模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">deplyment.yaml:
+</span>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include <span class="org-string">"archery.fullname"</span> . }}
+
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">_help.tpl
+</span>{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define <span class="org-string">"archery.fullname"</span> -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix <span class="org-string">"-"</span> -}}
+{{- else -}}
+{{- $<span class="org-variable-name">name</span> := default .Chart.Name .Values.nameOverride -}}
+{{- if contains $<span class="org-variable-name">name</span> .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix <span class="org-string">"-"</span> -}}
+{{- else -}}
+{{- printf <span class="org-string">"%s-%s"</span> .Release.Name $<span class="org-variable-name">name</span> | trunc 63 | trimSuffix <span class="org-string">"-"</span> -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+</pre>
+</div>
+
+<p>
+定义下面的辅助模板
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">_help.tpl
+</span>{{- define <span class="org-string">"imagePullSecret"</span> }}
+{{- with .Values.imageCredentials }}
+{{- printf <span class="org-string">"{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}"</span> .registry .username .password .email (printf <span class="org-string">"%s:%s"</span> .username .password | b64enc) | b64enc }}
+{{- end }}
+{{- end }}
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">values.yaml
+</span>imageCredentials:
+  registry: quay.io
+  username: someone
+  password: sillyness
+  email: someone@host.com
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">secret.yaml
+</span> apiVersion: v1
+kind: Secret
+metadata:
+  name: myregistrykey
+<span class="org-builtin">type</span>: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ template <span class="org-string">"imagePullSecret"</span> . }} 
+</pre>
+</div>
+
+<p>
+Helm提供了以下类型转换函数:
+</p>
+<ul class="org-ul">
+<li>toYaml: 将列表，切片，数组，字典或对象转换成已缩进的yaml，可以从任意源拷贝yaml块。</li>
+</ul>
+
+<p>
+范例:toYaml
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">values.yaml
+</span>deployment:
+  labels: {}
+  annotations: {}
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#28165;&#21333;&#25991;&#20214;
+</span><span class="org-comment-delimiter">## </span><span class="org-comment">&#36716;&#25442;&#20026;yaml&#26684;&#24335;, &#24182;&#32553;&#36827;4&#20010;&#31354;&#26684;,
+</span>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  {{- with .Values.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9a8d2294-2a5e-4442-b20f-eb078623281e" class="outline-3">
+<h3 id="h:9a8d2294-2a5e-4442-b20f-eb078623281e"><a href="#h:9a8d2294-2a5e-4442-b20f-eb078623281e">使用StatefulSet安装RabbitMQ集群</a></h3>
+<div class="outline-text-3" id="text-h:9a8d2294-2a5e-4442-b20f-eb078623281e">
+<div class="org-src-container">
+<pre class="src src-shell">&#19979;&#36733;&#22522;&#26412;&#25991;&#20214;&#65306;
+git clone https://github.com/dotbalo/k8s.git
+<span class="org-builtin">cd</span> k8s/k8s-rabbitmq-cluster ; kubectl create ns public-service ; kubectl apply -f .
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4" class="outline-3">
+<h3 id="h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4"><a href="#h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4">编写Chart一键安装RabbitMQ集群</a></h3>
+<div class="outline-text-3" id="text-h:a47489ef-459d-4353-a2ee-9d4ddbe0afe4">
+<p>
+创建一个Chart：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm create rabbitmq-cluster
+</pre>
+</div>
+
+<p>
+删除无用文件
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">rm -fr deployment.yaml hpa.yaml serviceaccount.yaml service.yaml tests
+</pre>
+</div>
+<p>
+安装一个Chart
+helm install XXXXX .
+测试无误后删除Chart
+helm delete XXXXX
+</p>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

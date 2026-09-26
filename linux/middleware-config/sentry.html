@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: 实时错误监控-Sentry</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+<meta name="description" content="sentry就扮演着一个错误收集的角色，将你的项目和sentry结合起来，无论谁在 项目使用中报错，sentry都会第一次时间通知开发者，出现了什么错误，错误出 现在哪，帮你记录错误，便于你解决问题，这就是sentry。" />
+<link rel="canonical" href="https://xuchangwei.com/linux/middleware-config/sentry.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: 实时错误监控-Sentry" />
+<meta property="og:description" content="sentry就扮演着一个错误收集的角色，将你的项目和sentry结合起来，无论谁在 项目使用中报错，sentry都会第一次时间通知开发者，出现了什么错误，错误出 现在哪，帮你记录错误，便于你解决问题，这就是sentry。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/middleware-config/sentry.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/middleware-config/sentry.html","@type":"WebPage","name":"Linux: 实时错误监控-Sentry","description":"sentry就扮演着一个错误收集的角色，将你的项目和sentry结合起来，无论谁在 项目使用中报错，sentry都会第一次时间通知开发者，出现了什么错误，错误出 现在哪，帮你记录错误，便于你解决问题，这就是sentry。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: 实时错误监控-Sentry</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:306205cc-4b08-4a38-88d1-3a0c939e2ffb">简介</a></li>
+<li><a href="#h:cd154a3b-21b3-4286-804c-66c98b65dca2">安装</a></li>
+<li><a href="#h:e2ef10af-f73c-4fee-be3b-8db51e6ccb65">使用</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Middleware</a></li>
+</ul>
+<section id="outline-container-h:306205cc-4b08-4a38-88d1-3a0c939e2ffb" class="outline-2">
+<h2 id="h:306205cc-4b08-4a38-88d1-3a0c939e2ffb"><a href="#h:306205cc-4b08-4a38-88d1-3a0c939e2ffb">简介</a></h2>
+<div class="outline-text-2" id="text-h:306205cc-4b08-4a38-88d1-3a0c939e2ffb">
+<p>
+sentry就扮演着一个错误收集的角色，将你的项目和sentry结合起来，无论谁在
+项目使用中报错，sentry都会第一次时间通知开发者，出现了什么错误，错误出
+现在哪，帮你记录错误，便于你解决问题，这就是sentry。
+</p>
+
+<ul class="org-ul">
+<li><p>
+什么是DSN
+</p>
+
+<p>
+DSN是连接客户端(项目)与sentry服务端,让两者能够通信的钥匙；每当我们在
+sentry服务端创建一个新的项目，都会得到一个独一无二的DSN，也就是密钥。
+在客户端初始化时会用到这个密钥，这样客户端报错，服务端就能抓到你对应
+项目的错误了。
+</p></li>
+</ul>
+
+<p>
+架构：<a href="https://develop.sentry.dev/application/architecture/">https://develop.sentry.dev/application/architecture/</a>
+</p>
+
+
+
+<figure id="org7cefc39">
+<img style="aspect-ratio:889/485" decoding="async" loading="lazy" src="./images/img_20240926_203205.webp" alt="img_20240926_203205.webp" width="90%">
+
+</figure>
+</div>
+</section>
+<section id="outline-container-h:cd154a3b-21b3-4286-804c-66c98b65dca2" class="outline-2">
+<h2 id="h:cd154a3b-21b3-4286-804c-66c98b65dca2"><a href="#h:cd154a3b-21b3-4286-804c-66c98b65dca2">安装</a></h2>
+<div class="outline-text-2" id="text-h:cd154a3b-21b3-4286-804c-66c98b65dca2">
+<p>
+<a href="https://github.com/sentry-kubernetes/charts/blob/develop/charts/sentry/README.md">https://github.com/sentry-kubernetes/charts/blob/develop/charts/sentry/README.md</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">helm pull sentry/sentry
+tar xf sentry-25.10.0.tgz
+<span class="org-builtin">cd</span> sentry
+</pre>
+</div>
+
+<p>
+创建sentry名称空间及自定义账号：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">kubectl  create ns sentry
+
+cat &lt;&lt;\EOF&gt; sentry-custom-account.yaml<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sentry-custom-account
+  namespace: sentry
+type: Opaque
+stringData:
+  admin-password: 74mJ4Z0xxx
+  s3-access-key-id: AKIAU6xxx
+  s3-secret-access-key: Cr4BHYkxxx
+  mail-password: nAKTIxxx
+EOF
+</span>
+kubectl  apply -f sentry-custom-account.yaml 
+</pre>
+</div>
+
+<p>
+value.yaml 修改
+</p>
+<pre class="example" id="org7dda3f6">
+#管理员用户
+user:
+  create: true
+  email: this@gmail.com
+  #password: aa
+
+  ## set this value to an existingSecret name to create the admin user with the password in the secret
+  existingSecret: sentry-admin-password
+
+
+asHook: true #首次安装为true来初始化，之后更新时改为false
+
+#sentry-worker和sentry-web之间共享数据，使用云对象存存储s3或者efs文件存储。这里使用s3存储
+#如果使用文件系统是RWO访问模式，  就把web服务的strategyType: RollingUpdate 改为的strategyType: Recreate
+filestore:
+  backend: s3 
+  s3:                                                                                                                                                        
+    existingSecret: sentry-custom-account
+    bucketName: sentry-filestore-data
+  #  endpointUrl:
+  #  signature_version:
+    region_name: af-south-1
+  #  default_acl:
+
+
+#將 activeDeadlineSeconds 設定為 1000 以免 pods 還未完成工作就被以為是Error 直接將整個安裝中斷掉。
+hooks:
+  activeDeadlineSeconds: 1000
+
+#邮箱
+mail:
+  backend: smtp
+  useTls: true
+  useSsl: false
+  username: this@gmail.com
+  #password: ""
+  existingSecret: sentry-custom-account
+  existingSecretKey: mail-password
+  port: 587
+  host: smtp.gmail.com
+  from: this@gmail.com
+#注意，如果使用gmail邮箱，需要开启双重认证后，找到应用专用密码，创建16位密码
+
+symbolicator:
+  enabled: true   
+
+#URL, DSN 客户端回调地址
+system:
+  url: "https://kubesentry.&lt;your-domain&gt;"
+
+#域名
+ingress:
+  enabled: true                                                                                       
+  regexPathStyle: nginx
+  ingressClassName: nginx-prod
+  alb:
+    httpRedirect: false
+  hostname: kubesentry.cici.com
+
+#目前镜像不支持arm架构，创建amd节点组，nodeSelecor指定node
+  nodeSelector: {type: adm-ops}
+#vim   :%s@nodeSelector:.*@nodeSelector: {type: adm-ops}@g
+</pre>
+
+<p>
+amd镜像服务： clickhouse\cleanup
+</p>
+<pre class="example" id="org3a6cda8">
+sentry:
+  cleanup:
+    nodeSelector: {type: adm-ops}
+
+clickhouse:
+  enabled: true
+  clickhouse:
+    nodeSelector: {type: adm-ops}
+
+kafka:
+  enabled: true
+  provisioning:
+    enabled: true
+    nodeSelector: {type: adm-ops}
+</pre>
+
+<p>
+安装
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm install sentry sentry/sentry -n sentry -f ./values-new.yaml --dry-run
+helm upgrade --install sentry sentry/sentry -n sentry -f ./values-new.yaml  --debug --wait
+</pre>
+</div>
+
+
+<p>
+初始化数据库\创建用户
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">kubectl  exec -it -n sentry $(kubectl get pods  -n sentry  |grep sentry-web |awk <span class="org-string">'{print $1}'</span>) bash  
+sentry upgrade
+sentry createuser --force-update
+</pre>
+</div>
+
+<p>
+重启服务
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-keyword">for</span> s<span class="org-keyword"> in</span> <span class="org-sh-quoted-exec">`kubectl  -n sentry get deploy  |sed '1d'|awk '{print $1}'`</span>; <span class="org-keyword">do </span><span class="org-builtin">echo</span> $<span class="org-variable-name">s</span>; kubectl -n sentry rollout restart deploy $<span class="org-variable-name">s</span>  ;<span class="org-keyword">done</span>
+</pre>
+</div>
+
+<p>
+卸载
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">helm uninstall sentry -n sentry
+kubectl delete pods -n sentry --all
+kubectl delete job -n sentry --all
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500; pvc
+</span>kubectl delete pvc --all -n sentry
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:e2ef10af-f73c-4fee-be3b-8db51e6ccb65" class="outline-2">
+<h2 id="h:e2ef10af-f73c-4fee-be3b-8db51e6ccb65"><a href="#h:e2ef10af-f73c-4fee-be3b-8db51e6ccb65">使用</a></h2>
+<div class="outline-text-2" id="text-h:e2ef10af-f73c-4fee-be3b-8db51e6ccb65">
+<ul class="org-ul">
+<li>创建团队： setting&#x2013;&gt;team</li>
+<li>增加成员：</li>
+<li>创建项目：new project</li>
+<li>项目告警：Alert</li>
+</ul>
+
+<p>
+参考：
+</p>
+<ul class="org-ul">
+<li><a href="https://medium.com/@hank93513/deploy-your-own-sentry-in-kubernetes-fc255e0e31e6">https://medium.com/@hank93513/deploy-your-own-sentry-in-kubernetes-fc255e0e31e6</a></li>
+<li><a href="https://www.cnblogs.com/echolun/p/10187245.html">https://www.cnblogs.com/echolun/p/10187245.html</a></li>
+</ul>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

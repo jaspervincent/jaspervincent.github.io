@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Prometheus</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="即：推（remote_write）+ CloudWatch API 拉，完全不用 VPN。" />
+<link rel="canonical" href="https://xuchangwei.com/linux/monitor/prometheus/index.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: Prometheus" />
+<meta property="og:description" content="即：推（remote_write）+ CloudWatch API 拉，完全不用 VPN。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/monitor/prometheus/index.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/monitor/prometheus/index.html","@type":"WebPage","name":"Linux: Prometheus","description":"即：推（remote_write）+ CloudWatch API 拉，完全不用 VPN。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Prometheus</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:1784852E-E54E-44E9-8DA4-5E8A00235FBE">exporter</a></li>
+<li><a href="#h:76747311-0D20-4603-9E30-556827DF22A2">告警规则</a></li>
+<li><a href="#h:1BC4D555-9585-4DFC-963E-FF5A2E8E23AD">多云采集</a>
+<ul>
+<li><a href="#h:4E349C4B-75D6-4E18-AF3D-8E728DF74962">外部 prometheus 相关</a>
+<ul>
+<li><a href="#h:DF9CD891-E7E4-41B3-88AD-A1447C65C015">生成证书</a></li>
+<li><a href="#h:B412BA0D-32B4-4731-ADA3-94498B5B5CEE">grafana 模板</a></li>
+<li><a href="#h:bc2e428a-36e7-41fb-a29e-aab172a8a7e6">安装外部 promethues</a></li>
+<li><a href="#h:BA459EBB-3BDB-4F4F-8CB0-58E234BB3FA0">各客户端怎么信任它</a></li>
+<li><a href="#h:C4204E02-D7D1-4416-8667-D9F000B836F7">prometheus 重新加载配置脚本</a></li>
+</ul>
+</li>
+<li><a href="#h:726F16D9-9CD8-4443-90D7-6919362B5F62">promehtues 采集 EKS 信息</a></li>
+<li><a href="#h:12387426-8B85-4B9D-B113-BD6A2DE94D6F">RDS / Redis / MQ 基础采集-YACE</a>
+<ul>
+<li><a href="#h:82B686E8-17F0-4CD8-B746-05F90809DA76">IAM 授权</a>
+<ul>
+<li><a href="#h:4C921E35-D21D-4DA0-A821-861B13983A0E">方式 A：IRSA（通用，推荐）</a></li>
+<li><a href="#h:2E29E47C-1C20-44EE-8B76-0AE5913AD4FB">方式 B：EKS Pod Identity（较新，不用碰 OIDC）</a></li>
+</ul>
+</li>
+<li><a href="#h:9859BD00-A846-4D28-8982-CC6EFC833AA8">部署清单</a></li>
+<li><a href="#h:562777EE-A9CE-4E0C-840B-2A79CFCFF6C2">自定定义 grafana 监控模板 json</a></li>
+</ul>
+</li>
+<li><a href="#h:79E72CC7-81F0-4D23-A896-D4CCF0A39ADE">深度指标：exporter 放进 EKS</a>
+<ul>
+<li><a href="#h:EF45D176-E7AE-4E2E-B646-9EDE63980F24">redis-exporter</a></li>
+<li><a href="#h:EF14066E-92BC-4989-AB2A-E2339AF43272">添加 agent 静态配置</a></li>
+<li><a href="#h:9C0D6805-5415-4EDD-950D-0A6889AE621F">mysql-exporter</a></li>
+<li><a href="#h:B0C357E4-CBDA-4965-B219-F2339AA9D8E0">rabbitmq-export</a></li>
+</ul>
+</li>
+<li><a href="#h:44252883-4BE6-46AA-8F81-2BD92AA6DDE7">PrometheusAlert全家桶</a></li>
+<li><a href="#h:F861F55B-9545-41E2-853C-9A84421E325A">备选方案</a>
+<ul>
+<li><a href="#h:91C909B6-A66A-47D6-B1B1-B51DE560B073">方案 B：跨云 VPN，保持纯 pull</a></li>
+<li><a href="#h:F8022D9B-AF7F-468C-85F5-83ADB6FF1826">方案 C：通过公网 apiserver 做代理抓取（小集群应急）</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+<section id="outline-container-h:1784852E-E54E-44E9-8DA4-5E8A00235FBE" class="outline-2">
+<h2 id="h:1784852E-E54E-44E9-8DA4-5E8A00235FBE"><a href="#h:1784852E-E54E-44E9-8DA4-5E8A00235FBE">exporter</a></h2>
+<div class="outline-text-2" id="text-h:1784852E-E54E-44E9-8DA4-5E8A00235FBE">
+<ul class="org-ul">
+<li><a href="./exporter.html">exporter</a></li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:76747311-0D20-4603-9E30-556827DF22A2" class="outline-2">
+<h2 id="h:76747311-0D20-4603-9E30-556827DF22A2"><a href="#h:76747311-0D20-4603-9E30-556827DF22A2">告警规则</a></h2>
+<div class="outline-text-2" id="text-h:76747311-0D20-4603-9E30-556827DF22A2">
+<ul class="org-ul">
+<li><a href="https://samber.github.io/awesome-prometheus-alerts/">https://samber.github.io/awesome-prometheus-alerts/</a></li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:1BC4D555-9585-4DFC-963E-FF5A2E8E23AD" class="outline-2">
+<h2 id="h:1BC4D555-9585-4DFC-963E-FF5A2E8E23AD"><a href="#h:1BC4D555-9585-4DFC-963E-FF5A2E8E23AD">多云采集</a></h2>
+<div class="outline-text-2" id="text-h:1BC4D555-9585-4DFC-963E-FF5A2E8E23AD">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">名称</td>
+<td class="org-left">平台</td>
+<td class="org-left">采集方式</td>
+<td class="org-left">是不需要打通内网</td>
+</tr>
+
+<tr>
+<td class="org-left">外部 promethes</td>
+<td class="org-left">ali</td>
+<td class="org-left">接收端</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">外部 grafana</td>
+<td class="org-left">ali</td>
+<td class="org-left">展示</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">EKS</td>
+<td class="org-left">aws</td>
+<td class="org-left">集群内部署一套 Prometheus（agent 模式） →</td>
+<td class="org-left">否。出网可访问 ali prom</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">remote_write 推到外部 Prometheus</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">RDS 基础指标</td>
+<td class="org-left">aws</td>
+<td class="org-left">走公网调CloudWatch API</td>
+<td class="org-left">否</td>
+</tr>
+
+<tr>
+<td class="org-left">ElastiCache(Redis)基础指标</td>
+<td class="org-left">aws</td>
+<td class="org-left">走公网调CloudWatch API</td>
+<td class="org-left">否</td>
+</tr>
+
+<tr>
+<td class="org-left">Amazon MQ 的基础指标</td>
+<td class="org-left">aws</td>
+<td class="org-left">走公网调CloudWatch API</td>
+<td class="org-left">否</td>
+</tr>
+
+<tr>
+<td class="org-left">RDS/Redis/MQ 的引擎深度指标</td>
+<td class="org-left">aws</td>
+<td class="org-left">EKS 里跑 mysqld/redis/rabbitmq-exporter</td>
+<td class="org-left">否</td>
+</tr>
+
+<tr>
+<td class="org-left">（慢查询、keyspace、队列深度等）</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">内网端口连通性探测</td>
+<td class="org-left">aws</td>
+<td class="org-left">blackbox-exporter 部署到 EKS 里</td>
+<td class="org-left">否</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+即：推（remote_write）+ CloudWatch API 拉，完全不用 VPN。
+</p>
+
+<p>
+架构
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; &#38463;&#37324;&#20113; ECS 10.14.0.219 / &#20844;&#32593; IP       &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  Prometheus v3.13.3  (HTTPS 9090, basic auth, remote-write receiver)                 &#9474;
+&#9474;  Grafana 13.0.8 / Alertmanager / node-exporter / cadvisor / blackbox-exporter        &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9650;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                                    &#9474;  remote_write (HTTPS + Basic Auth, &#20986;&#20844;&#32593;)
+                                    &#9474;
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472; AWS VPC 172.31.0.0/16 &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  EKS                                                                                 &#9474;
+&#9474;   &#9500;&#9472; kube-prometheus-stack (&#26412;&#22320; 12h &#20445;&#30041;&#65292;&#36127;&#36131;&#25152;&#26377;&#38598;&#32676;&#20869;&#25235;&#21462; + &#32479;&#19968;&#22806;&#25512;)                  &#9474;
+&#9474;   &#9474;    &#9500;&#9472; kubelet / cAdvisor / kube-state-metrics / node-exporter / apiserver        &#9474;
+&#9474;   &#9474;    &#9500;&#9472; YACE  &#9472;&#9472;(&#20844;&#32593; CloudWatch API)&#9472;&#9472;&#9654; AWS/RDS, AWS/ElastiCache, AWS/AmazonMQ     &#9474;
+&#9474;   &#9474;    &#9500;&#9472; mysqld_exporter / redis_exporter / rabbitmq_exporter &#65288;&#20869;&#32593;&#30452;&#36830;&#65292;&#28145;&#24230;&#25351;&#26631;&#65289;    &#9474;
+&#9474;   &#9474;    &#9492;&#9472; blackbox-exporter &#65288;&#20869;&#32593;&#31471;&#21475;&#25506;&#27963;&#65289;                                            &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+</pre>
+</div>
+</div>
+<div id="outline-container-h:4E349C4B-75D6-4E18-AF3D-8E728DF74962" class="outline-3">
+<h3 id="h:4E349C4B-75D6-4E18-AF3D-8E728DF74962"><a href="#h:4E349C4B-75D6-4E18-AF3D-8E728DF74962">外部 prometheus 相关</a></h3>
+<div class="outline-text-3" id="text-h:4E349C4B-75D6-4E18-AF3D-8E728DF74962">
+<p>
+开启 remote-write 接收 + 鉴权 + TLS
+</p>
+
+
+<ul class="org-ul">
+<li>建议走 私有 CA → 签发服务端证书 两级结构，而不是直接 req -x509 一把梭：这样 AWS 侧只需要信任一个 ca.crt，以后换 IP / 加域名重签服务端证书，客户端不用动。</li>
+<li>Go（Prometheus / Grafana 都是 Go）自 1.15 起完全忽略 CN，只认 SAN。所以 SAN 里必须补上 DNS:prometheus（compose 里 Grafana 是用
+<a href="https://prometheus:9090">https://prometheus:9090</a> 连的）和 IP:127.0.0.1，否则容器内互访会报 x509: certificate is valid for &#x2026;, not prometheus。</li>
+</ul>
+</div>
+<div id="outline-container-h:DF9CD891-E7E4-41B3-88AD-A1447C65C015" class="outline-4">
+<h4 id="h:DF9CD891-E7E4-41B3-88AD-A1447C65C015"><a href="#h:DF9CD891-E7E4-41B3-88AD-A1447C65C015">生成证书</a></h4>
+<div class="outline-text-4" id="text-h:DF9CD891-E7E4-41B3-88AD-A1447C65C015">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /opt/docker/monitor/prometheus/certs
+<span class="org-builtin">cd</span> /opt/docker/monitor/prometheus/certs
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">1 SAN &#25193;&#23637;&#25991;&#20214;
+</span>
+cat &gt; fd.ext &lt;&lt;<span class="org-string">'EOF'</span><span class="org-sh-heredoc">
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = DNS:*.xxx.com, DNS:xxx.com, DNS:prometheus, DNS:localhost, IP:&lt;&#20869;&#32593;IP&gt;, IP:&lt;&#20320;&#30340;IP&gt;, IP:127.0.0.1
+EOF
+</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">2 &#31169;&#26377; CA&#65288;100 &#24180;&#65289;
+</span>
+openssl genrsa -out ca.key 4096
+
+openssl req -x509 -new -nodes -sha256 -days 36500 <span class="org-sh-escaped-newline">\</span>
+  -key ca.key -out ca.crt <span class="org-sh-escaped-newline">\</span>
+  -subj <span class="org-string">"/C=CN/ST=hangzhou/L=hangzhou/O=ops:prometheus/CN=ops-internal-ca"</span> <span class="org-sh-escaped-newline">\</span>
+  -addext <span class="org-string">"basicConstraints=critical,CA:TRUE,pathlen:0"</span> <span class="org-sh-escaped-newline">\</span>
+  -addext <span class="org-string">"keyUsage=critical,keyCertSign,cRLSign"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">CA &#30340; CN &#19981;&#35201;&#21644;&#26381;&#21153;&#31471;&#35777;&#20070;&#30340; CN &#37325;&#21517;&#65292;&#21542;&#21017;&#37096;&#20998;&#24037;&#20855;&#38142;&#36335;&#26657;&#39564;&#20250;&#29359;&#36855;&#31946;&#65292;&#36825;&#37324;&#29992; ops-internal-ca&#12290;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">3 &#26381;&#21153;&#31471;&#31169;&#38053; + CSR&#65288;&#29992;&#20320;&#32473;&#30340; subj&#65289;
+</span>
+openssl genrsa -out tls.key 2048
+
+openssl req -new -sha256 -key tls.key -out tls.csr <span class="org-sh-escaped-newline">\</span>
+  -subj <span class="org-string">"/C=CN/ST=hangzhou/L=hangzhou/O=ops:prometheus/CN=prometheus"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">4 &#29992; CA &#31614;&#21457;
+</span>
+openssl x509 -req -sha256 -days 36500 <span class="org-sh-escaped-newline">\</span>
+  -in tls.csr <span class="org-sh-escaped-newline">\</span>
+  -CA ca.crt -CAkey ca.key -CAcreateserial <span class="org-sh-escaped-newline">\</span>
+  -extfile fd.ext <span class="org-sh-escaped-newline">\</span>
+  -out tls.crt
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">5 &#26657;&#39564;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#30475; SAN &#26377;&#27809;&#26377;&#20840;&#36827;&#21435;
+</span>openssl x509 -in tls.crt -noout -text | grep -A2 <span class="org-string">'Subject Alternative Name'</span>
+openssl x509 -in tls.crt -noout -subject -issuer -dates
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#31614;&#38142;
+</span>openssl verify -CAfile ca.crt tls.crt          <span class="org-comment-delimiter"># </span><span class="org-comment">&#24212;&#36755;&#20986; tls.crt: OK
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#30830;&#35748;&#20844;&#31169;&#38053;&#37197;&#23545;&#65288;&#20004;&#20010; md5 &#24517;&#39035;&#19968;&#33268;&#65289;
+</span>openssl x509 -in tls.crt -noout -pubkey | openssl md5
+openssl rsa  -in tls.key -pubout       | openssl md5
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">6 &#26435;&#38480;
+</span>chmod 600 ca.key tls.key
+chmod 644 ca.crt tls.crt
+rm -f tls.csr          <span class="org-comment-delimiter"># </span><span class="org-comment">ca.key &#35831;&#31163;&#32447;&#22791;&#20221;&#65292;&#21035;&#30041;&#22312;&#23481;&#22120;&#33021;&#35835;&#21040;&#30340;&#22320;&#26041;&#20043;&#22806;&#20063;&#21035;&#20002;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#23481;&#22120;&#37324; Prometheus &#20197; user: '0' &#36305;&#65292;root &#33021;&#35835; 600 &#30340; key&#65292;&#27809;&#38382;&#39064;&#12290;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:B412BA0D-32B4-4731-ADA3-94498B5B5CEE" class="outline-4">
+<h4 id="h:B412BA0D-32B4-4731-ADA3-94498B5B5CEE"><a href="#h:B412BA0D-32B4-4731-ADA3-94498B5B5CEE">grafana 模板</a></h4>
+<div class="outline-text-4" id="text-h:B412BA0D-32B4-4731-ADA3-94498B5B5CEE">
+<p>
+<a href="https://grafana.com/grafana/dashboards/">https://grafana.com/grafana/dashboards/</a>
+</p>
+
+
+<ul class="org-ul">
+<li>k8s clustr: 13105</li>
+<li>prometheus:25537</li>
+<li>node: 8919(中文汉化版) 1860(首选) node</li>
+<li>docker:14282</li>
+<li>mysql:7362 mysql-exporter 14057</li>
+<li>redis: 763</li>
+<li>blackbox: 14928</li>
+<li>JVM:4701</li>
+<li>nodejs
+<ul class="org-ul">
+<li>Node.js Exporter 14058</li>
+<li><a href="https://stackabuse.com/nodejs-application-monitoring-with-prometheus-and-grafana/">https://stackabuse.com/nodejs-application-monitoring-with-prometheus-and-grafana/</a></li>
+</ul></li>
+<li>rabbitmq:</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:bc2e428a-36e7-41fb-a29e-aab172a8a7e6" class="outline-4">
+<h4 id="h:bc2e428a-36e7-41fb-a29e-aab172a8a7e6"><a href="#h:bc2e428a-36e7-41fb-a29e-aab172a8a7e6">安装外部 promethues</a></h4>
+<div class="outline-text-4" id="text-h:bc2e428a-36e7-41fb-a29e-aab172a8a7e6">
+<p>
+prometheus compose
+</p>
+
+<p>
+web.yml TLS + Basic Auth
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">mkdir monitor/prometheus/rulues -pv
+<span class="org-builtin">cd</span> monitor
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Prometheus &#30340; web.yml &#21482;&#25903;&#25345; bcrypt
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#23494;&#30721;-&#26041;&#27861;1
+</span>apt install apache2-utils -y
+htpasswd -nBC 10 remote_writer   &#8594; &#21462;&#20882;&#21495;&#21518;&#38754;&#37027;&#20018;&#65292;&#27880;&#24847; $ &#22312; yaml &#21333;&#24341;&#21495;&#37324;&#26159;&#23433;&#20840;&#30340;
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#23494;&#30721;-&#26041;&#27861;2
+</span>docker run --rm httpd:alpine htpasswd -nBC 10 remote_writer
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;&#23494;&#30721;-&#26041;&#27861;3
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#23494;&#30721;
+</span>cat p.py &lt;&lt;EOF<span class="org-sh-heredoc">
+import getpass
+import bcrypt
+
+password = getpass.getpass("password: ")
+hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+print(hashed_password.decode())
+EOF
+</span>python3 p.py <span class="org-comment-delimiter"># </span><span class="org-comment">&#36755;&#20837;&#23494;&#30721;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#37197;&#32622;
+</span>cat &gt; prometheus/web.yml &lt;&lt;\EOF<span class="org-sh-heredoc">
+# https://prometheus.io/docs/prometheus/latest/configuration/https/
+tls_server_config:
+  cert_file: /etc/prometheus/certs/tls.crt
+  key_file:  /etc/prometheus/certs/tls.key
+  min_version: TLS12
+
+basic_auth_users:
+  admin: $2b$12$Bq/xxx
+  remote_write: $2y$10$PX4xxxxx
+EOF</span>
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">prometheus/alertmanager.yml
+</span>cat &lt;&lt;\EOF&gt; prometheus/alertmanager.yml <span class="org-sh-heredoc">
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 20m
+  receiver: 'default-receiver'
+
+receivers:
+- name: default-receiver
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#40657;&#30418;&#30417;&#25511;
+</span>cat &gt; prometheus/blackbox.yml &lt;&lt;EOF<span class="org-sh-heredoc">
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      preferred_ip_protocol: "ip4"
+      valid_status_codes: [200, 401, 301, 302]
+      method: GET
+  http_post_2xx:
+    http:
+      method: POST
+      preferred_ip_protocol: ip4
+    prober: http
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+  icmp:
+    prober: icmp
+    timeout: 5s
+EOF</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">prometheus/prometheus.yml
+</span>cat &gt; prometheus/prometheus.yml  &lt;&lt;\EOF<span class="org-sh-heredoc">
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: aliyun
+
+storage:
+  tsdb:
+    out_of_order_time_window: 30m   # &#36328;&#20113;&#32593;&#32476;&#25238;&#21160;/&#37325;&#20256;&#26102;&#65292;&#20081;&#24207;&#26679;&#26412;&#19981;&#34987;&#20002;&#24323;
+
+alerting:
+  alertmanagers:
+  - follow_redirects: true
+    scheme: http
+    timeout: 10s
+    api_version: v2
+    static_configs:
+    - targets:
+      - alertmanager:9093
+
+rule_files:
+- /etc/prometheus-rules/*.yml
+
+#https://grafana.com/docs/grafana-cloud/send-data/metrics/metrics-prometheus/prometheus-config-examples/docker-compose-linux/
+
+#remote_write:
+#  - url: '&lt;Your Prometheus remote_write endpoint&gt;'
+#    basic_auth:
+#      username: '&lt;Your Grafana Username&gt;'
+#      password: '&lt;Your Grafana API key&gt;'
+
+
+scrape_configs:
+- job_name: 'prometheus'
+  scrape_interval: 1m
+  scheme: https
+  static_configs:
+  - targets: ['localhost:9090']
+  tls_config:
+    ca_file: /etc/prometheus/certs/ca.crt
+    server_name: localhost
+  basic_auth:
+    username: admin
+    password: xxx
+
+- job_name: 'cadvisor'
+  scrape_interval: 5s
+  static_configs:
+  - targets: ['cadvisor:8080']
+
+- job_name: 'node'
+  static_configs:
+  - targets: ['node-exporter:9100']
+
+- job_name: 'blackbox-exporter'
+  static_configs:
+  - targets: ['blackbox-exporter:9115']
+- job_name: domain-url
+  scrape_interval: 30s
+  scrape_timeout: 20s
+  metrics_path: /probe
+  params:
+    modelue: [http_2xx]
+  static_configs:
+  # &#20869;&#32593;&#19981;&#20114;&#36890;
+  #- targets:
+  #    - http://argocd.xxx.com/login
+  #  labels:
+  #    bussiness: ops
+  #    serverty: info
+  - targets:
+      - https://devgw.xxx.com/api/
+    labels:
+      bussiness: pt-dev
+      service: web
+      serverty: info
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: blackbox-exporter:9115
+  - source_labels: [instance]
+    regex: https?://(.*)
+    replacement: "$1"
+    target_label: target
+
+- job_name: 'mysql'
+  static_configs:
+  - targets: ['mysqld_exporter:9104']
+
+- job_name: 'redis'
+  static_configs:
+  - targets: ['redis_exporter:9121']
+EOF</span>
+</pre>
+</div>
+
+
+<p>
+docker-compose.yml
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; docker-compose.yml &lt;&lt;EOF<span class="org-sh-heredoc">
+networks:
+  monitor_net:
+    name: monitor_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.222.0/24
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.13.3
+    container_name: prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/web.yml:/etc/prometheus/web.yml
+      - ./prometheus/certs:/etc/prometheus/certs:ro
+      - ./prometheus/rules:/etc/prometheus-rules
+      - ./prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.config.file=/etc/prometheus/web.yml'
+      - '--web.enable-remote-write-receiver'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=60d'
+    user: '0'
+    ports:
+      - 9090:9090
+    networks:
+      - monitor_net
+
+  alertmanager:
+    hostname: alertmanager
+    container_name: alertmanager
+    image: prom/alertmanager:v0.34.0
+    volumes:
+      - ./prometheus/alertmanager.yml:/config/alertmanager.yml
+    command:
+      - "--config.file=/config/alertmanager.yml"
+      - '--data.retention=240h'
+    ports:
+      - 9093:9093
+    networks:
+      - monitor_net
+    restart: always
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:13.0.8
+    depends_on:
+      - prometheus
+    user: '0'
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana-data:/var/lib/grafana
+    networks:
+      - monitor_net
+    restart: always
+
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.57.0
+    hostname: cadvisor
+    container_name: cadvisor
+    #platform: linux/aarch64
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+      - --store_container_labels=false
+      - --disable_metrics=percpu,sched,tcp,udp,hugetlb,referenced_memory,cpu_topology,resctrl
+    ports:
+      - 8080:8080
+    networks:
+      - monitor_net
+    restart: unless-stopped
+
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    hostname: node-exporter
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - 9100:9100
+    networks:
+      - monitor_net
+
+  blackbox-exporter:
+      image: quay.io/prometheus/blackbox-exporter:latest
+      hostname: blackbox-exporter
+      container_name: blackbox-exporter
+      restart: unless-stopped
+      volumes:
+      - ./prometheus/blackbox.yml:/etc/blackbox_exporter/config.yml
+      command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+      ports:
+      - "9115:9115"
+      networks:
+      - monitor_net
+      # &#24320;&#21551; icmp ping&#25506;&#27979;
+      cap_add:
+        - NET_RAW
+
+#  mysqld_exporter:
+#    image: prom/mysqld-exporter:v0.15.1
+#    hostname: mysqld-exporter
+#    container_name: mysqld_exporter
+#    ports:
+#      - 9104
+#    command:
+#      - "--mysqld.username=root:kot2LT4jgJEo2rsnvduF"
+#      - "--mysqld.address=mysql-8-slots:3306"
+#      - '--tls.insecure-skip-verify'
+#    restart: always
+#    networks:
+#      - monitor_net
+#
+#  redis_exporter:
+#    image: oliver006/redis_exporter:v1.62.0
+#    container_name: redis_exporter
+#    ports:
+#      - 9121
+#    command:
+#      - "--redis.addr=redis://redis-stack-slots:6379"
+#      - "--redis.password=OzTKYlJ9KvGZAkYf9B"
+#      - '--debug'
+#    restart: always
+#    networks:
+#      - monitor_net
+
+#  debian:
+#    image: debian:unstable-slim
+#    container_name: debian
+#    restart: always
+#    tty: true
+#    #entrypoint:
+#    #  - cat
+#    networks:
+#      - monitor_net
+EOF</span>
+</pre>
+</div>
+
+<p>
+启动
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">docker compose up -d
+docker compose logs --tail=50 prometheus
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20174; ECS &#26412;&#26426;&#39564;&#35777;&#65288;&#24102; CA &#26657;&#39564;&#65292;&#19981;&#35201;&#29992; -k&#65289;
+</span>curl --cacert /opt/docker/monitor/prometheus/certs/ca.crt <span class="org-sh-escaped-newline">\</span>
+     -u remote_writer:<span class="org-string">'&#20320;&#30340;&#23494;&#30721;'</span> <span class="org-sh-escaped-newline">\</span>
+     https://10.14.0.219:9090/-/healthy
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20844;&#32593; IP &#20063;&#24212;&#36890;&#36807;&#65288;SAN &#37324;&#26377;&#65289;
+</span>curl --cacert ... -u ... https://&lt;&#20320;&#30340;IP&gt;:9090/-/healthy
+
+&#22914;&#26524;&#26085;&#24535;&#37324;&#20986;&#29616; tls: failed to find any PEM data<span class="org-keyword"> in</span> key input&#65292;&#35828;&#26126; key &#34987;&#21152;&#23494;&#20102;&#65288;&#29983;&#25104;&#26102;&#28431;&#20102; -nodes/&#29992;&#20102; -aes256&#65289;&#12290;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:BA459EBB-3BDB-4F4F-8CB0-58E234BB3FA0" class="outline-4">
+<h4 id="h:BA459EBB-3BDB-4F4F-8CB0-58E234BB3FA0"><a href="#h:BA459EBB-3BDB-4F4F-8CB0-58E234BB3FA0">各客户端怎么信任它</a></h4>
+<div class="outline-text-4" id="text-h:BA459EBB-3BDB-4F4F-8CB0-58E234BB3FA0">
+<p>
+<b>Prometheus 自监控 job</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">- job_name: <span class="org-string">'prometheus'</span>
+  scheme: https
+  tls_config:
+    ca_file: /etc/prometheus/certs/ca.crt
+    server_name: prometheus
+  basic_auth:
+    username: remote_writer
+    password: <span class="org-string">'&#20320;&#30340;&#23494;&#30721;'</span>
+  static_configs:
+    - targets: [<span class="org-string">'prometheus:9090'</span>]
+</pre>
+</div>
+
+<p>
+<b>Grafana 数据源</b>
+</p>
+
+<p>
+URL 改成 <a href="https://prometheus:9090">https://prometheus:9090</a>，勾上 With CA Cert，把 ca.crt 内容粘进去，Server Name 填 prometheus。（cat prometheus/certs/ca.crt 复制即可。不想粘就勾 Skip TLS Verify）
+</p>
+</div>
+</div>
+<div id="outline-container-h:C4204E02-D7D1-4416-8667-D9F000B836F7" class="outline-4">
+<h4 id="h:C4204E02-D7D1-4416-8667-D9F000B836F7"><a href="#h:C4204E02-D7D1-4416-8667-D9F000B836F7">prometheus 重新加载配置脚本</a></h4>
+<div class="outline-text-4" id="text-h:C4204E02-D7D1-4416-8667-D9F000B836F7">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#24314;&#19968;&#20010; 600 &#26435;&#38480;&#30340;&#23494;&#30721;&#25991;&#20214;
+</span><span class="org-builtin">umask</span> 077
+printf <span class="org-string">'admin:xxxpassword'</span> &gt; /opt/docker/monitor/.reload-cred
+chmod 600 /opt/docker/monitor/.reload-cred
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#33050;&#26412;&#20869;&#23481;
+</span>cat &gt;reload-prom &lt;&lt;\EOF<span class="org-sh-heredoc">
+#!/usr/bin/bash
+# prometheus &#37325;&#21152;&#36733;&#37197;&#32622;
+ppath=/opt/docker/monitor
+/usr/bin/curl -fsS --connect-timeout 5 -m 30 \
+  -XPOST --cacert ${ppath}/prometheus/certs/tls.crt \
+  -u "$(cat ${ppath}/.reload-cred)" \
+  https://127.0.0.1:9090/-/reload \
+  &amp;&amp; echo "reload OK" || echo "reload FAILED"
+EOF
+</span>
+chmod +x reload-prom
+ln -sv /opt/docker/monitor/reload-prom /usr/local/bin
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#36825;&#26679;&#26222;&#36890;&#29992;&#25143; cat &#33050;&#26412;&#30475;&#19981;&#21040;&#23494;&#30721;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:726F16D9-9CD8-4443-90D7-6919362B5F62" class="outline-3">
+<h3 id="h:726F16D9-9CD8-4443-90D7-6919362B5F62"><a href="#h:726F16D9-9CD8-4443-90D7-6919362B5F62">promehtues 采集 EKS 信息</a></h3>
+<div class="outline-text-3" id="text-h:726F16D9-9CD8-4443-90D7-6919362B5F62">
+<p>
+EKS 指标：集群内 Prometheus → remote_write
+</p>
+
+<p>
+部署（kube-prometheus-stack，最省事）
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/prometheus-community/helm-charts/">https://github.com/prometheus-community/helm-charts/</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#25226; CA &#22622;&#36827; Secret&#65306;
+</span>kubectl create ns monitoring
+kubectl -n monitoring create secret generic prom-rw-ca <span class="org-sh-escaped-newline">\</span>
+  --from-file=ca.crt=./ca.crt
+
+kubectl -n monitoring create secret generic prom-rw <span class="org-sh-escaped-newline">\</span>
+  --from-literal=<span class="org-variable-name">username</span>=remote_writer --from-literal=<span class="org-variable-name">password</span>=<span class="org-string">'xxx'</span>
+
+cat &gt;values-agent.yaml &lt;&lt; EOF<span class="org-sh-heredoc">
+grafana:        { enabled: false }
+alertmanager:   { enabled: false }
+
+prometheus:
+  agentMode: true                  # &#24320;&#21551;&#36716;&#21457;&#22120;&#12290;&#19981;&#26412;&#22320;&#23384;&#20648;&#12289;&#30465;&#20869;&#23384;&#12290;&#19981;&#33021;&#26597;&#21382;&#21490;
+  prometheusSpec:
+    retention: 12h                 # &#26412;&#22320;&#21482;&#30041;&#30701;&#26399;&#65292;&#26041;&#20415;&#23601;&#36817;&#25490;&#26597;
+    externalLabels:
+      cloud: aws
+      cluster: eks-dev             # &#20851;&#38190;&#65306;Grafana &#38752;&#23427;&#21306;&#20998;&#38598;&#32676;
+    additionalScrapeConfigsSecret: # &#38745;&#24577;&#37197;&#32622;
+      enabled: true
+      name: additional-scrape-configs
+      key: prometheus-additional.yaml
+    remoteWrite:
+      - url: https://&lt;&#20320;&#30340;IP&gt;:9090/api/v1/write
+        basicAuth:
+          username: { name: prom-rw, key: username }
+          password: { name: prom-rw, key: password }
+        writeRelabelConfigs:
+          # &#20002;&#25481;&#39640;&#22522;&#25968;&#30452;&#26041;&#22270;&#65292;&#36328;&#20113;&#20986;&#27969;&#37327;&#26159;&#25353; GB &#25910;&#36153;&#30340;
+          - sourceLabels: [__name__]
+            regex: '(apiserver_request_duration_seconds_bucket|etcd_request_duration_seconds_bucket|.*_bucket)'
+            action: drop
+          - sourceLabels: [__name__]
+            regex: 'go_.*|process_.*'
+            action: drop
+        tlsConfig:
+          ca:
+            secret:
+              name: prom-rw-ca
+              key: ca.crt
+          #serverName: 'xx.me'
+EOF
+</span>
+&#29992;&#22495;&#21517;&#23601;&#25226; xx.com &#35299;&#26512;&#21040; &lt;&#20320;&#30340;IP&gt;&#65288;&#65307;&#19981;&#24819;&#37197; DNS &#23601;&#30452;&#25509;&#20889; https://&lt;&#20320;&#30340;IP&gt;:9090/api/v1/write &#24182;&#25226;
+  serverName &#21435;&#25481;&#8212;&#8212;SAN &#37324;&#26377;&#36825;&#20010; IP&#65292;&#19968;&#26679;&#33021;&#36890;&#36807;&#26657;&#39564;&#12290;
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm search repo prometheus-community
+
+helm install -n monitoring kps <span class="org-sh-escaped-newline">\</span>
+    prometheus-community/kube-prometheus-stack <span class="org-sh-escaped-newline">\</span>
+    -f values-agent.yaml
+
+helm upgrade --install -n monitoring kps <span class="org-sh-escaped-newline">\</span>
+     prometheus-community/kube-prometheus-stack <span class="org-sh-escaped-newline">\</span>
+     -f values-agent.yaml
+<span class="org-comment-delimiter"># </span><span class="org-comment">helm -n monitoring uninstall prometheus</span>
+</pre>
+</div>
+<p>
+装完就自带 kubelet / cAdvisor / kube-state-metrics / node-exporter / apiserver / coredns 全套抓取规则，不用自己写。
+</p>
+
+<p>
+流量预估
+</p>
+<ul class="org-ul">
+<li>remote_write 是 snappy 压缩的 protobuf，经验值约 1.5~2 bytes/sample。</li>
+<li>10 个节点、约 15 万 series、30s 一次 ≈ 5000 samples/s ≈ 10 KB/s ≈ 25 GB/月，AWS 出公网约 $2~3/月。做了上面的 drop 后通常能砍掉一半以上。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:12387426-8B85-4B9D-B113-BD6A2DE94D6F" class="outline-3">
+<h3 id="h:12387426-8B85-4B9D-B113-BD6A2DE94D6F"><a href="#h:12387426-8B85-4B9D-B113-BD6A2DE94D6F">RDS / Redis / MQ 基础采集-YACE</a></h3>
+<div class="outline-text-3" id="text-h:12387426-8B85-4B9D-B113-BD6A2DE94D6F">
+<p>
+基础指标：YACE 拉 CloudWatch（零网络打通）
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-yet-another-cloudwatch-exporter/README.md">https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-yet-another-cloudwatch-exporter/README.md</a></li>
+</ul>
+
+<p>
+所有 AWS 托管服务的官方指标都在 CloudWatch，而 CloudWatch 是公网 endpoint，理论上 exporter 放哪都行。放进 EKS 的好处是可以用 IRSA / Pod Identity 拿临时凭证，彻底不落地 AccessKey；代价是指标要经 remote_write 才能到阿里云，链路断了 CloudWatch 指标也一起看不到（可接受）。
+</p>
+</div>
+<div id="outline-container-h:82B686E8-17F0-4CD8-B746-05F90809DA76" class="outline-4">
+<h4 id="h:82B686E8-17F0-4CD8-B746-05F90809DA76"><a href="#h:82B686E8-17F0-4CD8-B746-05F90809DA76">IAM 授权</a></h4>
+<div class="outline-text-4" id="text-h:82B686E8-17F0-4CD8-B746-05F90809DA76">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">CLUSTER</span>=eks-dev
+<span class="org-variable-name">REGION</span>=ap-southeast-1
+<span class="org-variable-name">ACCOUNT</span>=$(aws sts get-caller-identity --query Account --output text)
+</pre>
+</div>
+
+<p>
+IAM：建一个最小权限策略：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; yace-policy.json &lt;&lt;<span class="org-string">'EOF'</span><span class="org-sh-heredoc">
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "tag:GetResources",
+      "cloudwatch:ListMetrics",
+      "cloudwatch:GetMetricData",
+      "cloudwatch:GetMetricStatistics",
+      "iam:ListAccountAliases",
+      "rds:DescribeDBInstances",
+      "elasticache:DescribeCacheClusters",
+      "mq:ListBrokers"
+    ],
+    "Resource": "*"
+  }]
+}
+EOF
+</span>
+aws iam create-policy --policy-name YaceCloudWatchRead <span class="org-sh-escaped-newline">\</span>
+  --policy-document file://yace-policy.json
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">CLUSTER</span>=eks-jp-test
+<span class="org-variable-name">REGION</span>=ap-southeast-1
+<span class="org-variable-name">ACCOUNT</span>=$(aws sts get-caller-identity --query Account --output text)
+</pre>
+</div>
+</div>
+<div id="outline-container-h:4C921E35-D21D-4DA0-A821-861B13983A0E" class="outline-5">
+<h5 id="h:4C921E35-D21D-4DA0-A821-861B13983A0E"><a href="#h:4C921E35-D21D-4DA0-A821-861B13983A0E">方式 A：IRSA（通用，推荐）</a></h5>
+<div class="outline-text-5" id="text-h:4C921E35-D21D-4DA0-A821-861B13983A0E">
+<p>
+eksctl 一条命令把 OIDC provider、IAM Role、ServiceAccount 注解全部搞定：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">eksctl utils associate-iam-oidc-provider --cluster $<span class="org-variable-name">CLUSTER</span> --region $<span class="org-variable-name">REGION</span> --approve
+
+kubectl create ns monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+eksctl create iamserviceaccount <span class="org-sh-escaped-newline">\</span>
+  --cluster $<span class="org-variable-name">CLUSTER</span> --region $<span class="org-variable-name">REGION</span> <span class="org-sh-escaped-newline">\</span>
+  --namespace monitoring --name yace <span class="org-sh-escaped-newline">\</span>
+  --attach-policy-arn arn:aws:iam::${<span class="org-variable-name">ACCOUNT</span>}:policy/YaceCloudWatchRead <span class="org-sh-escaped-newline">\</span>
+  --approve
+</pre>
+</div>
+
+<p>
+不用 eksctl 时，手动建 Role，信任策略为：
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">{
+  <span class="org-string">"Version"</span>: <span class="org-string">"2012-10-17"</span>,
+  <span class="org-string">"Statement"</span>: [{
+    <span class="org-string">"Effect"</span>: <span class="org-string">"Allow"</span>,
+    <span class="org-string">"Principal"</span>: {
+      <span class="org-string">"Federated"</span>: <span class="org-string">"arn:aws:iam::&lt;ACCOUNT&gt;:oidc-provider/oidc.eks.ap-southeast-1.amazonaws.com/id/&lt;OIDC_ID&gt;"</span>
+    },
+    <span class="org-string">"Action"</span>: <span class="org-string">"sts:AssumeRoleWithWebIdentity"</span>,
+    <span class="org-string">"Condition"</span>: {
+      <span class="org-string">"StringEquals"</span>: {
+        <span class="org-string">"oidc.eks.ap-southeast-1.amazonaws.com/id/&lt;OIDC_ID&gt;:sub"</span>: <span class="org-string">"system:serviceaccount:monitoring:yace"</span>,
+        <span class="org-string">"oidc.eks.ap-southeast-1.amazonaws.com/id/&lt;OIDC_ID&gt;:aud"</span>: <span class="org-string">"sts.amazonaws.com"</span>
+      }
+    }
+  }]
+}
+</pre>
+</div>
+
+<p>
+然后给 SA 打注解： <code>eks.amazonaws.com/role-arn: arn:aws:iam::&lt;ACCOUNT&gt;:role/YaceRole</code> 。
+</p>
+</div>
+</div>
+<div id="outline-container-h:2E29E47C-1C20-44EE-8B76-0AE5913AD4FB" class="outline-5">
+<h5 id="h:2E29E47C-1C20-44EE-8B76-0AE5913AD4FB"><a href="#h:2E29E47C-1C20-44EE-8B76-0AE5913AD4FB">方式 B：EKS Pod Identity（较新，不用碰 OIDC）</a></h5>
+<div class="outline-text-5" id="text-h:2E29E47C-1C20-44EE-8B76-0AE5913AD4FB">
+<div class="org-src-container">
+<pre class="src src-shell">aws eks create-addon --cluster-name $<span class="org-variable-name">CLUSTER</span> --region $<span class="org-variable-name">REGION</span> <span class="org-sh-escaped-newline">\</span>
+  --addon-name eks-pod-identity-agent
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Role &#20449;&#20219;&#31574;&#30053;&#30340; Principal &#20026; pods.eks.amazonaws.com
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Action &#20026; sts:AssumeRole + sts:TagSession
+</span>aws eks create-pod-identity-association --cluster-name $<span class="org-variable-name">CLUSTER</span> --region $<span class="org-variable-name">REGION</span> <span class="org-sh-escaped-newline">\</span>
+  --namespace monitoring --service-account yace <span class="org-sh-escaped-newline">\</span>
+  --role-arn arn:aws:iam::${<span class="org-variable-name">ACCOUNT</span>}:role/YaceRole
+</pre>
+</div>
+
+<p>
+此方式 SA 无需任何注解， <code>kubectl create sa yace -n monitoring</code> 即可。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9859BD00-A846-4D28-8982-CC6EFC833AA8" class="outline-4">
+<h4 id="h:9859BD00-A846-4D28-8982-CC6EFC833AA8"><a href="#h:9859BD00-A846-4D28-8982-CC6EFC833AA8">部署清单</a></h4>
+<div class="outline-text-4" id="text-h:9859BD00-A846-4D28-8982-CC6EFC833AA8">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#30830;&#35748;&#38236;&#20687;
+</span>helm upgrade --install yace  <span class="org-sh-escaped-newline">\</span>
+  prometheus-community/yet-another-cloudwatch-exporter <span class="org-sh-escaped-newline">\</span>
+  --timeout 600s <span class="org-sh-escaped-newline">\</span>
+  --dry-run=client <span class="org-sh-escaped-newline">\</span>
+  --namespace monitoring --create-namespace |grep image
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;yace.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yace-config
+  namespace: monitoring
+data:
+  config.yml: |
+    apiVersion: v1alpha1
+    sts-region: ap-southeast-1
+    discovery:
+      exportedTagsOnMetrics:
+        AWS/RDS: [Name, Env]
+        AWS/ElastiCache: [Name, Env]
+      jobs:
+        - type: AWS/RDS
+          regions: [ap-southeast-1]
+          period: 300
+          length: 600
+          metrics:
+            - { name: CPUUtilization,      statistics: [Average, Maximum] }
+            - { name: FreeableMemory,      statistics: [Average, Minimum] }
+            - { name: FreeStorageSpace,    statistics: [Average, Minimum] }
+            - { name: DatabaseConnections, statistics: [Average, Maximum] }
+            - { name: ReadLatency,         statistics: [Average, Maximum] }
+            - { name: WriteLatency,        statistics: [Average, Maximum] }
+            - { name: ReadIOPS,            statistics: [Average] }
+            - { name: WriteIOPS,           statistics: [Average] }
+            - { name: ReplicaLag,          statistics: [Average, Maximum] }
+            - { name: BurstBalance,        statistics: [Minimum] }
+            - { name: DiskQueueDepth,      statistics: [Average] }
+            - { name: SwapUsage, statistics: [Average] }
+
+        - type: AWS/ElastiCache
+          regions: [ap-southeast-1]
+          period: 300
+          length: 600
+          metrics:
+            - { name: CPUUtilization,        statistics: [Average, Maximum] }
+            - { name: EngineCPUUtilization,  statistics: [Average, Maximum] }
+            - { name: DatabaseMemoryUsagePercentage, statistics: [Average, Maximum] }
+            - { name: CurrConnections,       statistics: [Average, Maximum] }
+            - { name: ReplicationLag,        statistics: [Average, Maximum] }
+            - { name: SwapUsage,             statistics: [Average] }
+            - { name: Evictions,      statistics: [Sum, Average] }
+            - { name: CacheHits,      statistics: [Sum] }
+            - { name: CacheMisses,    statistics: [Sum, Average] }
+            - { name: FreeableMemory, statistics: [Average, Minimum] }
+
+        # Amazon MQ&#65288;RabbitMQ / ActiveMQ&#65289;
+        - type: AWS/AmazonMQ
+          regions: [ap-southeast-1]
+          period: 300
+          length: 600
+          metrics:
+            - { name: CpuUtilization,    statistics: [Average, Maximum] }
+            - { name: SystemCpuUtilization,       statistics: [Average] }
+            - { name: RabbitMQMemUsed,            statistics: [Average] }
+            - { name: RabbitMQMemLimit,           statistics: [Average] }
+            - { name: RabbitMQDiskFree,           statistics: [Average] }
+            - { name: RabbitMQDiskFreeLimit,      statistics: [Average] }
+            - { name: RabbitMQFdUsed,             statistics: [Average] }
+            - { name: MessageCount,               statistics: [Average] }
+            - { name: MessageReadyCount,          statistics: [Average] }
+            - { name: MessageUnacknowledgedCount, statistics: [Average] }
+            - { name: PublishRate,                statistics: [Average] }
+            - { name: ConfirmRate,                statistics: [Average] }
+            - { name: AckRate,                    statistics: [Average] }
+            - { name: ConsumerCount,              statistics: [Average] }
+            - { name: ConnectionCount,            statistics: [Average] }
+            - { name: ChannelCount,               statistics: [Average] }
+            - { name: QueueCount,                 statistics: [Average] }
+            - { name: ExchangeCount,              statistics: [Average] }
+
+        # &#33509; MQ &#23454;&#20026; MSK&#65292;&#25913;&#29992; AWS/Kafka&#65288;CpuUser / KafkaDataLogsDiskUsed / SumOffsetLag ...&#65289;
+        # &#33509;&#20026; SQS&#65292;&#25913;&#29992; AWS/SQS&#65288;ApproximateNumberOfMessagesVisible / ApproximateAgeOfOldestMessage&#65289;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yace
+  namespace: monitoring
+  labels: { app: yace }
+spec:
+  replicas: 1          # &#24517;&#39035;&#20026; 1&#65306;&#22810;&#21103;&#26412;&#20250;&#37325;&#22797;&#35843; CloudWatch API&#65292;&#36153;&#29992;&#32763;&#20493;
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: yace }
+  template:
+    metadata:
+      labels: { app: yace }
+      annotations:
+        checksum/config: "REPLACE_ME"   # &#25913;&#37197;&#32622;&#21518;&#25913;&#27492;&#20540;&#35302;&#21457;&#28378;&#21160;&#65292;&#25110; kubectl rollout restart
+    spec:
+      serviceAccountName: yace
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: yace
+          image: quay.io/prometheuscommunity/yet-another-cloudwatch-exporter:v0.62.1
+          args:
+            - -config.file=/etc/yace/config.yml
+            - -listen-address=:5000
+            - -scraping-interval=300      # &#21518;&#21488;&#36718;&#35810; CloudWatch &#30340;&#21608;&#26399;&#65288;&#31186;&#65289;
+          ports:
+            - { name: metrics, containerPort: 5000 }
+          volumeMounts:
+            - { name: config, mountPath: /etc/yace, readOnly: true }
+          resources:
+            requests: { cpu: 50m,  memory: 128Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          readinessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: config
+          configMap: { name: yace-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yace
+  namespace: monitoring
+  labels: { app: yace }
+spec:
+  selector: { app: yace }
+  ports:
+    - { name: metrics, port: 5000, targetPort: metrics }
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: yace
+  namespace: monitoring
+  labels:
+    app: yace
+    release: kps        # &#38656;&#21305;&#37197; kube-prometheus-stack &#30340; release &#21517;&#65292;&#21542;&#21017;&#19981;&#34987;&#21457;&#29616;
+spec:
+  selector:
+    matchLabels: { app: yace }
+  endpoints:
+    - port: metrics
+      interval: 60s
+      scrapeTimeout: 30s
+EOF
+</span>
+kubectl -n monitoring get po
+kubectl -n monitoring logs deploy/yace
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#39564;&#35777;
+</span>kubectl -n monitoring get pod -owide |grep yace
+curl -s http://172.31.88.138:5000/metrics |grep -c <span class="org-string">'^aws_'</span>
+curl -s http://172.31.88.138:5000/metrics |grep -c <span class="org-string">'^aws_rds'</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:562777EE-A9CE-4E0C-840B-2A79CFCFF6C2" class="outline-4">
+<h4 id="h:562777EE-A9CE-4E0C-840B-2A79CFCFF6C2"><a href="#h:562777EE-A9CE-4E0C-840B-2A79CFCFF6C2">自定定义 grafana 监控模板 json</a></h4>
+<div class="outline-text-4" id="text-h:562777EE-A9CE-4E0C-840B-2A79CFCFF6C2">
+<div class="org-src-container">
+<pre class="src src-shell">&#30053;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:79E72CC7-81F0-4D23-A896-D4CCF0A39ADE" class="outline-3">
+<h3 id="h:79E72CC7-81F0-4D23-A896-D4CCF0A39ADE"><a href="#h:79E72CC7-81F0-4D23-A896-D4CCF0A39ADE">深度指标：exporter 放进 EKS</a></h3>
+<div class="outline-text-3" id="text-h:79E72CC7-81F0-4D23-A896-D4CCF0A39ADE">
+</div>
+<div id="outline-container-h:EF45D176-E7AE-4E2E-B646-9EDE63980F24" class="outline-4">
+<h4 id="h:EF45D176-E7AE-4E2E-B646-9EDE63980F24"><a href="#h:EF45D176-E7AE-4E2E-B646-9EDE63980F24">redis-exporter</a></h4>
+<div class="outline-text-4" id="text-h:EF45D176-E7AE-4E2E-B646-9EDE63980F24">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;exporter.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+data:
+  sample-pwd-file.json: |-
+    {
+      "redis://redis6:6379": "",
+      "rediss://user@clustercfg.xxxx.cache.amazonaws.com:6379": "passwordxx"
+    }
+kind: ConfigMap
+metadata:
+  name: redis-pwd-config
+  namespace: monitoring
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  #annotations:
+  #  prometheus.io/scrape: "true"
+  labels:
+    app: redis-exporter
+spec:
+  selector:
+    app: redis-exporter
+  ports:
+    - name: tcp-9121
+      protocol: TCP
+      port: 9121
+      targetPort: 9121
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exporter
+  template:
+    metadata:
+      #annotations:
+      #  prometheus.io/path: "/metrics"
+      #  prometheus.io/port: "9121"
+      #  prometheus.io/scrape: "true"
+      labels:
+        app: redis-exporter
+    spec:
+      #nodeSelector:
+      #  type: ops-prod-prometheus
+      #imagePullSecrets:
+      #- name: docker-secret
+      containers:
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.91.1
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: REDIS_PASSWORD_FILE
+          value: /data/sample-pwd-file.json
+        resources:
+          limits:
+            cpu: 300m
+            memory: 300Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        ports:
+        - containerPort: 9121
+        volumeMounts:
+        - mountPath: /data
+          name: redis-pwd-file
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: sample-pwd-file.json
+            path: sample-pwd-file.json
+          name: redis-pwd-config
+        name: redis-pwd-file
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: redis-exporter
+    app.kubernetes.io/instance: redis-exporter
+    app.kubernetes.io/version: "1.91.1"
+    app.kubernetes.io/component: exporter
+    release: kps
+spec:
+  endpoints:
+    - path: /metrics
+      port: tcp-9121
+      #interval: 15s
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: redis-exporter
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:EF14066E-92BC-4989-AB2A-E2339AF43272" class="outline-4">
+<h4 id="h:EF14066E-92BC-4989-AB2A-E2339AF43272"><a href="#h:EF14066E-92BC-4989-AB2A-E2339AF43272">添加 agent 静态配置</a></h4>
+<div class="outline-text-4" id="text-h:EF14066E-92BC-4989-AB2A-E2339AF43272">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;prometheus-additional.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+#Redis
+- job_name: 'redis-exporter-targets'
+  static_configs:
+  - targets:
+    - rediss://user@clustercfg.xxx.cache.amazonaws.com:6379
+    labels:
+      dbtype: "db-redis"
+  metrics_path: /scrape
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: redis-exporter:9121
+
+#EC2
+- job_name: 'node-exporter'
+  static_configs:
+  - targets:
+    - "x.x.x.x:9100"
+    labels:
+      business: jp-test
+      type: ec2
+      service: "ops-jmp"
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">Update
+</span>kubectl -n monitoring create secret generic additional-scrape-configs <span class="org-sh-escaped-newline">\</span>
+        --from-file=prometheus-additional.yaml <span class="org-sh-escaped-newline">\</span>
+        --dry-run=client -oyaml|kubectl replace -f-
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">helm
+</span>prometheus:
+  agentMode: true                  <span class="org-comment-delimiter"># </span><span class="org-comment">&#24320;&#21551;&#36716;&#21457;&#22120;&#12290;&#19981;&#26412;&#22320;&#23384;&#20648;&#12289;&#30465;&#20869;&#23384;&#12290;&#19981;&#33021;&#26597;&#21382;&#21490;
+</span>  prometheusSpec:
+    ...
+    additionalScrapeConfigsSecret: <span class="org-comment-delimiter"># </span><span class="org-comment">&#38745;&#24577;&#37197;&#32622;
+</span>      enabled: true
+      name: additional-scrape-configs
+      key: prometheus-additional.yaml
+
+
+helm upgrade --install -n monitoring kps <span class="org-sh-escaped-newline">\</span>
+     prometheus-community/kube-prometheus-stack <span class="org-sh-escaped-newline">\</span>
+     -f values-agent.yaml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9C0D6805-5415-4EDD-950D-0A6889AE621F" class="outline-4">
+<h4 id="h:9C0D6805-5415-4EDD-950D-0A6889AE621F"><a href="#h:9C0D6805-5415-4EDD-950D-0A6889AE621F">mysql-exporter</a></h4>
+<div class="outline-text-4" id="text-h:9C0D6805-5415-4EDD-950D-0A6889AE621F">
+<p>
+略
+</p>
+</div>
+</div>
+<div id="outline-container-h:B0C357E4-CBDA-4965-B219-F2339AA9D8E0" class="outline-4">
+<h4 id="h:B0C357E4-CBDA-4965-B219-F2339AA9D8E0"><a href="#h:B0C357E4-CBDA-4965-B219-F2339AA9D8E0">rabbitmq-export</a></h4>
+<div class="outline-text-4" id="text-h:B0C357E4-CBDA-4965-B219-F2339AA9D8E0">
+<p>
+略
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:44252883-4BE6-46AA-8F81-2BD92AA6DDE7" class="outline-3">
+<h3 id="h:44252883-4BE6-46AA-8F81-2BD92AA6DDE7"><a href="#h:44252883-4BE6-46AA-8F81-2BD92AA6DDE7">PrometheusAlert全家桶</a></h3>
+<div class="outline-text-3" id="text-h:44252883-4BE6-46AA-8F81-2BD92AA6DDE7">
+<ul class="org-ul">
+<li><a href="https://github.com/feiyu563/prometheusalert">https://github.com/feiyu563/prometheusalert</a></li>
+</ul>
+
+<p>
+下载 app.conf
+docker-compose
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#19979;&#36733;&#40664;&#35748;&#37197;&#32622;&#12290;&#20462;&#25913;&#30331;&#24405;&#23494;&#30721;
+</span>mkdir prometheusalert/conf
+<span class="org-builtin">cd</span> prometheusalert/conf
+wget https://raw.githubusercontent.com/feiyu563/PrometheusAlert/master/conf/app-example.conf -O app.conf
+
+
+  prometheusalert:
+    container_name: prometheusalert
+    image: feiyu563/prometheus-alert:v4.9.1
+    depends_on:
+      - prometheus
+    user: <span class="org-string">'0'</span>
+    ports:
+      - 18080:8080
+    environment:
+      - <span class="org-variable-name">TZ</span>=Asia/Shanghai
+    volumes:
+      - ./prometheusalert/conf:/app/conf
+      - ./prometheusalert/db:/app/db <span class="org-comment-delimiter"># </span><span class="org-comment">&#38450;&#27169;&#26495;&#20002;&#22833;
+</span>      - ./prometheusalert/logs:/app/logs
+    networks:
+      - monitor_net
+    restart: always
+</pre>
+</div>
+
+<p>
+配置 alertmanager 路由
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/feiyu563/PrometheusAlert/blob/master/doc/readme/web-router.md#%E8%B7%AF%E7%94%B1%E5%8A%9F%E8%83%BD%E4%BD%BF%E7%94%A8%E6%A1%88%E4%BE%8B">路由功能使用案例</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;prometheus/alertmanager.yml &lt;&lt;EOF<span class="org-sh-heredoc">
+route:
+  group_by: ['alertname', 'instance']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 20m
+  receiver: 'default-receiver'
+
+  routes:
+  - receiver: 'eks-p1'
+    group_wait: 10s
+    group_interval: 30s
+    repeat_interval: 30m
+    match_re:
+      #severity: critical
+      cluster: ".*eks.*"
+  - receiver: 'default-receiver'
+    group_by: ['alertname']
+    match_re:
+      alertname: ".*"
+receivers:
+- name: "pt-p1"
+  webhook_configs:
+    # type&#65306;fs(&#39134;&#20070;),tg(Telegram),webhook
+    # tpl&#65306;&#27169;&#26495;&#21517;&#12290;&#20869;&#32622;&#20102;&#20869;&#32622;&#26377; prometheus-dd / prometheus-wx / prometheus-fs
+    # ddurl/wxurl/fsurl&#65306;&#35206;&#30422; app.conf &#40664;&#35748;&#20540;&#65292;&#22810;&#20010;&#29992; , &#20998;&#38548;
+    # at&#65306;@ &#25351;&#23450;&#25163;&#26426;&#21495;&#65292;&#22810;&#20010;&#29992; , &#20998;&#38548;
+    # rr=true&#65306;&#22810;&#22320;&#22336;&#26102;&#38543;&#26426;&#21462;&#19968;&#20010;&#21457;&#65292;&#36991;&#20813;&#26426;&#22120;&#20154;&#38480;&#39057;
+  - url: 'http://prometheusalert:8080/prometheusalert?type=fs&amp;tpl=prometheus-fs&amp;fsurl=https://open.larksuite.com/open-apis/bot/v2/hook/xxxx'
+    send_resolved: true
+- name: "default-receiver"
+  webhook_configs:
+  - url: 'http://prometheusalert:8080/prometheusalert?type=fs&amp;tpl=prometheus-fs&amp;fsurl=https://open.larksuite.com/open-apis/bot/v2/hook/xxx'
+    send_resolved: true
+
+inhibit_rules:
+- source_matchers: [severity="critical"]
+  target_matchers: [severity="warning"]
+  equal: ['alertname', 'instance']
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:F861F55B-9545-41E2-853C-9A84421E325A" class="outline-3">
+<h3 id="h:F861F55B-9545-41E2-853C-9A84421E325A"><a href="#h:F861F55B-9545-41E2-853C-9A84421E325A">备选方案</a></h3>
+<div class="outline-text-3" id="text-h:F861F55B-9545-41E2-853C-9A84421E325A">
+</div>
+<div id="outline-container-h:91C909B6-A66A-47D6-B1B1-B51DE560B073" class="outline-4">
+<h4 id="h:91C909B6-A66A-47D6-B1B1-B51DE560B073"><a href="#h:91C909B6-A66A-47D6-B1B1-B51DE560B073">方案 B：跨云 VPN，保持纯 pull</a></h4>
+<div class="outline-text-4" id="text-h:91C909B6-A66A-47D6-B1B1-B51DE560B073">
+<p>
+阿里云 VPN 网关 ↔ AWS Site-to-Site VPN 建 IPsec 隧道（你的 10.14.0.0/16 和 172.31.0.0/16 不冲突，可以直接互通）。打通后外部 Prometheus 就能用 kubernetes_sd_configs 直抓 Pod、直连 RDS 端口。
+</p>
+
+<ul class="org-ul">
+<li>优点：模型干净，指标零延迟，不用改集群。</li>
+<li>缺点：跨云公网 IPsec 稳定性一般，隧道断了就整片断采；VPN 网关有固定月费；抓取是持续长连接，对隧道压力比 remote_write 大。</li>
+<li>适合：你本来就需要跨云互通（比如业务侧也要访问）时顺带做。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:F8022D9B-AF7F-468C-85F5-83ADB6FF1826" class="outline-4">
+<h4 id="h:F8022D9B-AF7F-468C-85F5-83ADB6FF1826"><a href="#h:F8022D9B-AF7F-468C-85F5-83ADB6FF1826">方案 C：通过公网 apiserver 做代理抓取（小集群应急）</a></h4>
+<div class="outline-text-4" id="text-h:F8022D9B-AF7F-468C-85F5-83ADB6FF1826">
+<p>
+你的 EKS API Server 公网可达，可以让 Prometheus 通过 apiserver 的 proxy 子资源间接抓节点：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">- job_name: <span class="org-string">'eks-cadvisor-via-apiserver'</span>
+  scheme: https
+  tls_config: { ca_file: /etc/prometheus/eks/ca.crt }
+  bearer_token_file: /etc/prometheus/eks/token
+  kubernetes_sd_configs:
+    - role: node
+      api_server: https://XXXXX.gr7.ap-southeast-1.eks.amazonaws.com
+      tls_config: { ca_file: /etc/prometheus/eks/ca.crt }
+      bearer_token_file: /etc/prometheus/eks/token
+  relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: XXXXX.gr7.ap-southeast-1.eks.amazonaws.com:443
+    - sourceLabels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${<span class="org-variable-name">1</span>}/proxy/metrics/cadvisor
+</pre>
+</div>
+
+<p>
+需要建一个 ServiceAccount，ClusterRole 授予 nodes/proxy、nodes/metrics、services/proxy 的 get 权限，并手动创建
+kubernetes.io/service-account-token 类型的 Secret 拿长期 token（1.24+ 不再自动签发）。
+</p>
+
+<ul class="org-ul">
+<li>缺点很实在：所有抓取流量都压在 apiserver 上，节点一多 apiserver CPU 会被打爆；Pod 级自定义指标也得走 service proxy，很别扭。</li>
+<li>只建议用于十几个节点以内、临时过渡。另外务必把 EKS 公网 endpoint 的 Public access source allowlist 限制成 47.86.42.227/32。</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

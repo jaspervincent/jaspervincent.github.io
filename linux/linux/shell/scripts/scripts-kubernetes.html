@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-kubernetes</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="小脚本 工具1 · 工具2 · 小工具3 · 定时修改Hpa副本数 · bash脚本监控 · TAGS: Script" />
+<link rel="canonical" href="https://xuchangwei.com/linux/linux/shell/scripts/scripts-kubernetes.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="scripts-kubernetes" />
+<meta property="og:description" content="小脚本 工具1 · 工具2 · 小工具3 · 定时修改Hpa副本数 · bash脚本监控 · TAGS: Script" />
+<meta property="og:url" content="https://xuchangwei.com/linux/linux/shell/scripts/scripts-kubernetes.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/linux/shell/scripts/scripts-kubernetes.html","@type":"WebPage","name":"scripts-kubernetes","description":"小脚本 工具1 · 工具2 · 小工具3 · 定时修改Hpa副本数 · bash脚本监控 · TAGS: Script"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-kubernetes</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org75254f4">小脚本</a>
+<ul>
+<li><a href="#orgc04b65b">工具1</a></li>
+<li><a href="#org08d0f93">工具2</a></li>
+<li><a href="#org521cf2b">小工具3</a></li>
+<li><a href="#orgf7cfb1d">定时修改Hpa副本数</a></li>
+<li><a href="#org9bd2816">bash脚本监控</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../index.html">Script</a></li>
+</ul>
+<section id="outline-container-org75254f4" class="outline-2">
+<h2 id="org75254f4"><a href="#org75254f4">小脚本</a></h2>
+<div class="outline-text-2" id="text-org75254f4">
+</div>
+<div id="outline-container-orgc04b65b" class="outline-3">
+<h3 id="orgc04b65b"><a href="#orgc04b65b">工具1</a></h3>
+<div class="outline-text-3" id="text-orgc04b65b">
+<p>
+服务操作，适合不熟悉命令行的人
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mkdir ~/bin/
+<span class="org-builtin">cd</span> ~/bin
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; podnamespace<span class="org-sh-heredoc">
+#!/bin/bash
+#
+if [ $# -ge 1 ]; then
+   [[ $2 =~ "kubeconfig" ]] &amp;&amp; config=$2 ||:
+   n_list=$(kubectl $config  get ns -o jsonpath='{.items[*].metadata.name}'|tr ' ' '\n'|sort |awk '{printf("%-4d%s\n", NR, $0)}')
+   echo -e "\e[31mPlease execute the command:\e[0m \e[1;32m source podnamespace [anyone]\e[0m"
+   echo "${n_list}"
+   echo -n "Choose a namespace: "
+   read no
+   namespace=$(echo "${n_list}"| awk '{print $2}'|sed -n "${no}p")
+   export namespace
+   echo Namespace: $namespace
+fi
+
+[ $# -eq 0 ] &amp;&amp; {
+namespace=monitoring
+export namespace
+#p=$(ps -fp $(echo $$) |sed '1d'|awk '{print $3}')
+#echo -e "\e[31mSwitching Namespaces:\e[0m \e[1;32m source podnamespace [anyone]\e[0m" &gt;/proc/$p/fd/2
+echo Namespace: $namespace
+} || :
+EOF
+</span>
+cat &lt;&lt;\EOF&gt; podlist<span class="org-sh-heredoc">
+#!/bin/bash
+: ${namespace:=$(podnamespace|awk '/Namespace: /{print $2}')}
+app_name=$1
+
+# kubectl -n ${namespace} get pods -o wide|grep ${app_name}
+[ -z "${app_name}" ] &amp;&amp; kubectl -n ${namespace} get pods -o wide || { 
+pods=$(kubectl -n ${namespace} get pods -o wide|grep ${app_name}|awk '{printf("%-4d%s\t%s\t%s\t%s\t%s\t%s\n", NR, $1, $2, $3, $5, $6, $7)}')
+echo "${pods}"
+}
+EOF
+</span>
+cat &lt;&lt;\EOF&gt; poddesc<span class="org-sh-heredoc">
+#!/bin/bash
+: ${namespace:=$(podnamespace|awk '/Namespace: /{print $2}')}
+app_name=$1
+
+stty erase ^H
+# kubectl -n ${namespace} get pods -o wide|grep ${app_name}
+pods=$(kubectl -n ${namespace} get pods -o wide|grep -E ${app_name}|awk '{printf("%-4d%s\t%s\t%s\t%s\t%s\t%s\n", NR, $1, $2, $3, $5, $6, $7)}')
+
+echo "${pods}"
+echo -n "Choose a pod: "
+read no
+pod=$(echo "${pods}"|awk '{print $2}'|sed -n "${no}p")
+kubectl -n ${namespace} describe po/"${pod}"
+EOF
+</span>
+
+cat &lt;&lt;\EOF&gt; podlog<span class="org-sh-heredoc">
+#!/bin/bash
+: ${namespace:=$(podnamespace|awk '/Namespace: /{print $2}')}
+app_name=$1
+
+# kubectl -n ${namespace} get pods -o wide|grep ${app_name}
+pods=$(kubectl -n ${namespace} get pods -o wide|grep ${app_name}|awk '{printf("%-4d%s\t%s\t%s\t%s\t%s\n", NR, $1, $3, $5, $6, $7)}')
+echo "${pods}"
+echo -n "Choose a pod: "
+read no
+pod=$(echo "${pods}"|awk '{print $2}'|sed -n "${no}p")
+
+if ! kubectl  get po -n $namespace $pod -o jsonpath="{.spec['containers'][1].name}" &amp;&gt;/dev/null; then
+  kubectl -n ${namespace} logs -f --tail=50 "${pod}"
+else
+  cat -n &lt;(kubectl  get po -n $namespace $pod -o jsonpath="{.spec['containers'][*].name}"|tr ' ' '\n')
+  echo
+  read -p "Please input container number: " no
+  container_name=$(kubectl -n $namespace get po $pod -o jsonpath="{.spec.containers[$[no-1]].name}")
+  kubectl -n ${namespace} logs -f --tail=50 "${pod}" -c ${container_name} 
+fi
+EOF
+</span>
+
+cat &lt;&lt;\EOF&gt; podexec<span class="org-sh-heredoc">
+#!/bin/bash
+: ${namespace:=$(podnamespace|awk '/Namespace: /{print $2}')}
+app_name=$1
+
+# kubectl -n ${namespace} get pods -o wide|grep ${app_name}
+pods=$(kubectl -n ${namespace} get pods -o wide|grep ${app_name}|awk '{printf("%-4d%s\t%s\t%s\t%s\t%s\t%s\n", NR, $1, $2, $3, $5, $6, $7)}')
+echo "${pods}"
+echo -n "Choose a pod: "
+read no
+pod=$(echo "${pods}"|awk '{print $2}'|sed -n "${no}p")
+if ! kubectl  get po -n $namespace $pod -o jsonpath="{.spec['containers'][1].name}" &amp;&gt;/dev/null; then 
+  kubectl -n ${namespace} exec -ti "${pod}" -- bash  2&gt;/dev/null || kubectl -n ${namespace} exec -it $pod -- sh
+else
+  cat -n &lt;(kubectl  get po -n $namespace $pod -o jsonpath="{.spec['containers'][*].name}"|tr ' ' '\n')
+  echo
+  read -p "Please input container number: " no 
+  container_name=$(kubectl -n $namespace get po $pod -o jsonpath="{.spec.containers[$[no-1]].name}")
+  kubectl -n ${namespace} exec -ti "${pod}" -c ${container_name}  -- bash  2&gt;/dev/null || kubectl -n ${namespace} exec -it $pod -c ${container_name} -- sh
+fi
+EOF
+</span>
+cat &lt;&lt;\EOF&gt; poddel<span class="org-sh-heredoc">
+#!/bin/bash
+: ${namespace:=$(podnamespace|awk '/Namespace: /{print $2}')}
+app_name=$1
+# kubectl -n ${namespace} get pods -o wide|grep ${app_name}
+pods=$(kubectl -n ${namespace} get pods -o wide|grep ${app_name}|awk '{printf("%-4d%s\t%s\t%s\t%s\t%s\n", NR, $1, $3, $5, $6, $7)}')
+echo "${pods}"
+echo -n "Choose a pod: "
+read no
+pod=$(echo "${pods}"|awk '{print $2}'|sed -n "${no}p")
+set -x
+kubectl -n ${namespace} delete pod/"${pod}"
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org08d0f93" class="outline-3">
+<h3 id="org08d0f93"><a href="#org08d0f93">工具2</a></h3>
+<div class="outline-text-3" id="text-org08d0f93">
+<p>
+服务操作，适合不熟悉命令行的人
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">mkdir ~/bin/
+<span class="org-builtin">cd</span> ~/bin
+</pre>
+</div>
+
+<p>
+k8s_taillog 脚本内容
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">read &#20013;&#20801;&#35768;&#36864;&#26684;&#38190;&#21024;&#38500;&#23383;&#31526;
+</span>stty erase ^H
+<span class="org-variable-name">server</span>=$<span class="org-variable-name">2</span>
+<span class="org-variable-name">temp_list</span>=<span class="org-string">"/tmp/kube_po_${RANDOM}.list"</span>
+<span class="org-variable-name">title</span>=<span class="org-string">"/tmp/k8s_title"</span>
+<span class="org-variable-name">config_prod</span>=<span class="org-string">'--kubeconfig=/root/.kube/config_prod'</span>
+<span class="org-variable-name">config_dev</span>=<span class="org-string">'--kubeconfig=/root/.kube/config_dev'</span>
+<span class="org-keyword">if </span><span class="org-builtin">echo</span> $<span class="org-variable-name">1</span>|grep -iq <span class="org-string">'prod'</span>;<span class="org-keyword">then</span>
+   <span class="org-variable-name">config</span>=<span class="org-string">"-n default $config_prod"</span>
+<span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">1</span>|grep -iq <span class="org-string">'dev'</span>;<span class="org-keyword">then</span>
+   <span class="org-variable-name">config</span>=<span class="org-string">"$config_dev"</span>
+<span class="org-keyword">else</span>
+
+    <span class="org-builtin">echo</span> -en <span class="org-string">"\e[31;1mERROR &#19981;&#27491;&#30830;&#30340;&#21442;&#25968;\e[0m\n\n\e[1m&#29615;&#22659;&#21442;&#25968;\e[32m&#65288;&#24517;&#36873;&#39033;&#65289; \e[0m\n"</span>
+    <span class="org-builtin">echo</span> -en <span class="org-string">"\E[$[RANDOM%7+31];1m"</span>
+    cat &lt;&lt;EOF<span class="org-sh-heredoc">
+prod: &#27491;&#24335;&#29615;&#22659;
+dev:  &#24320;&#21457;&#29615;&#22659;
+stag: qa&#27979;&#35797;&#29615;&#22659;
+EOF
+</span>    <span class="org-builtin">echo</span> -en <span class="org-string">'\E[0m'</span>
+ 
+    <span class="org-builtin">echo</span> -en <span class="org-string">"\E[$[RANDOM%7+31];1m"</span>
+    cat &lt;&lt;EOF<span class="org-sh-heredoc">
+match &#21305;&#37197;&#26381;&#21153;&#21517;&#31216;,&#25903;&#25345;&#27169;&#31946;&#21305;&#37197;&#65288;&#21487;&#36873;&#39033;&#65289;
+
+Usage: $0 prod [match]
+EOF
+</span>    <span class="org-builtin">echo</span> -en <span class="org-string">'\E[0m'</span>
+   <span class="org-keyword">exit</span> 1
+<span class="org-keyword">fi</span>
+<span class="org-function-name">print_help</span>(){
+   <span class="org-builtin">echo</span> -e <span class="org-string">"
+   \e[32;1mUsage:\e[0m
+    \e[36;1mCheck\e[0m
+    1. \e[32;1m&lt;num bash&gt;\e[0m         &#25968;&#23383;&#21518;&#21152;&#31354;&#26684;bash&#36827;&#20837;&#23481;&#22120;,&#27604;&#22914; &lt;1 bash&gt;
+    ------------------------------------------------------------------------------------
+    2. \e[32;1m&lt;num&gt; [line_num]\e[0m   &#30452;&#25509;&#36755;&#20837;&#23545;&#24212;&#25968;&#23383;&#22238;&#36710;&#23454;&#26102;&#36755;&#20986;&#26368;&#21518;200&#34892;&#26085;&#24535;,&#20063;&#21487;&#20197;&#25351;&#23450;&#34892;&#25968;line_num
+    ------------------------------------------------------------------------------------
+    3. \e[32;1m&lt;num des&gt;\e[0m           &#25968;&#23383;&#21152;des&#26597;&#30475;pod&#35814;&#32454;&#20449;&#24687;,&#27604;&#22914;&lt;1 des&gt;
+    ------------------------------------------------------------------------------------
+    4. \e[32;1m&lt;num MATCH&gt;\e[0m        &#25968;&#23383;&#21152;&#31354;&#26684;&#21333;&#35789;&#36827;&#34892;&#26085;&#24535;&#21305;&#37197;,&#27604;&#22914; &lt;1 ERROR&gt; &#22914;&#26524;&#21305;&#37197;&#25968;&#23383;&#38656;&#35201;&#22312;&#21305;&#37197;
+                          &#30340;&#25968;&#23383;&#20004;&#36793;&#21152;&#19978;&#20013;&#25324;&#21495;&#20197;&#36991;&#20813;&#21644;&#26597;&#30475;&#26085;&#24535;&#34892;&#25968;&#20914;&#31361;&#65292;&#27604;&#22914;&#65306; &lt;1 [12345]&gt;
+    ------------------------------------------------------------------------------------
+    5. \e[32;1m&lt;num1,num2 [MATCH]&gt;\e[0m              &#25968;&#23383;&#29992;,&#20998;&#38548;&#21487;&#20197;&#23454;&#26102;&#26597;&#30475;&#22810;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;
+                                        &#27604;&#22914; 1,2,3 &#26597;&#30475;1 2 3 &#19977;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;
+                                        &#31532;&#20108;&#20010;&#21442;&#25968;&#26159;&#21487;&#36873;&#21442;&#25968;:&#21487;&#20197;&#25628;&#32034;&#21305;&#37197;&#30340;&#26085;&#24535; 
+    ------------------------------------------------------------------------------------
+    6. \e[32;1m&lt;num_start..num_end [MATCH]&gt;\e[0m     &#25968;&#23383;&#29992;..&#20998;&#38548;&#21487;&#20197;&#23454;&#26102;&#26597;&#30475;&#24320;&#22987;&#21040;&#32467;&#23614;&#22810;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;
+                                        &#27604;&#22914; 1..4 &#26597;&#30475;1&#21040;4&#22235;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;
+                                        &#31532;&#20108;&#20010;&#21442;&#25968;&#26159;&#21487;&#36873;&#21442;&#25968;:&#21487;&#20197;&#25628;&#32034;&#21305;&#37197;&#30340;&#26085;&#24535; 
+    ------------------------------------------------------------------------------------
+
+    \e[36;1mModify\e[0m
+    1. \e[32;1m&lt;num cp&gt;\e[0m            &#25968;&#23383;&#21152;&#31354;&#26684;cp&#22797;&#21046;&#25991;&#20214;&#25110;&#32773;&#30446;&#24405;,&#27604;&#22914; &lt;1 cp&gt;
+    ------------------------------------------------------------------------------------
+    2. \e[32;1m&lt;num update&gt;\e[0m        &#25968;&#23383;&#21152;update,&#26356;&#26032;&#38236;&#20687;&#29256;&#26412;&#65292;&#29992;&#20110;&#26356;&#26032;&#25110;&#32773;&#22238;&#28378;
+    ------------------------------------------------------------------------------------
+    3. \e[32;1m&lt;num scale&gt;\e[0m         &#25968;&#23383;&#21152;scale&#65292;&#20280;&#32553;&#26381;&#21153;&#25968;&#37327;&#65292;&#35774;&#32622;&#20026;0&#20572;&#27490;&#26381;&#21153;
+                           &#23545;&#20110;&#24050;&#32463;&#35774;&#32622;&#20026;0&#30340;&#26381;&#21153;&#38656;&#35201;&#36755;&#20837;  0 scale &#20877;&#36827;&#34892;&#26356;&#25913;
+    ------------------------------------------------------------------------------------
+    4. \e[32;1m&lt;num restart all&gt;\e[0m  &#37325;&#21551;&#25351;&#23450;&#23481;&#22120;&#30456;&#20851;&#30340;&#25152;&#26377;&#23481;&#22120;&#65292;&#28378;&#21160;&#37325;&#21551;&#19981;&#24433;&#21709;&#26381;&#21153;
+    ------------------------------------------------------------------------------------
+    5. \e[32;1m&lt;num restart&gt;\e[0m      &#25968;&#23383;&#21152;&#31354;&#26684;restart&#37325;&#21551;&#26381;&#21153;,&#27604;&#22914; &lt;1 restart&gt;
+                          &#25968;&#23383;&#21152;&#31354;&#26684;restart force&#24378;&#21046;&#21024;&#38500;&#26381;&#21153;&#65292;&#27604;&#22914;&lt;1 restart force&gt; &#19968;&#33324;&#38271;
+                          &#26102;&#38388;&#22788;&#20110;Terminal&#29366;&#24577;&#25110;&#32773;&#26080;&#27861;&#37325;&#21551;&#26102;&#20351;&#29992;
+    ------------------------------------------------------------------------------------
+
+    \e[36;1mHelp\e[0m
+    1. \e[32;1m&lt;r&gt;\e[0m                &#36755;&#20837;r&#21047;&#26032;&#24403;&#21069;&#21015;&#34920;\e[0m
+    ------------------------------------------------------------------------------------
+    2. \e[32;1m&lt;help&gt;\e[0m             &#36755;&#20837;help&#26597;&#30475;&#24110;&#21161;&#20449;&#24687;\e[0m
+    ------------------------------------------------------------------------------------
+    3. \e[32;1m&lt;exit|quit&gt;\e[0m        &#36864;&#20986;\e[0m
+    ------------------------------------------------------------------------------------
+    4. \e[32;1m&lt;num:num [MATCH]&gt;\e[0m  &#22914;&#26524;&#26377;&#22810;&#20010;&#23481;&#22120;&#65292;&#20882;&#21495;&#21518;&#30340;&#25968;&#23383;&#26159;&#25351;&#23450;&#23481;&#22120;
+    ------------------------------------------------------------------------------------
+   "</span>
+}
+<span class="org-function-name">print_list</span>(){
+   <span class="org-builtin">echo</span> -e <span class="org-string">'&#26381;&#21153;\t&#25968;&#37327;\t&#29366;&#24577;\t&#37325;&#21551;&#27425;&#25968;\t&#21019;&#24314;&#26102;&#38388;\t&#23481;&#22120;IP\t&#23487;&#20027;&#26426;'</span> &gt; $<span class="org-variable-name">title</span>
+   kubectl $<span class="org-variable-name">config</span> get po -o wide|grep -vP <span class="org-string">'^elastic|NAME'</span>|grep -P <span class="org-string">"$server"</span> &gt; $<span class="org-variable-name">temp_list</span>
+   <span class="org-variable-name">sep</span>=$(printf <span class="org-string">"%140s\n"</span>|tr <span class="org-string">' '</span> <span class="org-string">'='</span>)
+   cat -n $<span class="org-variable-name">title</span> $<span class="org-variable-name">temp_list</span>|awk <span class="org-string">'{$1--;print $0}'</span> |column -t -o <span class="org-string">'| '</span>|awk -F<span class="org-string">'|'</span> <span class="org-string">'BEGIN{OFS=" | "}{print $1,"\033[34;1m"$2"\033[0m",$3,$4,$5,$6,$7,$8}'</span>|sed <span class="org-string">"1a${sep}"</span>
+   <span class="org-builtin">echo</span> <span class="org-string">"$sep"</span>
+   <span class="org-builtin">echo</span> -e <span class="org-string">"\e[1mTips: &#33050;&#26412;&#21442;&#25968;&#21487;&#30452;&#25509;&#36755;&#20986;&#21305;&#37197;&#30340;&#26381;&#21153;&#21517;&#31216;\n\t$0 [match]\e[0m"</span>
+   <span class="org-builtin">read</span> -p <span class="org-string">"&#36755;&#20837;&#32534;&#21495;&#26597;&#30475;&#26085;&#24535;(&#36755;&#20837;help&#25171;&#21360;&#24110;&#21161;): "</span> num;<span class="org-builtin">echo</span> -e <span class="org-string">"\e[0m"</span>
+   
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#24110;&#24537;&#19982;&#36864;&#20986;
+</span>   <span class="org-keyword">if </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'^\s*help\s*$'</span>;<span class="org-keyword">then</span>
+      print_help
+      <span class="org-builtin">read</span> -p <span class="org-string">"&#36755;&#20837;&#32534;&#21495;&#26597;&#30475;&#26085;&#24535;: "</span> num;<span class="org-builtin">echo</span> -e <span class="org-string">"\e[0m"</span>
+   <span class="org-keyword">fi</span>
+    
+   <span class="org-keyword">if </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'exit|quit'</span>;<span class="org-keyword">then exit</span> 0;<span class="org-keyword">fi</span>
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22810;&#23481;&#22120;
+</span>   <span class="org-keyword">if </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'^\d+:\d+.*$'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">operation</span>=$(<span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|awk <span class="org-string">'{print $2}'</span>)
+      <span class="org-variable-name">container_num</span>=$(<span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|awk -F<span class="org-string">':|[[:space:]]+'</span> <span class="org-string">'{print $2}'</span>)
+      <span class="org-variable-name">num</span>=<span class="org-string">"$(echo $num|awk -F: '{print $1}') ${operation}"</span>
+   <span class="org-keyword">fi</span>
+  
+   <span class="org-comment-delimiter">##</span><span class="org-comment">&#26597;&#30475; 
+</span>   <span class="org-comment-delimiter">#</span><span class="org-comment">&#36827;&#23481;&#22120;: &lt;num bash&gt; &#25968;&#23383;&#21518;&#21152;&#31354;&#26684;bash&#36827;&#20837;&#23481;&#22120;,&#27604;&#22914; &lt;1 bash&gt;
+</span>   <span class="org-keyword">if </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+bash'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'`</span>
+      <span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -z $<span class="org-variable-name">container_num</span> ];<span class="org-keyword">then</span>
+<span class="org-comment-delimiter">#         </span><span class="org-comment">[[ $cs =~ (^.*)-[^-]+-[^-]+$ ]]
+</span>         ((container_num--))
+         <span class="org-variable-name">container_name</span>=$(kubectl get po $<span class="org-variable-name">cs</span> -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">"{.spec.containers[$container_num].name}"</span>)
+         <span class="org-variable-name">container_cmd</span>=<span class="org-string">"-c $container_name"</span>
+      <span class="org-keyword">fi</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m=== &#36827;&#20837;&#23481;&#22120; $cs &#36755;&#20837;&#21629;&#20196;exit&#36864;&#20986; ====\n\e[0m"</span>
+      kubectl $<span class="org-variable-name">config</span> exec -it $<span class="org-variable-name">cs</span> ${<span class="org-variable-name">container_cmd</span>} -- bash  2&gt;/dev/null || kubectl $<span class="org-variable-name">config</span> exec -it $<span class="org-variable-name">cs</span> ${<span class="org-variable-name">container_cmd</span>} -- sh
+      <span class="org-keyword">exit</span> 0
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26381;&#21153;&#26085;&#24535;: &lt;num&gt; [line_num] &#30452;&#25509;&#36755;&#20837;&#23545;&#24212;&#25968;&#23383;&#22238;&#36710;&#23454;&#26102;&#36755;&#20986;&#26368;&#21518;200&#34892;&#26085;&#24535;,&#20063;&#21487;&#20197;&#25351;&#23450;&#34892;&#25968;line_num
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^\d+$'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "${num}p" $temp_list|awk '{print $1}'`</span>
+      <span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -z $<span class="org-variable-name">container_num</span> ];<span class="org-keyword">then</span>
+         <span class="org-comment-delimiter">#</span><span class="org-comment">[[ $cs =~ (^.*)-[^-]+-[^-]+$ ]]
+</span>         <span class="org-comment-delimiter">#</span><span class="org-comment">container_cmd="-c ${BASH_REMATCH[1]}${container_suffix}"
+</span>         ((container_num--))
+         <span class="org-variable-name">container_name</span>=$(kubectl $<span class="org-variable-name">config</span> get po $<span class="org-variable-name">cs</span> -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">"{.spec.containers[$container_num].name}"</span>)
+         <span class="org-variable-name">container_cmd</span>=<span class="org-string">"-c $container_name"</span>
+      <span class="org-keyword">fi</span>
+      kubectl $<span class="org-variable-name">config</span> logs -f --tail=1000 $<span class="org-variable-name">cs</span> ${<span class="org-variable-name">container_cmd</span>}
+
+   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^\d+\s+\d+$'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'`</span>
+      <span class="org-keyword">if</span> [ <span class="org-negation-char">!</span> -z $<span class="org-variable-name">container_num</span> ];<span class="org-keyword">then</span>
+         <span class="org-comment-delimiter">#</span><span class="org-comment">[[ $cs =~ (^.*)-[^-]+-[^-]+$ ]]
+</span>         <span class="org-comment-delimiter">#</span><span class="org-comment">container_cmd="-c ${BASH_REMATCH[1]}${container_suffix}"
+</span>         ((container_num--))
+         <span class="org-variable-name">container_name</span>=$(kubectl get po $<span class="org-variable-name">cs</span> -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">"{.spec.containers[$container_num].name}"</span>)
+         <span class="org-variable-name">container_cmd</span>=<span class="org-string">"-c $container_name"</span>
+      <span class="org-keyword">fi</span>
+       <span class="org-variable-name">line</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $2}'`</span>
+       kubectl $<span class="org-variable-name">config</span> logs -f --tail=$<span class="org-variable-name">line</span> $<span class="org-variable-name">cs</span> ${<span class="org-variable-name">container_cmd</span>}
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">pod&#35814;&#24773;: &lt;num des&gt; &#25968;&#23383;&#21152;des&#26597;&#30475;pod&#35814;&#32454;&#20449;&#24687;,&#27604;&#22914;&lt;1 des&gt;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^\d+\s+des$'</span>;<span class="org-keyword">then</span>
+           <span class="org-variable-name">match</span>=<span class="org-sh-quoted-exec">`echo $num|sed -rn 's/^[0-9]+[[:space:]]+//p'`</span>
+           <span class="org-variable-name">num</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $1}'`</span>
+           <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "${num}p" $temp_list|awk '{print $1}'`</span>
+           kubectl $<span class="org-variable-name">config</span> describe po $<span class="org-variable-name">cs</span>
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26085;&#24535;&#21305;&#37197;: &lt;num MATCH&gt; &#25968;&#23383;&#21152;&#31354;&#26684;&#21333;&#35789;&#36827;&#34892;&#26085;&#24535;&#21305;&#37197;,&#27604;&#22914; &lt;1 ERROR&gt;, &#21305;&#37197;&#25968;&#23383;&#38656;&#35201;&#23558;&#25968;&#23383;&#25324;&#36215;&#26469; &lt;1 [12345]&gt;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^\d+\s+.+$'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">match</span>=<span class="org-sh-quoted-exec">`echo $num|sed -rn 's/^[0-9]+[[:space:]]+//p'`</span>
+      <span class="org-keyword">if </span><span class="org-builtin">echo</span> $<span class="org-variable-name">match</span>|grep -qP <span class="org-string">'\[\d+\]'</span>;<span class="org-keyword">then</span> <span class="org-variable-name">match</span>=$(<span class="org-builtin">echo</span> $<span class="org-variable-name">match</span>|sed -nr <span class="org-string">'s/\[([0-9]+)\]/\1/p'</span>);<span class="org-keyword">fi</span>
+      <span class="org-variable-name">num</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $1}'`</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "${num}p" $temp_list|awk '{print $1}'`</span>
+      kubectl $<span class="org-variable-name">config</span> logs -f --tail=200 $<span class="org-variable-name">cs</span>|grep --color -iP <span class="org-string">"$match"</span>
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22810;&#23481;&#22120;&#32858;&#21512;&#26085;&#24535;: &lt;num1,num2 [MATCH]&gt; &#27604;&#22914; 1,3,5 &#26597;&#30475;1 3 5 &#19977;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^\d+,\d+'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">awk_re</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $1}'|awk -F: '{gsub(/,/,"||NR==");print "NR=="$0}'`</span>
+      <span class="org-variable-name">match</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $2}'`</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`awk '{if('''$awk_re''')print $1}' $temp_list`</span>
+      stern $<span class="org-variable-name">config</span> ${<span class="org-variable-name">cs</span>//[[:space:]]/|} --tail 1000 --include <span class="org-string">"$match"</span>
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22810;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;: &lt;num_start..num_end [MATCH]&gt; &#27604;&#22914; 1..4 &#26597;&#30475;1&#21040;4&#22235;&#20010;&#23481;&#22120;&#30340;&#32858;&#21512;&#26085;&#24535;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^\d+..\d+'</span>;<span class="org-keyword">then</span>
+       <span class="org-variable-name">num_list</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $1}'`</span>
+       <span class="org-variable-name">awk_re</span>=<span class="org-sh-quoted-exec">`eval echo {$num_list}|awk '{gsub(/ /,"||NR==");print "NR=="$0}'`</span>
+       <span class="org-variable-name">match</span>=<span class="org-sh-quoted-exec">`echo $num|awk '{print $2}'`</span>
+       <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`awk '{if('''$awk_re''')print $1}' $temp_list`</span>
+       stern $<span class="org-variable-name">config</span> ${<span class="org-variable-name">cs</span>//[[:space:]]/|} --tail 1000 --include <span class="org-string">"$match"</span>
+
+   <span class="org-comment-delimiter">##</span><span class="org-comment">&#20462;&#25913;
+</span>   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26356;&#26032;&#38236;&#20687;: &lt;num update&gt; &#25968;&#23383;&#21152;update,&#26356;&#26032;&#38236;&#20687;&#29256;&#26412;&#65292;&#29992;&#20110;&#26356;&#26032;&#25110;&#32773;&#22238;&#28378;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+update'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'|sed -n -r 's/^(.*)-[^-]+-[^-]+$/\1/p'`</span>
+      <span class="org-variable-name">iver</span>=<span class="org-sh-quoted-exec">`kubectl $config describe deploy $cs|awk -F: '/Image:/{print $NF}'`</span>
+      <span class="org-variable-name">image</span>=<span class="org-sh-quoted-exec">`kubectl $config describe deploy $cs|awk -F'[ |:]' '/Image:/{print $(NF-1)}'`</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m===  $cs &#24403;&#21069;&#29256;&#26412;&#20026; [$iver] ====\n\e[0m"</span>
+      <span class="org-builtin">read</span> -p <span class="org-string">'&#36755;&#20837;&#26032;&#30340;&#29256;&#26412;&#21495;(&#25968;&#23383;&#25110;&#32773;latest,&#40664;&#35748;&#20026;latest)&#65306;'</span> nver
+      kubectl $<span class="org-variable-name">config</span> set image deployment/$<span class="org-variable-name">cs</span> ${<span class="org-variable-name">cs</span>}=${<span class="org-variable-name">image</span>}:${<span class="org-variable-name">nver</span>:=latest}
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m\t&#24050;&#35774;&#32622; $cs &#38236;&#20687;&#29256;&#26412;&#20026;\n===  ${image}:$nver  ====\n\e[0m"</span>
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#22797;&#21046;&#25991;&#20214;: &lt;num cp&gt; &#25968;&#23383;&#21152;&#31354;&#26684;cp&#22797;&#21046;&#25991;&#20214;&#25110;&#32773;&#30446;&#24405;,&#27604;&#22914; &lt;1 cp&gt;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+cp'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">copydir</span>=$<span class="org-variable-name">RANDOM</span>
+      mkdir /tmp/$<span class="org-variable-name">copydir</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'`</span>
+      <span class="org-builtin">read</span> -p <span class="org-string">'&#36755;&#20837;&#35201;&#22797;&#21046;&#30340;&#30446;&#24405;&#25110;&#32773;&#25991;&#20214;&#65288;&#32477;&#23545;&#36335;&#24452;&#65289;&#65306;'</span> copyfile
+      kubectl $<span class="org-variable-name">config</span> cp ${<span class="org-variable-name">cs</span>}:$<span class="org-variable-name">copyfile</span> /tmp/$<span class="org-variable-name">copydir</span>/$(basename $<span class="org-variable-name">copyfile</span>) 2&gt;/dev/null &amp;&amp; <span class="org-builtin">echo</span> -e <span class="org-string">"&#25991;&#20214;&#24050;&#32463;&#22797;&#21046;&#21040;/tmp/$copydir"</span>
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#26381;&#21153;&#20280;&#32553;: &lt;num scale&gt; &#25968;&#23383;&#34920;&#31034;&#36873;&#23450;&#35201;&#20280;&#32553;&#30340;&#26381;&#21153;&#65292;&#22914;&lt;1 scale&gt;&#65292;&#33258;&#23450;&#20041;&#20280;&#32553;&#30340;&#26381;&#21153; &lt;0 scale&gt;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+scale$'</span>;<span class="org-keyword">then</span>
+      <span class="org-keyword">if</span> [ $(<span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|awk <span class="org-string">'{print $1}'</span>) == 0 ];<span class="org-keyword">then</span>
+          <span class="org-builtin">echo</span> -e <span class="org-string">"\e[1m--- &#20197;&#19979;&#26381;&#21153;&#25968;&#37327;&#20026;0 ---"</span>
+          kubectl $<span class="org-variable-name">config</span> get deploy|awk -F<span class="org-string">' +|/'</span> <span class="org-string">'$3==0{print $1}'</span>
+          <span class="org-builtin">read</span> -p <span class="org-string">'&#36755;&#20837;&#23545;&#24212;&#26381;&#21153;&#21517;&#31216;&#65306;'</span> deploy
+      <span class="org-keyword">else</span>
+          <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'`</span>
+          <span class="org-variable-name">deploy</span>=$(<span class="org-builtin">echo</span> $<span class="org-variable-name">cs</span>|sed -nr <span class="org-string">'s/-[^-]+-[^-]+$//p'</span>)
+      <span class="org-keyword">fi</span>
+      <span class="org-variable-name">c_num</span>=$(kubectl $<span class="org-variable-name">config</span> get deploy $<span class="org-variable-name">deploy</span>|sed -n <span class="org-string">'2p'</span>|awk -F<span class="org-string">' +|/'</span> <span class="org-string">'{print $3}'</span>)
+      <span class="org-builtin">read</span> -p <span class="org-string">"&#24403;&#21069;&#36873;&#25321; $deploy &#26381;&#21153;&#65292;&#36755;&#20837;&#35201;&#20280;&#32553;&#30340;&#26381;&#21153;&#25968;&#37327;[&#24403;&#21069;&#25968;&#37327;&#20026; $c_num ]&#65306;"</span> scale_num
+<span class="org-comment-delimiter">#      </span><span class="org-comment">expr $scale_num + 0 &gt;/dev/null 2&gt;&amp;1
+</span>      <span class="org-builtin">echo</span> $<span class="org-variable-name">scale_num</span>|grep -P <span class="org-string">'^\d+$'</span> &gt;/dev/null
+      <span class="org-keyword">if</span> [ $<span class="org-variable-name">?</span> -ne 0 ];<span class="org-keyword">then</span>
+          <span class="org-builtin">echo</span> -e <span class="org-string">"\e[31;1mError&#65306;&#24517;&#39035;&#36755;&#20837;&#19968;&#20010;&#25972;&#25968;&#65281;\e[0m"</span>;<span class="org-keyword">exit</span> 1
+      <span class="org-keyword">else</span>
+          <span class="org-builtin">echo</span> -e <span class="org-string">"\e[1m&#27491;&#22312;&#20280;&#32553; ${deploy} &#25968;&#37327;&#20026; $scale_num ...\e[0m"</span>;sleep 1
+          kubectl $<span class="org-variable-name">config</span> scale deploy ${<span class="org-variable-name">deploy</span>} --replicas=$<span class="org-variable-name">scale_num</span>
+      <span class="org-keyword">fi</span>
+   
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551;&#25351;&#23450;&#30456;&#20851;&#25152;&#26377;&#26381;&#21153;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+restart\s+all'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'|sed -n -r 's/^(.*)-[^-]+-[^-]+$/\1/p'`</span>
+      kubectl $<span class="org-variable-name">config</span> rollout restart deploy $<span class="org-variable-name">cs</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m===  &#27491;&#22312;&#37325;&#21551;&#25152;&#26377;$cs&#23481;&#22120;  ====\n\e[0m"</span>
+
+   <span class="org-comment-delimiter">#</span><span class="org-comment">&#37325;&#21551;&#26381;&#21153;: &lt;num restart&gt; &#25968;&#23383;&#21152;&#31354;&#26684;restart&#37325;&#21551;&#26381;&#21153;,&#27604;&#22914; &lt;1 restart&gt; &#24378;&#21046;&#21024;&#38500;&#26381;&#21153;&#22914;&lt;1 restart force&gt;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+restart\s+force'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'`</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m=== &#27491;&#22312;&#24378;&#21046;&#37325;&#21551;&#23481;&#22120; $cs  ====\n\e[0m"</span>
+      kubectl $<span class="org-variable-name">config</span> delete pod $<span class="org-variable-name">cs</span> --force --grace-period=0
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m=== &#24378;&#21046;&#37325;&#21551;&#23436;&#27605;  ====\n\e[0m"</span>
+      <span class="org-keyword">exit</span> 0
+   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qiP <span class="org-string">'\d+\s+restart$'</span>;<span class="org-keyword">then</span>
+      <span class="org-variable-name">cs</span>=<span class="org-sh-quoted-exec">`sed -n "$(echo $num|awk '{print $1}')p" $temp_list|awk '{print $1}'`</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m=== &#27491;&#22312;&#37325;&#21551;&#23481;&#22120; $cs  ====\n\e[0m"</span>
+      kubectl $<span class="org-variable-name">config</span> delete pod $<span class="org-variable-name">cs</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[33;1m=== &#37325;&#21551;&#23436;&#27605;  ====\n\e[0m"</span>
+      <span class="org-keyword">exit</span> 0
+
+   <span class="org-comment-delimiter">##</span><span class="org-comment">&#20854;&#20182; 
+</span>   <span class="org-comment-delimiter">#</span><span class="org-comment">&#21047;&#26032;&#24403;&#21069;&#21015;&#34920;
+</span>   <span class="org-keyword">elif </span><span class="org-builtin">echo</span> $<span class="org-variable-name">num</span>|grep -qP <span class="org-string">'^reload$|^r$'</span>;<span class="org-keyword">then</span>
+      print_list
+   <span class="org-keyword">else</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\e[32;1mERROR: Not a Correct Command !!!\e[0m"</span>
+      <span class="org-keyword">exit</span> 1
+   <span class="org-keyword">fi</span>
+}
+print_list
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org521cf2b" class="outline-3">
+<h3 id="org521cf2b"><a href="#org521cf2b">小工具3</a></h3>
+<div class="outline-text-3" id="text-org521cf2b">
+<p>
+功能：登入容器
+</p>
+
+<p>
+kube-ci选项
+</p>
+<pre class="example" id="org6a650fe">
+kube-ci [名称空间] pod名称 [shell路径] [k8s配置文件]
+[]为可选
+默认 kube-ci pod名称 为登入生产环境名称空间为english-prod的容器，使用shell为/bin/bash
+</pre>
+
+<p>
+脚本内容
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF &gt; kube-ci <span class="org-sh-heredoc">
+#!/bin/bash
+[ $# -eq 0 ] &amp;&amp; echo -e "Please input: \e[31;1m kube-ci\e[0m [nameSpace] \e[31;1m podName \e[0m [shellPath] [kubeConfigPath]\n" &amp;&amp; exit 1
+[ $# -eq 2 ] &amp;&amp; namesapce=$1 podname=$2 
+[ $# -eq 3 ] &amp;&amp; namesapce=$1 podname=$2 shell_path=$3
+[ $# -gt 3 ] &amp;&amp; namesapce=$1 podname=$2 shell_path=$3  config=$4
+: export ${namesapce:="english-prod"} ${podname:=$1} ${shell_path:=/bin/bash} ${config:="/data/ops/config_prod"}
+kubectl --kubeconfig=$config -n $namesapce exec -it $podname ${shell_path}
+EOF
+</span>
+chmod +x kube-ci
+</pre>
+</div>
+
+<p>
+脚本加密
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">shc -T -r -f kube-ci
+mv -f  kube-ci .kube-ci ; mv -f kube-ci.x kube-ci ; rm -f kube-ci.x.c
+ln -svf /data/ops/scripts/kube-ci /usr/bin/
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">kube-ci  english-activity-server-68f797b6b8-ww4mh
+</span>[root@english-activity-server-68f797b6b8-ww4mh data]# 
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">kube-ci bigdata-prod data-center-point-web-7765887f5f-st4gs
+</span>[root@data-center-point-web-7765887f5f-st4gs data]# 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgf7cfb1d" class="outline-3">
+<h3 id="orgf7cfb1d"><a href="#orgf7cfb1d">定时修改Hpa副本数</a></h3>
+<div class="outline-text-3" id="text-orgf7cfb1d">
+<p>
+可以用cronhpa
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">crontab -l
+<span class="org-comment-delimiter"># </span><span class="org-comment">k8s &#25253;&#35686; by xuchangwei
+</span>*/5 8-23 * * * bash  /data/ops/k8s_ding.sh &amp;&gt;/root/tmp.log
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#22823;&#36187;HPA
+</span>20 20 * * * bash  /data/ops/k8s_hot_etp_hpa.sh --up  &amp;&gt;/dev/null
+30 21 * * * bash  /data/ops/k8s_hot_etp_hpa.sh --down  &amp;&gt;/dev/null
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF &gt;k8s_hot_etp_hpa.sh <span class="org-sh-heredoc">
+#!/bin/bash
+source /etc/profile
+kube_conf_file=/etc/kubernetes/admin.conf
+namespace=english-prod
+kube_CMD="kubectl --kubeconfig=$kube_conf_file"
+tokens="1923d71ff377813"
+#--------------------
+[ ! -e  /data/ops/logs ] &amp;&amp; mkdir -p ./logs
+declare -A monitor_info
+
+unset scale_up
+unset scale_down
+declare -A SCALE
+scale_down="
+english-etp-race-mqtt|english-etp-race-mqtt|2
+english-etp-web|english-etp-web|10
+"
+
+scale_up="
+english-etp-race-mqtt|english-etp-race-mqtt|40
+english-etp-web|english-etp-web|20
+"
+SCALE["UP"]=$scale_up
+SCALE["DOWN"]=$scale_down
+
+#dingding push
+function dingding() {
+local access_tokens=$1
+local ding_url='https://oapi.dingtalk.com/robot/send'
+local ding_header='Content-Type: application/json'
+local msg=$2
+for key in $access_tokens; do
+curl -s -connect-timeout 40 -XPOST -H "$ding_header" "$ding_url?access_token=$key" \
+-d '{"msgtype": "text",
+    "text": {
+        "content": "&#12304;&#29983;&#20135;k8s-hpa&#21464;&#26356;&#36890;&#30693;&#12305; \n'"$msg"'"
+    },
+"at": {
+      "atMobiles": [],
+      "isAtAll": true
+  }
+}'
+done
+}
+
+
+function set_hpa() {
+    local hpa_info=${SCALE["$1"]}
+    [ -z "${hpa_info}" ] &amp;&amp; exit 1
+    for h in ${hpa_info}; do
+        deployment_name=$(echo $h | awk -F'|' '{print $1}')
+        hpa_name=$(echo $h | awk -F'|' '{print $2}')
+        hpa_min_num=$(echo $h | awk -F'|' '{print $3}')
+        [ -z "${hpa_name}" -o -z "${hpa_min_num}" ] &amp;&amp; continue
+        monitor_info[${#monitor_info[*]}]="${deployment_name} &#26368;&#23567;&#21103;&#26412;&#25968;&#65306; ${hpa_min_num}\n"
+        $kube_CMD -n $namespace patch hpa ${hpa_name} -p '{"spec":{"minReplicas":'"${hpa_min_num}"'}}' &gt;/dev/null
+        echo "$kube_CMD -n $namespace patch hpa ${hpa_name} -p '{"spec":{"minReplicas":'"${hpa_min_num}"'}}' "
+
+    done
+
+    [ ${#monitor_info[@]} -gt 0 ] &amp;&amp; {
+        # chinese&#25253;&#35686;&#32676;
+        dingding "a74e585f34d" "$(echo -e "${monitor_info[@]}")\\n"
+       :
+    }
+}
+
+main() {
+    set_hpa "$1"
+    #echo  -e "${monitor_info[@]}"
+    [ ${#monitor_info[@]} -gt 0 ] &amp;&amp; {
+        dingding "$tokens" "$(echo -e "${monitor_info[@]}")\\n"
+        echo -e "${monitor_info[@]}" &gt;&gt; /data/ops/logs/k8s_hpa_`date +"%Y-%m"`.log
+    }
+}
+
+usage(){
+cat &lt;&lt;EOF
+Usage: $0  [OPTION]
+
+OPTION:
+  -u, --up                 chang minReplicas
+  -d, --down               chang minReplicas
+  --version                show version
+  --help                   show help
+EOF
+</span>}
+
+getopt -T &amp;&gt;/dev/null;[ $<span class="org-variable-name">?</span> -ne 4 ] &amp;&amp; { <span class="org-builtin">echo</span> <span class="org-string">"not enhanced version"</span>;<span class="org-keyword">exit</span> 1; }
+
+<span class="org-variable-name">parameters</span>=$(getopt -o ud --long up,down,help,version -n <span class="org-string">"$0"</span> -- <span class="org-string">"$@"</span>)
+[ $<span class="org-variable-name">?</span> -ne 0 ] &amp;&amp; { <span class="org-builtin">echo</span> <span class="org-string">"Try '$0 --help' for more information."</span>; <span class="org-keyword">exit</span> 1; }
+
+<span class="org-builtin">eval</span> set -- <span class="org-string">"$parameters"</span>
+
+<span class="org-keyword">while </span><span class="org-builtin">true</span>; <span class="org-keyword">do</span>
+    <span class="org-keyword">case</span> <span class="org-string">"$1"</span><span class="org-keyword"> in</span>
+    -u|--up)   main UP ; <span class="org-builtin">shift</span> ; <span class="org-keyword">exit</span> ;;
+    -d|--down) main DOWN ; <span class="org-builtin">shift</span> ; <span class="org-keyword">exit</span> ;;
+    --version) <span class="org-builtin">echo</span> <span class="org-string">"$0 version V0.1"</span>; <span class="org-keyword">exit</span> ;;
+    --help) usage;<span class="org-keyword">exit</span> ;;
+    --)
+        <span class="org-builtin">shift</span>
+        [ <span class="org-string">"$1"</span> = <span class="org-string">""</span> ] &amp;&amp; usage ||  {
+        <span class="org-builtin">echo</span> -e <span class="org-string">"$0: invalid floating point argument: $@\nTry '$0 --help' for more information."</span> ; <span class="org-keyword">exit</span> 1; }
+        [ <span class="org-string">"$#"</span> -ge 2 ] &amp;&amp; {
+        <span class="org-builtin">echo</span> -e <span class="org-string">"$0: invalid floating point argument: $@\nTry '$0 --help' for more information."</span> ; <span class="org-keyword">exit</span> 1; }
+        <span class="org-variable-name">FIRST</span>=$<span class="org-variable-name">1</span>
+        <span class="org-variable-name">SECOND</span>=$<span class="org-variable-name">2</span>
+        <span class="org-variable-name">LAST</span>=$<span class="org-variable-name">3</span>
+        <span class="org-keyword">break</span> ;;
+    *) <span class="org-builtin">echo</span> <span class="org-string">"0k"</span>  ;;
+    <span class="org-keyword">esac</span>
+<span class="org-keyword">done</span>
+EOF
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org9bd2816" class="outline-3">
+<h3 id="org9bd2816"><a href="#org9bd2816">bash脚本监控</a></h3>
+<div class="outline-text-3" id="text-org9bd2816">
+<p>
+定时任务 
+</p>
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">k8s &#25253;&#35686; by xuchangwei
+</span>*/5 8-23 * * * bash /data/ops/k8s_ding.sh &amp;&gt;/dev/null
+</pre>
+</div>
+
+<p>
+执行输出
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">[root@ali-h-ops-elkf-kibana-prod-bj01 /data/ops] <span class="org-variable-name">eth0</span> = 10.16.202.198
+<span class="org-comment-delimiter"># </span><span class="org-comment">bash  k8s_ding.sh 
+</span>&#38598;&#32676;CPU&#20351;&#29992;&#29575;62.55, &#35831;&#27714;/&#24635;&#39069;:960.75/1536
+&#38598;&#32676;&#20869;&#23384;&#20351;&#29992;&#29575;74.05, &#35831;&#27714;/&#24635;&#39069;:2219494/2997146.30
+&#38598;&#32676; [ops] CPU&#20351;&#29992;&#29575;19.67, &#35831;&#27714;/&#24635;&#39069;(&#26680;):12.59/64, &#33410;&#28857;&#25968;:2 
+&#38598;&#32676; [ops] &#20869;&#23384;&#20351;&#29992;&#29575;16.45, &#35831;&#27714;/&#24635;&#39069;(Gi):19.99/121.54, &#33410;&#28857;&#25968;:2
+.....
+&#38598;&#32676; [bigdata] CPU&#20351;&#29992;&#29575;77.64, &#35831;&#27714;/&#24635;&#39069;(&#26680;):149.06/192, &#33410;&#28857;&#25968;:6 
+&#38598;&#32676; [bigdata] &#20869;&#23384;&#20351;&#29992;&#29575;77.38, &#35831;&#27714;/&#24635;&#39069;(Gi):282.14/364.62, &#33410;&#28857;&#25968;:6
+&#38598;&#32676; [application] CPU&#20351;&#29992;&#29575;65.01, &#35831;&#27714;/&#24635;&#39069;(&#26680;):748.91/1152, &#33410;&#28857;&#25968;:36 
+&#38598;&#32676; [application] &#20869;&#23384;&#20351;&#29992;&#29575;81.72, &#35831;&#27714;/&#24635;&#39069;(Gi):1795.96/2197.66, &#33410;&#28857;&#25968;:36
+</pre>
+</div>
+
+<p>
+脚本内容(已废)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF &gt; k8s_ding.sh <span class="org-sh-heredoc">
+#!/bin/bash
+set -e
+source /etc/profile
+PATH=/usr/local/bin/:$PATH
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &amp;&amp; pwd )"
+cd $DIR
+bash ./k8s_node_ding.sh  &amp;
+bash ./k8s_namespace_ding.sh bigdata-prod &amp;
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">node&#30417;&#25511;
+</span>cat &lt;&lt;\EOF &gt; k8s_node_ding.sh <span class="org-sh-heredoc">
+#!/bin/bash
+set -e
+source /etc/profile
+PATH=/usr/local/bin/:$PATH
+#kube_conf_file=/etc/kubernetes/admin.conf
+kube_conf_file=/root/xuchangwei/config_prod
+kube_CMD="kubectl --kubeconfig=$kube_conf_file"
+namespace=english-prod 
+node_cpu=4             # node CPU &#39044;&#35686;&#20540;(&#26680;)
+node_memory=5          # node &#20869;&#23384; &#39044;&#35686;&#20540;(GB)
+node_cpu_pre=90        # node cpu&#20351;&#29992;&#29575; &#39044;&#35686;&#20540;(%)
+node_memory_pre=90     # node &#20869;&#23384;&#20351;&#29992;&#29575; &#39044;&#35686;&#20540;(%)
+tokens="1923dbd1ff377813"
+#--------------------
+mkdir -p ./logs
+unset monitor_info
+declare -A monitor_info
+
+#&#25552;&#21069;&#23545;node&#25171;&#19978;node&#26631;&#31614;
+
+function caler() {
+    res=`awk 'BEGIN{printf "%.2f\n",'$1'/'$2'*100}'`
+}
+
+function node_check() {
+:
+   n_cpu=0
+   n_memory=0 
+   n_cpu_request=0
+   n_memory_request=0
+   declare -A n_cpu_roles
+   declare -A n_memory_roles
+   declare -A n_cpu_request_roles
+   declare -A n_memory_request_roles
+   declare -A n_num_roles
+   while read n; do
+        #echo $n
+        #n=$(kubectl get       node cn-beijing.10.16.20.146 |sed '1d')
+        node_name=$(echo $n | awk '{print $1}')
+        #node_roles=$(echo $n | awk '{print $3}')
+        node_roles=$(echo $n | grep  -Eo 'node=[[:alnum:]-]{1,}' | awk -F'node=' '{print $2}')
+        if [ ${node_roles} != "ingress" ]; then
+        node_info=$($kube_CMD describe node ${node_name} )
+        node_total_info=$(echo "${node_info}"|grep -A15 Capacity)
+        node_rl_info=$(echo "${node_info}"|grep -E 'cpu |memory  ')
+
+        node_cpu_total=$(echo "${node_total_info}"|grep -A6 Capacity|grep cpu|awk '{print $2}')
+        node_memory_total=$(echo "${node_total_info}"|grep -A6 Capacity|grep memory|awk '{print $2}'|sed 's/Ki//')
+        node_cpu_total_allocatable=$(echo "${node_total_info}"|grep -A6 Allocatable|grep cpu|awk '{print $2}')
+        node_memory_total_allocatable=$(echo "${node_total_info}"|grep -A6 Allocatable|grep memory|awk '{print $2}'|sed 's/Ki//')
+        n_cpu=$[${node_cpu_total}+${n_cpu}]
+        n_memory=$[${node_memory_total}+${n_memory}]
+        [ -z "${n_num_roles["${node_roles}"]}" ] &amp;&amp; n_num_roles["${node_roles}"]=0
+        [ -z "${n_cpu_roles["${node_roles}"]}" ] &amp;&amp; n_cpu_roles["${node_roles}"]=0
+        [ -z "${n_memory_roles["${node_roles}"]}" ] &amp;&amp; n_memory_roles["${node_roles}"]=0
+        n_num_roles["${node_roles}"]=$[ 1 + ${n_num_roles["${node_roles}"]} ]
+        n_cpu_roles["${node_roles}"]=$[ ${node_cpu_total} + ${n_cpu_roles["${node_roles}"]} ]
+        n_memory_roles["${node_roles}"]=$[ ${node_memory_total} + ${n_memory_roles["${node_roles}"]} ]
+
+        node_cpu_requests=$(echo "${node_rl_info}"|grep 'cpu ' |awk '{print $2}'|sed 's/m//')
+        #node_cpu_requests_pre=$(echo "${node_rl_info}"|grep 'cpu ' |awk '{print $3}'|sed -r 's/(\(|\)|%)//g')
+        node_cpu_requests_pre=$(awk 'BEGIN{printf "%.2f",('"${node_cpu_requests}/${node_cpu_total}"'/1000*100)}')
+        node_cpu_limits=$(echo "${node_rl_info}"|grep 'cpu ' |awk '{print $4}'|sed 's/m//')
+        node_cpu_limits_pre=$(awk 'BEGIN{printf "%.2f",('"${node_cpu_limits}/${node_cpu_total}"'/1000*100)}')
+        node_cpu_allocatable=$(awk 'BEGIN{printf "%.2f",('"${node_cpu_total_allocatable}-${node_cpu_requests}/1000"')}')
+        if echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}' | grep 'Mi'&amp;&gt;/dev/null; then
+            node_memory_requests=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}'|sed 's/Mi//')
+            node_memory_requests_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_requests}/${node_memory_total}"'*1024*100)}')
+            node_memory_allocatable=$(awk 'BEGIN{printf "%.2f",('"${node_memory_total_allocatable}/1024/1024-${node_memory_requests}/1024"')}')
+        node_memory_limits=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $4}'|sed 's/Mi//')
+        node_memory_limits_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_limits}/${node_memory_total}"'*1024*100)}')
+        elif echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}'|grep 'Gi'&amp;&gt;/dev/null; then
+            node_memory_requests=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}'|sed 's/Gi//'|awk '{printf "%.2f",($1*1024)}')
+            node_memory_requests_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_requests}/${node_memory_total}"'*1024*100)}')
+            node_memory_allocatable=$(awk 'BEGIN{printf "%.2f",('"${node_memory_total_allocatable}/1024/1024-${node_memory_requests}/1024"')}')
+        node_memory_limits=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $4}'|sed 's/Mi//')
+        node_memory_limits_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_limits}/${node_memory_total}"'*1024*100)}')
+        elif echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}'|grep 'm'&amp;&gt;/dev/null; then
+            node_memory_requests=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}'|sed 's/m//'|awk '{printf "%.2f",($1/1024/1024/1024)}')
+            node_memory_requests_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_requests}/${node_memory_total}"'*1024*100)}')
+            node_memory_allocatable=$(awk 'BEGIN{printf "%.2f",('"${node_memory_total_allocatable}/1024/1024-${node_memory_requests}/1024"')}')
+        node_memory_limits=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $4}'|sed 's/m//'|awk '{printf "%.2f",($1/1024/1024/1024)}')
+        node_memory_limits_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_limits}/${node_memory_total}"'*1024*100)}')
+        else
+            node_memory_requests=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $2}'|sed 's/Mi//')
+            node_memory_requests_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_requests}/${node_memory_total}"'*1024*100)}')
+            node_memory_allocatable=$(awk 'BEGIN{printf "%.2f",('"${node_memory_total_allocatable}/1024/1024-${node_memory_requests}/1024"')}')
+        node_memory_limits=$(echo "${node_rl_info}"|grep 'memory  ' |awk '{print $4}'|sed 's/Mi//')
+        node_memory_limits_pre=$(awk 'BEGIN{printf "%.2f",('"${node_memory_limits}/${node_memory_total}"'*1024*100)}')
+        fi
+        n_cpu_request=$[${node_cpu_requests}+${n_cpu_request}]
+        #n_memory_request=$[${node_memory_requests}+${n_memory_request}]
+        n_memory_request=$(awk 'BEGIN{printf "%.2f",('"${node_memory_requests}+${n_memory_request}"')}')
+        [ -z "${n_cpu_request_roles["${node_roles}"]}" ] &amp;&amp; n_cpu_request_roles["${node_roles}"]=0
+        [ -z "${n_memory_request_roles["${node_roles}"]}" ] &amp;&amp; n_memory_request_roles["${node_roles}"]=0
+        n_cpu_request_roles["${node_roles}"]=$[ ${node_cpu_requests} + ${n_cpu_request_roles["${node_roles}"]} ]
+        #n_memory_request_roles["${node_roles}"]=$[ ${node_memory_requests} + ${n_memory_request_roles["${node_roles}"]} ]
+        n_memory_request_roles["${node_roles}"]=$(awk 'BEGIN{printf "%.2f",('"${node_memory_requests} + ${n_memory_request_roles[${node_roles}]}"')}')
+   
+       # # &#21333;&#33410;&#28857;&#30417;&#25511;
+       # if_cpu=$(awk 'BEGIN{if (int('"${node_cpu_allocatable}"') &lt;= int('"$node_cpu"')){print "1"}}')
+       # [ "${if_cpu}"  == "1" ] &amp;&amp; { 
+       #     cpu_waring=$(printf "%s(%s)&#21487;&#20998;&#37197;CPU&#19981;&#36275;&#65292;CPU&#21097;&#20313;%s&#26680;&#65292;CPU&#24635;&#39069;: %s&#26680;&#65292;CPU requrests: %s (%s%%)&#65292;CPU limits: %s (%s%%)\n" ${node_name} ${node_roles} ${node_cpu_allocatable} `awk 'BEGIN{printf "%.2f\n",'"${node_cpu_total_allocatable}"'}'` ${node_cpu_requests}m ${node_cpu_requests_pre} ${node_cpu_limits}m ${node_cpu_limits_pre})
+       #     monitor_info[${#monitor_info[*]}]="${cpu_waring}\n"
+       #     }
+       # if_memory=$(awk 'BEGIN{if (int('"${node_memory_allocatable}"') &lt;= int('"$node_memory"')){print "1"}}')
+       # [ "${if_memory}"  == "1" ] &amp;&amp; {
+       #      memory_waring=$(printf "%s(%s)&#21487;&#20998;&#37197;&#20869;&#23384;&#19981;&#36275;&#65292;&#20869;&#23384;&#21097;&#20313;%sGi&#65292;&#20869;&#23384;&#24635;&#39069;: %sGi&#65292;&#20869;&#23384; requrests: %s (%s%%)&#65292;&#20869;&#23384; limits: %s (%s%%)\n" ${node_name} ${node_roles} ${node_memory_allocatable} `awk 'BEGIN{printf "%.2f\n",'"${node_memory_total_allocatable}/1024/1024"'}'` ${node_memory_requests}Mi ${node_memory_requests_pre} ${node_memory_limits}Mi ${node_memory_limits_pre})
+       #      monitor_info[${#monitor_info[*]}]="${memory_waring}\n"
+       #      }
+       
+        #echo ${#monitor_info[*]}
+        fi
+   done  &lt; &lt;($kube_CMD get node --show-labels|sed '1d')
+#   echo ${monitor_info[@]}
+   # &#38598;&#32676;&#33410;&#28857;&#30417;&#25511;
+   caler "(${n_cpu_request}/1000)" ${n_cpu}
+   [ "`awk -v num1=$res -v num2=${node_cpu_pre} 'BEGIN{print(num1&gt;num2)?"0":"1"}'`" == "0" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="&#38598;&#32676;CPU&#20351;&#29992;&#29575;&gt;${node_cpu_pre}%, &#24403;&#21069;$res&#65292;&#35831;&#27714;/&#24635;&#39069;:`awk 'BEGIN{printf "%.2f",('"${n_cpu_request}/1000"')}'`/${n_cpu}\n"
+   echo "&#38598;&#32676;CPU&#20351;&#29992;&#29575;$res, &#35831;&#27714;/&#24635;&#39069;:`awk 'BEGIN{printf "%.2f",('"${n_cpu_request}/1000"')}'`/${n_cpu}"
+   caler ${n_memory_request} "(${n_memory}/1024)"
+   echo "&#38598;&#32676;&#20869;&#23384;&#20351;&#29992;&#29575;$res, &#35831;&#27714;/&#24635;&#39069;:${n_memory_request}/`awk 'BEGIN{printf "%.2f",'"(${n_memory}/1024)"'}'`"
+   # roles
+   for r in ${!n_cpu_roles[@]};do
+       caler "(${n_cpu_request_roles[$r]}/1000)" "${n_cpu_roles[$r]}"
+       [ "`awk -v num1=$res -v num2=${node_cpu_pre} 'BEGIN{print(num1&gt;num2)?"0":"1"}'`" == "0" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="&#38598;&#32676; [$r] CPU&#20351;&#29992;&#29575;&gt;${node_cpu_pre}%, &#24403;&#21069;$res, &#35831;&#27714;/&#24635;&#39069;(&#26680;): $(awk 'BEGIN{printf "%.2f",'"(${n_cpu_request_roles[$r]}/1000)"'}')/${n_cpu_roles[$r]}, &#33410;&#28857;&#25968;:${n_num_roles[$r]} \n"
+       echo "&#38598;&#32676; [$r] CPU&#20351;&#29992;&#29575;$res, &#35831;&#27714;/&#24635;&#39069;(&#26680;):`awk 'BEGIN{printf "%.2f",'"(${n_cpu_request_roles[$r]}/1000)"'}'`/${n_cpu_roles[$r]}, &#33410;&#28857;&#25968;:${n_num_roles[$r]} "
+       caler ${n_memory_request_roles[$r]} "(${n_memory_roles[$r]}/1024)"
+       [ "`awk -v num1=$res -v num2=${node_memory_pre} 'BEGIN{print(num1&gt;num2)?"0":"1"}'`" == "0" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="&#38598;&#32676; [$r] &#20869;&#23384;&#20351;&#29992;&#29575;&gt;${node_memory_pre}%, &#24403;&#21069;$res, &#35831;&#27714;/&#24635;&#39069;(Gi):`awk 'BEGIN{printf "%.2f",'"(${n_memory_request_roles[$r]}/1024)"'}'`/`awk 'BEGIN{printf "%.2f",'"(${n_memory_roles[$r]}/1024/1024)"'}'`, &#33410;&#28857;&#25968;:${n_num_roles[$r]}\n"
+       echo "&#38598;&#32676; [$r] &#20869;&#23384;&#20351;&#29992;&#29575;$res, &#35831;&#27714;/&#24635;&#39069;(Gi):`awk 'BEGIN{printf "%.2f",'"(${n_memory_request_roles[$r]}/1024)"'}'`/`awk 'BEGIN{printf "%.2f",'"(${n_memory_roles[$r]}/1024/1024)"'}'`, &#33410;&#28857;&#25968;:${n_num_roles[$r]}"
+   done
+
+}
+
+#dingding push
+function dingding() {
+local access_tokens=$1
+local ding_url='https://oapi.dingtalk.com/robot/send'
+local ding_header='Content-Type: application/json'
+local msg=$2
+for key in $access_tokens; do
+curl -s -connect-timeout 40 -XPOST -H "$ding_header" "$ding_url?access_token=$key" \
+-d '{"msgtype": "text",
+    "text": {
+        "content": "&#12304;&#22269;&#20869;&#39033;&#30446;&#25253;&#35686;&#65306;bj-prod-k8s&#12305; \n'"$msg"'"
+    },
+"at": {
+      "atMobiles": [],
+      "isAtAll": true
+  }
+}'
+done
+}
+
+function check_k8s() {
+    # node &#26816;&#26597;
+    check_node_status=`$kube_CMD get node |sed '1d'|awk  '$2 != "Ready"{print $1,$2}'`
+    [ -n "${check_node_status}" -a "${check_node_status}" != "\\n" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="node&#24322;&#24120;&#65306;\n${check_node_status}"
+    node_check
+}
+
+main() {
+    check_k8s
+    #echo  -e "${monitor_info[@]}"
+    [ ${#monitor_info[@]} -gt 0 ] &amp;&amp; {
+        dingding "$tokens" "$(echo -e "${monitor_info[@]}")"
+        echo -e "${monitor_info[@]}" &gt;&gt; ./logs/k8s_check_`date +"%Y-%m"`.log
+    }
+    :
+}
+
+main
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">namespace&#30417;&#25511;
+</span>cat &lt;&lt;\EOF &gt; k8s_namespace_ding.sh <span class="org-sh-heredoc">
+#!/bin/bash
+set -e
+source /etc/profile
+PATH=/usr/local/bin/:$PATH
+#kube_conf_file=/etc/kubernetes/admin.conf
+kube_conf_file=/root/xuchangwei/config_prod
+kube_CMD="kubectl --kubeconfig=$kube_conf_file"
+namespace=$1
+cpu_num=95             # pod cpu&#20351;&#29992;&#29575; &#39044;&#35686;&#20540;(%)
+mem_num=90             # pod &#20869;&#23384;&#20351;&#29992;&#29575; &#39044;&#35686;&#20540;(%)
+mem_hpa=95             # pod hpa&#20869;&#23384;&#20351;&#29992;&#29575; &#39044;&#35686;&#20540;(%)
+pod_num=45             # pod &#21103;&#26412;&#25968; &#39044;&#35686;&#20540;(&#20010;)
+tokens="1923d7c93ff377813"
+#--------------------
+mkdir -p ./logs
+unset podname_limit
+unset podname_now
+unset monitor_info
+declare -A podname_limit
+declare -A podname_now
+declare -A monitor_info
+
+function check_cpu_mem(){
+    podnames=`$kube_CMD -n $namespace get pod |grep Running|awk '{print $1}'`
+    for p in $podnames; do 
+        limit_cm=`$kube_CMD -n $namespace describe pod $p|grep -A 2 Limits|awk '{print $2}'|sed -n '2,3{N;s/\n/\@/p}'`
+        #echo "$p  ${limit_cm}"
+        [ -n "$limit_cm" ] &amp;&amp; podname_limit[$p]="${limit_cm}"
+    done
+    
+    podnames_now=`sed -r 's#[ ]+#@#g'  &lt;($kube_CMD -n $namespace top pod|sed '1d')`
+    for n in ${podnames_now}; do 
+        pname=`echo $n |awk -F@ '{print $1}'`
+        pinfo=`echo $n |awk -F@ '{print $2"@"$3}'`
+        [ -n "`$kube_CMD -n $namespace get pods $pname|awk '$NF~"([5-9]m|[1-5][0-9]m|d|h|y)"{print}'`" ] &amp;&amp; \
+            podname_now[$pname]=$pinfo
+    done
+
+}
+
+function caler() {
+    res=`awk 'BEGIN{printf "%.2f\n",'$1'/'$2'*100}'`
+}
+
+
+#dingding push
+function dingding() {
+local access_tokens=$1
+local ding_url='https://oapi.dingtalk.com/robot/send'
+local ding_header='Content-Type: application/json'
+local msg=$2
+for key in $access_tokens; do
+curl -s -connect-timeout 40 -XPOST -H "$ding_header" "$ding_url?access_token=$key" \
+-d '{"msgtype": "text",
+    "text": {
+        "content": "&#12304;&#22269;&#20869;&#39033;&#30446;&#25253;&#35686;&#65306;bj-prod-k8s-'"$namespace"'&#12305; \n'"$msg"'"
+    },
+"at": {
+      "atMobiles": [],
+      "isAtAll": true
+  }
+}'
+done
+}
+
+function check_k8s() {
+    ## &#26816;&#26597;pod&#25968;
+    #check_pod_num="`$kube_CMD -n $namespace get deploy |sed '1d'|awk '{split($2,num,"/");if(num[2]&gt;='"${pod_num}"')printf "%sPOD&#25968;%s&gt;=%s&#65292;&#35831;&#20851;&#27880;\n",$1,num[2],'"${pod_num}"'}'`\\n"
+    #[ -n "${check_pod_num}" -a "${check_pod_num}" != "\\n" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="${check_pod_num}"
+
+    ## hpa &#20869;&#23384;&#19981;&#36275;&#65292;MAXPODS&#31561;&#20110;REPLICAS&#65292;TARGETS&#20013;&#22823;&#20110;70&#65292;&#26080;&#27861;&#21160;&#24577;&#20280;&#32553;
+    #hpa_info="`$kube_CMD get hpa -n $namespace |sed '1d' |awk '$5==$6{split($3,tag,"/");deploy[$1]=tag[1]; pnum[$1]=$6}END{for(d in deploy)if(deploy[d]&gt;'"${mem_hpa}"')printf "%s&#20869;&#23384;&#19981;&#36275;&#26080;&#27861;&#21160;&#24577;&#20280;&#32553;&#65292;&#24403;&#21069;&#20869;&#23384;%s&#65292;&#21103;&#26412;&#25968;%s&#20010;\\n",d,deploy[d],pnum[d]}'`\\n"
+    #[ -n "$hpa_info" -a "$hpa_info" != "\\n" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="${hpa_info}"
+
+    ## pod cpu mem&#30417;&#25511;
+    #check_cpu_mem
+    #for p in ${!podname_limit[@]}; do
+    #    #echo $p 
+    #    cpu_limit=`echo ${podname_limit[$p]}|awk -F@ '{print $1*1000}'`
+    #    mem_limit=`echo ${podname_limit[$p]}|awk -F@ '{print $2}'|sed 's#Mi##'`
+    #    [[ ${mem_limit} =~ "Gi" ]] &amp;&amp; mem_limit=`awk 'BEGIN{printf "%s",(int('"${mem_limit}"')*1024)}'`
+    #    cpu_now=`echo ${podname_now[$p]}|awk -F@ '{print $1}'|sed 's#m##'`
+    #    mem_now=`echo ${podname_now[$p]}|awk -F@ '{print $2}'|sed 's#Mi##'`
+    #
+    #    if [ -n "$cpu_now" -a -n "$mem_now" ]; then
+    #    caler $cpu_now $cpu_limit
+    #    [ "`awk -v num1=$res -v num2=${cpu_num} 'BEGIN{print(num1&gt;num2)?"0":"1"}'`" == "0" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="$p CPU&#20351;&#29992;&#29575;&gt;${cpu_num}%, &#24403;&#21069;$res, &#24050;&#20351;&#29992;$cpu_now\n"
+    #    caler $mem_now $mem_limit
+    #    [ "`awk -v num1=$res -v num2=${mem_num} 'BEGIN{print(num1&gt;num2)?"0":"1"}'`" == "0" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="$p &#20869;&#23384;&#20351;&#29992;&#29575;&gt;${mem_num}%, &#24403;&#21069;$res, &#24050;&#20351;&#29992;$mem_now Mi\n"
+    #    fi
+    #done
+  
+    podnames_unrun=`$kube_CMD -n $namespace get pod |sed '1d'|awk '$(NF-3)~"0/" &amp;&amp; $NF!~"(^[1-6]m|^[1-60]s)"{print $1}'`
+    [ -n "${podnames_unrun}" -a "${podnames_unrun}" != "\\n" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="pod&#21551;&#21160;&#22833;&#36133;\\n${podnames_unrun}\\n"
+    :
+
+    # events
+    #check_events_status=`$kube_CMD -n $namespace get events   --field-selector type=Warning,reason=FailedScheduling --sort-by='.metadata.creationTimestamp' -o 'go-template={{range .items}}{{.involvedObject.name}}{{"\t"}}{{.involvedObject.kind}}{{"\t"}}{{.message}}{{"\t"}}{{.reason}}{{"\t"}}{{.type}}{{"\t"}}{{.firstTimestamp}}{{"\n"}}{{end}}'`
+    #[ -n "${check_events_status}" -a "${check_events_status}" != "\\n" ] &amp;&amp; monitor_info[${#monitor_info[*]}]="node&#36164;&#28304;&#19981;&#22815;&#65306;\n${check_events_status}"
+
+}
+function monitor_k8s(){
+    # pod&#37325;&#21551;&#30417;&#25511;
+    podnames_restart=`$kube_CMD -n $namespace get pods |sed '1d'|awk '$(NF-1)&gt;0{print}' |awk '$NF~"(^[1-5]m)"{printf "%s@%s@%s\n",$1,$(NF-1),$NF}'`
+    #podnames_restart="$podnames_restart `$kube_CMD -n $namespace get pods |sed '1d'|awk '$(NF-1)&gt;0{print}' |awk '$NF!="(^[1-5]m)" &amp;&amp; $3!="Running"{split($2,num,"/");if(num[1]==0)printf "%s@%s@%s\n",$1,$(NF-1),$NF}'`"
+    podnames_restart="$podnames_restart `$kube_CMD -n $namespace get pods |sed '1d'|awk '$(NF-1)&gt;0{print}' |awk '$NF!="(^[1-5]m)"{split($2,num,"/");if(num[1]==0)printf "%s@%s@%s\n",$1,$(NF-1),$NF}'`"
+    for p in $podnames_restart; do
+        rname=`echo $p |awk -F@ '{print $1}'`
+        rinfo=`echo $p |awk -F@ '{print $3"&#20869;&#37325;&#21551;"$2"&#27425;"}'`
+        rinfo2=`$kube_CMD -n $namespace get pods $rname  -o go-template="{{range .status.containerStatuses}}{{.lastState.terminated.finishedAt}}@{{.lastState.terminated.reason}}{{end}}@{{.status.podIP}}@{{.status.hostIP}}"`
+        r_last_time=`date -d "@$(date -d "$(echo $rinfo2|awk -F@ '{print $1}')" +%s)" +"%F %H:%M:%S"`
+        rinfo="$rname&#21457;&#29983;&#37325;&#21551;&#65292;$rinfo&#65292;&#26368;&#36817;$r_last_time&#65292;&#21407;&#22240;&#65306;$(echo $rinfo2|awk -F@ '{print $2}')&#65292;&#23481;&#22120;ip/&#33410;&#28857;ip:$(echo $rinfo2|awk -F@ '{print $3}')/$(echo $rinfo2|awk -F@ '{print $4}')\n"
+        monitor_info[${#monitor_info[*]}]="$rinfo"
+    done
+    [ ${#monitor_info[@]} -gt 0 ] &amp;&amp; {
+        # PL&#25253;&#35686;&#32676;
+        dingding "a74e7f47383f0c7585f34d" "$(echo -e "${monitor_info[@]}")"
+    } 
+    :
+}
+
+main() {
+    monitor_k8s
+    check_k8s
+    #echo  -e "${monitor_info[@]}"
+    [ ${#monitor_info[@]} -gt 0 ] &amp;&amp; {
+        dingding "$tokens" "$(echo -e "${monitor_info[@]}")"
+        echo -e "${monitor_info[@]}" &gt;&gt; ./logs/k8s_check_`date +"%Y-%m"`.log
+    }
+    :
+}
+
+main
+echo $1
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

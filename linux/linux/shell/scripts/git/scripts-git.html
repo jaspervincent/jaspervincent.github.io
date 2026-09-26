@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scripts-gitlab</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="Git钩子是在Git命令执行时自动调用的脚本程序。GitLab支持多种Git钩子，其中pre-commit钩子可以用于检查提交之前的代码更改，并在必要时拒绝提交。" />
+<link rel="canonical" href="https://xuchangwei.com/linux/linux/shell/scripts/git/scripts-git.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="scripts-gitlab" />
+<meta property="og:description" content="Git钩子是在Git命令执行时自动调用的脚本程序。GitLab支持多种Git钩子，其中pre-commit钩子可以用于检查提交之前的代码更改，并在必要时拒绝提交。" />
+<meta property="og:url" content="https://xuchangwei.com/linux/linux/shell/scripts/git/scripts-git.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/linux/shell/scripts/git/scripts-git.html","@type":"WebPage","name":"scripts-gitlab","description":"Git钩子是在Git命令执行时自动调用的脚本程序。GitLab支持多种Git钩子，其中pre-commit钩子可以用于检查提交之前的代码更改，并在必要时拒绝提交。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">scripts-gitlab</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:efbe4d73-0a07-4124-8184-7ad19408eec2">创建用户</a></li>
+<li><a href="#h:bf745044-5aae-45f4-a955-ad8321d71d2c">git-分组下项目迁移</a></li>
+<li><a href="#h:f6014a39-7df3-4556-9451-7b84a99220d6">扫描中文字符</a>
+<ul>
+<li><a href="#h:b065eff1-9f67-48b0-a4d2-c41fcbd54586">在 jenkins pipline 中添加脚本</a></li>
+<li><a href="#h:2c6eca2f-befd-480c-bb8b-7ed83d259614">git 勾子</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Script</a></li>
+</ul>
+<section id="outline-container-h:efbe4d73-0a07-4124-8184-7ad19408eec2" class="outline-2">
+<h2 id="h:efbe4d73-0a07-4124-8184-7ad19408eec2"><a href="#h:efbe4d73-0a07-4124-8184-7ad19408eec2">创建用户</a></h2>
+<div class="outline-text-2" id="text-h:efbe4d73-0a07-4124-8184-7ad19408eec2">
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; gitlab_adduser.sh <span class="org-sh-heredoc">
+#!/bin/bash
+# https://docs.gitlab.com/ee/api/users.html#create-a-user
+set -eu
+git_url=https://kubegitlab.cici.com
+access_token=glpat-X87Lxxxxxxx
+
+read -p "Please input new username: " newuser
+read -p "email: " email
+
+#newuser=j.xu
+#email=xxx@163.com
+default_password=Rc1208_@2024
+
+curl -s -X POST "${git_url}/api/v4/users" \
+  -H "PRIVATE-TOKEN: ${access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "'"$newuser"'", "name": "'"$newuser"'", "email": "'"$email"'", "password": "'"${default_password}"'", "skip_confirmation": true}' &gt;/dev/null
+
+[ $? -eq 0 ] &amp;&amp; echo -e "\n\nSuccessfully created user.\nPlease login ${git_url} \nusername: $newuser \ndefault_password: ${default_password}" ||:</span>
+</pre>
+</div>
+
+<p>
+效果
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">]$ gitlab_adduser.sh 
+Please input new username: adsf
+email: llll@163.com
+
+Successfully created user.
+Please login https://kubegitlab.cicicom 
+username: adsf 
+default_password: Rc1208_@2024
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:bf745044-5aae-45f4-a955-ad8321d71d2c" class="outline-2">
+<h2 id="h:bf745044-5aae-45f4-a955-ad8321d71d2c"><a href="#h:bf745044-5aae-45f4-a955-ad8321d71d2c">git-分组下项目迁移</a></h2>
+<div class="outline-text-2" id="text-h:bf745044-5aae-45f4-a955-ad8321d71d2c">
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">&#21019;&#24314;&#29992;&#25143;&#32452;&#12289;&#28155;&#21152;&#19978;&#20256;&#36134;&#21495;&#24182;&#20851;&#32852;sshkey 
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#33719;&#21462;&#24453;&#20811;&#38534;&#32452;&#39033;&#30446;
+</span><span class="org-variable-name">pricateToken</span>=mCS1kfv9VQ6SeY2f9Fzk
+
+<span class="org-comment-delimiter">## </span><span class="org-comment">&#25214;&#21040;&#20998;&#32452;&#20449;&#24687;
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">?per_page=3&amp;page=2  &#23558;&#36755;&#20986;&#38480;&#21046;&#20026;&#27599;&#39029;3&#20010;&#26465;&#30446;(&#27599;&#39029; = 3) &#65292;&#24182;&#35831;&#27714;&#31532;&#20108;&#39029;(&#27599;&#39029; = 2)
+</span>
+curl -H <span class="org-string">"PRIVATE-TOKEN: mCS1kfv9VQ6SeY2f9Fzk"</span>  http://git.cici.com/api/v4/groups
+<span class="org-comment-delimiter">#</span><span class="org-comment">"id":156,ttp://git.cici.com/groups/english-new
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">"id":262  http://git.cici.com/groups/english-new-abroad
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">idList["e"]=156
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">idList["a"]=262
+</span>
+&gt;repo.txt
+curl -H <span class="org-string">"PRIVATE-TOKEN: $pricateToken"</span> <span class="org-string">'http://git.cici.com/api/v4/groups/156/projects?visibility=internal&amp;per_page=3000'</span> |jq .[].ssh_url_to_repo  &gt;&gt;repo.txt
+
+curl -H <span class="org-string">"PRIVATE-TOKEN: $pricateToken"</span> <span class="org-string">'http://git.cici.com/api/v4/groups/156/projects?visibility=private&amp;per_page=3000'</span> |jq .[].ssh_url_to_repo &gt;&gt;repo.txt
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#19979;&#36733;
+</span><span class="org-function-name">&#20811;&#38534;&#19968;&#20010;&#23436;&#25972;&#30340;&#39033;&#30446;&#21040;&#26412;&#22320;</span>(&#21253;&#21547;&#25152;&#26377;&#20998;&#25903;&#21450;tag)
+cat repo.txt | sed <span class="org-string">'s@^@git clone --mirror  @g'</span>|bash
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#36801;&#31227;&#21040;&#26032;&#39033;&#30446;
+</span>
+<span class="org-keyword">for</span> p<span class="org-keyword"> in</span> *.git;<span class="org-keyword">do</span> 
+   <span class="org-builtin">cd</span> ~/xuchangwei/gitdir/${<span class="org-variable-name">p</span>}; <span class="org-builtin">pwd</span>
+   <span class="org-comment-delimiter"># </span><span class="org-comment">&#36828;&#31243;&#21019;&#24314;&#39033;&#30446;
+</span>   curl -k --request POST --header <span class="org-string">"PRIVATE-TOKEN:mCS1kfv9VQ6SeY2f9Fzk"</span> --data <span class="org-string">"name=${p%.git}&amp;namespace_id=262"</span> http://git.cici.com/api/v4/projects
+   <span class="org-comment-delimiter"># </span><span class="org-comment">&#20462;&#25913;&#20851;&#32852;&#39033;&#30446;
+</span>   git remote set-url origin git@git.cici.com:english-new-abroad/$<span class="org-variable-name">p</span>
+   git remote -v
+   git push --mirror
+<span class="org-keyword">done</span>
+<span class="org-builtin">cd</span> .. 
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:f6014a39-7df3-4556-9451-7b84a99220d6" class="outline-2">
+<h2 id="h:f6014a39-7df3-4556-9451-7b84a99220d6"><a href="#h:f6014a39-7df3-4556-9451-7b84a99220d6">扫描中文字符</a></h2>
+<div class="outline-text-2" id="text-h:f6014a39-7df3-4556-9451-7b84a99220d6">
+</div>
+<div id="outline-container-h:b065eff1-9f67-48b0-a4d2-c41fcbd54586" class="outline-3">
+<h3 id="h:b065eff1-9f67-48b0-a4d2-c41fcbd54586"><a href="#h:b065eff1-9f67-48b0-a4d2-c41fcbd54586">在 jenkins pipline 中添加脚本</a></h3>
+<div class="outline-text-3" id="text-h:b065eff1-9f67-48b0-a4d2-c41fcbd54586">
+<div class="org-src-container">
+<pre class="src src-shell">...
+                dir(<span class="org-string">"${code_path}"</span>) {
+                    script {
+                        <span class="org-keyword">if</span>(<span class="org-variable-name">service_name</span> == <span class="org-string">"xx-website"</span>) {
+                            <span class="org-builtin">echo</span> <span class="org-string">"&#35813;&#26381;&#21153;&#19981;&#21152;&#36136;&#37327;&#26816;&#27979;."</span>
+                        } <span class="org-keyword">else</span> {
+                          sh <span class="org-string">'bash /data/ci/devops_scripts/gitlab/git_check.sh rummy ${service_name}'</span>
+                        }
+...
+</pre>
+</div>
+
+<p>
+需要：
+</p>
+
+<p>
+钉钉通知：send_msg.py
+</p>
+
+<p>
+检测逻辑：git_check.sh
+</p>
+
+
+<p>
+检测逻辑：git_check.sh
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">env</span><span class="org-comment"> bash
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>
+<span class="org-variable-name">app_name</span>=$<span class="org-variable-name">1</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">application name
+</span><span class="org-variable-name">service_name</span>=$<span class="org-variable-name">2</span>
+<span class="org-variable-name">BUILD_URL</span>=$(<span class="org-builtin">echo</span> ${<span class="org-variable-name">BUILD_URL</span>} | sed <span class="org-string">'s@jenkins/@@g'</span>)
+
+<span class="org-keyword">function</span> <span class="org-function-name">git_last</span>() {
+    <span class="org-variable-name">git_log</span>=<span class="org-sh-quoted-exec">`git log --name-status -p -1`</span>
+    <span class="org-variable-name">w_file</span>=()
+    <span class="org-keyword">if </span><span class="org-builtin">echo</span> <span class="org-string">"$git_log"</span> |grep <span class="org-string">'Merge:'</span>; <span class="org-keyword">then</span>
+       <span class="org-variable-name">git_commit</span>=<span class="org-sh-quoted-exec">`echo "$git_log" |grep 'Merge:'|awk '{print $2,$3}'`</span>
+    <span class="org-keyword">else</span>
+       <span class="org-variable-name">git_commit</span>=<span class="org-sh-quoted-exec">`echo "$git_log" |grep 'commit '|awk '{print $2}'`</span>
+    <span class="org-keyword">fi</span>
+    <span class="org-keyword">for</span> ci<span class="org-keyword"> in</span> $(<span class="org-builtin">echo</span> <span class="org-string">"$git_commit"</span>);<span class="org-keyword">do</span>
+        <span class="org-builtin">echo</span> <span class="org-string">"CommitID: $ci"</span>
+        <span class="org-variable-name">git_file</span>=$(git log  --name-only -1 $<span class="org-variable-name">ci</span>|grep -vE <span class="org-string">"^$|Author:|Date:|Merge:|[[:space:]]"</span>|sort|uniq)
+        <span class="org-keyword">for</span> f<span class="org-keyword"> in</span> $(<span class="org-builtin">echo</span> <span class="org-string">"$git_file"</span>); <span class="org-keyword">do</span>
+            <span class="org-comment-delimiter">#</span><span class="org-comment">echo "git log   -p -1 $ci -- $f|grep '^+' | rg  '[\x{4e00}-\x{9f5a}]'"
+</span>            <span class="org-keyword">if</span> git log   -p -1 $<span class="org-variable-name">ci</span> -- $<span class="org-variable-name">f</span>|grep <span class="org-string">'^+'</span> | rg  <span class="org-string">'[\x{4e00}-\x{9f5a}]'</span> ;<span class="org-keyword">then</span>
+                <span class="org-comment-delimiter">#</span><span class="org-comment">echo $f
+</span>                <span class="org-variable-name">w_file</span>+=(<span class="org-string">"$f"</span>)
+            <span class="org-keyword">fi</span>
+        <span class="org-keyword">done</span>
+        <span class="org-variable-name">warn_file</span>=$(<span class="org-builtin">echo</span> <span class="org-string">"${w_file[*]}"</span>|tr <span class="org-string">' '</span> <span class="org-string">'\n'</span>|sort |uniq)
+        notify
+    <span class="org-keyword">done</span>
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">git_time_check</span>() {
+   <span class="org-variable-name">git_file</span>=$(git log --after=<span class="org-string">"$(date +%F -d '30days ago')"</span> --name-only|grep -vE <span class="org-string">"^$|Author:|Date:|Merge:|[[:space:]]"</span>|sort|uniq)
+   <span class="org-variable-name">warn_file</span>=$(rg <span class="org-string">'[\x{4e00}-\x{9f5a}]'</span> -l  $<span class="org-variable-name">git_file</span> 2&gt;/dev/null)
+   notify
+}
+
+<span class="org-keyword">function</span> <span class="org-function-name">notify</span>() {
+   <span class="org-keyword">if</span> [ -n <span class="org-string">"$warn_file"</span> ]; <span class="org-keyword">then</span>
+      <span class="org-builtin">echo</span> -e <span class="org-string">"\033[31mWarning\033[0m: Found Chinese character files, please repair: "</span>
+      <span class="org-builtin">echo</span> <span class="org-string">"$warn_file"</span>
+      <span class="org-builtin">echo</span>
+      python3 /data/ci/devops_scripts/gitlab/send_msg.py $<span class="org-variable-name">app_name</span> $<span class="org-variable-name">service_name</span> <span class="org-string">"$warn_file"</span> <span class="org-string">"${BUILD_URL}"</span>
+      <span class="org-comment-delimiter">#</span><span class="org-comment">python3 /data/ci/devops_scripts/gitlab/send_msg.py jasper $service_name "$warn_file"
+</span>      <span class="org-keyword">exit</span> 11
+   <span class="org-keyword">else</span>
+      <span class="org-builtin">echo</span> <span class="org-string">"Chinese character detection: Passed"</span>
+   <span class="org-keyword">fi</span>
+}
+
+
+<span class="org-keyword">function</span> <span class="org-function-name">get_file</span>() {
+  <span class="org-builtin">echo</span> <span class="org-string">"Chinese character detection..."</span>
+  <span class="org-comment-delimiter">#</span><span class="org-comment">git_time_check
+</span>  git_last
+}
+
+get_file
+</pre>
+</div>
+
+<p>
+钉钉通知：send_msg.py
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">python 3.8
+</span>import sys
+import time
+import hmac
+import hashlib
+import base64
+import urllib.parse
+
+import requests
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">secret token
+</span><span class="org-variable-name">app_secret_map</span> = {
+    <span class="org-string">"rummy"</span>: [<span class="org-string">"Sertes"</span>, <span class="org-string">"tokenxxxx"</span>],
+    <span class="org-string">"jasper"</span>: [<span class="org-string">"SE"</span>, <span class="org-string">""</span>]
+}
+
+def sign_cal(app_name):
+    <span class="org-variable-name">timestamp</span> = str(round(time.time() * 1000))
+    <span class="org-variable-name">secret</span> = app_secret_map.get(app_name)[0]
+    <span class="org-variable-name">secret_enc</span> = secret.encode(<span class="org-string">'utf-8'</span>)
+    <span class="org-variable-name">string_to_sign</span> = <span class="org-string">'{}\n{}'</span>.format(timestamp, secret)
+    <span class="org-variable-name">string_to_sign_enc</span> = string_to_sign.encode(<span class="org-string">'utf-8'</span>)
+    <span class="org-variable-name">hmac_code</span> = hmac.new(secret_enc, string_to_sign_enc, <span class="org-variable-name">digestmod</span>=hashlib.sha256).digest()
+    <span class="org-variable-name">sign</span> = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+    <span class="org-keyword">return</span> timestamp, sign
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">timestamp = str(round(time.time() * 1000))
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">secret = 'SECxxxx'
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">secret_enc = secret.encode('utf-8')
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">string_to_sign = '{}\n{}'.format(timestamp, secret)
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">string_to_sign_enc = string_to_sign.encode('utf-8')
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">print(timestamp)
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">print(sign)
+</span>
+
+def send_msg(app_name, service_name, git_files, build_url):
+    timestamp, <span class="org-variable-name">sign</span> = sign_cal(app_name)
+    <span class="org-variable-name">ding_token</span> = app_secret_map.get(app_name)[1]
+    <span class="org-variable-name">url</span> = f<span class="org-string">"https://oapi.dingtalk.com/robot/send?access_token={ding_token}&amp;timestamp={timestamp}&amp;sign={sign}"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">data = {"msgtype": "text",
+</span>    <span class="org-comment-delimiter">#         </span><span class="org-comment">"text": {"content": "platformxx"}
+</span>    <span class="org-comment-delimiter">#         </span><span class="org-comment">}890
+</span>    <span class="org-variable-name">time_now</span> = str(time.strftime(<span class="org-string">"%Y-%m-%d %H:%M:%S"</span>, time.localtime())).strip()
+    <span class="org-variable-name">data</span> = {
+        <span class="org-string">"msgtype"</span>: <span class="org-string">"markdown"</span>,
+        <span class="org-string">"markdown"</span>: {
+            <span class="org-string">"title"</span>: f<span class="org-string">"{service_name}"</span>,
+            <span class="org-string">"text"</span>: f<span class="org-string">"#### {service_name}&#26381;&#21153;&#21457;&#24067;&#32456;&#27490;, &#20013;&#25991;&#26816;&#27979;&#26410;&#36890;&#36807;. \n &gt; "</span>
+                    f<span class="org-string">"time: {time_now} \n &gt; \n&#35814;&#24773;: {build_url} \n {git_files} \n"</span>
+        },
+        <span class="org-string">"at"</span>: {
+            <span class="org-string">"atMobiles"</span>: [
+                <span class="org-string">"150XXXXXXXX"</span>
+            ],
+            <span class="org-string">"atUserIds"</span>: [
+                <span class="org-string">"user123"</span>
+            ],
+            <span class="org-string">"isAtAll"</span>: False
+        }
+    }
+    <span class="org-variable-name">r</span> = requests.post(url, <span class="org-variable-name">json</span>=data, )
+    <span class="org-comment-delimiter"># </span><span class="org-comment">print(r.json(), type(r.json()))
+</span>
+
+<span class="org-keyword">if</span> <span class="org-variable-name">__name__</span> == <span class="org-string">'__main__'</span>:
+    <span class="org-variable-name">app_name</span> = sys.argv[1]  <span class="org-comment-delimiter"># </span><span class="org-comment">application name
+</span>    <span class="org-variable-name">service_name</span> = sys.argv[2]
+    <span class="org-variable-name">git_files</span> = sys.argv[3]
+    <span class="org-variable-name">build_url</span> = sys.argv[4]
+    send_msg(app_name, service_name, git_files, build_url)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:2c6eca2f-befd-480c-bb8b-7ed83d259614" class="outline-3">
+<h3 id="h:2c6eca2f-befd-480c-bb8b-7ed83d259614"><a href="#h:2c6eca2f-befd-480c-bb8b-7ed83d259614">git 勾子</a></h3>
+<div class="outline-text-3" id="text-h:2c6eca2f-befd-480c-bb8b-7ed83d259614">
+<p>
+Git钩子是在Git命令执行时自动调用的脚本程序。GitLab支持多种Git钩子，其中pre-commit钩子可以用于检查提交之前的代码更改，并在必要时拒绝提交。
+</p>
+
+<p>
+以下是一个使用pre-commit钩子来检查本地代码中是否包含中文字符的示例：
+</p>
+
+
+<ul class="org-ul">
+<li>在本地Git存储库中创建pre-commit钩子文件，并给执行权限：</li>
+</ul>
+<div class="org-src-container">
+<pre class="src src-shell">vim .git/hooks/pre-commit
+<span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span>
+<span class="org-builtin">echo</span> <span class="org-string">"Checking for Chinese characters in files..."</span>
+
+<span class="org-keyword">if</span> git diff --cached --diff-filter=AM HEAD |grep <span class="org-string">'^+'</span>|grep -P <span class="org-string">"[\x{4e00}-\x{9fa5}]"</span>; <span class="org-keyword">then</span>
+  <span class="org-builtin">echo</span> <span class="org-string">"Error: There are files containing Chinese characters. Please remove them and try again."</span>
+  <span class="org-keyword">exit</span> 1
+<span class="org-keyword">fi</span>
+
+chmod +x .git/hooks/pre-commit
+</pre>
+</div>
+
+<p>
+全局服务器勾子：
+<a href="https://docs.gitlab.cn/jh/administration/server_hooks.html">https://docs.gitlab.cn/jh/administration/server_hooks.html</a>
+</p>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

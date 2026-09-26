@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Pandoc文件转换器</title>
+<meta name="description" content="pandoc https://pandoc.org/" />
+<meta name="keywords" content="计算机, 博客, Codelog" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/codelog/2025-01-07-linux-pandoc.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Linux: Pandoc文件转换器" />
+<meta property="og:description" content="pandoc https://pandoc.org/" />
+<meta property="og:url" content="https://xuchangwei.com/codelog/2025-01-07-linux-pandoc.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/codelog/2025-01-07-linux-pandoc.html","@type":"BlogPosting","headline":"Linux: Pandoc文件转换器","datePublished":"2025-01-07","author":{"@type":"Person","name":"Jasper Hsu"},"mainEntityOfPage":"https://xuchangwei.com/codelog/2025-01-07-linux-pandoc.html","description":"pandoc https://pandoc.org/"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Pandoc文件转换器</h1>
+</header><ul class="org-ul">
+<li>TAG: <a href="../jcodelogv.html">编码</a></li>
+</ul>
+
+<p>
+pandoc <a href="https://pandoc.org/">https://pandoc.org/</a>
+</p>
+
+<p>
+Pandoc 是一个用于从一种标记格式转换为另一种标记格式的Haskell 库，以及一个使用该库的命令行工具。
+</p>
+
+<p>
+pandoc支持多少文件格式的相互转换，基本满足日常需求。下面介绍简单的使用。
+</p>
+
+<p>
+<code>.org</code> 文件可以很轻松的通过 <code>org-md-export-to-markdown</code> 生成 <code>.md</code> 文件。 <code>.md</code> 文件可以借助 Pandoc 生成 <code>.org</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">&#24120;&#35268;&#36873;&#39033;
+</span>-f &lt;format&gt;, -r &lt;format&gt;   <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#36755;&#20837;&#25991;&#20214;&#26684;&#24335;&#65292;&#40664;&#35748;&#20026; Markdown&#65307;
+</span>-t &lt;format&gt;, -w &lt;format&gt;   <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#36755;&#20986;&#25991;&#20214;&#26684;&#24335;&#65292;&#40664;&#35748;&#20026; HTML&#65307;
+</span>-o &lt;file&gt;                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#36755;&#20986;&#25991;&#20214;&#65292;&#35813;&#39033;&#32570;&#30465;&#26102;&#65292;&#23558;&#36755;&#20986;&#21040;&#26631;&#20934;&#36755;&#20986;&#65307;
+</span>
+--verbose                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#24320;&#21551; Verbose &#27169;&#24335;&#65292;&#29992;&#20110; Debug&#65307;
+</span>--list-input-formats       <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25903;&#25345;&#30340;&#36755;&#20837;&#26684;&#24335;&#65307;
+</span>--list-output-formats      <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25903;&#25345;&#30340;&#36755;&#20986;&#26684;&#24335;&#65307;
+</span>--list-extensions          <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25903;&#25345;&#30340; Markdown &#25193;&#23637;&#26041;&#26696;&#65307;
+</span>--list-highlight-languages <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25903;&#25345;&#20195;&#30721;&#39640;&#20142;&#30340;&#32534;&#31243;&#35821;&#35328;&#65307;
+</span>--list-highlight-styles    <span class="org-comment-delimiter">#</span><span class="org-comment">&#21015;&#20986;&#25903;&#25345;&#30340;&#20195;&#30721;&#39640;&#20142;&#20027;&#39064;&#65307;
+</span>-v, --version              <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#31243;&#24207;&#30340;&#29256;&#26412;&#21495;&#65307;
+</span>-h, --help                 <span class="org-comment-delimiter">#</span><span class="org-comment">&#26174;&#31034;&#31243;&#24207;&#30340;&#24110;&#21161;&#20449;&#24687;&#12290;
+</span>--toc                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;&#30446;&#24405;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#38405;&#35835;&#22120;&#36873;&#39033;
+</span>--extract-media=DIR       <span class="org-comment-delimiter">#</span><span class="org-comment">&#23558;&#28304;&#25991;&#26723;&#22270;&#20687;&#21644;&#20854;&#20182;&#23186;&#20307;&#25991;&#20214;&#25552;&#21462;&#21040;DIR/media&#30446;&#24405;&#20013;&#65292;&#24182;&#35843;&#25972;&#25991;&#26723;&#20013;&#30340;&#22270;&#20687;&#24341;&#29992;&#12290;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24120;&#35268;&#20316;&#23478;&#36873;&#39033;
+</span>--template=FILE            <span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992;&#33258;&#23450;&#20041;&#27169;&#26495;&#25991;&#20214; (&#23545; LaTeX, HTML, DOCX &#31561;&#26684;&#24335;&#23588;&#20854;&#26377;&#29992;)&#12290;
+</span>-s --standalone            <span class="org-comment-delimiter">#</span><span class="org-comment">&#29983;&#25104;&#24102;&#26377;&#36866;&#24403;&#39029;&#30473;&#21644;&#39029;&#33050;&#30340;&#36755;&#20986;&#65288;HTML&#65292;LaTeX&#65292;TEI &#25110; RTF&#65289;&#65307;
+</span>--wrap=auto| none|preserve <span class="org-comment-delimiter">#</span><span class="org-comment">&#22914;&#20309;&#25442;&#34892;&#12290;auto&#65288;&#40664;&#35748;&#20540;&#65289;&#65292;&#25351;&#23450;&#21015;&#23485; --columns&#65288;&#40664;&#35748;72&#65289;&#12290;none&#65306;&#23436;&#20840;&#19981;&#25442;&#34892;&#12290;preserve&#65306;&#20445;&#30041;&#28304;&#25991;&#26723;&#20013;&#30340;&#25442;&#34892;
+</span>--toc / --table-of-contents#&#29983;&#25104;&#30446;&#24405; (&#36866;&#29992;&#20110; HTML, LaTeX, EPUB, DOCX &#31561;)&#12290;
+--toc-depth=NUMBER         <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#30446;&#24405;&#21253;&#21547;&#30340;&#26631;&#39064;&#32423;&#21035;&#28145;&#24230; (&#20363;&#22914; --toc-depth=3 &#21253;&#21547; H1-H3)&#12290;
+</span>-V KEY[=VAL]               <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#27169;&#26495;&#21464;&#37327; (&#23545; LaTeX &#27169;&#26495;&#38750;&#24120;&#26377;&#29992;&#65292;&#22914;&#35774;&#32622;&#32440;&#24352;&#22823;&#23567; papersize, &#23383;&#20307;&#22823;&#23567; fontsize)
+</span>--highlight-style &lt;style&gt;  <span class="org-comment-delimiter">#</span><span class="org-comment">&#35774;&#32622;&#20195;&#30721;&#39640;&#20142;&#20027;&#39064;&#65292;&#40664;&#35748;&#20026; pygments&#65307;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24433;&#21709;&#29305;&#23450;&#20316;&#32773;&#30340;&#36873;&#39033;
+</span>--reference-links[=true|<span class="org-builtin">false</span>] <span class="org-comment-delimiter">#</span><span class="org-comment">&#40664;&#35748;&#24773;&#20917;&#19979;&#20351;&#29992;&#20869;&#32852;&#38142;&#25509;
+</span>--pdf-engine=PROGRAM       <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#29983;&#25104; PDF &#30340;&#24341;&#25806; (&#24120;&#29992; pdflatex, xelatex, lualatex, wkhtmltopdf, weasyprint)
+</span>--reference-doc=&#25991;&#20214;|&#32593;&#22336;  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992;&#25351;&#23450;&#30340;&#25991;&#20214;&#20316;&#20026;&#29983;&#25104; docx &#25110; ODT &#25991;&#20214;&#30340;&#26679;&#24335;&#21442;&#32771;
+</span>-c &#32593;&#22336;&#8203;--css=&#8203;              <span class="org-comment-delimiter">#</span><span class="org-comment">&#38142;&#25509;&#21040; CSS &#26679;&#24335;&#34920;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#24341;&#25991;&#28210;&#26579;
+</span>-C,--citeproc              <span class="org-comment-delimiter">#</span><span class="org-comment">&#22788;&#29702;&#24341;&#29992; (&#38656;&#35201; BibTeX &#25110; CSL JSON &#26684;&#24335;&#30340;&#21442;&#32771;&#25991;&#29486;&#25968;&#25454;&#24211;&#25991;&#20214;&#65292;&#24182;&#36890;&#36807; --bibliography &#25351;&#23450;)&#12290;
+</span>--bibliography=FILE        <span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#21442;&#32771;&#25991;&#29486;&#25968;&#25454;&#24211;&#25991;&#20214; (.bib &#25110; .json)&#12290;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">HTML &#20013;&#30340;&#25968;&#23398;&#28210;&#26579;
+</span>--mathml / --webtex / --mathjax / --katex: &#25351;&#23450;&#25968;&#23398;&#20844;&#24335;&#30340;&#28210;&#26579;&#26041;&#24335; (&#36866;&#29992;&#20110; HTML &#36755;&#20986;)
+</pre>
+</div>
+
+
+<p>
+范例：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">ORG, HTML &#20114;&#36716;
+</span>pandoc -f html -t org -o h.org h.html     <span class="org-comment-delimiter"># </span><span class="org-comment">html &#36716; org
+</span>pandoc -f org -t html -o h.html h.org     <span class="org-comment-delimiter"># </span><span class="org-comment">org &#36716; html
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">ORG, Markdown&#20114;&#36716;
+</span>pandoc -f markdown -t org -o a.org a.md   <span class="org-comment-delimiter"># </span><span class="org-comment">markdown &#36716; org
+</span>pandoc -f org -t markdown -o a.md a.org   <span class="org-comment-delimiter"># </span><span class="org-comment">org &#36716; markdown
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">Markdown, HTML &#20114;&#36716;
+</span>pandoc -f html -t markdown a.html -o a.md <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>pandoc a.md -s -o a.html --css=styles.css --toc <span class="org-comment-delimiter"># </span><span class="org-comment">markdown &#36716; html
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#23558; article.md &#36716;&#20026;&#23436;&#25972;&#30340; HTML &#25991;&#20214; article.html (-s)&#12290;&#38142;&#25509;&#22806;&#37096; CSS &#26679;&#24335;&#34920; styles.css&#12290;&#29983;&#25104;&#30446;&#24405;&#12290;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">Markdown, Word (DOCX)&#20114;&#36716;
+</span>pandoc input.md -o output.docx --reference-doc=custom_template.docx --toc <span class="org-comment-delimiter"># </span><span class="org-comment">markdown &#36716; word
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992; custom_template.docx &#25991;&#20214;&#20013;&#23450;&#20041;&#30340;&#26679;&#24335;&#12289;&#39029;&#30473;&#39029;&#33050;&#31561;&#12290;&#29983;&#25104;&#30446;&#24405; (--toc)&#12290;
+</span>
+pandoc -f docx -t gfm --wrap=none --reference-links --extract-media=./  a.docx  -o b.md <span class="org-comment-delimiter"># </span><span class="org-comment">word &#36716; markdown
+</span>pandoc -f docx -t markdown_mmd --extract-media=./  a.docx  -o d.md <span class="org-comment-delimiter"># </span><span class="org-comment">word &#36716; markdown
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">--extract-media=./  #&#20445;&#23384;&#22270;&#20687;&#65292;&#25918;&#21040;media&#25991;&#20214;&#22841;&#20013;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">Github &#30340;&#40664;&#35748;&#26684;&#24335;&#20351;&#29992; gfm&#65292;&#23427;&#20063;&#25903;&#25345;&#34920;&#26684;
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">MultiMarkdown &#25903;&#25345;&#20803;&#25968;&#25454;&#12289;&#30446;&#24405;&#12289;&#33050;&#27880;&#12289;&#25968;&#23398;&#12289;&#34920;&#26684;&#21644; YAML
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#22810;&#20010;&#36755;&#20837;&#25991;&#20214;&#21512;&#24182;&#36716;&#25442;:
+</span>pandoc intro.md chap1.md chap2.md refs.md -o book.docx <span class="org-comment-delimiter">#</span><span class="org-comment">&#25353;&#39034;&#24207;&#21512;&#24182;&#21518;&#36716;&#25442;&#20026;&#21333;&#20010; Word &#25991;&#26723;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">Markdown, PDF&#20114;&#36716;
+</span>pandoc paper.md --citeproc --bibliography=references.bib -o paper.pdf --pdf-engine=pdflatex <span class="org-comment-delimiter"># </span><span class="org-comment">markdown &#36716; pdf
+</span><span class="org-function-name">&#21551;&#29992;&#24341;&#29992;&#22788;&#29702;</span> (--citeproc)&#12290;&#25351;&#23450;&#21442;&#32771;&#25991;&#29486;&#25968;&#25454;&#24211;&#25991;&#20214; references.bib (--bibliography)&#12290;
+
+pandoc report.md -o report.pdf --pdf-engine=xelatex -V <span class="org-variable-name">mainfont</span>=<span class="org-string">"Microsoft YaHei"</span> -V geometry:<span class="org-variable-name">margin</span>=1in <span class="org-comment-delimiter"># </span><span class="org-comment">pdf &#36716; markdown
+</span>&#20351;&#29992; xelatex &#24341;&#25806; (&#25903;&#25345; Unicode/&#20013;&#25991;&#23383;&#20307;&#26356;&#22909;)&#12290;
+&#35774;&#32622; mainfont &#21464;&#37327;&#20026; <span class="org-string">"Microsoft YaHei"</span> (&#30830;&#20445;&#31995;&#32479;&#26377;&#27492;&#23383;&#20307;)&#12290;
+&#20351;&#29992; geometry LaTeX &#21253;&#21464;&#37327;&#35774;&#32622;&#39029;&#36793;&#36317;&#20026; 1 &#33521;&#23544;&#12290;
+
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">Markdown &#36716; Reveal.js &#24187;&#28783;&#29255;
+</span>pandoc slides.md -t revealjs -s -o presentation.html -V revealjs-url=https://revealjs.com <span class="org-comment-delimiter"># </span><span class="org-comment">markdown &#36716; revealjs &#24187;&#28783;&#29255;
+</span>&#35774;&#32622; revealjs-url &#21464;&#37327;&#25351;&#21521; Reveal.js &#24211;&#30340;&#20301;&#32622;&#12290;
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">Markdown &#36716; PowerPoint (PPTX):
+</span>pandoc p.md -o presentation.pptx  <span class="org-comment-delimiter"># </span><span class="org-comment">markdown &#36716; PPTX
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">Pandoc &#20250;&#33258;&#21160;&#22788;&#29702;&#26631;&#39064;&#32423;&#21035;&#20998;&#21106;&#24187;&#28783;&#29255;&#12290;
+</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">texi &#36716; org
+</span><span class="org-comment-delimiter">#</span><span class="org-comment">texi2html org.texi org.html
+</span>makeinfo--html --no-split org.texi <span class="org-comment-delimiter"># </span><span class="org-comment">&#23548;&#20986;&#20026;&#21333;&#20010;&#25991;&#20214;org.html
+</span>pandoc -t org org.html -o org.org
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">org &#36716; texi
+</span>pandoc -f org -t texinfo org.org -o org.texi
+</pre>
+</div>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

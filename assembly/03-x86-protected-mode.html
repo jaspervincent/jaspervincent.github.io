@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Assembly: x86保持模式</title>
+<meta name="description" content="为什么要引入平坦模型及平坦模型的特点 在主引导程序中创建平坦模型下的段 平坦模型对内核程序分段的影响 平坦模型对加载内核程序的影响 平坦模型下的内核初始化与内核任务的确立 平坦模型下的用户程序结构 平坦模型下的用户任务创建 在用户任务内动态分配内存 平坦模型下的多任务切换演示与调试" />
+<meta name="keywords" content="计算机, 语言, 汇编" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/assembly/03-x86-protected-mode.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Assembly: x86保持模式" />
+<meta property="og:description" content="为什么要引入平坦模型及平坦模型的特点 在主引导程序中创建平坦模型下的段 平坦模型对内核程序分段的影响 平坦模型对加载内核程序的影响 平坦模型下的内核初始化与内核任务的确立 平坦模型下的用户程序结构 平坦模型下的用户任务创建 在用户任务内动态分配内存 平坦模型下的多任务切换演示与调试" />
+<meta property="og:url" content="https://xuchangwei.com/assembly/03-x86-protected-mode.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/assembly/03-x86-protected-mode.html","@type":"WebPage","name":"Assembly: x86保持模式","description":"为什么要引入平坦模型及平坦模型的特点 在主引导程序中创建平坦模型下的段 平坦模型对内核程序分段的影响 平坦模型对加载内核程序的影响 平坦模型下的内核初始化与内核任务的确立 平坦模型下的用户程序结构 平坦模型下的用户任务创建 在用户任务内动态分配内存 平坦模型下的多任务切换演示与调试"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Assembly: x86保持模式</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:3D47B893-C02D-4B65-995D-B415A68E37AD">中断和动态时钟显示</a></li>
+<li><a href="#h:E9670BE6-63E1-4B5F-8FC8-BEEC468A8D99">32 位 x86 处理器编程架构</a></li>
+<li><a href="#h:90CC62C8-31BD-457A-9E3B-C2F091C496FD">进入保护模式</a></li>
+<li><a href="#h:6CEBCB15-D3D3-444D-8FAA-973298210886">指令的格式及其操作尺寸</a></li>
+<li><a href="#h:B0576BC2-A747-4AB7-BCF7-48B5887B9E31">存储器的保护</a></li>
+<li><a href="#h:34AAFB06-C884-419C-8628-301725148975">保持模式程序的动态加载和执行</a></li>
+<li><a href="#h:6D2E41DE-2B2E-4EFD-AA17-887C84E5CC0E">用户程序编程接口及其实现</a></li>
+<li><a href="#h:E663696F-CD1B-460F-9F62-5D7A46DE3305">任务和任务的创建</a></li>
+<li><a href="#h:DCFEF892-1B10-40D6-8873-1BB7E6A65F58">特权级和特权级保护</a></li>
+<li><a href="#h:741D2AF4-C65D-4E3D-A133-008B9ACAFA4F">协同式任务切换</a></li>
+<li><a href="#h:03AEF2D9-808B-4AD9-83D5-35DF1A35B7FB">中断和异常的处理与抢占式多任务</a></li>
+<li><a href="#h:56D8F910-FA4D-4804-8B13-3E4222749C32">分布和动态页分配</a></li>
+<li><a href="#h:332797D7-CD2C-41DD-B551-64FF898E3DD1">平坦模型</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Assembly</a></li>
+</ul>
+
+
+<p>
+保持模式
+</p>
+
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>中断和动态时钟显示</li>
+<li>32 位 x86 处理器编程架构</li>
+<li>进入保护模式</li>
+<li>指令的格式及其操作尺寸</li>
+<li>存储器的保护</li>
+<li>保持模式程序的动态加载和执行</li>
+<li>用户程序编程接口及其实现</li>
+<li>任务和任务的创建</li>
+<li>特权级和特权级保护</li>
+<li>协同式任务切换</li>
+<li>中断和异常的处理与抢占式多任务</li>
+<li>分布和动态页分配</li>
+<li>平坦模型</li>
+</ul>
+<section id="outline-container-h:3D47B893-C02D-4B65-995D-B415A68E37AD" class="outline-2">
+<h2 id="h:3D47B893-C02D-4B65-995D-B415A68E37AD"><a href="#h:3D47B893-C02D-4B65-995D-B415A68E37AD">中断和动态时钟显示</a></h2>
+<div class="outline-text-2" id="text-h:3D47B893-C02D-4B65-995D-B415A68E37AD">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>中断和硬件中断</li>
+<li>中断控制器简介</li>
+<li>中断号、中断处理过程和中断向量表</li>
+<li>实时时钟、CMOS RAM和BCD编码</li>
+<li>实时时钟芯片的中断信号</li>
+<li>安装0x70号中断处理过程</li>
+<li>启用更新周期结束中断</li>
+<li>用TEST指令等待更新周期结束</li>
+<li>读取BCD码的时间并在屏幕上显示</li>
+<li>用NOT指令反转时间分隔符的颜色</li>
+<li>使用IRET指令从中断过程返回</li>
+<li>用停机指令HLT使处理器进入低功耗状态</li>
+<li>内部中断和软中断</li>
+<li>BIOS中断概述</li>
+<li>使用BIOS功能调用接收并显示键盘输入</li>
+<li>练习</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:E9670BE6-63E1-4B5F-8FC8-BEEC468A8D99" class="outline-2">
+<h2 id="h:E9670BE6-63E1-4B5F-8FC8-BEEC468A8D99"><a href="#h:E9670BE6-63E1-4B5F-8FC8-BEEC468A8D99">32 位 x86 处理器编程架构</a></h2>
+<div class="outline-text-2" id="text-h:E9670BE6-63E1-4B5F-8FC8-BEEC468A8D99">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>IA-32架构和保护模式</li>
+<li>寄存器的扩展和扩充</li>
+<li>32位处理器的内存访问概况</li>
+<li>32位处理器的寻址方式概况</li>
+<li>选修-流水线技术</li>
+<li>选修-高速缓存技术</li>
+<li>选修-乱序执行技术</li>
+<li>选修-寄存器重命名技术</li>
+<li>选修-分支目标预测技术</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:90CC62C8-31BD-457A-9E3B-C2F091C496FD" class="outline-2">
+<h2 id="h:90CC62C8-31BD-457A-9E3B-C2F091C496FD"><a href="#h:90CC62C8-31BD-457A-9E3B-C2F091C496FD">进入保护模式</a></h2>
+<div class="outline-text-2" id="text-h:90CC62C8-31BD-457A-9E3B-C2F091C496FD">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>保护模式是要保护什么</li>
+<li>全局描述符表GDT和全局描述符表寄存器GDTR</li>
+<li>准备创建全局描述符表</li>
+<li>描述符的分类</li>
+<li>存储器的段描述符-段的类型和基地址</li>
+<li>存储器的段描述符-段界限及访问控制位</li>
+<li>安装存储器的段描述符</li>
+<li>加载全局描述符表寄存器GDTR</li>
+<li>开启处理器的第21根地址线A20</li>
+<li>通过设置寄存器CR0的PE位进入保护模式</li>
+<li>描述符高速缓存器和保护模式下的内存访问</li>
+<li>在调试器中观察实模式和保护模式的内存访问</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:6CEBCB15-D3D3-444D-8FAA-973298210886" class="outline-2">
+<h2 id="h:6CEBCB15-D3D3-444D-8FAA-973298210886"><a href="#h:6CEBCB15-D3D3-444D-8FAA-973298210886">指令的格式及其操作尺寸</a></h2>
+<div class="outline-text-2" id="text-h:6CEBCB15-D3D3-444D-8FAA-973298210886">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>80286的16位保护模式</li>
+<li>16位处理器的指令操作尺寸</li>
+<li>32位处理器的指令操作尺寸</li>
+<li>x86的指令格式-操作码和立即数部分</li>
+<li>x86的指令格式-ModRM和偏移量部分</li>
+<li>x86的指令格式-SIB部分</li>
+<li>x86的指令格式-指令前缀部分</li>
+<li>处理器的默认操作尺寸和相关指令前缀</li>
+<li>用伪指令bits生成16位和32位模块</li>
+<li>描述符和段描述符高速缓存器的D位</li>
+<li>进入保护模式后立即切换到32位模块并使用32位默认操作尺寸</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:B0576BC2-A747-4AB7-BCF7-48B5887B9E31" class="outline-2">
+<h2 id="h:B0576BC2-A747-4AB7-BCF7-48B5887B9E31"><a href="#h:B0576BC2-A747-4AB7-BCF7-48B5887B9E31">存储器的保护</a></h2>
+<div class="outline-text-2" id="text-h:B0576BC2-A747-4AB7-BCF7-48B5887B9E31">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>话说MOV DS,AX和MOV DS,EAX</li>
+<li>修改段寄存器时的保护</li>
+<li>代码段执行时的保护</li>
+<li>用向上扩展的段做为栈段</li>
+<li>向上扩展的段用做栈段时的保护</li>
+<li>访问普通数据段时的保护</li>
+<li>内存线性地址的回绕特性</li>
+<li>用向下扩展的段做为栈段</li>
+<li>向下扩展的段用做栈段时的保护</li>
+<li>通过别名来实现段的共用和共享</li>
+<li>冒泡排序法的基本原理</li>
+<li>32位操作尺寸下的LOOP指令</li>
+<li>数据交换指令XCHG</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:34AAFB06-C884-419C-8628-301725148975" class="outline-2">
+<h2 id="h:34AAFB06-C884-419C-8628-301725148975"><a href="#h:34AAFB06-C884-419C-8628-301725148975">保持模式程序的动态加载和执行</a></h2>
+<div class="outline-text-2" id="text-h:34AAFB06-C884-419C-8628-301725148975">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>本章的目标和内容提要</li>
+<li>内核的结构和加载前的准备工作</li>
+<li>准备为内核的每个段创建和安装描述符</li>
+<li>段描述符的创建和BSWAP指令</li>
+<li>进入内核执行</li>
+<li>进入内核后显示文本信息</li>
+<li>用CPUID指令取得处理器品牌信息并显示</li>
+<li>准备加载用户程序</li>
+<li>预读用户程序并得到它的大小</li>
+<li>条件传送指令簇CMOVcc</li>
+<li>计算以512字节为单位的用户程序总长度</li>
+<li>内存分配的基本策略和方法</li>
+<li>内存分配的简易实现过程</li>
+<li>加载用户程序</li>
+<li>准备安装用户程序的段描述符</li>
+<li>用SGDT和MOVZX指令确定GDT的位置</li>
+<li>安装新描述符并生成选择子</li>
+<li>安装用户程序的段描述符并回填选择子</li>
+<li>用户程序的执行和退出</li>
+<li>在虚拟机上观察内核的加载以及用户程序的执行与退出</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:6D2E41DE-2B2E-4EFD-AA17-887C84E5CC0E" class="outline-2">
+<h2 id="h:6D2E41DE-2B2E-4EFD-AA17-887C84E5CC0E"><a href="#h:6D2E41DE-2B2E-4EFD-AA17-887C84E5CC0E">用户程序编程接口及其实现</a></h2>
+<div class="outline-text-2" id="text-h:6D2E41DE-2B2E-4EFD-AA17-887C84E5CC0E">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>内核与用户程序之间的栈切换问题</li>
+<li>在内核中为用户程序提供编程支持</li>
+<li>用户程序中的符号地址检索表</li>
+<li>内核程序中的符号地址检索表</li>
+<li>串比较指令CMPS</li>
+<li>串比较的方向和重复前缀</li>
+<li>使用外循环依次取得用户SALT表的每个条目</li>
+<li>使用内循环依次取得内核SALT表的每个条目并进行比较</li>
+<li>在用户程序内使用内核编程接口读硬盘和显示文本</li>
+<li>在虚拟机上验证程序的执行</li>
+<li>以十六进制形式显示一个双字以及PUSHAD、POPAD和XLAT指令的使用</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:E663696F-CD1B-460F-9F62-5D7A46DE3305" class="outline-2">
+<h2 id="h:E663696F-CD1B-460F-9F62-5D7A46DE3305"><a href="#h:E663696F-CD1B-460F-9F62-5D7A46DE3305">任务和任务的创建</a></h2>
+<div class="outline-text-2" id="text-h:E663696F-CD1B-460F-9F62-5D7A46DE3305">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>任务：概念和组成</li>
+<li>使用任务控制块保存任务基本信息</li>
+<li>将任务控制块加入任务控制块链表</li>
+<li>通过栈传递例程参数以及立即数的压栈指令</li>
+<li>段寄存器的压栈和出栈以及栈的随机访问机制</li>
+<li>创建任务的局部描述符表LDT</li>
+<li>在当前任务的LDT中安装描述符</li>
+<li>LDT描述符的格式和LDT描述符的创建</li>
+<li>创建任务状态段TSS</li>
+<li>TSS描述符的格式和TSS描述符的创建</li>
+<li>用带参数的RET指令返回调用者</li>
+<li>加载任务寄存器TR和局部描述符表寄存器LDTR</li>
+<li>在虚拟机上验证任务的执行</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:DCFEF892-1B10-40D6-8873-1BB7E6A65F58" class="outline-2">
+<h2 id="h:DCFEF892-1B10-40D6-8873-1BB7E6A65F58"><a href="#h:DCFEF892-1B10-40D6-8873-1BB7E6A65F58">特权级和特权级保护</a></h2>
+<div class="outline-text-2" id="text-h:DCFEF892-1B10-40D6-8873-1BB7E6A65F58">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>特权级保护的必要性和特权保护机制</li>
+<li>当前特权级CPL</li>
+<li>描述符特权级DPL</li>
+<li>任务公共部分和私有部分的特权级划分</li>
+<li>依从的代码段</li>
+<li>门描述符和调用门</li>
+<li>本章程序说明及特权级检查的时机</li>
+<li>请求特权级RPL</li>
+<li>请求特权级调整指令ARPL</li>
+<li>一般情况下的请求特权级设置</li>
+<li>为内核接口例程创建调用门</li>
+<li>调用门的测试和调用门转移过程</li>
+<li>通过调用门实施低特权级到高特权级的转移</li>
+<li>通过调用门转移控制时的栈切换过程</li>
+<li>通过调用门转移控制并返回的完整描述</li>
+<li>创建0、1和2特权级的栈并登记在TSS中</li>
+<li>通过模拟调用门返回进入用户程序执行</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:741D2AF4-C65D-4E3D-A133-008B9ACAFA4F" class="outline-2">
+<h2 id="h:741D2AF4-C65D-4E3D-A133-008B9ACAFA4F"><a href="#h:741D2AF4-C65D-4E3D-A133-008B9ACAFA4F">协同式任务切换</a></h2>
+<div class="outline-text-2" id="text-h:741D2AF4-C65D-4E3D-A133-008B9ACAFA4F">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>多任务和任务切换概述</li>
+<li>内核任务的创建和I/O特权级IOPL</li>
+<li>I/O特权级的修改和POPF指令</li>
+<li>任务的用户态和内核态</li>
+<li>I/O许可位串和TSS的I/O许可位映射区</li>
+<li>任务切换的方法及内核任务的确立</li>
+<li>用户任务的创建和初始化</li>
+<li>简单的任务调度和切换策略</li>
+<li>遍历TCB链表寻找忙任务和就绪任务</li>
+<li>通过JMP FAR执行任务切换的过程</li>
+<li>内核任务与用户任务轮流执行的过程</li>
+<li>任务的终止和清理</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:03AEF2D9-808B-4AD9-83D5-35DF1A35B7FB" class="outline-2">
+<h2 id="h:03AEF2D9-808B-4AD9-83D5-35DF1A35B7FB"><a href="#h:03AEF2D9-808B-4AD9-83D5-35DF1A35B7FB">中断和异常的处理与抢占式多任务</a></h2>
+<div class="outline-text-2" id="text-h:03AEF2D9-808B-4AD9-83D5-35DF1A35B7FB">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>中断和异常概述</li>
+<li>保护模式下中断和异常的向量分配</li>
+<li>中断描述符表、中断门和陷阱门</li>
+<li>程序介绍</li>
+<li>创建并安装全部的256个中断门</li>
+<li>为实时时钟中断创建和安装中断门</li>
+<li>加载中断描述符表寄存器IDTR</li>
+<li>重新设置8259A主片的中断向量</li>
+<li>中断和异常发生时的特权级检查</li>
+<li>中断和异常发生时的栈切换过程</li>
+<li>在中断处理过程中实施任务切换（含NOP指令的介绍）</li>
+<li>抢占式多任务的执行效果演示</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:56D8F910-FA4D-4804-8B13-3E4222749C32" class="outline-2">
+<h2 id="h:56D8F910-FA4D-4804-8B13-3E4222749C32"><a href="#h:56D8F910-FA4D-4804-8B13-3E4222749C32">分布和动态页分配</a></h2>
+<div class="outline-text-2" id="text-h:56D8F910-FA4D-4804-8B13-3E4222749C32">
+<p>
+主要内容
+</p>
+
+<ul class="org-ul">
+<li>保护模式下的段式虚拟内存管理</li>
+<li>每个任务独立的虚拟内存</li>
+<li>物理内存的分页以及段到页的拆分</li>
+<li>处理器的段部件和页部件</li>
+<li>从线性地址到物理地址的转换过程</li>
+<li>页目录和页表及其地址转换过程</li>
+<li>设计内核的页目录和页表</li>
+<li>页目录项和页表项的组成格式</li>
+<li>创建内核的页表并初始化低端1MB对应的页表项</li>
+<li>设置控制寄存器CR3和CR0开启分页功能</li>
+<li>在调试器中观察页目录表和页表</li>
+<li>准备将内核映射到虚拟内存的高端</li>
+<li>在分页机制下访问页目录表自身</li>
+<li>使内核在虚拟内存高端的映射生效</li>
+<li>为内核任务创建任务控制块TCB</li>
+<li>为内核任务的TSS分配内存空间</li>
+<li>处理与线性地址对应的页目录项和页表项</li>
+<li>根据需要分配物理页并设置页表项</li>
+<li>物理内存的页面管理和页映射位串</li>
+<li>空闲页的搜索和BTS指令</li>
+<li>空闲页搜索和分配的具体过程</li>
+<li>确立内核任务并开始创建用户任务</li>
+<li>用户任务的内存分配策略</li>
+<li>清空内核任务页目录表的前半部分并刷新TLB</li>
+<li>为用户任务分配内存并创建LDT</li>
+<li>用户程序的加载和重定位</li>
+<li>用户任务页目录表的创建和访问以及INVLPG指令</li>
+<li>第二个用户任务的创建和分页模式下的任务切换</li>
+<li>分页模式下多任务切换的演示和调试</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-h:332797D7-CD2C-41DD-B551-64FF898E3DD1" class="outline-2">
+<h2 id="h:332797D7-CD2C-41DD-B551-64FF898E3DD1"><a href="#h:332797D7-CD2C-41DD-B551-64FF898E3DD1">平坦模型</a></h2>
+<div class="outline-text-2" id="text-h:332797D7-CD2C-41DD-B551-64FF898E3DD1">
+<p>
+主要内容
+</p>
+
+<p>
+为什么要引入平坦模型及平坦模型的特点
+在主引导程序中创建平坦模型下的段
+平坦模型对内核程序分段的影响
+平坦模型对加载内核程序的影响
+平坦模型下的内核初始化与内核任务的确立
+平坦模型下的用户程序结构
+平坦模型下的用户任务创建
+在用户任务内动态分配内存
+平坦模型下的多任务切换演示与调试
+</p>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

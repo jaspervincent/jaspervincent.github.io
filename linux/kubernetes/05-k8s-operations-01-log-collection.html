@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubernetes: k8s 运维篇-k8s容器日志收集</title>
+<meta name="description" content="logstash 缺点：java 语言，占用资源、语法复杂" />
+<meta name="keywords" content="kubernetes, linux" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/linux/kubernetes/05-k8s-operations-01-log-collection.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Kubernetes: k8s 运维篇-k8s容器日志收集" />
+<meta property="og:description" content="logstash 缺点：java 语言，占用资源、语法复杂" />
+<meta property="og:url" content="https://xuchangwei.com/linux/kubernetes/05-k8s-operations-01-log-collection.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/kubernetes/05-k8s-operations-01-log-collection.html","@type":"WebPage","name":"Kubernetes: k8s 运维篇-k8s容器日志收集","description":"logstash 缺点：java 语言，占用资源、语法复杂"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Kubernetes: k8s 运维篇-k8s容器日志收集</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:a50b2bcb-307a-4f9b-81a6-7ed3edcfb9b4">k8s 运维篇-k8s容器日志收集</a>
+<ul>
+<li><a href="#h:3aa02fb6-b3d7-47e9-8f6a-0b2431f9d307">说明</a>
+<ul>
+<li><a href="#h:01eea1c6-ee7d-4573-9185-0d8f7111add2">K8s集群需要收集哪些日志？</a></li>
+<li><a href="#h:201bb14e-011c-4915-8778-729d765a6953">收集日志常用的技术栈</a></li>
+</ul>
+</li>
+<li><a href="#h:04f3210a-d379-4527-83c7-6a18019d0cfa">使用 EFK 收集控制台日志</a>
+<ul>
+<li><a href="#h:e4b9bf7f-df14-4055-b6b9-fde365a42fa4">ES+Fluentd+Kibana架构解析</a></li>
+<li><a href="#h:1765c085-7acd-4373-b166-3c9107f24dd8">部署EFK Stack收集K8s日志</a></li>
+<li><a href="#h:56185687-a6c1-4b9b-82e6-5b2969b7c2dc">Kibana 使用</a></li>
+</ul>
+</li>
+<li><a href="#h:4c540b0f-2f5e-452e-9191-d6b239266755">使用 Filebeat 收集自定义文件日志</a>
+<ul>
+<li><a href="#h:b43fb0ce-0ab3-4f5b-8c05-317ff8e4fa00">Filebeat+Kafka+Logstash+ES架构解析</a></li>
+<li><a href="#h:62bd79a4-9d88-4ea4-ab0c-2439fe244803">创建 Kafka 和 Logstash</a>
+<ul>
+<li><a href="#h:6d54a253-0c63-47cf-927f-0076cfc1136d">logstash-cm.yaml</a></li>
+<li><a href="#h:cfeda0a2-0930-40fb-a689-a3e1a253673f">logstash-service.yaml</a></li>
+<li><a href="#h:4d413a2f-1854-44ff-8c62-1f83c092bf2e">logstash-deploy.yaml</a></li>
+</ul>
+</li>
+<li><a href="#h:1ea7e6ca-620b-4d3e-adb8-12529d5be5ad">使用Filebeat采集容器内日志文件</a>
+<ul>
+<li><a href="#h:3517fff2-4388-4101-acb1-da1c52187d90">es &amp; kibana</a></li>
+</ul>
+</li>
+<li><a href="#h:5e6d4e9e-d3fd-41e9-95b5-c66c700bfe3c">实现Pod名称和命名空间检索日志</a></li>
+</ul>
+</li>
+<li><a href="#h:02e176d0-38b0-4192-a9b1-9c1011fd66fd">Loki</a>
+<ul>
+<li><a href="#h:1f2b3972-e96a-4c00-94b9-8e83d112a384">Loki架构解析</a></li>
+<li><a href="#h:d46c4e40-cb46-47e2-8629-fced6b7a6777">使用Loki收集K8s日志</a></li>
+<li><a href="#h:ace66a7f-21ab-4080-9885-0e4ee3088ae1">Loki语法入门</a></li>
+</ul>
+</li>
+<li><a href="#h:dfe4aa4c-e547-4776-bcd9-deb5044d5454">样例</a>
+<ul>
+<li><a href="#h:b072d347-23a5-4128-b3a3-6a5c5a9f24c2">filebeat+logstash 示例1</a>
+<ul>
+<li><a href="#h:b819d90b-b4b7-4957-9f9f-f156c33134df">从 kafka 收集数据输出到 ES</a></li>
+<li><a href="#h:fdebf0cf-615e-4f97-b374-b2b284788974">filebeat</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="./index.html">Kubernetes</a></li>
+</ul>
+<section id="outline-container-h:a50b2bcb-307a-4f9b-81a6-7ed3edcfb9b4" class="outline-2">
+<h2 id="h:a50b2bcb-307a-4f9b-81a6-7ed3edcfb9b4"><a href="#h:a50b2bcb-307a-4f9b-81a6-7ed3edcfb9b4">k8s 运维篇-k8s容器日志收集</a></h2>
+<div class="outline-text-2" id="text-h:a50b2bcb-307a-4f9b-81a6-7ed3edcfb9b4">
+</div>
+<div id="outline-container-h:3aa02fb6-b3d7-47e9-8f6a-0b2431f9d307" class="outline-3">
+<h3 id="h:3aa02fb6-b3d7-47e9-8f6a-0b2431f9d307"><a href="#h:3aa02fb6-b3d7-47e9-8f6a-0b2431f9d307">说明</a></h3>
+<div class="outline-text-3" id="text-h:3aa02fb6-b3d7-47e9-8f6a-0b2431f9d307">
+</div>
+<div id="outline-container-h:01eea1c6-ee7d-4573-9185-0d8f7111add2" class="outline-4">
+<h4 id="h:01eea1c6-ee7d-4573-9185-0d8f7111add2"><a href="#h:01eea1c6-ee7d-4573-9185-0d8f7111add2">K8s集群需要收集哪些日志？</a></h4>
+<div class="outline-text-4" id="text-h:01eea1c6-ee7d-4573-9185-0d8f7111add2">
+<ul class="org-ul">
+<li>系统和 k8s 组件日志
+<ul class="org-ul">
+<li>/var/log/messages</li>
+<li>apiserver,contorllor manager</li>
+</ul></li>
+<li>业务应用程序日志
+<ul class="org-ul">
+<li>云原生-控制台日志</li>
+<li>非云原生-容器内日志文件</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:201bb14e-011c-4915-8778-729d765a6953" class="outline-4">
+<h4 id="h:201bb14e-011c-4915-8778-729d765a6953"><a href="#h:201bb14e-011c-4915-8778-729d765a6953">收集日志常用的技术栈</a></h4>
+<div class="outline-text-4" id="text-h:201bb14e-011c-4915-8778-729d765a6953">
+<ul class="org-ul">
+<li>传统架构
+<ul class="org-ul">
+<li>ELK 技术栈 Elasticsearch+Logstash+Kibana</li>
+</ul></li>
+</ul>
+
+<p>
+logstash 缺点：java 语言，占用资源、语法复杂
+</p>
+
+<ul class="org-ul">
+<li>Kubernetes
+<ul class="org-ul">
+<li>EFK 技术栈 Elasticsearch+Fluentd+Kibana</li>
+<li>Filebeat  占用资源小，sidecar 形式注入容器，收集容器内日志</li>
+<li>Loki 新贵</li>
+</ul></li>
+</ul>
+
+<p>
+fluentd 优点：k8s 中使用 fluentd 代替 Logstash，配置简单，收集控制台输出日志。
+</p>
+
+<p>
+Loki：不依赖 EFK，可直接在 grafana 查询日志。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:04f3210a-d379-4527-83c7-6a18019d0cfa" class="outline-3">
+<h3 id="h:04f3210a-d379-4527-83c7-6a18019d0cfa"><a href="#h:04f3210a-d379-4527-83c7-6a18019d0cfa">使用 EFK 收集控制台日志</a></h3>
+<div class="outline-text-3" id="text-h:04f3210a-d379-4527-83c7-6a18019d0cfa">
+</div>
+<div id="outline-container-h:e4b9bf7f-df14-4055-b6b9-fde365a42fa4" class="outline-4">
+<h4 id="h:e4b9bf7f-df14-4055-b6b9-fde365a42fa4"><a href="#h:e4b9bf7f-df14-4055-b6b9-fde365a42fa4">ES+Fluentd+Kibana架构解析</a></h4>
+<div class="outline-text-4" id="text-h:e4b9bf7f-df14-4055-b6b9-fde365a42fa4">
+
+<figure id="org9fea759">
+<img style="aspect-ratio:1432/714" decoding="async" loading="lazy" src="./images/Snipaste_2022-12-27_06-51-27.webp" alt="Snipaste_2022-12-27_06-51-27.webp" width="50%">
+
+</figure>
+</div>
+</div>
+<div id="outline-container-h:1765c085-7acd-4373-b166-3c9107f24dd8" class="outline-4">
+<h4 id="h:1765c085-7acd-4373-b166-3c9107f24dd8"><a href="#h:1765c085-7acd-4373-b166-3c9107f24dd8">部署EFK Stack收集K8s日志</a></h4>
+<div class="outline-text-4" id="text-h:1765c085-7acd-4373-b166-3c9107f24dd8">
+<p>
+<a href="https://github.com/kubernetes/kubernetes/tree/release-1.23/cluster/addons/fluentd-elasticsearch">https://github.com/kubernetes/kubernetes/tree/release-1.23/cluster/addons/fluentd-elasticsearch</a>
+</p>
+
+<p>
+收集宿主机日志 /var/log
+</p>
+
+<p>
+下载需要部署的文件
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">git clone https://github.com/dotbalo/k8s.git
+<span class="org-builtin">cd</span> k8s/efk-7.10.2/
+</pre>
+</div>
+
+<p>
+创建 EFK 所用的命令空间
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f create-logging-namespace.yaml
+</pre>
+</div>
+
+<p>
+创建 ES 集群
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f es-service.yaml
+kubectl create -f es-statefulset.yaml
+</pre>
+</div>
+
+<p>
+创建 kibana
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f kibana-deployment.yaml
+kubectl create -f kibana-service.yaml
+
+  <span class="org-comment-delimiter"># </span><span class="org-comment">&#22914;&#26524;&#35775;&#38382;&#26377;&#38382;&#39064;&#65292;kibana-deployment.yaml &#20851;&#25481;&#37324;&#38754;&#30340;&#35775;&#38382;&#27169;&#24335;proxy
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#27880;&#37322;&#20197;&#19979;2&#34892;&#65288;kibana-deployment.yaml &#65289;
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">- name: SERVER_BASEPATH
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy</span>
+</pre>
+</div>
+
+<p>
+由于在 k8s 中，我们可能并不需要对所有机器采集日志，所以可以更改 fluentd 的部署文件，添加节点绑定：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f fluentd-es-configmap.yaml -f fluentd-es-ds.yaml
+</pre>
+</div>
+
+<p>
+参考：<a href="https://www.cnblogs.com/hsyw/p/14397700.html">https://www.cnblogs.com/hsyw/p/14397700.html</a>
+</p>
+</div>
+</div>
+<div id="outline-container-h:56185687-a6c1-4b9b-82e6-5b2969b7c2dc" class="outline-4">
+<h4 id="h:56185687-a6c1-4b9b-82e6-5b2969b7c2dc"><a href="#h:56185687-a6c1-4b9b-82e6-5b2969b7c2dc">Kibana 使用</a></h4>
+<div class="outline-text-4" id="text-h:56185687-a6c1-4b9b-82e6-5b2969b7c2dc">
+</div>
+</div>
+</div>
+<div id="outline-container-h:4c540b0f-2f5e-452e-9191-d6b239266755" class="outline-3">
+<h3 id="h:4c540b0f-2f5e-452e-9191-d6b239266755"><a href="#h:4c540b0f-2f5e-452e-9191-d6b239266755">使用 Filebeat 收集自定义文件日志</a></h3>
+<div class="outline-text-3" id="text-h:4c540b0f-2f5e-452e-9191-d6b239266755">
+</div>
+<div id="outline-container-h:b43fb0ce-0ab3-4f5b-8c05-317ff8e4fa00" class="outline-4">
+<h4 id="h:b43fb0ce-0ab3-4f5b-8c05-317ff8e4fa00"><a href="#h:b43fb0ce-0ab3-4f5b-8c05-317ff8e4fa00">Filebeat+Kafka+Logstash+ES架构解析</a></h4>
+<div class="outline-text-4" id="text-h:b43fb0ce-0ab3-4f5b-8c05-317ff8e4fa00">
+
+<figure id="orgb47db75">
+<img style="aspect-ratio:1620/830" decoding="async" loading="lazy" src="./images/Snipaste_2022-12-27_14-00-55.webp" alt="Snipaste_2022-12-27_14-00-55.webp" width="50%">
+
+</figure>
+
+<p>
+Pod 中有 2 个容器
+</p>
+<ul class="org-ul">
+<li>业务容器 日志未输出到控制台，输出到指定文件</li>
+<li>日志容器 volume 使用 EmptyDir</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:62bd79a4-9d88-4ea4-ab0c-2439fe244803" class="outline-4">
+<h4 id="h:62bd79a4-9d88-4ea4-ab0c-2439fe244803"><a href="#h:62bd79a4-9d88-4ea4-ab0c-2439fe244803">创建 Kafka 和 Logstash</a></h4>
+<div class="outline-text-4" id="text-h:62bd79a4-9d88-4ea4-ab0c-2439fe244803">
+<p>
+首先需要部署 Kafka 和 logstash 至 k8s 集群。如果企业内已经有比较成熟的技术栈，可以无需部署，直接将 filebeat 的输出指向外部 kafka 集群即可：
+</p>
+
+<p>
+参考： <a href="https://github.com/dotbalo/k8s/tree/master/fklek/7.x">https://github.com/dotbalo/k8s/tree/master/fklek/7.x</a>
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">cd</span> filebeat
+helm install zookeeper zookeeper/ -n logging
+helm install kafka kafka/ -n logging
+</pre>
+</div>
+
+<p>
+待 pod 都正常后，创建 logstash 服务：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f logstash-cm.yaml -f logstash-service.yaml -f logstash.yaml
+</pre>
+</div>
+</div>
+<div id="outline-container-h:6d54a253-0c63-47cf-927f-0076cfc1136d" class="outline-5">
+<h5 id="h:6d54a253-0c63-47cf-927f-0076cfc1136d"><a href="#h:6d54a253-0c63-47cf-927f-0076cfc1136d">logstash-cm.yaml</a></h5>
+<div class="outline-text-5" id="text-h:6d54a253-0c63-47cf-927f-0076cfc1136d">
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-configmap
+data:
+  logstash.yml: |
+    http.host: <span class="org-string">"0.0.0.0"</span>
+    path.config: /usr/share/logstash/pipeline
+  logstash.conf: |
+    <span class="org-comment-delimiter"># </span><span class="org-comment">all input will come from filebeat, no local logs
+</span>    input {
+      kafka {
+              <span class="org-variable-name">enable_auto_commit</span> =&gt; true
+              <span class="org-variable-name">auto_commit_interval_ms</span> =&gt; <span class="org-string">"1000"</span>
+              <span class="org-variable-name">bootstrap_servers</span> =&gt; <span class="org-string">"kafka:9092"</span>
+              <span class="org-variable-name">topics</span> =&gt; [<span class="org-string">"test-filebeat"</span>]
+              <span class="org-variable-name">codec</span> =&gt; json
+          }
+    }
+    output {
+       stdout{ <span class="org-variable-name">codec</span>=&gt;rubydebug}
+       <span class="org-keyword">if</span> [fields][pod_namespace] =~ <span class="org-string">"public-service"</span> {
+           elasticsearch {
+             <span class="org-variable-name">hosts</span> =&gt; [<span class="org-string">"elasticsearch-logging:9200"</span>]
+             <span class="org-variable-name">index</span> =&gt; <span class="org-string">"%{[fields][pod_namespace]}-s-%{+YYYY.MM.dd}"</span>
+          }
+       } <span class="org-keyword">else</span> {
+          elasticsearch {
+             <span class="org-variable-name">hosts</span> =&gt; [<span class="org-string">"elasticsearch-logging:9200"</span>]
+             <span class="org-variable-name">index</span> =&gt; <span class="org-string">"no-index-%{+YYYY.MM.dd}"</span>
+          }
+       }
+    }
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:cfeda0a2-0930-40fb-a689-a3e1a253673f" class="outline-5">
+<h5 id="h:cfeda0a2-0930-40fb-a689-a3e1a253673f"><a href="#h:cfeda0a2-0930-40fb-a689-a3e1a253673f">logstash-service.yaml</a></h5>
+<div class="outline-text-5" id="text-h:cfeda0a2-0930-40fb-a689-a3e1a253673f">
+<div class="org-src-container">
+<pre class="src src-shell">kind: Service
+apiVersion: v1
+metadata:
+  name: logstash-service
+spec:
+  selector:
+    app: logstash
+  ports:
+  - protocol: TCP
+    port: 5044
+    targetPort: 5044
+  <span class="org-builtin">type</span>: ClusterIP
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4d413a2f-1854-44ff-8c62-1f83c092bf2e" class="outline-5">
+<h5 id="h:4d413a2f-1854-44ff-8c62-1f83c092bf2e"><a href="#h:4d413a2f-1854-44ff-8c62-1f83c092bf2e">logstash-deploy.yaml</a></h5>
+<div class="outline-text-5" id="text-h:4d413a2f-1854-44ff-8c62-1f83c092bf2e">
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash-deployment
+spec:
+  selector:
+    matchLabels:
+      app: logstash
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: logstash:7.4.2
+        ports:
+        - containerPort: 5044
+        volumeMounts:
+          - name: config-volume
+            mountPath: /usr/share/logstash/config
+          - name: logstash-pipeline-volume
+            mountPath: /usr/share/logstash/pipeline
+      volumes:
+      - name: config-volume
+        configMap:
+          name: logstash-configmap
+          items:
+            - key: logstash.yml
+              path: logstash.yml
+      - name: logstash-pipeline-volume
+        configMap:
+          name: logstash-configmap
+          items:
+            - key: logstash.conf
+              path: logstash.conf
+</pre>
+</div>
+
+<p>
+需要注意 logstash-cm.yaml 文件中的一些配置：
+</p>
+<ul class="org-ul">
+<li>input:  数据来源，示例配置的是 kafka</li>
+<li>input.kakfa.topics: kafka 的 topic，需要和 filebeat 输出的 topic 一致</li>
+<li>output: 数据输出至哪里，示例输出至 ES 集群</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1ea7e6ca-620b-4d3e-adb8-12529d5be5ad" class="outline-4">
+<h4 id="h:1ea7e6ca-620b-4d3e-adb8-12529d5be5ad"><a href="#h:1ea7e6ca-620b-4d3e-adb8-12529d5be5ad">使用Filebeat采集容器内日志文件</a></h4>
+<div class="outline-text-4" id="text-h:1ea7e6ca-620b-4d3e-adb8-12529d5be5ad">
+<p>
+filebeat-cm.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">cd</span> /root/install-some-apps/efk
+mkdir filebeat &amp;&amp; <span class="org-builtin">cd</span> filebeat
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">vim filebeat-cm.yaml
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeatconf
+data:
+  filebeat.yml: |-
+    filebeat.inputs:
+    - input_type: log
+      paths:
+        - /data/log/*/*.log
+      tail_files: true
+      fields:
+        pod_name: <span class="org-string">'${podName}'</span>
+        pod_ip: <span class="org-string">'${podIp}'</span>
+        pod_deploy_name: <span class="org-string">'${podDeployName}'</span>
+        pod_namespace: <span class="org-string">'${podNamespace}'</span>
+      tags: [test-filebeat] 
+    output.kafka:
+      hosts: [<span class="org-string">"kafka:9092"</span>]
+      topic: <span class="org-string">"test-filebeat"</span>
+      codec.json:
+        pretty: false
+      keep_alive: 30s
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f filebeat-cm.yaml -n public-service
+</pre>
+</div>
+
+
+<p>
+接下来创建一个模拟程序
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create -f app-filebeat.yaml -nlogging
+</pre>
+</div>
+<p>
+该程序会一直在/opt/date.log 文件输出当前日期，配置如下
+</p>
+<div class="org-src-container">
+<pre class="src src-shll">command:
+  - sh
+  - -c
+  - while true; do date &gt;&gt; /opt/date.log; sleep 2;  done
+</pre>
+</div>
+<p>
+/opt 目录数据共享
+</p>
+
+<p>
+app-filebeat.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+    env: release
+spec:
+  selector:
+    matchLabels:
+      app: app
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  # minReadySeconds: 30
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: filebeat
+          image: registry.cn-beijing.aliyuncs.com/dotbalo/filebeat:7.10.2
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "10m"
+            limits:
+              cpu: "200m"
+              memory: "300Mi"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: podIp
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: podName
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: podNamespace
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: podDeployName
+              value: app
+            - name: TZ
+              value: "Asia/Shanghai"
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: logpath
+              mountPath: /data/log/app/
+            - name: filebeatconf
+              mountPath: /usr/share/filebeat/filebeat.yml
+              subPath: usr/share/filebeat/filebeat.yml
+        - name: app
+          image: registry.cn-beijing.aliyuncs.com/dotbalo/alpine:3.6
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: logpath
+              mountPath: /opt/
+          env:
+            - name: TZ
+              value: "Asia/Shanghai"
+            - name: LANG
+              value: C.UTF-8
+            - name: LC_ALL
+              value: C.UTF-8
+          command:
+            - sh
+            - -c
+            - while true; do date &gt;&gt; /opt/date.log; sleep 2;  done
+      volumes:
+        - name: logpath
+          emptyDir: {}
+        - name: filebeatconf
+          configMap:
+            name: filebeatconf
+            items:
+              - key: filebeat.yml
+                path: usr/share/filebeat/filebeat.yml
+</pre>
+</div>
+</div>
+<div id="outline-container-h:3517fff2-4388-4101-acb1-da1c52187d90" class="outline-5">
+<h5 id="h:3517fff2-4388-4101-acb1-da1c52187d90"><a href="#h:3517fff2-4388-4101-acb1-da1c52187d90">es &amp; kibana</a></h5>
+<div class="outline-text-5" id="text-h:3517fff2-4388-4101-acb1-da1c52187d90">
+<p>
+#+end_src
+es 和 kibana 用的上面安装的
+#+end_src
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:5e6d4e9e-d3fd-41e9-95b5-c66c700bfe3c" class="outline-4">
+<h4 id="h:5e6d4e9e-d3fd-41e9-95b5-c66c700bfe3c"><a href="#h:5e6d4e9e-d3fd-41e9-95b5-c66c700bfe3c">实现Pod名称和命名空间检索日志</a></h4>
+<div class="outline-text-4" id="text-h:5e6d4e9e-d3fd-41e9-95b5-c66c700bfe3c">
+<p>
+登录 kibana ，添加 filebeat 的索引即可查看日志。点击菜单栏&#x2013;&gt; Stack Management
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-h:02e176d0-38b0-4192-a9b1-9c1011fd66fd" class="outline-3">
+<h3 id="h:02e176d0-38b0-4192-a9b1-9c1011fd66fd"><a href="#h:02e176d0-38b0-4192-a9b1-9c1011fd66fd">Loki</a></h3>
+<div class="outline-text-3" id="text-h:02e176d0-38b0-4192-a9b1-9c1011fd66fd">
+</div>
+<div id="outline-container-h:1f2b3972-e96a-4c00-94b9-8e83d112a384" class="outline-4">
+<h4 id="h:1f2b3972-e96a-4c00-94b9-8e83d112a384"><a href="#h:1f2b3972-e96a-4c00-94b9-8e83d112a384">Loki架构解析</a></h4>
+<div class="outline-text-4" id="text-h:1f2b3972-e96a-4c00-94b9-8e83d112a384">
+</div>
+</div>
+<div id="outline-container-h:d46c4e40-cb46-47e2-8629-fced6b7a6777" class="outline-4">
+<h4 id="h:d46c4e40-cb46-47e2-8629-fced6b7a6777"><a href="#h:d46c4e40-cb46-47e2-8629-fced6b7a6777">使用Loki收集K8s日志</a></h4>
+<div class="outline-text-4" id="text-h:d46c4e40-cb46-47e2-8629-fced6b7a6777">
+<p>
+<a href="https://grafana.com/docs/loki/latest/installation/helm/install-scalable/">https://grafana.com/docs/loki/latest/installation/helm/install-scalable/</a>
+</p>
+
+<p>
+Loki 提供了 helm 的安装方式，可以直接下载包进行安装。
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+</pre>
+</div>
+
+<p>
+创建 loki namespace
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl create ns loki
+</pre>
+</div>
+
+<p>
+创建 loki stack:
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">helm upgrade --install loki grafana/loki --set grafana.enalbed=true --set grafana.service.type=NodePort -n loki
+
+<span class="org-comment-delimiter">#  </span><span class="org-comment">&#27809;&#26377; grafana &#35774;&#32622;&#20026; true</span>
+</pre>
+</div>
+<p>
+访问grafana
+</p>
+
+<p>
+查看grafana 密码（账号 admin）：
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">kubectl get secret --namespace loki loki-grafana -o <span class="org-variable-name">jsonpath</span>=<span class="org-string">"{.data.admin-password}"</span> | base64 -d; <span class="org-builtin">echo</span> 
+</pre>
+</div>
+
+<p>
+grfana 页面中点击左边栏 Explore 找到 loki 来查询
+</p>
+</div>
+</div>
+<div id="outline-container-h:ace66a7f-21ab-4080-9885-0e4ee3088ae1" class="outline-4">
+<h4 id="h:ace66a7f-21ab-4080-9885-0e4ee3088ae1"><a href="#h:ace66a7f-21ab-4080-9885-0e4ee3088ae1">Loki语法入门</a></h4>
+<div class="outline-text-4" id="text-h:ace66a7f-21ab-4080-9885-0e4ee3088ae1">
+<p>
+语法 prometheus 语法相似
+</p>
+
+<p>
+支持 pipline，如过滤 avg 字段
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">{<span class="org-variable-name">namespace</span>=<span class="org-string">"kube-system"</span>, <span class="org-variable-name">pod</span>=~<span class="org-string">"calico.*"</span>} |~ <span class="org-string">"avg"</span>
+</pre>
+</div>
+
+<p>
+格式化后过滤，如过滤 avg 字段，同时其中 longest 大于 18ms 的行
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">{<span class="org-variable-name">namespace</span>=<span class="org-string">"kube-system"</span>, <span class="org-variable-name">pod</span>=~<span class="org-string">"calico.*"</span>} |~ <span class="org-string">"avg"</span> |logfmt| longest &gt; 18ms
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:dfe4aa4c-e547-4776-bcd9-deb5044d5454" class="outline-3">
+<h3 id="h:dfe4aa4c-e547-4776-bcd9-deb5044d5454"><a href="#h:dfe4aa4c-e547-4776-bcd9-deb5044d5454">样例</a></h3>
+<div class="outline-text-3" id="text-h:dfe4aa4c-e547-4776-bcd9-deb5044d5454">
+</div>
+<div id="outline-container-h:b072d347-23a5-4128-b3a3-6a5c5a9f24c2" class="outline-4">
+<h4 id="h:b072d347-23a5-4128-b3a3-6a5c5a9f24c2"><a href="#h:b072d347-23a5-4128-b3a3-6a5c5a9f24c2">filebeat+logstash 示例1</a></h4>
+<div class="outline-text-4" id="text-h:b072d347-23a5-4128-b3a3-6a5c5a9f24c2">
+</div>
+<div id="outline-container-h:b819d90b-b4b7-4957-9f9f-f156c33134df" class="outline-5">
+<h5 id="h:b819d90b-b4b7-4957-9f9f-f156c33134df"><a href="#h:b819d90b-b4b7-4957-9f9f-f156c33134df">从 kafka 收集数据输出到 ES</a></h5>
+<div class="outline-text-5" id="text-h:b819d90b-b4b7-4957-9f9f-f156c33134df">
+<p>
+logstash-configmap.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: v1
+data:
+  jvm.options: |
+    #-Xms16g
+    #-Xmx16g
+    -XX:+UseG1GC
+    -XX:MaxGCPauseMillis=50
+    -Djava.awt.headless=true
+    -Dfile.encoding=UTF-8
+    -Djruby.compile.invokedynamic=true
+    -Djruby.jit.threshold=0
+    -Djruby.regexp.interruptible=true
+    -XX:+HeapDumpOnOutOfMemoryError
+    -Djava.security.egd=file:/dev/urandom
+    -Dlog4j2.isThreadContextMapInheritable=true
+  logstash.conf: |
+    input {
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "taskcenter-prd-new-${POD_NAME}"
+        client_id =&gt; "taskcenter-prd-client"
+        #group_id =&gt; "taskcenter-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "taskcenter-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_bytes =&gt; "204857600"
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "messagcenter-prd-new-${POD_NAME}"
+        client_id =&gt; "messagcenter-prd-client"
+        #group_id =&gt; "messagecenter-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "messagecenter-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "clevertap-prd-new-${POD_NAME}"
+        client_id =&gt; "clevertap-prd-client"
+        #group_id =&gt; "clevertap-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "clevertap-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_bytes =&gt; "204857600"
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+      kafka {
+        bootstrap_servers =&gt; "kafka.public-middleware:9092"
+        #client_id =&gt; "rummy-sc-prd-new-${POD_NAME}"
+        client_id =&gt; "rummy-sc-prd-client"
+        #group_id =&gt; "rummy-sc-prd"
+        group_id =&gt; "growth-prd"
+        topics_pattern =&gt; "rummy-sc-prd.*" # kafka topics 正则索引匹配
+        consumer_threads =&gt; 6
+        fetch_max_wait_ms =&gt; "1000"
+        decorate_events =&gt; basic
+        auto_offset_reset =&gt; "latest"
+        codec =&gt; "json"
+        max_poll_records =&gt; "5000"
+      }
+    }
+
+    filter {
+      if [kafka_topic] =~ "clevertap-prd" {
+                  grok {
+                      # patterns_dir =&gt; ["/etc/logstash/conf.d"]
+                      match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) %{GREEDYDATA:class}" }
+                  }
+                  date {
+                      match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                      target =&gt; "@timestamp"
+                      timezone =&gt; "Asia/Kolkata"
+                  }
+      }
+      if [kafka_topic] =~ "taskcenter-prd" {
+                  grok {
+                      # patterns_dir =&gt; ["/etc/logstash/conf.d"]
+                      match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) %{GREEDYDATA:class}" }
+                  }
+                  date {
+                      match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                      target =&gt; "@timestamp"
+                      timezone =&gt; "Asia/Kolkata"
+                  }
+      }
+      if [kafka_topic] =~ "messagecenter-prd" {
+                  grok {
+                      # patterns_dir =&gt; ["/etc/logstash/conf.d"]
+                      match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) %{GREEDYDATA:class}" }
+                  }
+                  date {
+                      match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                      target =&gt; "@timestamp"
+                      timezone =&gt; "Asia/Kolkata"
+                  }
+                  #mutate {
+                  #        split =&gt; {"class" =&gt; ":"}
+                  #        add_field =&gt; { "error_class" =&gt; "%{[class][0]}" }
+                  #}
+      }
+      if [kafka_topic] =~ "rummy-sc-prd" {
+                    grok {
+                       match =&gt; { "message" =&gt; "(?&lt;mydate&gt;\d+-\d+-\d+\s\d+\:\d+\:\d+\.\d{3})?(\s\[.+\]) %{LOGLEVEL:loglevel} (?&lt;line&gt;\[.*\]) (?&lt;traceid&gt;\[.*\]) (?&lt;logv&gt;(-\s\S+\d|-\s\S+)) (param: AppLogReqParam\(userId=(?&lt;userid&gt;\d+( |)),\scontent=(?&lt;content_json&gt;(\[.*\]|\{.*\})),\stype=(?&lt;apptype&gt;.*)\)|)%{GREEDYDATA:class}" }
+                    }
+
+                    date {
+                       match =&gt; ["mydate", "yyyy-MM-dd HH:mm:ss.SSS"]
+                       target =&gt; "@timestamp"
+                       timezone =&gt; "Asia/Kolkata"
+                          }
+      }
+      mutate {
+        remove_field  =&gt; ["agent","ecs","host"]
+      }
+    }
+
+
+    output {
+        #if "-dev" in [kafka_topic] {
+        #if [kafka_topic] =~ "-dev(|\s+)" {
+            elasticsearch {
+                  #hosts =&gt; ["elasticsearch-log-master.public-middleware:9200"]
+                  hosts =&gt; ["elasticsearch-growth.public-middleware:9200"]
+                  #index =&gt; "%{kafka_topic}-%{service}-%{+YYYY.MM.dd}"
+                  index =&gt; "%{[@metadata][kafka][topic]}-%{service}-%{+YYYY.MM.dd}"
+                }
+        #}
+        #if [kafka_topic] =~ "-prd(|\s+)" {
+        #    elasticsearch {
+        #          hosts =&gt; ["elasticsearch-log-master.public-middleware:9200"]
+        #          index =&gt; "%{kafka_topic}-%{+YYYY.MM.dd}"
+        #        }
+        #}
+    }
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    pipeline.workers: 20
+    pipeline.batch.size: 50240
+    pipeline.batch.delay: 10
+    pipeline.ecs_compatibility: disabled
+    config.reload.automatic: true
+    config.reload.interval: 300s
+kind: ConfigMap
+metadata:
+  name: logstash-growth-prd
+  namespace: logstash
+</pre>
+</div>
+
+
+<p>
+logstash-deployment.yaml
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: logstash-growth-prd
+  name: logstash-growth-prd
+  namespace: logstash
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: logstash-growth-prd
+  template:
+    metadata:
+      labels:
+        app: logstash-growth-prd
+    spec:
+      nodeSelector:
+        type: ops-prod-logstash
+        #type: ops-prod-infra
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: logstash-growth-prd
+              namespaces:
+              - logstash
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - env:
+        - name: ES_HOSTS
+          value: es:9200
+        #- name: MY_NODE_NAME
+        #  valueFrom:
+        #    fieldRef:
+        #      apiVersion: v1
+        #      fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: TZ
+          value: Asia/Calcutta
+        image: docker.elastic.co/logstash/logstash:7.17.8
+        imagePullPolicy: IfNotPresent
+        name: logstash-growth-prd
+        ports:
+        - containerPort: 5044
+          protocol: TCP
+        #resources:
+        #  requests:
+        #    memory: "10Gi"
+        #    cpu: "1"
+        #  limits:
+        #    memory: "30Gi"
+        #    cpu: "16"
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/share/logstash/config/jvm.options
+          name: conf
+          subPath: jvm.options
+        - mountPath: /usr/share/logstash/config/logstash.yml
+          name: conf
+          subPath: logstash.yml
+        - mountPath: /usr/share/logstash/pipeline/logstash.conf
+          name: conf
+          subPath: logstash.conf
+        - mountPath: /etc/localtime
+          name: time
+      restartPolicy: Always
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: logstash-growth-prd
+        name: conf
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+          type: ""
+        name: time
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:fdebf0cf-615e-4f97-b374-b2b284788974" class="outline-5">
+<h5 id="h:fdebf0cf-615e-4f97-b374-b2b284788974"><a href="#h:fdebf0cf-615e-4f97-b374-b2b284788974">filebeat</a></h5>
+<div class="outline-text-5" id="text-h:fdebf0cf-615e-4f97-b374-b2b284788974">
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat config/app-config.yaml
+apiVersion: v1
+data:
+  TZ: Asia/Calcutta
+  APP_NAMESPACE: taskcenter-prd
+  APP_ENV: prod
+  APP_JVM_CONFIG: |-
+    -Dfile.encoding=utf-8
+    -server
+    -XX:+UseG1GC
+    -XX:+ExitOnOutOfMemoryError
+    -XX:InitialRAMPercentage=75.0
+    -XX:MinRAMPercentage=75.0
+    -XX:MaxRAMPercentage=75.0
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/opt/logs/
+  PreStop.sh: |-
+    #! /bin/bash
+    sleep 50
+    curl  --connect-timeout 5 --max-time 5 -s -i -H "Content-Type: application/json" -X POST  http://localhost:8099/actuator/shutdown
+    sleep 60
+  PreStop_task.sh: |-
+    #! /bin/bash
+    sleep 50
+    curl --connect-timeout 5 --max-time 5 -s -i "http://localhost:8080/xxljob/shutdown"
+    sleep 20
+    curl --connect-timeout 5 --max-time 5 -s -i -H "Content-Type: application/json" -X POST  http://localhost:8099/actuator/shutdown
+    sleep 40
+  app-config.yml: |-
+    - type: log
+      scan_frequency: 10s
+      paths:
+        - '/data/logs/${POD_NAME}/*/*.log'
+      fields:
+        service: ${SERVICE_NAME}
+        kafka_topic: ${KAFKA_TOPIC_NAME}
+      #  LOG_TYPE: 'dc'
+      #  POD_IP: '${POD_IP}'
+      #  POD_NAME: '${POD_NAME}'
+      #  NODE_NAME: '${NODE_NAME}'
+      #  POD_NAMESPACE: '${POD_NAMESPACE}'
+      # json.overwrite_keys: true
+      # json.keys_under_root: true
+      force_close_files: true
+      fields_under_root: true
+      ignore_older: 24h  # 忽略1天前的日志
+      clean_inactive: 25h
+      close_inactive: 20m
+      exclude_lines: ['DEBUG']
+      exclude_files: ['.gz$', 'gc.log']
+      tags: ['taskcenter']
+      multiline.pattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]][0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}[[:space:]]\[)'
+      multiline.negate: true
+      multiline.match: after
+  filebeat.yml: |-
+    filebeat.config.inputs:
+      path: ${path.config}/conf.d/app-config.yml
+      enable: true
+      reload.enabled: true
+      reload.period: 10s
+      max_bytes: 20480  # 单条日志限制20kb
+    # ============================== Filebeat modules ==============================
+    filebeat.config.modules:
+      path: ${path.config}/modules.d/*.yml
+      reload.enabled: false
+      reload.period: 10s
+    # =================================== Filebeat output ===================================
+    output.kafka:
+      enabled: true
+      hosts: ["kafka.xxx.com:9094"]
+      topic: '%{[kafka_topic]}'
+      partition.round_robin:
+        reachable_only: false
+      required_acks: 1
+      compression: gzip
+      max_message_bytes: 1000000
+    # =================================== Queue ===================================
+    max_procs: 1
+    queue.mem:
+      events: 2048
+      flush.min_events: 1024
+      flush.timeout: 2s
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: taskcenter
+</pre>
+</div>
+
+<p>
+日志容器
+</p>
+<div class="org-src-container">
+<pre class="src src-yaml">$ cat task-center-web/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: task-center-web
+    department: taskcenter
+    env: prod
+  name: task-center-web
+  namespace: taskcenter
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: task-center-web
+      department: taskcenter
+      env: prod
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "10081"
+        prometheus.io/scrape: "true"
+      labels:
+        app: task-center-web
+        department: taskcenter
+        env: prod
+    spec:
+      terminationGracePeriodSeconds: 90
+      nodeSelector:
+        type: paltform-growth-arm
+      topologySpreadConstraints:
+      - maxSkew: 2
+        topologyKey: eks.amazonaws.com/capacityType
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: task-center-web
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: task-center-web
+              namespaces:
+              - taskcenter
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+        #nodeAffinity:
+        #  preferredDuringSchedulingIgnoredDuringExecution:
+        #  - weight: 100
+        #    preference:
+        #      matchExpressions:
+        #      - key: eks.amazonaws.com/capacityType
+        #        operator: In
+        #        values:
+        #        - SPOT
+      initContainers:
+      - image: ops-harbor.xxx.com/devops/skywalking-agent:vv8.7.0
+        name: skywalking-sidecar
+        imagePullPolicy: Always
+        command: ['sh']
+        args: ['-c', 'mkdir -p /skywalking &amp;&amp; /bin/cp -rf /opt/skywalking/agent /skywalking']
+        volumeMounts:
+        - mountPath: /skywalking
+          name: skywalking
+      containers:
+      - args:
+        - -javaagent:/opt/skywalking/agent/skywalking-agent.jar
+        - -server
+        - -XX:+HeapDumpOnOutOfMemoryError
+        - -XX:HeapDumpPath=logs/
+        - -Xms6g
+        - -Xmx6g
+        - -XX:G1HeapRegionSize=16m
+        - -XX:G1ReservePercent=25
+        - -XX:InitiatingHeapOccupancyPercent=30
+        - -XX:SoftRefLRUPolicyMSPerMB=0
+        - -verbose:gc
+        - -Xloggc:logs/$(POD_NAME)/gc.log
+        - -XX:+PrintGCDetails
+        - -XX:+PrintGCDateStamps
+        - -XX:+PrintGCApplicationStoppedTime
+        - -XX:+PrintAdaptiveSizePolicy
+        - -XX:+UseGCLogFileRotation
+        - -XX:NumberOfGCLogFiles=5
+        - -XX:GCLogFileSize=30m
+        - -XX:-OmitStackTraceInFastThrow
+        - -XX:+AlwaysPreTouch
+        - -XX:MaxDirectMemorySize=512m
+        - -XX:-UseLargePages
+        - -XX:LargePageSizeInBytes=128m
+        - -XX:+UseFastAccessorMethods
+        - -XX:-UseBiasedLocking
+        - -Dfile.encoding=UTF-8
+        - -Dspring.profiles.active=k8sprod
+        - -XX:+DisableExplicitGC
+        - -jar
+        - /opt/task-center-web/task-center-web.jar
+        command:
+        - java
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: SW_AGENT_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SW_AGENT_NAME
+          value: "taskcenter-prd-task-center-web"
+        - name: SW_LOGGING_DIR
+          value: "/opt/skywalking/logs"
+        - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+          value: "ops-public-skywalking:11800"
+        image: ops-harbor.xxx.com/taskcenter/task-center-web:dev_20221226_141335
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - curl -X PUT "http://nacos-0.nacos.base.svc.cluster.local:8848/nacos/v1/ns/instance?serviceName=task-center-web&amp;groupName=FENCE_GROUP_PROD&amp;ip=${POD_IP}&amp;port=18081&amp;namespaceId=f043157a-7d73-4f9c-99c0-d90de4db8163&amp;enabled=false"
+                &amp;&amp; sleep 60
+        startupProbe:
+          httpGet:
+            path: /taskcenter/health/check
+            port: 18081
+            scheme: HTTP
+          periodSeconds: 10
+          failureThreshold: 50
+          successThreshold: 1
+          timeoutSeconds: 2
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /taskcenter/health/check
+            port: 18081
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: task-center-web
+        ports:
+        - containerPort: 18081
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /taskcenter/health/check
+            port: 18081
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "2.5"
+            memory: 7.5Gi
+          requests:
+            cpu: "1"
+            memory: 7.5Gi
+        volumeMounts:
+        - mountPath: /opt/task-center-web/logs
+          name: logs
+        - mountPath: /etc/localtime
+          name: time
+        - mountPath: /opt/skywalking
+          name: skywalking
+      - env:
+        - name: TZ
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: TZ
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: KAFKA_TOPIC_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAMESPACE
+        - name: SERVICE_NAME
+          value: "task-center-web"
+        image: docker.elastic.co/beats/filebeat:8.5.2
+        imagePullPolicy: IfNotPresent
+        name: filebeat
+        resources:
+          limits:
+            cpu: 100m
+            memory: 200Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /usr/share/filebeat/filebeat.yml
+          name: filebeat-config
+          subPath: filebeat.yml
+        - mountPath: /usr/share/filebeat/conf.d
+          name: filebeat-config
+        - mountPath: /data/logs
+          name: logs
+      imagePullSecrets:
+      - name: docker-pull
+      securityContext:
+        runAsUser: 0
+      volumes:
+      - configMap:
+          defaultMode: 511
+          name: app-config
+        name: app-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: filebeat.yml
+            path: filebeat.yml
+          - key: app-config.yml
+            path: app-config.yml
+          name: app-config
+        name: filebeat-config
+      - hostPath:
+          path: /usr/share/zoneinfo/Asia/Calcutta
+          type: ""
+        name: time
+      - emptyDir: {}
+        name: logs
+      - emptyDir: {}
+        name: skywalking
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

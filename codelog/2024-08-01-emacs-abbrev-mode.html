@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Emacs: 缩写模式(abbrev-mode)</title>
+<meta name="description" content="本文介绍在Emacs中，如何使用内置的缩写模式来定义“缩写”，以实现快速而强大的文本扩展。" />
+<meta name="keywords" content="计算机, 博客, Codelog" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/codelog/2024-08-01-emacs-abbrev-mode.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Emacs: 缩写模式(abbrev-mode)" />
+<meta property="og:description" content="本文介绍在Emacs中，如何使用内置的缩写模式来定义“缩写”，以实现快速而强大的文本扩展。" />
+<meta property="og:url" content="https://xuchangwei.com/codelog/2024-08-01-emacs-abbrev-mode.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/codelog/2024-08-01-emacs-abbrev-mode.html","@type":"BlogPosting","headline":"Emacs: 缩写模式(abbrev-mode)","datePublished":"2024-08-01","author":{"@type":"Person","name":"Jasper Hsu"},"mainEntityOfPage":"https://xuchangwei.com/codelog/2024-08-01-emacs-abbrev-mode.html","description":"本文介绍在Emacs中，如何使用内置的缩写模式来定义“缩写”，以实现快速而强大的文本扩展。"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Emacs: 缩写模式(abbrev-mode)</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:d2f77b1d-6617-4cd7-8a6f-bd3083475447">abbrev-mode 基本使用</a></li>
+<li><a href="#h:336d363f-8eb1-48a9-b9f7-461fe98f8204">abbrev-mode 如何开启,</a></li>
+<li><a href="#h:aaf45093-e557-4383-ac15-f1518df61342">交互式缩写</a></li>
+<li><a href="#h:dd4f21ed-cfc5-48f8-9765-3683da333f48">插入表情符号</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAG: <a href="../jcodelogv.html">编码</a></li>
+</ul>
+
+<div class="PREVIEW" id="org4476467">
+<p>
+本文介绍在Emacs中，如何使用内置的缩写模式来定义“缩写”，以实现快速而强大的文本扩展。
+</p>
+
+</div>
+
+<p>
+不需要按TAB, 只需要输入简短字符后接一个空格。
+</p>
+
+<p>
+实现
+</p>
+<pre class="example" id="orgf660a28">
+This is a test: a global abbrev for demo puposes, 23:14:18 , Hello Jasper , 🦄 
+</pre>
+<section id="outline-container-h:d2f77b1d-6617-4cd7-8a6f-bd3083475447" class="outline-2">
+<h2 id="h:d2f77b1d-6617-4cd7-8a6f-bd3083475447"><a href="#h:d2f77b1d-6617-4cd7-8a6f-bd3083475447">abbrev-mode 基本使用</a></h2>
+<div class="outline-text-2" id="text-h:d2f77b1d-6617-4cd7-8a6f-bd3083475447">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#32553;&#20889;&#27169;&#24335;&#22522;&#30784;&#20351;&#29992;
+</span>
+(define-abbrev global-abbrev-table <span class="org-string">"metest"</span> <span class="org-string">"a global abbrev for demo puposes"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#23450;&#20041;&#20840;&#23616;&#32553;&#20889;
+</span>(define-abbrev text-mode-abbrev-table <span class="org-string">"metest"</span> <span class="org-string">"text-mode abbrev expansion here"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#23450;&#20041;text-mode&#32553;&#20889;
+</span>(define-abbrev org-mode-abbrev-table <span class="org-string">"metest"</span> <span class="org-string">"org-mode abbrev"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#23450;&#20041;org-mode&#32553;&#20889;
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">metest global-abbrev-table
+</span>a global abbrev for demo puposes
+<span class="org-comment-delimiter">;; </span><span class="org-comment">metest text-mode
+</span>text-mode abbrev expansion here
+<span class="org-comment-delimiter">;; </span><span class="org-comment">metext org-mode
+</span>org-mode abbrev 
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:336d363f-8eb1-48a9-b9f7-461fe98f8204" class="outline-2">
+<h2 id="h:336d363f-8eb1-48a9-b9f7-461fe98f8204"><a href="#h:336d363f-8eb1-48a9-b9f7-461fe98f8204">abbrev-mode 如何开启,</a></h2>
+<div class="outline-text-2" id="text-h:336d363f-8eb1-48a9-b9f7-461fe98f8204">
+<p>
+它是本地缓存, 使用继承来引用abbrev-mode
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">abbrev-mode</span></span><span class="org-comment">' is buffer-local
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#22240;&#20026;&#26159;abbre-mode&#26159;&#26412;&#22320;&#32531;&#23384;&#65292;&#23427;&#21482;&#20250;&#22312;&#20320;&#37197;&#32622;&#25991;&#20214;&#20013;&#29983;&#25928;
+</span>(abbrev-mode 1) <span class="org-comment-delimiter">; </span><span class="org-comment">&#36825;&#26679;&#37197;&#32622;&#26159;&#38169;&#35823;&#30340;
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">&#30495;&#27491;&#24819;&#35201;&#37197;&#32622;&#23427;&#65292;&#35201;&#23558;&#20854;&#35774;&#32622;&#20026;major-mode&#20027;&#27169;&#24335;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Parent modes: `</span><span class="org-comment"><span class="org-constant">prog-mode</span></span><span class="org-comment">' (programming), `</span><span class="org-comment"><span class="org-constant">text-mode</span></span><span class="org-comment">' (prose)
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#26041;&#27861;1 &#28155;&#21152;&#38057;&#23376;
+</span>(add-hook 'text-mode-hook 'abbrev-mode)
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:aaf45093-e557-4383-ac15-f1518df61342" class="outline-2">
+<h2 id="h:aaf45093-e557-4383-ac15-f1518df61342"><a href="#h:aaf45093-e557-4383-ac15-f1518df61342">交互式缩写</a></h2>
+<div class="outline-text-2" id="text-h:aaf45093-e557-4383-ac15-f1518df61342">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;;; </span><span class="org-comment">&#32553;&#20889;&#25554;&#20837;&#24403;&#21069;&#26102;&#38388;
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my-current-time</span> ()
+  (insert (format-time-string <span class="org-string">"%T"</span>)))
+
+(my-current-time)   <span class="org-comment-delimiter">;</span><span class="org-comment">C-x C-e 21:29:29
+</span>
+(define-abbrev global-abbrev-table <span class="org-string">"medyn"</span> <span class="org-string">""</span> 'my-current-time) <span class="org-comment-delimiter">; </span><span class="org-comment">medyna &#25193;&#23637;&#20026;&#31354;&#65292;&#21516;&#26102;&#24341;&#29992;&#38057;&#23376;&#20989;&#25968;my-current-time
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">medyn
+</span>21:32:30 
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#20132;&#20114;&#24335;&#32553;&#20889;&#25554;&#20837;&#23383;&#31526;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#20132;&#20114;&#24335;&#20989;&#25968;
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my-greet-person</span> (name)
+  (<span class="org-keyword">interactive</span> (list (read-string <span class="org-string">"Greet person: "</span>)))
+  (insert (format <span class="org-string">"Hello %s"</span> name)))
+
+(my-greet-person <span class="org-string">"Ja"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">C-x C-e Hello Ja
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">M-x my-greet-person &#22238;&#36710;&#36755;&#20837;&#23383;&#31526; Jasper
+</span>Hello Jasper
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">&#36866;&#21512;&#32553;&#20889;&#30340;&#20132;&#20114;&#24335;&#20989;&#25968;, &#22312;&#32553;&#20889;&#20013;&#27809;&#26377;&#35843;&#29992;&#21442;&#25968;
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my-greet-person</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (insert (format <span class="org-string">"Hello %s"</span> (read-string <span class="org-string">"Greet persion: "</span>))))
+
+(define-abbrev global-abbrev-table <span class="org-string">"mehi"</span> <span class="org-string">""</span> 'my-greet-person)
+<span class="org-comment-delimiter">;; </span><span class="org-comment">mehi &#36755;&#20837;&#23383;&#31526;&#20018;Jasper
+</span>Hello Jasper 
+</pre>
+</div>
+</div>
+</section>
+<section id="outline-container-h:dd4f21ed-cfc5-48f8-9765-3683da333f48" class="outline-2">
+<h2 id="h:dd4f21ed-cfc5-48f8-9765-3683da333f48"><a href="#h:dd4f21ed-cfc5-48f8-9765-3683da333f48">插入表情符号</a></h2>
+<div class="outline-text-2" id="text-h:dd4f21ed-cfc5-48f8-9765-3683da333f48">
+<p>
+默认情况下，table表中内容仅被视为 abev ，是由什么字符组成。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(define-abbrev global-abbrev-table <span class="org-string">":uni"</span> <span class="org-string">"&#129412;"</span>)
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">:uni &#20160;&#20040;&#20063;&#19981;&#20250;&#21457;&#22768;&#65292;&#22240;&#20026;&#34920;&#24773;&#31526;&#21495;&#19981;&#26159;&#35789;&#32452;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">hello :uni uni  &#22312;&#21333;&#35789;&#21518;&#20351;&#29992;M-b&#25105;&#20204;&#21487;&#20197;&#21457;&#29616;&#20809;&#26631;&#20572;&#30041;&#22312;:&#20882;&#21495;&#21518;,
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#20882;&#21495;&#19981;&#34987;&#35782;&#21035;&#20026;&#21333;&#35789;&#25104;&#20998;&#65292;&#25152;&#20197;&#20250;&#36339;&#36807;&#23427;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#24517;&#39035;&#35774;&#32622;&#32553;&#20889;&#30340;&#23646;&#24615;&#25165;&#34892;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#22312;&#24110;&#21161;&#25163;&#20876;&#20013;&#25551;&#36848; (info "(elisp) Abbrev Table Properties")
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#27491;&#21017;&#21305;&#37197;&#32553;&#20889; &#21644; &#35789;&#32452;&#22312;&#21738;&#32467;&#26463;
+</span>(abbrev-table-put global-abbrev-table <span class="org-builtin">:regexp</span> <span class="org-string">"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(?:</span></span><span class="org-string">^</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">[\t\s]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(?1:</span></span><span class="org-string">[:_].*</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">.*</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">"</span>)
+
+test
+<span class="org-builtin">:test</span>
+_test
+
+ test
+ <span class="org-builtin">:test</span> 
+ _test
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">M-x re-builder &#27491;&#21017;&#26597;&#30475;"\\(?:^\\|[\t\s]+\\)\\(?1:[:_].*\\|.*\\)" &#21305;&#37197;&#30340;&#20869;&#23481;
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">:uni
+</span>&#129412;
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#32452;&#21512; This is a test: metest, medyn, mehi , :uni
+</span>This is a test: a global abbrev for demo puposes, 23:14:18 , Hello Jasper , &#129412; 
+</pre>
+</div>
+
+<p>
+<b>完整内容</b>
+</p>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span class="org-comment-delimiter">;; </span><span class="org-comment">This buffer is for text that is not saved, and for Lisp evaluation.
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">To create a file, visit it with &#8216;C-x C-f&#8217; and enter text in its buffer.
+</span>
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#32553;&#20889;&#27169;&#24335;&#22522;&#30784;&#20351;&#29992;
+</span>
+(define-abbrev global-abbrev-table <span class="org-string">"metest"</span> <span class="org-string">"a global abbrev for demo puposes"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#23450;&#20041;&#20840;&#23616;&#32553;&#20889;
+</span>(define-abbrev text-mode-abbrev-table <span class="org-string">"metest"</span> <span class="org-string">"text-mode abbrev expansion here"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#23450;&#20041;text-mode&#32553;&#20889;
+</span>(define-abbrev org-mode-abbrev-table <span class="org-string">"metest"</span> <span class="org-string">"org-mode abbrev"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">&#23450;&#20041;org-mode&#32553;&#20889;
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">metest global-abbrev-table
+</span>a global abbrev for demo puposes
+<span class="org-comment-delimiter">;; </span><span class="org-comment">metest text-mode
+</span>text-mode abbrev expansion here
+<span class="org-comment-delimiter">;; </span><span class="org-comment">metext org-mode
+</span>org-mode abbrev 
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">abbrev-mode</span></span><span class="org-comment">' is buffer-local
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#22240;&#20026;&#26159;abbre-mode&#26159;&#26412;&#22320;&#32531;&#23384;&#65292;&#23427;&#21482;&#20250;&#22312;&#20320;&#37197;&#32622;&#25991;&#20214;&#20013;&#29983;&#25928;
+</span>(abbrev-mode 1) <span class="org-comment-delimiter">; </span><span class="org-comment">&#36825;&#26679;&#37197;&#32622;&#26159;&#38169;&#35823;&#30340;
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">&#30495;&#27491;&#24819;&#35201;&#37197;&#32622;&#23427;&#65292;&#35201;&#23558;&#20854;&#35774;&#32622;&#20026;major-mode&#20027;&#27169;&#24335;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Parent modes: `</span><span class="org-comment"><span class="org-constant">prog-mode</span></span><span class="org-comment">' (programming), `</span><span class="org-comment"><span class="org-constant">text-mode</span></span><span class="org-comment">' (prose)
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#26041;&#27861;1 &#28155;&#21152;&#38057;&#23376;
+</span>(add-hook 'text-mode-hook 'abbrev-mode)
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#20132;&#20114;&#24335;&#32553;&#20889;
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">&#32553;&#20889;&#25554;&#20837;&#24403;&#21069;&#26102;&#38388;
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my-current-time</span> ()
+  (insert (format-time-string <span class="org-string">"%T"</span>)))
+
+(my-current-time)   <span class="org-comment-delimiter">;</span><span class="org-comment">C-x C-e 21:29:29
+</span>
+(define-abbrev global-abbrev-table <span class="org-string">"medyn"</span> <span class="org-string">""</span> 'my-current-time) <span class="org-comment-delimiter">; </span><span class="org-comment">medyna &#25193;&#23637;&#20026;&#31354;&#65292;&#21516;&#26102;&#24341;&#29992;&#38057;&#23376;&#20989;&#25968;my-current-time
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">medyn
+</span>21:32:30 
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#20132;&#20114;&#24335;&#32553;&#20889;&#25554;&#20837;&#23383;&#31526;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#20132;&#20114;&#24335;&#20989;&#25968;
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my-greet-person</span> (name)
+  (<span class="org-keyword">interactive</span> (list (read-string <span class="org-string">"Greet person: "</span>)))
+  (insert (format <span class="org-string">"Hello %s"</span> name)))
+
+(my-greet-person <span class="org-string">"Ja"</span>) <span class="org-comment-delimiter">; </span><span class="org-comment">C-x C-e Hello Ja
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">M-x my-greet-person &#22238;&#36710;&#36755;&#20837;&#23383;&#31526; Jasper
+</span>Hello Jasper
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">&#36866;&#21512;&#32553;&#20889;&#30340;&#20132;&#20114;&#24335;&#20989;&#25968;, &#22312;&#32553;&#20889;&#20013;&#27809;&#26377;&#35843;&#29992;&#21442;&#25968;
+</span>(<span class="org-keyword">defun</span> <span class="org-function-name">my-greet-person</span> ()
+  (<span class="org-keyword">interactive</span>)
+  (insert (format <span class="org-string">"Hello %s"</span> (read-string <span class="org-string">"Greet persion: "</span>))))
+
+(define-abbrev global-abbrev-table <span class="org-string">"mehi"</span> <span class="org-string">""</span> 'my-greet-person)
+<span class="org-comment-delimiter">;; </span><span class="org-comment">mehi &#36755;&#20837;&#23383;&#31526;&#20018;Jasper
+</span>Hello Jasper 
+
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">&#25554;&#20837;&#34920;&#24773;&#31526;&#21495; 
+</span>(define-abbrev global-abbrev-table <span class="org-string">":uni"</span> <span class="org-string">"&#129412;"</span>)
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">:uni &#20160;&#20040;&#20063;&#19981;&#20250;&#21457;&#22768;&#65292;&#22240;&#20026;&#34920;&#24773;&#31526;&#21495;&#19981;&#26159;&#35789;&#32452;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">hello :uni uni  &#22312;&#21333;&#35789;&#21518;&#20351;&#29992;M-b&#25105;&#20204;&#21487;&#20197;&#21457;&#29616;&#20809;&#26631;&#20572;&#30041;&#22312;:&#20882;&#21495;&#21518;,
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#20882;&#21495;&#19981;&#34987;&#35782;&#21035;&#20026;&#21333;&#35789;&#25104;&#20998;&#65292;&#25152;&#20197;&#20250;&#36339;&#36807;&#23427;
+</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#24517;&#39035;&#35774;&#32622;&#32553;&#20889;&#30340;&#23646;&#24615;&#25165;&#34892;
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#22312;&#24110;&#21161;&#25163;&#20876;&#20013;&#25551;&#36848; (info "(elisp) Abbrev Table Properties")
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">&#27491;&#21017;&#21305;&#37197;&#32553;&#20889; &#21644; &#35789;&#32452;&#22312;&#21738;&#32467;&#26463;
+</span>(abbrev-table-put global-abbrev-table <span class="org-builtin">:regexp</span> <span class="org-string">"</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(?:</span></span><span class="org-string">^</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">[\t\s]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(?1:</span></span><span class="org-string">[:_].*</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">.*</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">"</span>)
+
+test
+<span class="org-builtin">:test</span>
+_test
+
+ test
+ <span class="org-builtin">:test</span> 
+ _test
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">M-x re-builder &#27491;&#21017;&#26597;&#30475;"\\(?:^\\|[\t\s]+\\)\\(?1:[:_].*\\|.*\\)" &#21305;&#37197;&#30340;&#20869;&#23481;
+</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">:uni
+</span>&#129412;
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">&#32452;&#21512; This is a test: metest, medyn, mehi , :uni
+</span>This is a test: a global abbrev for demo puposes, 23:14:18 , Hello Jasper , &#129412; 
+</pre>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

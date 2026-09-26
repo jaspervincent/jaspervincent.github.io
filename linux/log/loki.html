@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Loki</title>
+<meta name="description" content="loki" />
+<meta name="keywords" content="计算机, 语言, loki" />
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<link rel="canonical" href="https://xuchangwei.com/linux/log/loki.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Loki" />
+<meta property="og:description" content="loki" />
+<meta property="og:url" content="https://xuchangwei.com/linux/log/loki.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/log/loki.html","@type":"WebPage","name":"Loki","description":"loki"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Loki</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#h:B126BDFF-D119-464E-8AE5-F4CA4487846B">LAG 日志管理架构和组件</a>
+<ul>
+<li><a href="#h:E13F4A56-A751-41B8-A274-128FFF9153C9">可观测性</a></li>
+<li><a href="#h:93FDAC5D-73AD-4073-B130-5712E9BC8C97">主流日志管理方案对比</a></li>
+<li><a href="#h:B7478CF0-A3D5-4039-88F3-193E03FA82F7">LAG 架构和组件</a>
+<ul>
+<li><a href="#h:4FD36347-DEC4-4EC6-9DBB-5515F4A1982E">Loki 概述</a></li>
+<li><a href="#h:CF917C0C-86F8-43FE-BA3F-B990581349D8">Loki Stack组成</a></li>
+<li><a href="#h:B19ACE40-8E49-4AD2-B9FA-C61E30D7A4D4">Loki架构</a></li>
+<li><a href="#h:A722AEE3-70D2-4113-B4B8-588DCABDDB4F">Loki 三种部署模式</a>
+<ul>
+<li><a href="#h:4707B24F-D9C4-4F12-95B9-B963E958C3BC">Monolithic 单体模式（All-in-One）</a></li>
+<li><a href="#h:8395FB1E-D788-4AB5-82BC-E5EEDE6F2168">Simple Scalable</a></li>
+<li><a href="#h:95AEE4D2-2187-4859-99F1-98671BC4B0E2">Microservices mode</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:3829BEE0-7AD8-4A68-93A5-CDE5DAF75977">Loki 二进制部署</a>
+<ul>
+<li><a href="#h:B8897D80-17CA-4704-9965-6F5160B2FF2C">准备日志</a>
+<ul>
+<li><a href="#h:1FD4CD4B-3CBB-448F-9561-77307C033A54">flog 准备应用日志文件</a></li>
+<li><a href="#h:CF8F2942-5FDD-4059-A539-1AB1D8BD9BDE">准备容器日志</a></li>
+</ul>
+</li>
+<li><a href="#h:C2EE14EC-2362-42CD-AC65-281214E4AF77">对象存储部署和配置</a>
+<ul>
+<li><a href="#h:37E698C1-38AC-42DB-91F9-86F05FCC2984">安装 minIO</a></li>
+<li><a href="#h:15E2351F-36D7-4764-9943-D800DFA175BC">配置</a></li>
+</ul>
+</li>
+<li><a href="#h:9B739DD3-60F7-4E5D-B101-272C2CBB6416">Loki 二进制部署和配置</a>
+<ul>
+<li><a href="#h:596BDD23-8E9D-4C10-A22A-1354D4AF7951">二进制安装</a></li>
+<li><a href="#h:11124E71-1F8F-4C77-AC83-1954E8D04340">loki 配置</a></li>
+<li><a href="#h:364E8C60-20F3-46AA-97BA-CB769AC98117">systemd 开启自启配置</a></li>
+</ul>
+</li>
+<li><a href="#h:4743D1FE-9D02-48CF-B058-E2F33CFD484E">Alloy 二进制部署和配置</a>
+<ul>
+<li><a href="#h:1612CAA7-8134-4ACC-AE66-E5100F810D51">二进制安装</a></li>
+<li><a href="#h:E3D819CD-2F91-490C-BD86-B3FF9EF7DA6D">alloy 配置</a>
+<ul>
+<li><a href="#h:50AE0DC1-C114-448A-83E1-98967242E072">grafana alloy 配置文件格式说明</a></li>
+<li><a href="#h:D197B999-C3D4-4767-A3AD-2C5E975AA5FA">alloy 配置</a></li>
+<li><a href="#h:1A297441-8AD0-4FAF-B23C-8051B65FA66D">systemd 开机自启配置</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#h:555A3904-5F45-450A-A001-EA17027B8B22">Grafana 部署和配置</a>
+<ul>
+<li><a href="#h:053E134E-5170-444C-B90B-FBED095FFFF7">二进制安装</a></li>
+<li><a href="#h:09169E44-27C8-46B9-A190-F890B1A776E4">配置</a></li>
+</ul>
+</li>
+<li><a href="#h:67749B76-317E-475E-98B9-4B58DB094FBB">LogQL 可视化展示</a></li>
+<li><a href="#h:4E824460-D972-4C16-97F4-7CC9AB1937C7">AlerManager 告警</a>
+<ul>
+<li><a href="#h:57B055B6-2B03-4804-A013-26662A767F9D">二进制安装</a></li>
+<li><a href="#h:46CAFA8E-6762-4893-B2B6-914E1E5115C3">alertmanager 配置</a></li>
+<li><a href="#h:FA48352E-5F40-406E-83D4-5E34567362D6">配置 loki 实现告警实现告警规则</a></li>
+<li><a href="#h:DE448390-5906-409A-9D50-D57D08DC5C60">alertmanager 查看告警</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<section id="outline-container-h:B126BDFF-D119-464E-8AE5-F4CA4487846B" class="outline-2">
+<h2 id="h:B126BDFF-D119-464E-8AE5-F4CA4487846B"><a href="#h:B126BDFF-D119-464E-8AE5-F4CA4487846B">LAG 日志管理架构和组件</a></h2>
+<div class="outline-text-2" id="text-h:B126BDFF-D119-464E-8AE5-F4CA4487846B">
+</div>
+<div id="outline-container-h:E13F4A56-A751-41B8-A274-128FFF9153C9" class="outline-3">
+<h3 id="h:E13F4A56-A751-41B8-A274-128FFF9153C9"><a href="#h:E13F4A56-A751-41B8-A274-128FFF9153C9">可观测性</a></h3>
+<div class="outline-text-3" id="text-h:E13F4A56-A751-41B8-A274-128FFF9153C9">
+<p>
+可观测性是 <b>通过系统外部输出的数据(指标、日志、链路追踪),无需改动代码、不侵入系统内部,就能推断系统内部状态、定位问题根因</b> 的能力,源自控制论,后广泛用于分布式IT系统(云原生)微服务)。
+</p>
+
+<p>
+总之:不知道系统会出什么错,但仅凭外部观测数据,就能:搞清楚哪里出问题、为什么出问题。
+</p>
+
+<p>
+三大核心支柱
+</p>
+<ul class="org-ul">
+<li><b>指标Metrics</b> 数值型时序数据，如CPU使用率、QPS、错误率、延迟、队列长度。适合告警、趋势监控。产品如：zabbix、prometheus。</li>
+<li><b>日志Logs</b> 离散文本事件，程序打印的运行记录,包含错误堆栈、业务上下文。适合问题细节排查。</li>
+<li><b>链路追踪Traces</b> 记录一次请求跨多个服务完整调用路径，每个环节耗时、错误。专门解决微服务分布式调用故障定位。产品如：skywalking</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:93FDAC5D-73AD-4073-B130-5712E9BC8C97" class="outline-3">
+<h3 id="h:93FDAC5D-73AD-4073-B130-5712E9BC8C97"><a href="#h:93FDAC5D-73AD-4073-B130-5712E9BC8C97">主流日志管理方案对比</a></h3>
+<div class="outline-text-3" id="text-h:93FDAC5D-73AD-4073-B130-5712E9BC8C97">
+<ul class="org-ul">
+<li>ELK: Elasticsearch + Logstash + Kibana(传统经典)</li>
+<li>ELFK: Elasticsearch + Filebeat + Logstash + Kibana(生产最常用的 ES 分层架构)</li>
+<li>EFK: Elasticsearch + Fluent-Bit + Kibana(K8s 轻量化 ES 栈)</li>
+<li>PLG: Promtail + Loki + Grafana( 旧版Loki栈，2026-03式 EOL，新项目不再推荐)</li>
+<li>LAG: Loki + Alloy + Grafana(新一代，Promtail 已经EOL，代 Promtail 采集)</li>
+</ul>
+
+
+
+<p>
+对比
+</p>
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">对比维度</td>
+<td class="org-left">ELFK</td>
+<td class="org-left">EFK</td>
+<td class="org-left">PLG(旧)</td>
+<td class="org-left">LAG(新)</td>
+</tr>
+
+<tr>
+<td class="org-left">组件构成</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">索引模型</td>
+<td class="org-left">全文倒排索引</td>
+<td class="org-left">全文倒排索引</td>
+<td class="org-left">仅索引标签 labels，正文不建索引</td>
+<td class="org-left">仅索引标签 labels，正文不建索引</td>
+</tr>
+
+<tr>
+<td class="org-left">存储成本</td>
+<td class="org-left">高，原始日志1.5-3倍</td>
+<td class="org-left">高</td>
+<td class="org-left">很低，约 ES 的 1/10-1/20</td>
+<td class="org-left">很低，约 ES 的 1/10-1/20</td>
+</tr>
+
+<tr>
+<td class="org-left">资源消耗</td>
+<td class="org-left">高(JVM 吃内存 CPU)</td>
+<td class="org-left">中等； Fluntet-Bit 轻量 agent</td>
+<td class="org-left">低</td>
+<td class="org-left">低; Alloy 单二进制</td>
+</tr>
+
+<tr>
+<td class="org-left">查询能力</td>
+<td class="org-left">全文检索极强、复杂聚合、KQL</td>
+<td class="org-left">同ELK</td>
+<td class="org-left">标签过滤极快；无全局全文</td>
+<td class="org-left">同PLG；Alloy 同时采集日志/指标</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">索引，大范围关键词搜索慢</td>
+<td class="org-left">/trace</td>
+</tr>
+
+<tr>
+<td class="org-left">运维复杂度</td>
+<td class="org-left">高，分片/JVM/版本严格对齐</td>
+<td class="org-left">中高；ES 依旧重</td>
+<td class="org-left">低；Loki 支持对象存储 S3/OSS</td>
+<td class="org-left">中； River 组件式配置学习成本</td>
+</tr>
+
+<tr>
+<td class="org-left">核心优势</td>
+<td class="org-left">插件极多，日志分析、审计、安全 SIEM</td>
+<td class="org-left">Fluent-Bit 适合 k8s DaemonSet</td>
+<td class="org-left">成本极低； 和 Prometheus/Grafana</td>
+<td class="org-left">单 Agent 统一可观测采集</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">能力强，分层架构：Filebeat 本机</td>
+<td class="org-left">资源占用低</td>
+<td class="org-left">生态打通；LogQL 类似 PromQL</td>
+<td class="org-left">(Logs+Mertics+Trace)；替代</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">采集，Logstash 集中过滤转换，</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">Promtail；组件模式 forward_to；</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">生产 ES 标准架构</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">和 OTel 生态兼容</td>
+</tr>
+
+<tr>
+<td class="org-left">主要短板</td>
+<td class="org-left">整套组件多，ES 集群调优门槛高，</td>
+<td class="org-left">ES 存储成本、运维负担</td>
+<td class="org-left">全局模糊检索弱；标签设计很关键，</td>
+<td class="org-left">大范围全文检索性能弱；</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">成本昂贵</td>
+<td class="org-left">没有减少</td>
+<td class="org-left">标签爆炸会压垮 Loki</td>
+<td class="org-left">River 配置模型需要学习</td>
+</tr>
+
+<tr>
+<td class="org-left">适用场景</td>
+<td class="org-left">大规模生产 ES，千万级日志吞吐，</td>
+<td class="org-left">k8s 环境，想用 ES 但希望采集</td>
+<td class="org-left">云原生 k8s，主要用于故障</td>
+<td class="org-left">云原生、微服务、k8s；</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">需要复杂日志解析转换，专职 ES 运维团队</td>
+<td class="org-left">Agent 轻量化</td>
+<td class="org-left">排查，已有 grafana/prometheus</td>
+<td class="org-left">一套 agent 搞定全部摇测；</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">控制存储成本，新项目不选</td>
+<td class="org-left">优先新项目采用</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+全文倒排：以关键词反查全文中的位置。索引量比原始日志大。
+</p>
+</div>
+</div>
+<div id="outline-container-h:B7478CF0-A3D5-4039-88F3-193E03FA82F7" class="outline-3">
+<h3 id="h:B7478CF0-A3D5-4039-88F3-193E03FA82F7"><a href="#h:B7478CF0-A3D5-4039-88F3-193E03FA82F7">LAG 架构和组件</a></h3>
+<div class="outline-text-3" id="text-h:B7478CF0-A3D5-4039-88F3-193E03FA82F7">
+</div>
+<div id="outline-container-h:4FD36347-DEC4-4EC6-9DBB-5515F4A1982E" class="outline-4">
+<h4 id="h:4FD36347-DEC4-4EC6-9DBB-5515F4A1982E"><a href="#h:4FD36347-DEC4-4EC6-9DBB-5515F4A1982E">Loki 概述</a></h4>
+<div class="outline-text-4" id="text-h:4FD36347-DEC4-4EC6-9DBB-5515F4A1982E">
+<p>
+<a href="https://grafana.com/docs/loki/latest/">https://grafana.com/docs/loki/latest/</a>
+</p>
+
+
+<p>
+Loki是受Prometheus启发而设计的 <b>水平可扩展、高可用、多租户日志聚合系统</b> 。设计目标是低成本、易于运维。
+</p>
+
+<p>
+它不对日志正文内容建立索引,仅为每一条日志流的标签集合建立索引。
+</p>
+
+<p>
+注意:日志行的全部内容仍然可以被检索;标签的作用是在查询时缩小待检索日志范围,从而提升查询效率。
+</p>
+
+<p>
+Loki 项目由 Grafana Labs 于 2018 年启动，在西雅图 KubeCon 大会正式对外发布。
+</p>
+
+<p>
+项目基于 <b>AGPLv3开源协议</b> 对外发布，是开源日志聚合系统，深度绑定 Grafana 生态。
+</p>
+
+<p>
+Grafana Labs 主导 Loki 项目的研发工作，在 Grafana 中提供一流的 Loki 适配能力，保障 Grafana Labs 的客户能够获取所需的 Loki 技术支持与功能特性。
+</p>
+
+<p>
+核心设计思路: <b>只索引标签(元数据)，不索引日志全文</b> ，大幅降低存储与索引开销。
+</p>
+
+
+<p>
+优势
+</p>
+<ul class="org-ul">
+<li>接入简单: 多客户端支持，不限日志来源与日志格式。</li>
+<li>对象存储持久化: PB 级大规模，高吞吐，低成本高可靠。</li>
+<li>日志衍生能力: 从日志生成指标、配置告警规则。</li>
+<li>不强制入库格式: 采集时无需预先格式化，解析格式化延迟到查询时时处理。</li>
+<li>实时日志查看: 支持 tail 实时流、自动刷新、按日期检索历史日志。</li>
+<li>云原生原生集成: 与 Prometheus、Grafana、K8s 深度整合；单 UI 统一观测指标、日志、链路追踪。</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:CF917C0C-86F8-43FE-BA3F-B990581349D8" class="outline-4">
+<h4 id="h:CF917C0C-86F8-43FE-BA3F-B990581349D8"><a href="#h:CF917C0C-86F8-43FE-BA3F-B990581349D8">Loki Stack组成</a></h4>
+<div class="outline-text-4" id="text-h:CF917C0C-86F8-43FE-BA3F-B990581349D8">
+<p>
+<a href="https://grafana.com/docs/loki/latest/get-started/overview/">https://grafana.com/docs/loki/latest/get-started/overview/</a>
+</p>
+
+<p>
+套标准基于 Loki 的日志栈由三大组件构成:
+</p>
+<ul class="org-ul">
+<li>采集代理(Agent):
+<ul class="org-ul">
+<li>日志代理/客户端，例如 Grafana Alloy。</li>
+<li>代理采集日志，通过附加标签将日志归类为日志流，并经由 HTTP 接口把日志流推送至 Loki。</li>
+</ul></li>
+<li>Loki 服务端:
+<ul class="org-ul">
+<li>核心服务程序，负责日志接收、持久化存储以及日志查询运算。</li>
+</ul></li>
+<li>Grafana:
+<ul class="org-ul">
+<li>用于查询并可视化展示日志数据。你也可以通过命令行工具 LogCLI 或直接调用 Loki 原生 API 查询日志。</li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:B19ACE40-8E49-4AD2-B9FA-C61E30D7A4D4" class="outline-4">
+<h4 id="h:B19ACE40-8E49-4AD2-B9FA-C61E30D7A4D4"><a href="#h:B19ACE40-8E49-4AD2-B9FA-C61E30D7A4D4">Loki架构</a></h4>
+<div class="outline-text-4" id="text-h:B19ACE40-8E49-4AD2-B9FA-C61E30D7A4D4">
+<p>
+<a href="https://grafana.com/docs/loki/latest/get-started/architecture/">https://grafana.com/docs/loki/latest/get-started/architecture/</a>
+</p>
+
+<p>
+Grafana Loki采用微服务架构，设计为水平可扩展的分布式系统。系统包含多个组件，可独立、并行运行。
+</p>
+
+
+
+<figure id="org6a6e05d">
+<img style="aspect-ratio:753/557" decoding="async" loading="lazy" src="./images/img_20260924_112930.webp" alt="img_20260924_112930.webp" width="800">
+
+</figure>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">distributor           <span class="org-comment-delimiter">#</span><span class="org-comment">&#20998;&#21457;&#22120;&#12290;&#25509;&#25910;&#26085;&#24535;&#65292;&#26681;&#25454;&#19968;&#33268;&#24615;&#21704;&#24076;&#36335;&#30001;&#21040; ingester
+</span>ingester              <span class="org-comment-delimiter">#</span><span class="org-comment">&#20889;&#20837;&#23454;&#20363;&#12290;&#20869;&#23384;&#25509;&#25910;&#26085;&#24535;&#65292;&#29983;&#25104; chunk &#26085;&#24535;&#22359;
+</span>consistent hash ring  <span class="org-comment-delimiter">#</span><span class="org-comment">&#19968;&#33268;&#24615;&#21704;&#24076;&#29615;&#12290;Loki &#29992;&#20110;&#20998;&#29255;&#26085;&#24535;&#27969;&#30340;&#26426;&#21046;
+</span>replication factor    <span class="org-comment-delimiter">#</span><span class="org-comment">&#22797;&#21046;&#22240;&#23376;&#12290;&#26085;&#24535;&#21103;&#26412;&#25968;&#37327;
+</span>quorum                <span class="org-comment-delimiter">#</span><span class="org-comment">&#27861;&#23450;&#22810;&#25968;&#12290;&#20889;&#25104;&#21151;&#38656;&#35201;&#24212;&#31572;&#30340;&#21103;&#26412;&#25968;&#37327;
+</span>chunk                 <span class="org-comment-delimiter">#</span><span class="org-comment">&#26085;&#24535;&#22359;&#12290;Loki&#23384;&#20648;&#26085;&#24535;&#30340;&#26368;&#23567;&#21333;&#20803;&#65292;&#31199;&#25143;+&#26631;&#31614;&#21807;&#19968;
+</span>query-frontend        <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#35810;&#21069;&#31471;&#12290;&#25509;&#25910;&#29992;&#25143;&#26597;&#35810;&#65292;&#25286;&#20998;&#26597;&#35810;&#20219;&#21153;
+</span>query-scheduler       <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#35810;&#35843;&#24230;&#22120;&#12290;&#20998;&#21457;&#23376;&#26597;&#35810;&#20219;&#21153;&#32473; querier
+</span>querier               <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#35810;&#22120;&#12290;&#25191;&#34892;&#23454;&#38469;&#26597;&#35810;&#65292;&#21512;&#24182; ingester &#19982;&#21518;&#31471;&#23384;&#20648;&#25968;&#25454;
+</span>backing store         <span class="org-comment-delimiter">#</span><span class="org-comment">&#21518;&#31471;&#23384;&#20648;&#12290;&#23545;&#35937;&#23384;&#20648;&#65292;&#20445;&#23384;&#24050;&#32463;&#33853;&#30424;&#30340; chunk
+</span>deduplicates          <span class="org-comment-delimiter">#</span><span class="org-comment">&#21435;&#37325;&#12290;&#22788;&#29702;&#22810;&#21103;&#26412;&#24102;&#26469;&#30340;&#37325;&#22797;&#26085;&#24535;
+</span>X-Scope-OrgID         <span class="org-comment-delimiter">#</span><span class="org-comment">&#31199;&#25143;&#35831;&#27714;&#22836;&#12290;Loki &#22810;&#31199;&#25143;&#35782;&#21035;&#26631;&#35782;</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:A722AEE3-70D2-4113-B4B8-588DCABDDB4F" class="outline-4">
+<h4 id="h:A722AEE3-70D2-4113-B4B8-588DCABDDB4F"><a href="#h:A722AEE3-70D2-4113-B4B8-588DCABDDB4F">Loki 三种部署模式</a></h4>
+<div class="outline-text-4" id="text-h:A722AEE3-70D2-4113-B4B8-588DCABDDB4F">
+<p>
+<a href="https://grafana.com/docs/loki/latest/get-started/deployment-modes/">https://grafana.com/docs/loki/latest/get-started/deployment-modes/</a>
+</p>
+</div>
+<div id="outline-container-h:4707B24F-D9C4-4F12-95B9-B963E958C3BC" class="outline-5">
+<h5 id="h:4707B24F-D9C4-4F12-95B9-B963E958C3BC"><a href="#h:4707B24F-D9C4-4F12-95B9-B963E958C3BC">Monolithic 单体模式（All-in-One）</a></h5>
+<div class="outline-text-5" id="text-h:4707B24F-D9C4-4F12-95B9-B963E958C3BC">
+<p>
+把 loki 组件所有功能集成在二进制文件中。
+</p>
+
+<p>
+<a href="https://grafana.com/docs/loki/latest/setup/install/helm/install-monolithic/">https://grafana.com/docs/loki/latest/setup/install/helm/install-monolithic/</a>
+</p>
+
+<p>
+最简单的运行模式是单体部署模式。
+</p>
+
+<p>
+通过设置命令行参数 <code>-target=all</code> 启用单体模式。该模式将 Loki 的全部微服务组件运行在同一个进程中，表现为单个二进制程序或 Docker 镜像。
+</p>
+
+<p>
+单体模式适合快速上手体检 Loki，也适合用于每日读写数据量最高约 20GB 的小规模场景。
+</p>
+</div>
+</div>
+<div id="outline-container-h:8395FB1E-D788-4AB5-82BC-E5EEDE6F2168" class="outline-5">
+<h5 id="h:8395FB1E-D788-4AB5-82BC-E5EEDE6F2168"><a href="#h:8395FB1E-D788-4AB5-82BC-E5EEDE6F2168">Simple Scalable</a></h5>
+<div class="outline-text-5" id="text-h:8395FB1E-D788-4AB5-82BC-E5EEDE6F2168">
+<p>
+<a href="https://grafana.com/docs/loki/latest/get-started/deployment-modes/#simple-scalable">https://grafana.com/docs/loki/latest/get-started/deployment-modes/#simple-scalable</a>
+</p>
+
+
+<p>
+简单可扩展部署模式(SSD模式)现已废弃，Loki4.0 将不再支持 SSD 模式运行。
+</p>
+
+<p>
+需要规划将 SSD 模式迁移至 <b>微服务模式</b> 或者高可用单体(HAmonolithic)部署模式。
+</p>
+
+<p>
+组件拆分三组独立扩容:
+</p>
+<ol class="org-ol">
+<li>WritePath: Distributor + Ingester(写入链路)I</li>
+<li>ReadPath: QueryFrontend + Querier(查询链路)</li>
+<li>Backend: Compactor + Ruler + IndexGateway(后台任务)</li>
+</ol>
+
+
+
+<ul class="org-ul">
+<li>适用: TB 级日志,绝大多数企业生产环境</li>
+<li>配套网关 Nginx 实现读写分离路由</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:95AEE4D2-2187-4859-99F1-98671BC4B0E2" class="outline-5">
+<h5 id="h:95AEE4D2-2187-4859-99F1-98671BC4B0E2"><a href="#h:95AEE4D2-2187-4859-99F1-98671BC4B0E2">Microservices mode</a></h5>
+<div class="outline-text-5" id="text-h:95AEE4D2-2187-4859-99F1-98671BC4B0E2">
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/loki/latest/get-started/deployment-modes/#microservices-mode">https://grafana.com/docs/loki/latest/get-started/deployment-modes/#microservices-mode</a></li>
+<li>部署方法
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/loki/latest/setup/install/helm/install-microservices/">https://grafana.com/docs/loki/latest/setup/install/helm/install-microservices/</a></li>
+</ul></li>
+</ul>
+
+
+
+<p>
+微服务部署模式将 Loki 的各个组件作为相互独立的进程运行，该部署模式也被称作分布式部署模式。
+</p>
+<ul class="org-ul">
+<li>把组件拆分为独立微服务，粒度更细，可对每一个组件单独扩缩容，更好适配业务场景。</li>
+<li>微服务模式可以实现更高的集群运行效率，但同时它也是部署与维护复杂度最高的模式。</li>
+<li>仅建议超大规模 Loki 集群，或是需要对扩缩容、集群运维做精细化管控的运维人员使用微服务模式。</li>
+<li>微服务模式专为 Kubernetes 环境设计，社区提供 Helm Chart 用于部署微服务模式的 Loki。</li>
+</ul>
+
+<p>
+启动每个进程时需要指定对应的target(组件目标)。包含如下组件:
+</p>
+<ul class="org-ul">
+<li>BloomBuilder(实验性)</li>
+<li>Bloom Gateway(实验性): 对外暴露 Loki API，将请求代理转发到对应的 Loki 内部组件。</li>
+<li>Bloom Planner(实验性)</li>
+<li>Compactor(压缩器): 对已存储的数据执行压缩与处理。压缩合并自志增快</li>
+<li>Distributor(分发器): 对收到的写入请求做分发处理。分发器，接收 Aggent 日志写入请求，转发给 Ingester</li>
+<li>Index Gateway(索引网关): 负责索引相关处理。索引网关，代理索引访询问</li>
+<li>Ingester(写入接收组件):负责日志数据的摄入写入。接收日志，内存处理后写入对象存储，默认开启可用区感知复制；配置 <code>ingester.replicas: 3</code> 时，会创建 3 套 StatefulSet(zon、zone-c)，每套各1个副本。</li>
+<li>OverridesExporter(覆盖配置导出器)</li>
+<li>Querier(查询器): 执行日志查询处理。</li>
+<li>QueryFrontend(查询前端): 管理前端查询请求。查询前端，做查询排队、分片、缓存</li>
+<li>QueryScheduler(查询调度器): 负责查询任务调度。查询调度器，分发发查询任务</li>
+<li>Ruler(规则/告警引擎): 规则引擎，执行日志规则、生成指标、告警</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-h:3829BEE0-7AD8-4A68-93A5-CDE5DAF75977" class="outline-2">
+<h2 id="h:3829BEE0-7AD8-4A68-93A5-CDE5DAF75977"><a href="#h:3829BEE0-7AD8-4A68-93A5-CDE5DAF75977">Loki 二进制部署</a></h2>
+<div class="outline-text-2" id="text-h:3829BEE0-7AD8-4A68-93A5-CDE5DAF75977">
+<p>
+架构：Loki + Alloy + MinIO + Grafana + AlertManager
+</p>
+
+<p>
+说明：
+</p>
+<ul class="org-ul">
+<li>纯二进制原生部署，无需要依赖 Docker、k8s 容器环境。</li>
+<li>架构实现：日志采集 &#x2013;&gt; 结构化清洗 &#x2013;&gt; 压缩存储 &#x2013;&gt; 可视化查询 &#x2013;&gt; 告警，轻量化场景，资源占用低、运维简单、稳定性高。</li>
+</ul>
+
+
+<p>
+技术栈选型
+</p>
+<ul class="org-ul">
+<li>日志服务端：grafana loki</li>
+<li>日志采集端：grfana alloy</li>
+<li>对象存储：minio</li>
+<li>可视化平台：grafana 原生部署</li>
+<li>测试工具：flog 二进制日志压测工具。</li>
+</ul>
+
+
+<p>
+核心数据流：
+</p>
+<ul class="org-ul">
+<li>Flog 模拟日志/业务日志 &#x2013;&gt; Alloy 采集监听 &#x2013;&gt; 日志结构化解析、动态打标签、清洗 &#x2013;&gt; 批量推送 Loki &#x2013;&gt; Loki TSDB 索引构建 + 压缩 &#x2013;&gt; Grafana 可视化查询、LogQL 聚合指标化 &#x2013;&gt; AlertManager 日志告警。</li>
+</ul>
+
+<p>
+部署环境
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">10.103.236.201 Loki/Grafana/AlertManager  2C/2G  ubuntu
+10.103.236.202 Alloy/Flog/Docker/MinIO    2C/2G  ubuntu
+</pre>
+</div>
+</div>
+<div id="outline-container-h:B8897D80-17CA-4704-9965-6F5160B2FF2C" class="outline-3">
+<h3 id="h:B8897D80-17CA-4704-9965-6F5160B2FF2C"><a href="#h:B8897D80-17CA-4704-9965-6F5160B2FF2C">准备日志</a></h3>
+<div class="outline-text-3" id="text-h:B8897D80-17CA-4704-9965-6F5160B2FF2C">
+<p>
+应用日志、容器日志
+</p>
+</div>
+<div id="outline-container-h:1FD4CD4B-3CBB-448F-9561-77307C033A54" class="outline-4">
+<h4 id="h:1FD4CD4B-3CBB-448F-9561-77307C033A54"><a href="#h:1FD4CD4B-3CBB-448F-9561-77307C033A54">flog 准备应用日志文件</a></h4>
+<div class="outline-text-4" id="text-h:1FD4CD4B-3CBB-448F-9561-77307C033A54">
+<p>
+二进制安装 log 日志压测工具 Flog
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/mingrammer/flog">https://github.com/mingrammer/flog</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">FLOG_VERSION</span>=0.4.4
+<span class="org-variable-name">GO_VERSION</span>=1.25.0
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013; go &#35821;&#35328;
+</span>wget https://studygolang.com/dl/golang/go${<span class="org-variable-name">GO_VERSION</span>}.linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+tar xf go${<span class="org-variable-name">GO_VERSION</span>}.linux-${<span class="org-variable-name">ARCH</span>}.tar.gz  -C /usr/local/
+&#35774;&#32622;&#29615;&#22659;&#21464;&#37327;
+cat &gt;/etc/profile.d/go.sh&lt;&lt;\EOF<span class="org-sh-heredoc">
+export GOROOT=/usr/local/go
+export GOPATH=/go/lib:/go/goproject
+#export GOBIN=/go/gobin
+export PATH=$PATH:$GOROOT/bin:$GOBIN
+EOF
+</span>mkdir /go/{lib,goproject,gobin} -pv
+mkdir /go/goproject/src -pv
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25928;
+</span><span class="org-builtin">source</span> /etc/profile
+go env -w <span class="org-variable-name">GOPROXY</span>=https://goproxy.cn,direct
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#35793;&#23433;&#35013; flog
+</span>mkdir -p $<span class="org-variable-name">GOPATH</span>/src/flog
+<span class="org-builtin">cd</span> $<span class="org-variable-name">GOPATH</span>/src/flog
+git clone --depth 1 --branch v${<span class="org-variable-name">FLOG_VERSION</span>} https://github.com/mingrammer/flog.git
+<span class="org-builtin">cd</span> flog
+<span class="org-variable-name">CGO_ENABLED</span>=0 go build -o flog .
+cp ./flog /usr/local/bin/
+flog -h
+</pre>
+</div>
+
+<p>
+systemd 开机配置
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt; /lib/systemd/system/flog.service &lt;&lt;EOF<span class="org-sh-heredoc">
+[Unit]
+Description=Flog fake log generator for loki test
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/flog -f json -d 200ms -l # &#27599; 200 ms &#29983;&#25104;&#26085;&#24535;
+Restart=always
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+systemctl daemon-reload &amp;&amp; systemctl enable --now flog
+systemctl status flog
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013; rsyslog
+</span>apt update
+apt install rsyslog -y
+systemctl enable --now rsyslog
+systemctl status rsyslog
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475; json &#26085;&#24535;
+</span>journalctl -u flog -f
+tail -f /var/log/syslog
+</pre>
+</div>
+
+<p>
+使用 flog 生成其他格式日志
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">flog -f json -t log -o /var/log/flog/access_json.log -d 300ms -l -w &amp;
+flog -f apache_common -t log -o /var/log/flog/access_apache_common.log -d 300ms -l -w &amp;
+flog -f apache_combined -t log -o /var/log/flog/access_apache_combined.log -d 300ms -l -w &amp;
+
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#30475;&#26085;&#24535;
+</span>head -1 /var/log/flog/access_json.log
+head -1 /var/log/flog/access_apache_common.log
+head -1 /var/log/flog/access_apache_combined.log
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:CF8F2942-5FDD-4059-A539-1AB1D8BD9BDE" class="outline-4">
+<h4 id="h:CF8F2942-5FDD-4059-A539-1AB1D8BD9BDE"><a href="#h:CF8F2942-5FDD-4059-A539-1AB1D8BD9BDE">准备容器日志</a></h4>
+<div class="outline-text-4" id="text-h:CF8F2942-5FDD-4059-A539-1AB1D8BD9BDE">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#21551;&#21160;&#20004;&#20010;&#23481;&#22120;&#29983;&#25104;&#26085;&#24535;
+</span>docker run -d --name mynginx -p 80:80 <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">service</span>=nginx <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">env</span>=prod <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">version</span>=1.30.0 <span class="org-sh-escaped-newline">\</span>
+       ealen/echo-server:latest
+
+docker run -d --name myapp -p 8080:80 <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">service</span>=myapp <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">env</span>=dev <span class="org-sh-escaped-newline">\</span>
+       --label ver1.0 <span class="org-sh-escaped-newline">\</span>
+       nbilal786/myapp:latest
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#23433;&#35013; nerdctl &#21551;&#21160;&#23481;&#22120;
+</span>apt install -y wget slirp4netns
+<span class="org-builtin">cd</span> /tmp
+wget https://files.m.daocloud.io/github.com/containerd/nerdctl/releases/download/v2.3.4/nerdctl-2.3.4-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+tar -zxvf nerdctl-2.3.4-linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+mv nerdctl /usr/local/bin/
+chmod +x /usr/local/bin/nerdctl
+sysctl -a  |grep ip_forward <span class="org-comment-delimiter"># </span><span class="org-comment">&#30830;&#35748;&#24320;&#21551;&#20869;&#26680; IP &#36716;&#21457;
+</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">mynginx
+</span>nerdctl run -d --name mynginx -p 80:80 <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">service</span>=nginx <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">env</span>=prod <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">version</span>=1.30.0 <span class="org-sh-escaped-newline">\</span>
+       ealen/echo-server:latest
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">myapp
+</span>nerdctl run -d --name myapp -p 8080:80 <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">service</span>=myapp <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">env</span>=dev <span class="org-sh-escaped-newline">\</span>
+       --label <span class="org-variable-name">ver</span>=1.0 <span class="org-sh-escaped-newline">\</span>
+       nbilal786/myapp:latest
+
+root@master01:~# kubectl  get pod
+NAME                     READY   STATUS    RESTARTS       AGE
+echo-647c98d9f-zrpdg     1/1     Running   0              29m
+myapp-8b88f5cdd-5nbx4    1/1     Running   0              3m50s
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#35775;&#38382;&#23481;&#22120;,&#29983;&#25104;&#23481;&#22120;&#26085;&#24535;
+</span><span class="org-keyword">while </span><span class="org-builtin">true</span>; <span class="org-keyword">do</span> curl 10.103.236.202;sleep 1;<span class="org-keyword">do</span> &amp;
+<span class="org-keyword">while </span><span class="org-builtin">true</span>; <span class="org-keyword">do</span> curl 10.103.236.202:8080;sleep 1;<span class="org-keyword">do</span> &amp;                                          
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:C2EE14EC-2362-42CD-AC65-281214E4AF77" class="outline-3">
+<h3 id="h:C2EE14EC-2362-42CD-AC65-281214E4AF77"><a href="#h:C2EE14EC-2362-42CD-AC65-281214E4AF77">对象存储部署和配置</a></h3>
+<div class="outline-text-3" id="text-h:C2EE14EC-2362-42CD-AC65-281214E4AF77">
+</div>
+<div id="outline-container-h:37E698C1-38AC-42DB-91F9-86F05FCC2984" class="outline-4">
+<h4 id="h:37E698C1-38AC-42DB-91F9-86F05FCC2984"><a href="#h:37E698C1-38AC-42DB-91F9-86F05FCC2984">安装 minIO</a></h4>
+<div class="outline-text-4" id="text-h:37E698C1-38AC-42DB-91F9-86F05FCC2984">
+<ul class="org-ul">
+<li><a href="https://www.minio.org.cn/docs/minio/linux/index.html">https://www.minio.org.cn/docs/minio/linux/index.html</a></li>
+</ul>
+
+<p>
+注意：2025-04-22 之后的版本功能缺失。
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+wget https://dl.minio.org.cn/server/minio/release/linux-${<span class="org-variable-name">ARCH</span>}/minio
+
+chmod +x minio
+cp minio /usr/local/bin
+<span class="org-comment-delimiter">#</span><span class="org-comment">MINIO_ROOT_USER=admin MINIO_ROOT_PASSWORD=password ./minio server /mnt/data --console-address ":9001" --address ":9000"
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">9001 &#20026;&#31649;&#29702;&#25511;&#21046;&#21488;&#65292;9000 &#20026; api &#31471;&#21475;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#35793;&#21151;&#33021;&#23436;&#21892;&#30340; minio
+</span><span class="org-variable-name">MINIO_VERSION</span>=RELEASE.2025-04-22T22-12-26Z
+git clone --depth 1 --branch ${<span class="org-variable-name">MINIO_VERSION</span>} https://github.com/minio/minio.git
+<span class="org-builtin">cd</span> minio
+<span class="org-variable-name">CGO_ENABLED</span>=0 go build -o minio .
+cp ./minio /usr/local/bin/
+minio --version
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#29983;&#25104;&#23384;&#20648;&#21644;&#21551;&#21160;&#37197;&#32622;
+</span>mkdir /data/minio -pv
+groupadd -r minio-user
+useradd -M -r -g minio-user minio-user
+chown minio-user:minio-user /data/minio
+
+cat &gt;/etc/default/minio&lt;&lt;EOF<span class="org-sh-heredoc">
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=Admin@123456
+MINIO_VOLUMES="/data/minio"
+MINIO_OPTS="--console-address :9001 --address :9000"
+EOF
+</span>
+cat &gt;/lib/systemd/system/minio.service&lt;&lt;\EOF<span class="org-sh-heredoc">
+[Unit]
+Description=MinIO
+Documentation=https://min.io/docs/minio/linux/index.html
+Wants=network-online.target
+After=network-online.target
+AssertFileIsExecutable=/usr/local/bin/minio
+
+[Service]
+WorkingDirectory=/usr/local
+User=minio-user
+Group=minio-user
+ProtectProc=invisible
+EnvironmentFile=-/etc/default/minio
+ExecStartPre=/bin/bash -c "if [ -z \"${MINIO_VOLUMES}\" ]; then echo \"Variable MINIO_VOLUMES not set in /etc/default/minio\"; exit 1; fi"
+ExecStart=/usr/local/bin/minio server $MINIO_OPTS $MINIO_VOLUMES
+Restart=always
+LimitNOFILE=65536
+TasksMax=infinity
+TimeoutStopSec=infinity
+SendSIGKILL=no
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+systemctl daemon-reload &amp;&amp; systemctl enable --now  minio.service
+systemctl status minio.service
+journalctl -f -u minio.service
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:15E2351F-36D7-4764-9943-D800DFA175BC" class="outline-4">
+<h4 id="h:15E2351F-36D7-4764-9943-D800DFA175BC"><a href="#h:15E2351F-36D7-4764-9943-D800DFA175BC">配置</a></h4>
+<div class="outline-text-4" id="text-h:15E2351F-36D7-4764-9943-D800DFA175BC">
+<p>
+创建 Access Key
+</p>
+<ul class="org-ul">
+<li>界面操作  <a href="http://&lt;ip&gt;:9001/access-keys/new-account">http://&lt;ip&gt;:9001/access-keys/new-account</a></li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-shell">Access Key: d3qFSWw6zosYK4xyHeZC
+Secret Key: iJ8gwfA5lZ3xhhf0n0EarjAkJgByNJKOnZWjJsUd
+</pre>
+</div>
+
+<p>
+创建 Bucket
+</p>
+<ul class="org-ul">
+<li>UI 操作，桶名 loki</li>
+</ul>
+
+
+<p>
+安装客户端工具 mc
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#32534;&#35793;&#21151;&#33021;&#23436;&#21892;&#30340; minio
+</span><span class="org-variable-name">MC_VERSION</span>=<span class="org-string">'RELEASE.2025-04-16T18-13-26Z'</span>
+git clone --depth 1 --branch ${<span class="org-variable-name">MC_VERSION</span>} https://github.com/minio/mc.git
+<span class="org-builtin">cd</span> mc
+<span class="org-variable-name">CGO_ENABLED</span>=0 go build -o mc .
+cp ./mc /usr/local/bin/
+mc --version
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37197;&#32622;&#23458;&#25143;&#31471;&#36830;&#25509;
+</span><span class="org-builtin">echo</span> 10.103.236.202  minio.jasper.org &gt;&gt; /etc/hosts
+mc alias set minio http://minio.jasper.org:9000 d3qFSWw6zosYK4xyHeZC iJ8gwfA5lZ3xhhf0n0EarjAkJgByNJKOnZWjJsUd
+mc alias ls minio
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#27979;&#35797;
+</span>mc admin info minio <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#30913;&#30424;&#31354;&#38388;&#31561;&#20449;&#24687;
+</span>mc ls minio <span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475;&#26742;&#20449;&#24687;</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:9B739DD3-60F7-4E5D-B101-272C2CBB6416" class="outline-3">
+<h3 id="h:9B739DD3-60F7-4E5D-B101-272C2CBB6416"><a href="#h:9B739DD3-60F7-4E5D-B101-272C2CBB6416">Loki 二进制部署和配置</a></h3>
+<div class="outline-text-3" id="text-h:9B739DD3-60F7-4E5D-B101-272C2CBB6416">
+</div>
+<div id="outline-container-h:596BDD23-8E9D-4C10-A22A-1354D4AF7951" class="outline-4">
+<h4 id="h:596BDD23-8E9D-4C10-A22A-1354D4AF7951"><a href="#h:596BDD23-8E9D-4C10-A22A-1354D4AF7951">二进制安装</a></h4>
+<div class="outline-text-4" id="text-h:596BDD23-8E9D-4C10-A22A-1354D4AF7951">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">LOKI_VERSION</span>=3.7.8
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/grafana/loki/releases/download/v${<span class="org-variable-name">LOKI_VERSION</span>}/loki-linux-${<span class="org-variable-name">ARCH</span>}.zip
+unzip loki-linux-${<span class="org-variable-name">ARCH</span>}.zip
+install -m 755 loki-linux-${<span class="org-variable-name">ARCH</span>}  /usr/local/bin/loki
+loki --version
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:11124E71-1F8F-4C77-AC83-1954E8D04340" class="outline-4">
+<h4 id="h:11124E71-1F8F-4C77-AC83-1954E8D04340"><a href="#h:11124E71-1F8F-4C77-AC83-1954E8D04340">loki 配置</a></h4>
+<div class="outline-text-4" id="text-h:11124E71-1F8F-4C77-AC83-1954E8D04340">
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/loki/latest/configure/">https://grafana.com/docs/loki/latest/configure/</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-builtin">echo</span> 10.103.236.202  minio.jasper.org &gt;&gt; /etc/hosts
+
+mkdir -p /etc/loki
+
+cat &gt;/etc/loki/loki.yaml &lt;&lt;\EOF<span class="org-sh-heredoc">
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  http_listen_address: 0.0.0.0
+  log_level: info
+
+common:
+  path_prefix: /data/loki
+  # minio &#23545;&#35937;&#23384;&#20648;
+  storage:
+    s3:
+      endpoint: minio.jasper.org:9000
+      bucketnames: loki
+      access_key_id: d3qFSWw6zosYK4xyHeZC
+      secret_access_key: iJ8gwfA5lZ3xhhf0n0EarjAkJgByNJKOnZWjJsUd
+      # minio &#20351;&#29992; http
+      insecure: true
+      # &#24378;&#21046; path style
+      s3forcepathstyle: true
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+# loki v3.x &#25512;&#33616; TSDB &#32034;&#24341;
+schema_config:
+  configs:
+    - from: 2024-01-01
+      # TSDB &#32034;&#24341;
+      store: tsdb
+      # &#23545;&#35937;&#23384;&#20648;&#25913;&#20026; mino
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# &#20889;&#20837;&#32452;&#20214;
+ingester:
+  # WAL &#20173;&#28982;&#20445;&#30041;&#26412;&#22320;
+  wal:
+    enabled: true
+    dir: /data/loki/wal
+  chunk_idle_period: 5m
+  max_chunk_age: 1h
+
+# TSDB &#21387;&#32553;
+compactor:
+  # &#26412;&#22320;&#20020;&#26102;&#30446;&#24405;
+  working_directory: /data/loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  # &#21024;&#38500;&#35831;&#27714;&#23384;&#20648;
+  delete_request_store: s3
+
+limits_config:
+  # &#26085;&#24535;&#20445;&#23384; 30 &#22825;
+  retention_period: 30d
+  max_query_series: 10000
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+
+# &#21578;&#35686;&#35268;&#21017;
+ruler:
+  alertmanager_url: http://127.0.0.1:9093
+  storage:
+    type: local
+    local:
+      directory: /etc/loki/rules
+  rule_path: /data/loki/rules-temp
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35821;&#27861;&#26816;&#26597;
+</span>loki -config.file=/etc/loki/loki.yaml -verify-config
+</pre>
+</div>
+
+<p>
+配置说明
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">auth_enabled: false                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#20851;&#38381;Loki&#20869;&#32622;&#35748;&#35777;,&#19981;&#38656;&#35201;&#30331;&#24405;&#37492;&#26435;,&#20869;&#32593;&#29615;&#22659;&#20351;&#29992;
+</span>
+server:                                         <span class="org-comment-delimiter">#</span><span class="org-comment">HTTP&#26381;&#21153;&#37197;&#32622;&#22359;
+</span>  http_listen_port: 3100                        <span class="org-comment-delimiter">#</span><span class="org-comment">Loki&#23545;&#22806;HTTP&#31471;&#21475;,&#40664;&#35748;3100
+</span>  http_listen_address: 0.0.0.0                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#30417;&#21548;&#25152;&#26377;&#32593;&#21345;,&#20801;&#35768;&#22806;&#37096;&#35775;&#38382;
+</span>  log_level: info                               <span class="org-comment-delimiter">#</span><span class="org-comment">Loki&#33258;&#36523;&#26085;&#24535;&#36755;&#20986;&#32423;&#21035;info/debug/warn/error
+</span>
+common:                                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#20844;&#20849;&#37197;&#32622;,&#22810;&#20010;&#32452;&#20214;&#20849;&#20139;
+</span>  path_prefix: /data/loki                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#26412;&#22320;&#25968;&#25454;&#26681;&#30446;&#24405;,wal&#12289;&#20020;&#26102;&#25991;&#20214;&#23384;&#25918;&#26681;&#36335;&#24452;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">minio &#23545;&#35937;&#23384;&#20648;
+</span>  storage:                                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#23545;&#35937;&#23384;&#20648;&#37197;&#32622;,&#26085;&#24535;chunk&#12289;&#32034;&#24341;&#23384; MinIO S3 &#20860;&#23481;&#22312;&#20648;&#23384;
+</span>    s3:
+      endpoint: minio.jasper.org:9000           <span class="org-comment-delimiter">#</span><span class="org-comment">MinIO&#26381;&#21153;&#22320;&#22336;&#31471;&#21475;
+</span>      bucketnames: loki                         <span class="org-comment-delimiter">#</span><span class="org-comment">MinIO&#26742;&#21517;&#31216;,loki&#25152;&#26377;&#25968;&#25454;&#23384;&#22312;&#36825;&#20010;bucket
+</span>      access_key_id: d3qFSWw6zosYK4xyHeZC
+      secret_access_key: iJ8gwfA5lZ3xhhf0n0EarjAkJgByNJKOnZWjJsUd
+      <span class="org-comment-delimiter"># </span><span class="org-comment">minio &#20351;&#29992; http
+</span>      insecure: true                            <span class="org-comment-delimiter">#</span><span class="org-comment">true &#20351;&#29992;http,&#20851;&#38381;https&#35777;&#20070;&#26657;&#39564;
+</span>      <span class="org-comment-delimiter"># </span><span class="org-comment">&#24378;&#21046; path style
+</span>      s3forcepathstyle: true                    <span class="org-comment-delimiter">#</span><span class="org-comment">MinIO&#24517;&#39035;&#24320;&#21551;,&#20351;&#29992;path&#27169;&#24335;&#35775;&#38382;s3,&#19981;&#20351;&#29992;&#34394;&#25311;host&#27169;&#24335;
+</span>  replication_factor: 1                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#21103;&#26412;&#25968;,&#21333;&#26426;&#37096;&#32626;&#20889;1;&#38598;&#32676;&#37096;&#32626;&#22823;&#20110;1
+</span>  ring:                                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#19968;&#33268;&#24615;ring&#37197;&#32622;,&#21333;&#26426;&#20351;&#29992;&#20869;&#23384;&#23384;&#20648;ring&#20449;&#24687;
+</span>    kvstore:
+      store: inmemory                           <span class="org-comment-delimiter">#</span><span class="org-comment">ring&#20803;&#25968;&#25454;&#23384;&#20869;&#23384;,&#21333;&#26426;&#19987;&#29992;;&#38598;&#32676;&#25913;&#29992;etcd
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">loki v3.x &#25512;&#33616; TSDB &#32034;&#24341;
+</span>schema_config:                                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#32034;&#24341;schema&#37197;&#32622;,&#23450;&#20041;&#32034;&#24341;&#23384;&#20648;&#26684;&#24335;
+</span>  configs:
+    - from: 2024-01-01                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#35813;schema&#29983;&#25928;&#36215;&#22987;&#26102;&#38388;,&#26089;&#20110;&#35813;&#26102;&#38388;&#30340;&#25968;&#25454;&#19981;&#20351;&#29992;&#27492;&#37197;&#32622;
+</span>      <span class="org-comment-delimiter"># </span><span class="org-comment">TSDB &#32034;&#24341;
+</span>      store: tsdb                               <span class="org-comment-delimiter">#</span><span class="org-comment">&#20351;&#29992;TSDB&#32034;&#24341;(Lokiv3&#25512;&#33616;,&#26367;&#20195;&#21407;&#20808;boltdb-shippper)
+</span>      <span class="org-comment-delimiter"># </span><span class="org-comment">&#23545;&#35937;&#23384;&#20648;&#25913;&#20026; mino
+</span>      object_store: s3                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#32034;&#24341;&#25991;&#20214;&#23384;&#25918;&#21518;&#31471;:s3(minio)
+</span>      schema: v13                               <span class="org-comment-delimiter">#</span><span class="org-comment">schema&#29256;&#26412;&#21495;,v13&#36866;&#37197;tsdb
+</span>      index:
+        prefix: index_                          <span class="org-comment-delimiter">#</span><span class="org-comment">&#23545;&#35937;&#23384;&#20648;&#37324;&#32034;&#24341;&#25991;&#20214;&#21517;&#31216;&#21069;&#32512;
+</span>        period: 24h                             <span class="org-comment-delimiter">#</span><span class="org-comment">&#32034;&#24341;&#20998;&#29255;&#21608;&#26399;,&#27599;24&#23567;&#26102;&#29983;&#25104;&#19968;&#20221;&#29420;&#31435;&#32034;&#24341;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#20889;&#20837;&#32452;&#20214;
+</span>ingester:                                       <span class="org-comment-delimiter">#</span><span class="org-comment">ingester:&#25509;&#25910;&#26085;&#24535;&#20889;&#20837;,&#20869;&#23384;&#25874;chunk,&#21047;&#20889;&#21040;&#23545;&#35937;&#23384;&#20648;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">WAL &#20173;&#28982;&#20445;&#30041;&#26412;&#22320;
+</span>  wal:
+    enabled: true                               <span class="org-comment-delimiter">#</span><span class="org-comment">&#24320;&#21551;WAL&#39044;&#20889;&#26085;&#24535;,&#23445;&#26426;&#38450;&#27490;&#20869;&#23384;&#26085;&#24535;&#20002;&#22833;
+</span>    dir: /data/loki/wal                         <span class="org-comment-delimiter">#</span><span class="org-comment">WAL&#26412;&#22320;&#30913;&#30424;&#23384;&#20648;&#30446;&#24405;
+</span>  chunk_idle_period: 5m                         <span class="org-comment-delimiter">#</span><span class="org-comment">chunk&#31354;&#38386;5&#20998;&#38047;,&#27809;&#26377;&#26032;&#25968;&#25454;&#23601;&#21047;&#30424;&#21040;&#23545;&#35937;&#23384;&#20648;
+</span>  max_chunk_age: 1h                             <span class="org-comment-delimiter">#</span><span class="org-comment">chunk&#26368;&#38271;&#23384;&#27963;1&#23567;&#26102;,&#26080;&#35770;&#26159;&#21542;&#31354;&#38386;&#24378;&#21046;&#21047;&#30424;
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">TSDB &#21387;&#32553;
+</span>compactor:                                      <span class="org-comment-delimiter">#</span><span class="org-comment">TSDB&#21387;&#32553;&#32452;&#20214;,&#21512;&#24182;&#23567;&#32034;&#24341;&#22359;&#12289;&#25191;&#34892;&#25968;&#25454;&#36807;&#26399;&#21024;&#38500;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26412;&#22320;&#20020;&#26102;&#30446;&#24405;
+</span>  working_directory: /data/loki/compactor       <span class="org-comment-delimiter">#</span><span class="org-comment">compactor&#24037;&#20316;&#20020;&#26102;&#30446;&#24405;,&#21387;&#32553;&#36807;&#31243;&#20013;&#38388;&#25991;&#20214;
+</span>  compaction_interval: 10m                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#21387;&#32553;&#20219;&#21153;&#25191;&#34892;&#38388;&#38548;,&#27599;10&#20998;&#38047;&#36305;&#19968;&#27425;&#21387;&#32553;
+</span>  retention_enabled: true                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#24320;&#21551;&#25968;&#25454;&#36807;&#26399;&#28165;&#29702;,&#37197;&#21512;retention_period&#21024;&#38500;&#26087;&#29255;&#26085;&#24535;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#21024;&#38500;&#35831;&#27714;&#23384;&#20648;
+</span>  delete_request_store: s3                      <span class="org-comment-delimiter">#</span><span class="org-comment">&#21024;&#38500;&#35831;&#27714;&#35760;&#24405;&#20445;&#23384;&#21040;s3&#23545;&#35937;&#23384;&#20648;
+</span>
+limits_config:                                  <span class="org-comment-delimiter">#</span><span class="org-comment">&#20840;&#23616;&#38480;&#27969;&#12289;&#37197;&#39069;&#12289;&#20445;&#23384;&#21608;&#26399;&#37197;&#32622;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">&#26085;&#24535;&#20445;&#23384; 30 &#22825;
+</span>  retention_period: 30d                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#20840;&#23616;&#26085;&#24535;&#20445;&#30041;&#26102;&#38271;30&#22825;,&#21040;&#26399;&#33258;&#21160;&#21024;&#38500;
+</span>  max_query_series: 10000                       <span class="org-comment-delimiter">#</span><span class="org-comment">&#26597;&#35810;&#26368;&#22823;&#36820;&#22238;&#26102;&#24207;&#24207;&#21015;&#25968;&#37327;,&#38450;&#27490;&#22823;&#26597;&#35810;&#21387;&#22446;loki
+</span>  ingestion_rate_mb: 10                         <span class="org-comment-delimiter">#</span><span class="org-comment">&#21333;&#23454;&#20363;&#26085;&#24535;&#20889;&#20837;&#36895;&#29575;&#19978;&#38480;10MB/s
+</span>  ingestion_burst_size_mb: 20                   <span class="org-comment-delimiter">#</span><span class="org-comment">&#20889;&#20837;&#31361;&#21457;&#27969;&#37327;&#19978;&#38480;20MB
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21578;&#35686;&#35268;&#21017;
+</span>ruler:                             <span class="org-comment-delimiter">#</span><span class="org-comment">ruler&#32452;&#20214;:&#21152;&#36733;&#21578;&#35686;&#35268;&#21017;,&#25191;&#34892;LogQL,&#20135;&#29983;&#21578;&#35686;&#25512;&#36865;&#32473;aalertmanager
+</span>  alertmanager_url: http://127.0.0.1:9093       <span class="org-comment-delimiter">#</span><span class="org-comment">Alertmanager&#25509;&#25910;&#21578;&#35686;&#30340;&#22320;&#22336;
+</span>  storage:                                      <span class="org-comment-delimiter">#</span><span class="org-comment">ruler&#35268;&#21017;&#25991;&#20214;&#23384;&#20648;&#37197;&#32622;
+</span>    <span class="org-builtin">type</span>: local                                 <span class="org-comment-delimiter">#</span><span class="org-comment">&#35268;&#21017;&#20351;&#29992;&#26412;&#22320;&#25991;&#20214;&#27169;&#24335;
+</span>    <span class="org-builtin">local</span>:
+      directory: /etc/loki/rules                <span class="org-comment-delimiter">#</span><span class="org-comment">&#21578;&#35686;&#35268;&#21017;yam1&#25991;&#20214;&#23384;&#25918;&#30446;&#24405;
+</span>  rule_path: /data/loki/rules-temp              <span class="org-comment-delimiter">#</span><span class="org-comment">ruler&#36816;&#34892;&#26102;&#20020;&#26102;&#32531;&#23384;&#30446;&#24405;
+</span>  ring:
+    kvstore:
+      store: inmemory                           <span class="org-comment-delimiter">#</span><span class="org-comment">ruler ring,&#21333;&#26426;&#20869;&#23384;&#23384;&#20648;
+</span>  enable_api: true                              <span class="org-comment-delimiter">#</span><span class="org-comment">&#24320;&#21551;ruler http API,&#25903;&#25345;curl&#19978;&#20256;&#26657;&#39564;&#35268;&#21017;,&#35843;&#35797;&#29992;</span>
+</pre>
+</div>
+
+
+<p>
+<a href="http://10.103.236.201:3100/ring">http://10.103.236.201:3100/ring</a>
+</p>
+
+<p>
+配置错误排查-ui 还没有前端
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#25214;&#24403;&#21069;&#29256;&#26412;&#30340;&#37197;&#32622;
+</span>/usr/local/bin/loki -help 2&gt;&amp;1 | grep -- <span class="org-string">'-ui\.'</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#24102;&#19978;&#37197;&#32622;&#25991;&#20214;&#20877;&#21015; target
+</span>/usr/local/bin/loki -config.file=/etc/loki/loki.yaml -list-targets
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21152;&#36733;&#21518;&#30340; ui &#22359;&#23454;&#38469;&#38271;&#20160;&#20040;&#26679;
+</span>/usr/local/bin/loki -config.file=/etc/loki/loki.yaml -print-config-stderr 2&gt;&amp;1 | grep -A 25 <span class="org-string">'^ui:'</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#21551;&#21160;&#26085;&#24535;&#37324; ui &#30456;&#20851;&#30340;&#34892;
+</span>grep -i -E <span class="org-string">'ui|cluster'</span> /var/log/loki/loki.log | tail -40
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:364E8C60-20F3-46AA-97BA-CB769AC98117" class="outline-4">
+<h4 id="h:364E8C60-20F3-46AA-97BA-CB769AC98117"><a href="#h:364E8C60-20F3-46AA-97BA-CB769AC98117">systemd 开启自启配置</a></h4>
+<div class="outline-text-4" id="text-h:364E8C60-20F3-46AA-97BA-CB769AC98117">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /var/log/loki
+
+cat &gt;/lib/systemd/system/loki.service &lt;&lt;EOF<span class="org-sh-heredoc">
+[Unit]
+Description=Grafana Loki Log Aggregator Service
+Documentation=https://grafana.com/docs/loki/latest
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/loki -config.file=/etc/loki/loki.yaml
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/loki/loki.log
+StandardError=append:/var/log/loki/loki-error.log
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+systemctl daemon-reload &amp;&amp; systemctl enable --now loki
+systemctl status loki
+journalctl -f -u loki
+</pre>
+</div>
+
+<p>
+验证
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#33258;&#21160;&#29983;&#25104;&#30456;&#20851;&#25991;&#20214;
+</span>root@master01:~/.jasper# ls /data/loki/
+compactor  tsdb-shipper-active  tsdb-shipper-cache  wal
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26597;&#30475; loki &#30456;&#20851;&#26381;&#21153;
+</span>root@master01:~/.jasper# curl -s http://127.0.0.1:3100/services
+<span class="org-variable-name">querier</span> =&gt; Running
+<span class="org-variable-name">ingester</span> =&gt; Running
+query-frontend =&gt; Running
+<span class="org-variable-name">server</span> =&gt; Running
+query-scheduler-ring =&gt; Running
+<span class="org-variable-name">ring</span> =&gt; Running
+<span class="org-variable-name">analytics</span> =&gt; Running
+query-scheduler =&gt; Running
+rule-evaluator =&gt; Running
+query-frontend-tripperware =&gt; Running
+<span class="org-variable-name">compactor</span> =&gt; Running
+<span class="org-variable-name">store</span> =&gt; Running
+ingester-querier =&gt; Running
+<span class="org-variable-name">ruler</span> =&gt; Running
+cache-generation-loader =&gt; Running
+memberlist-kv =&gt; Running
+<span class="org-variable-name">distributor</span> =&gt; Running
+
+root@master01:~/.jasper# curl -s http://127.0.0.1:3100/ready
+Ingester not ready: waiting for 15s after being ready
+
+root@master01:~/.jasper# curl -s http://127.0.0.1:3100/ready
+ready
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4743D1FE-9D02-48CF-B058-E2F33CFD484E" class="outline-3">
+<h3 id="h:4743D1FE-9D02-48CF-B058-E2F33CFD484E"><a href="#h:4743D1FE-9D02-48CF-B058-E2F33CFD484E">Alloy 二进制部署和配置</a></h3>
+<div class="outline-text-3" id="text-h:4743D1FE-9D02-48CF-B058-E2F33CFD484E">
+</div>
+<div id="outline-container-h:1612CAA7-8134-4ACC-AE66-E5100F810D51" class="outline-4">
+<h4 id="h:1612CAA7-8134-4ACC-AE66-E5100F810D51"><a href="#h:1612CAA7-8134-4ACC-AE66-E5100F810D51">二进制安装</a></h4>
+<div class="outline-text-4" id="text-h:1612CAA7-8134-4ACC-AE66-E5100F810D51">
+<p>
+类似于 filebeat 收集日志
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">ALLOY_VERSION</span>=1.19.2
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/grafana/alloy/releases/download/v${<span class="org-variable-name">ALLOY_VERSION</span>}/alloy-linux-${<span class="org-variable-name">ARCH</span>}.zip
+unzip alloy-linux-${<span class="org-variable-name">ARCH</span>}.zip
+install -m 755 alloy-linux-${<span class="org-variable-name">ARCH</span>}  /usr/local/bin/alloy
+alloy -v
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:E3D819CD-2F91-490C-BD86-B3FF9EF7DA6D" class="outline-4">
+<h4 id="h:E3D819CD-2F91-490C-BD86-B3FF9EF7DA6D"><a href="#h:E3D819CD-2F91-490C-BD86-B3FF9EF7DA6D">alloy 配置</a></h4>
+<div class="outline-text-4" id="text-h:E3D819CD-2F91-490C-BD86-B3FF9EF7DA6D">
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/alloy/latest/configure/">安装配置</a></li>
+<li><a href="https://grafana.com/docs/alloy/latest/get-started/syntax/">Alloy 语法</a></li>
+<li><a href="https://grafana.com/docs/alloy/latest/collect/logs-in-kubernetes/">收集 Kubernetes 日志并将其转发到 Loki</a></li>
+</ul>
+</div>
+<div id="outline-container-h:50AE0DC1-C114-448A-83E1-98967242E072" class="outline-5">
+<h5 id="h:50AE0DC1-C114-448A-83E1-98967242E072"><a href="#h:50AE0DC1-C114-448A-83E1-98967242E072">grafana alloy 配置文件格式说明</a></h5>
+<div class="outline-text-5" id="text-h:50AE0DC1-C114-448A-83E1-98967242E072">
+<p>
+使用标准 River 语法构建采集与解析 Pipeline
+</p>
+
+<p>
+Grafana Alloy 使用的是 Grafana 自研的配置语言，称为 River(其法设计灵感大量借鉴了 HashiCorp 的 HCL，即 Terraform 的配置语言)。
+</p>
+
+<p>
+Alloy 的 River 配置本质是 <b>组件拼图+显式管道</b> 模型，数据流需要手动串联。
+</p>
+
+<p>
+日志采集典型链路:
+</p>
+<ul class="org-ul">
+<li><code>local.file_match</code> 发现日志文件 → <code>loki.sounce.file</code> 读取文件 → <code>loki.process</code> 处理/转换日志 → <code>loki.write</code> 推送后端每一步通过 <code>forward_to=[组件名.标签receiver]</code> 显式把输出传给下一个组件的接收端口。</li>
+</ul>
+
+<p>
+配套 Alloy 最简示例
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">// &#21457;&#29616;&#26085;&#24535;&#25991;&#20214;
+local.file_match <span class="org-string">"log_files"</span> {
+    <span class="org-variable-name">path_targets</span> = [{<span class="org-variable-name">__path__</span> = <span class="org-string">"/var/log/*.log"</span>}]
+}
+
+// &#35835;&#21462;&#25991;&#20214;&#65292;forward_to &#23558;&#35835;&#21462;&#30340;&#26085;&#24535;&#36755;&#20986;&#20256;&#36882;&#32473; loki.process
+loki.source.file <span class="org-string">"read_log"</span> {
+    <span class="org-variable-name">targets</span>    = local.file_match.log_files.targets
+    <span class="org-variable-name">forward_to</span> = [loki.process.filter.receiver]
+}
+
+// &#22788;&#29702;&#26085;&#24535;&#65292;&#20877;&#36716;&#21457;&#32473; loki.write
+loki.process <span class="org-string">"filter"</span> {
+    stage.drop {
+        <span class="org-variable-name">expression</span> = <span class="org-string">"level=~\"debug\""</span>
+    }
+    <span class="org-variable-name">forward_to</span> = [loki.write.loki_backend.receiver]
+}
+
+// &#25512;&#36865;&#33267; Loki &#21518;&#31471;
+loki.write <span class="org-string">"loki_backend"</span> {
+    endpoint {
+        <span class="org-variable-name">url</span> = <span class="org-string">"http://loki:3100/loki/api/v1/push"</span>
+    }
+}
+</pre>
+</div>
+
+<p>
+生产环境中 Docker 日志采集建议
+</p>
+<ul class="org-ul">
+<li>使用 <code>discovery.docker</code> 自动发现容器</li>
+<li>使用 <code>discovery.relabel</code> 清洗 metadata</li>
+<li>只保留低基数 label</li>
+<li>不把 <code>clientip</code>, <code>path</code>, <code>user-agent</code> 等高基数字段作为 loki label</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-h:D197B999-C3D4-4767-A3AD-2C5E975AA5FA" class="outline-5">
+<h5 id="h:D197B999-C3D4-4767-A3AD-2C5E975AA5FA"><a href="#h:D197B999-C3D4-4767-A3AD-2C5E975AA5FA">alloy 配置</a></h5>
+<div class="outline-text-5" id="text-h:D197B999-C3D4-4767-A3AD-2C5E975AA5FA">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /etc/alloy
+
+cat &gt;/etc/alloy/config.alloy &lt;&lt;\EOF<span class="org-sh-heredoc">
+// systemd journal &#37319;&#38598; flog.service
+loki.source.journal "flog_journal" {
+  // &#20351;&#29992; matches &#23646;&#24615;&#65292;&#27880;&#24847; systemd &#21333;&#20803;&#36807;&#28388;&#38656;&#35201;&#21152;&#19978; _SYSTEMD_UNIT=
+  matches = "_SYSTEMD_UNIT=flog.service"
+
+  labels = {
+    job = "flog-journal",
+    env = "prod",
+  }
+
+  forward_to = [
+    loki.process.flog_journal.receiver,
+  ]
+}
+
+// journal &#26085;&#24535;&#22788;&#29702;
+loki.process "flog_journal" {
+    stage.json {
+        expressions = {
+            level  = "level",
+            method = "method",
+            path   = "path",
+            status = "status",
+        }
+    }
+
+    stage.labels {
+        values = {
+            level  = "",
+            status = "",
+        }
+    }
+
+    forward_to = [loki.write.loki_server.receiver]
+}
+
+// =========================
+// &#23450;&#20041; flog &#25991;&#20214;&#26085;&#24535;
+local.file_match "flog_files" {
+    path_targets = [
+      {
+        __path__ = "/var/log/flog/access_json.log",
+        job      = "flog-json-file",
+        env      = "prod",
+        format   = "json",
+      },
+      {
+        __path__ = "/var/log/flog/access_apache_common.log",
+        job      = "flog-apache-common",
+        env      = "prod",
+        format   = "apache_common",
+      },
+      {
+        __path__ = "/var/log/flog/access_apache_combined.log",
+        job      = "flog-apache-combined",
+        env      = "prod",
+        format   = "apache_combined",
+      },
+    ]
+}
+
+// &#25991;&#20214;&#26085;&#24535;&#35835;&#21462;
+loki.source.file "flog_files" {
+  targets = local.file_match.flog_files.targets
+  forward_to = [
+    loki.process.flog_files.receiver,
+  ]
+}
+
+// &#25991;&#20214;&#26085;&#24535;&#22788;&#29702;
+loki.process "flog_files" {
+  // JSON &#26684;&#24335; access.log
+  stage.match {
+    selector = "{format=\"json\"}"
+
+    stage.json {
+      expressions = {
+        level  = "level",
+        method = "method",
+        path   = "path",
+        status = "status",
+      }
+    }
+
+    stage.labels {
+      values = {
+        level  = "",
+        status = "",
+      }
+    }
+  }
+
+  // Apache Common
+  stage.match {
+    selector = "{format=\"apache_common\"}"
+
+    stage.regex {
+      expression = "^(?P&lt;ip&gt;\\S+) (?P&lt;ident&gt;\\S+) (?P&lt;user&gt;\\S+) \\[(?P&lt;time&gt;.*?)\\] \"(?P&lt;method&gt;\\S+) (?P&lt;path&gt;.*?) (?P&lt;proto&gt;.*?)\" (?P&lt;status&gt;\\d+?) (?P&lt;size&gt;\\d+)"
+    }
+
+    stage.labels {
+      values = {
+        method = "",
+        status = "",
+        // clientip = "ip"&#65292;&#19981;&#35201;&#25226; ip, path &#25918;&#36827; labels&#65292;&#39640;&#22522;&#25968;&#26631;&#31614;&#65292;&#20250;&#25171;&#29190; loki &#32034;&#24341;
+      }
+    }
+  }
+
+  // Apache Combined
+  stage.match {
+    selector = "{format=\"apache_combined\"}"
+
+    stage.regex {
+      expression = "^(?P&lt;ip&gt;\\S+) (?P&lt;ident&gt;\\S+) (?P&lt;user&gt;\\S+) \\[(?P&lt;time&gt;.*?)\\] \"(?P&lt;method&gt;\\S+) (?P&lt;path&gt;.*?) (?P&lt;proto&gt;.*?)\" (?P&lt;status&gt;\\d+) (?P&lt;size&gt;\\d+) \"(?P&lt;referer&gt;.*?)\" \"(?P&lt;agent&gt;.*?)\""
+    }
+
+    stage.labels {
+      values = {
+        method = "",
+        status = "",
+      }
+    }
+  }
+
+  forward_to = [
+    loki.write.loki_server.receiver,
+  ]
+}
+
+// &#20889;&#20837; loki
+loki.write "loki_server" {
+    endpoint {
+        url = "http://10.103.236.201:3100/loki/api/v1/push"
+    }
+}
+
+// =========================
+// containerd Pod &#23481;&#22120;&#26085;&#24535;
+// =========================
+
+// 1) &#21457;&#29616;&#25152;&#26377;&#23481;&#22120;&#26085;&#24535;&#25991;&#20214;
+local.file_match "pod_logs" {
+  path_targets = [{
+    __path__ = "/var/log/pods/*/*/*.log",
+    job      = "containerd-pods",
+    node     = constants.hostname,
+    env      = "prod",
+  }]
+  sync_period = "10s"
+}
+
+// 2) &#20174;&#25991;&#20214;&#36335;&#24452;&#37324;&#25552;&#21462; namespace / pod / container &#26631;&#31614;
+//    /var/log/pods/kube-system_calico-node-222ml_b1223a0a-.../calico-node/4.log
+discovery.relabel "pod_logs" {
+  targets = local.file_match.pod_logs.targets
+
+  rule {
+    source_labels = ["__path__"]
+    regex         = "/var/log/pods/([^/_]+)_([^/_]+)_([^/]+)/([^/]+)/[0-9]+\\.log"
+    target_label  = "namespace"
+    replacement   = "$1"
+  }
+  rule {
+    source_labels = ["__path__"]
+    regex         = "/var/log/pods/([^/_]+)_([^/_]+)_([^/]+)/([^/]+)/[0-9]+\\.log"
+    target_label  = "pod"
+    replacement   = "$2"
+  }
+  rule {
+    source_labels = ["__path__"]
+    regex         = "/var/log/pods/([^/_]+)_([^/_]+)_([^/]+)/([^/]+)/[0-9]+\\.log"
+    target_label  = "container"
+    replacement   = "$4"
+  }
+
+  // &#21487;&#36873;&#65306;&#19981;&#24819;&#25910;&#30340; namespace &#30452;&#25509;&#20002;&#25481;
+  // rule {
+  //   source_labels = ["namespace"]
+  //   regex         = "kube-system|calico-system"
+  //   action        = "drop"
+  // }
+}
+
+// 3) tail &#25991;&#20214;
+loki.source.file "pod_logs" {
+  targets       = discovery.relabel.pod_logs.output
+  forward_to    = [loki.process.pod_logs.receiver]
+  tail_from_end = true          // &#39318;&#27425;&#21551;&#21160;&#21482;&#25910;&#26032;&#26085;&#24535;&#65292;&#36991;&#20813;&#28748;&#21382;&#21490;
+}
+
+// 4) &#35299;&#26512; CRI &#26684;&#24335;
+// https://grafana.com/docs/alloy/latest/reference/components/loki/loki.process/
+loki.process "pod_logs" {
+  // &#35299;&#26512;&#20986;&#30495;&#23454;&#26102;&#38388;&#25139;&#12289;stream(stdout/stderr) &#26631;&#31614;&#65292;&#24182;&#33258;&#21160;&#25340;&#25509; P &#26631;&#35760;&#30340;&#20998;&#29255;&#34892;
+  stage.cri {}
+
+  // filename &#26159;&#39640;&#22522;&#25968;&#26631;&#31614;&#65292;&#21435;&#25481;&#65288;&#37325;&#21551;&#27425;&#25968;&#21464;&#20102;&#36335;&#24452;&#23601;&#21464;&#65292;&#20250;&#20135;&#29983;&#26032; series&#65289;
+  stage.label_drop {
+    values = ["filename"]
+  }
+
+  forward_to = [loki.write.loki_server.receiver]
+}
+EOF
+</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#26816;&#26597;&#35821;&#27861;&#65292;&#27809;&#26377;&#36755;&#20986;&#23601;&#26159;&#27809;&#38382;&#39064;
+</span>alloy validate  /etc/alloy/config.alloy
+alloy fmt /etc/alloy/config.alloy
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:1A297441-8AD0-4FAF-B23C-8051B65FA66D" class="outline-5">
+<h5 id="h:1A297441-8AD0-4FAF-B23C-8051B65FA66D"><a href="#h:1A297441-8AD0-4FAF-B23C-8051B65FA66D">systemd 开机自启配置</a></h5>
+<div class="outline-text-5" id="text-h:1A297441-8AD0-4FAF-B23C-8051B65FA66D">
+<div class="org-src-container">
+<pre class="src src-shell">mkdir -p /var/log/alloy
+
+cat &gt;/lib/systemd/system/alloy.service&lt;&lt;\EOF<span class="org-sh-heredoc">
+[Unit]
+Description=Grafana Alloy Log Collector Service
+Documentation=https://grafana.com/docs/alloy/latest
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/alloy run /etc/alloy/config.alloy --server.http.listen-addr=0.0.0.0:9090
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/alloy/alloy.log
+StandardError=append:/var/log/alloy/alloy-error.log
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+systemctl daemon-reload &amp;&amp; systemctl enable --now alloy
+systemctl status alloy
+journalctl -f -u alloy
+</pre>
+</div>
+
+<p>
+查看 alloy 状态，访问页面 <a href="http://10.103.236.202:9090/">http://10.103.236.202:9090/</a> 
+</p>
+
+<p>
+在 minio 上查看收集到日志数据， 可以看到如下数据。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">root@master02:~# mc tree minio/loki
+minio/loki
+&#9500;&#9472; fake
+&#9474;  &#9500;&#9472; 1bbe7883c50eb257
+&#9474;  &#9500;&#9472; f3bae548f6d69b62
+&#9492;&#9472; index
+   &#9500;&#9472; delete_requests
+   &#9492;&#9472; index_20720
+      &#9492;&#9472; fake
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-h:555A3904-5F45-450A-A001-EA17027B8B22" class="outline-3">
+<h3 id="h:555A3904-5F45-450A-A001-EA17027B8B22"><a href="#h:555A3904-5F45-450A-A001-EA17027B8B22">Grafana 部署和配置</a></h3>
+<div class="outline-text-3" id="text-h:555A3904-5F45-450A-A001-EA17027B8B22">
+</div>
+<div id="outline-container-h:053E134E-5170-444C-B90B-FBED095FFFF7" class="outline-4">
+<h4 id="h:053E134E-5170-444C-B90B-FBED095FFFF7"><a href="#h:053E134E-5170-444C-B90B-FBED095FFFF7">二进制安装</a></h4>
+<div class="outline-text-4" id="text-h:053E134E-5170-444C-B90B-FBED095FFFF7">
+<ul class="org-ul">
+<li><a href="https://grafana.com/docs/grafana/latest/setup-grafana/installation/">https://grafana.com/docs/grafana/latest/setup-grafana/installation/</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">wget https://mirrors.tuna.tsinghua.edu.cn/grafana/apt/pool/main/g/grafana/grafana_13.2.2_34846740809_linux_arm64.deb
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">apt install grafana_13.2.2_34846740809_linux_arm64.deb
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">systemctl enable --now grafana-server
+</span>
+<span class="org-variable-name">GRAFANA_VERSION</span>=13.2.2
+<span class="org-variable-name">GRAFANA_FULLVERSION</span>=${<span class="org-variable-name">GRAFANA_VERSION</span>}_34846740809
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://dl.grafana.com/grafana-enterprise/release/${<span class="org-variable-name">GRAFANA_VERSION</span>}/grafana-enterprise_${<span class="org-variable-name">GRAFANA_FULLVERSION</span>=}_linux_${<span class="org-variable-name">ARCH</span>}.tar.gz
+tar -zxvf grafana-enterprise_${<span class="org-variable-name">GRAFANA_FULLVERSION</span>=}_linux_${<span class="org-variable-name">ARCH</span>}.tar.gz <span class="org-sh-escaped-newline">\</span>
+    --strip-components=2  <span class="org-sh-escaped-newline">\</span>
+    -C /usr/local/bin
+    grafana-${<span class="org-variable-name">GRAFANA_VERSION</span>}/bin/grafana
+grafana -v
+
+
+tar xf grafana-enterprise_${<span class="org-variable-name">GRAFANA_FULLVERSION</span>=}_linux_${<span class="org-variable-name">ARCH</span>}.tar.gz
+mv grafana-${<span class="org-variable-name">GRAFANA_VERSION</span>} /usr/local/grafana
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:09169E44-27C8-46B9-A190-F890B1A776E4" class="outline-4">
+<h4 id="h:09169E44-27C8-46B9-A190-F890B1A776E4"><a href="#h:09169E44-27C8-46B9-A190-F890B1A776E4">配置</a></h4>
+<div class="outline-text-4" id="text-h:09169E44-27C8-46B9-A190-F890B1A776E4">
+<div class="org-src-container">
+<pre class="src src-shell">useradd -r -s /bin/false grafana
+chown -R grafana:users /usr/local/grafana
+
+mkdir -pv /etc/grafana/provisioning/{access-control,alerting,dashboards,datasources,notifiers,plugins}
+mkdir -pv /var/log/grafana /var/lib/grafana/plugins
+
+chown -R grafana:grafana /var/log/grafana /var/lib/grafana /etc/grafana/provisioning
+
+cat &lt;&lt;\EOF&gt;  /etc/grafana/grafana.ini<span class="org-sh-heredoc">
+[server]
+# &#29983;&#25104;&#22806;&#37096;&#38142;&#25509;&#65288;&#20998;&#20139;&#38142;&#25509;&#12289;OAuth &#22238;&#35843;&#12289;&#21578;&#35686;&#36890;&#30693;&#37324;&#30340;&#36339;&#36716; URL&#65289;
+root_url = http://10.103.236.201:3000
+EOF
+</span>
+
+
+cat &gt;/lib/systemd/system/grafana-server.service &lt;&lt;\EOF<span class="org-sh-heredoc">
+[Unit]
+Description=Grafana Server
+After=network.target
+
+[Service]
+Type=simple
+User=grafana
+Group=users
+#Grafana &#21551;&#21160;&#30340;&#30828;&#24615;&#20381;&#36182; /usr/local/grafana/conf/defaults.ini
+#&#29983;&#25928;&#39034;&#24207;&#65288;&#21518;&#32773;&#35206;&#30422;&#21069;&#32773;&#65289;:
+#  conf/defaults.ini  &#8594;  grafana.ini  &#8594;  GF_* &#29615;&#22659;&#21464;&#37327;  &#8594;  &#21629;&#20196;&#34892; cfg: &#21442;&#25968;
+Environment=GF_PATHS_HOME=/usr/local/grafana
+Environment=GF_PATHS_CONFIG=/etc/grafana/grafana.ini
+Environment=GF_PATHS_DATA=/var/lib/grafana
+Environment=GF_PATHS_LOGS=/var/log/grafana
+Environment=GF_PATHS_PLUGINS=/var/lib/grafana/plugins
+Environment=GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+ExecStart=/usr/local/grafana/bin/grafana server \
+   --homepath=${GF_PATHS_HOME} \
+   --config=${GF_PATHS_CONFIG} \
+   cfg:default.log.mode=console                            \
+   cfg:default.paths.data=${GF_PATHS_DATA}                   \
+   cfg:default.paths.logs=${GF_PATHS_LOGS}                   \
+   cfg:default.paths.plugins=${GF_PATHS_PLUGINS}             \
+   cfg:default.paths.provisioning=${GF_PATHS_PROVISIONING}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+systemctl daemon-reload &amp;&amp; systemctl enable --now grafana-server
+systemctl status grafana-server
+journalctl -u grafana-server -f
+journalctl -u grafana-server -n 30 --no-pager | grep -i <span class="org-string">"config\|root_url\|listen"</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>UI 界面： <code>http://&lt;ip&gt;:3000/</code> ，默认账号密码：admin/admin</li>
+<li>增加 loki 数据源：<a href="http://127.0.0.1:3100/">http://127.0.0.1:3100/</a></li>
+<li>查看日志 Drilldown &#x2013;&gt; Grafana Logs Drilldown</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-h:67749B76-317E-475E-98B9-4B58DB094FBB" class="outline-3">
+<h3 id="h:67749B76-317E-475E-98B9-4B58DB094FBB"><a href="#h:67749B76-317E-475E-98B9-4B58DB094FBB">LogQL 可视化展示</a></h3>
+<div class="outline-text-3" id="text-h:67749B76-317E-475E-98B9-4B58DB094FBB">
+<p>
+进入 GrafanaExplore 界面，选择 Loki 数据源
+</p>
+
+<p>
+Grafana LogQL实战查询
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#22522;&#30784;&#26085;&#24535;&#26816;&#32034;:
+</span>{<span class="org-variable-name">job</span>=<span class="org-string">"flog-apache-common"</span>}
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25351;&#23450;&#26085;&#24535;&#36807;&#28388;:
+</span>{<span class="org-variable-name">filename</span>=<span class="org-string">"/var/log/flog/access_apache_common.log"</span>, <span class="org-variable-name">status</span>=<span class="org-string">"200"</span>,<span class="org-variable-name">method</span>=<span class="org-string">"POST"</span>}
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">LogQL&#25351;&#26631;&#21270;:&#26085;&#24535;&#20135;&#29983;&#36895;&#29575;QPS
+</span><span class="org-function-name">rate</span>({<span class="org-variable-name">status</span>=<span class="org-string">"401"</span>}[1m])
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#25353;&#26085;&#24535;&#32423;&#21035;&#20998;&#32452;&#32479;&#35745;
+</span>sum by(job)(rate({<span class="org-variable-name">status</span>=<span class="org-string">"401"</span>}[1m]))
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#32479;&#35745;nginx&#30340;&#23481;&#22120;&#30340;&#23458;&#25143;&#31471;IP
+</span>sum by(clientip)(count_over_time({<span class="org-variable-name">container</span>=<span class="org-string">"nginx"</span>} |pattern
+<span class="org-sh-quoted-exec">`&lt;clientip&gt; - - [&lt;time&gt;] "&lt;method&gt; &lt;path&gt; &lt;protocol&gt;" &lt;status&gt;&lt;size&gt;&lt;rest&gt;`</span>[5m]))
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#32479;&#35745;nginx&#30340;&#29366;&#24577;&#30721;
+</span>sum by(status)(count_over_time({<span class="org-variable-name">service</span>=<span class="org-string">"nginx"</span>}[5m]))
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">&#32479;&#35745;&#35831;&#27714;&#26041;&#27861;
+</span>sum by(method)(count_over_time({<span class="org-variable-name">service</span>=<span class="org-string">"nginx"</span>}[5m]))
+
+sum by(env) (count_over_time({<span class="org-variable-name">container</span>=<span class="org-string">"calico-node"</span>} | pattern <span class="org-sh-quoted-exec">`&lt;pod&gt;`</span> [5m]))
+
+{<span class="org-variable-name">env</span>=<span class="org-string">"prod"</span>, <span class="org-variable-name">container</span> =~<span class="org-string">"sp.*"</span>} 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:4E824460-D972-4C16-97F4-7CC9AB1937C7" class="outline-3">
+<h3 id="h:4E824460-D972-4C16-97F4-7CC9AB1937C7"><a href="#h:4E824460-D972-4C16-97F4-7CC9AB1937C7">AlerManager 告警</a></h3>
+<div class="outline-text-3" id="text-h:4E824460-D972-4C16-97F4-7CC9AB1937C7">
+</div>
+<div id="outline-container-h:57B055B6-2B03-4804-A013-26662A767F9D" class="outline-4">
+<h4 id="h:57B055B6-2B03-4804-A013-26662A767F9D"><a href="#h:57B055B6-2B03-4804-A013-26662A767F9D">二进制安装</a></h4>
+<div class="outline-text-4" id="text-h:57B055B6-2B03-4804-A013-26662A767F9D">
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-variable-name">ALERT_VERSION</span>=0.34.1
+<span class="org-variable-name">ARCH</span>=$([ <span class="org-sh-quoted-exec">`arch`</span>  = <span class="org-string">"aarch64"</span> ] &amp;&amp; <span class="org-builtin">echo</span> arm64 || <span class="org-builtin">echo</span> amd64)
+
+wget https://github.com/prometheus/alertmanager/releases/download/v${<span class="org-variable-name">ALERT_VERSION</span>}/alertmanager-${<span class="org-variable-name">ALERT_VERSION</span>}.linux-${<span class="org-variable-name">ARCH</span>}.tar.gz
+
+tar -zxvf alertmanager-${<span class="org-variable-name">ALERT_VERSION</span>}.linux-${<span class="org-variable-name">ARCH</span>}.tar.gz <span class="org-sh-escaped-newline">\</span>
+    --strip-components=1  <span class="org-sh-escaped-newline">\</span>
+    -C /usr/local/bin <span class="org-sh-escaped-newline">\</span>
+    alertmanager-${<span class="org-variable-name">ALERT_VERSION</span>}.linux-${<span class="org-variable-name">ARCH</span>}/{alertmanager,amtool}
+
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:46CAFA8E-6762-4893-B2B6-914E1E5115C3" class="outline-4">
+<h4 id="h:46CAFA8E-6762-4893-B2B6-914E1E5115C3"><a href="#h:46CAFA8E-6762-4893-B2B6-914E1E5115C3">alertmanager 配置</a></h4>
+<div class="outline-text-4" id="text-h:46CAFA8E-6762-4893-B2B6-914E1E5115C3">
+<div class="org-src-container">
+<pre class="src src-shell">useradd -r -s /bin/false alertmanager
+
+mkdir -pv /etc/alertmanager /data/alertmanager
+chown -R alertmanager:alertmanager /etc/alertmanager /data/alertmanager
+
+
+cat &lt;&lt;\EOF&gt;  /etc/alertmanager/alertmanager.yml<span class="org-sh-heredoc">
+global:
+  resolve_timeout: 1m
+  # &#37038;&#20214;&#20449;&#24687;
+  smtp_from: "xxxx@163.com"
+  smtp_smarthost: "smtp.163.com:465"
+  smtp_hello: "163.com"
+  smtp_auth_username: "xxx@163.com"
+  smtp_auth_password: "Nxxx" # &#25480;&#26435;&#30721;
+  smtp_require_tls: false
+route:
+  group_by: ['instance', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 10s
+  receiver: 'email'
+receivers:
+  - name: 'email'
+    email_configs:
+    - to: 'xcwhome@163.com'
+      send_resolved: true
+      headers: {Subject: "[WARN] {{ .CommonLabels.alertname }}"}
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [alertname, dev, instance]
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35821;&#27861;&#26816;&#27979;
+</span>amtool check-config /etc/alertmanager/alertmanager.yml
+
+cat &gt;/lib/systemd/system/alertmanager.service &lt;&lt;\EOF<span class="org-sh-heredoc">
+[Unit]
+Description=Alertmanager Server
+After=network.target
+
+[Service]
+Type=simple
+User=grafana
+Group=users
+ExecStart=/usr/local/bin/alertmanager  \
+   --config.file=/etc/alertmanager/alertmanager.yml \
+   --storage.path=/data/alertmanager \
+   --cluster.advertise-address=0.0.0.0:9093 \
+   --data.retention=240h \
+   --web.route-prefix=/ \
+   --web.external-url=https://alert.jasper.org
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</span>
+systemctl daemon-reload &amp;&amp; systemctl enable --now alertmanager
+systemctl status alertmanager
+journalctl -u alertmanager -f
+journalctl -u alertmanager -f | grep -i <span class="org-string">"notify\|smtp"</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#37325;&#26032;&#21152;&#36733;&#37197;&#32622;
+</span>curl -X POST http://localhost:9093/-/reload
+</pre>
+</div>
+
+
+<p>
+测试告警
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#35843;&#29992; api
+</span>curl --location --request POST <span class="org-string">'http://10.103.236.201:9093/api/v2/alerts'</span> <span class="org-sh-escaped-newline">\</span>
+--header <span class="org-string">'Content-Type: application/json'</span> <span class="org-sh-escaped-newline">\</span>
+--data-raw <span class="org-string">'[
+    {
+        "labels": {
+            "alertname":"testAlert",
+            "severity": "critical",
+            "duty": "infra_op|fsy_rd"
+        },
+        "annotations": {
+            "info": "The disk sda1 is running full2",
+            "summary": "please check the instance example1"
+        }
+    }
+]'</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#25110;&#32773;&#20351;&#29992; amtool
+</span>amtool alert add <span class="org-variable-name">alertname</span>=TestEmail <span class="org-variable-name">severity</span>=critical <span class="org-variable-name">service</span>=inhouse-service <span class="org-sh-escaped-newline">\</span>
+    --annotation=<span class="org-variable-name">summary</span>=<span class="org-string">"&#37038;&#20214;&#36890;&#36947;&#27979;&#35797;"</span> <span class="org-sh-escaped-newline">\</span>
+    --alertmanager.url=http://localhost:9093
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:FA48352E-5F40-406E-83D4-5E34567362D6" class="outline-4">
+<h4 id="h:FA48352E-5F40-406E-83D4-5E34567362D6"><a href="#h:FA48352E-5F40-406E-83D4-5E34567362D6">配置 loki 实现告警实现告警规则</a></h4>
+<div class="outline-text-4" id="text-h:FA48352E-5F40-406E-83D4-5E34567362D6">
+<p>
+创建 loki 实现告警规则文件
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter"># </span><span class="org-comment">&#28155;&#21152;&#21578;&#35686;&#35268;&#21017;&#25991;&#20214;
+</span>mkdir -p /etc/loki/rules/fake
+cat &gt;/etc/loki/rules/fake/alert-rule-demo1.yml &lt;&lt;EOF<span class="org-sh-heredoc">
+groups:
+  - name: http_response
+    interval: 10s
+    rules:
+      - alert: HighPercentageError
+        expr: |-
+          sum(rate({filename="/var/log/flog/access_json.log", status=~"(4|5).."}[1m]))
+          /
+          sum(rate({filename="/var/log/flog/access_json.log"}[1m])) &gt; 0.5
+        for: 10s
+        labels:
+          serverty: warning
+        annotations:
+          summary: High request latency
+  - name: nginx_availability
+    interval: 10s
+    rules:
+      - alert: NginxToraffic
+        expr: |
+          absent_over_time({container="calico-node"}[1m])
+        for: 10s
+        labels:
+          serverty: critical
+          service: nginx
+        annotations:
+          summary: 'nginx &#26381;&#21153;&#26080;&#26085;&#24535;'
+          description: |
+            nginx 1 &#20998;&#38047;&#27809;&#26377;&#20135;&#29983;&#35775;&#38382;&#26085;&#24535;&#65292;
+            &#21487;&#33021;&#26381;&#21153;&#24322;&#24120;&#25110;&#26080;&#27861;&#35775;&#38382;&#12290;
+EOF
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">&#35268;&#21017;&#25991;&#20214;&#33258;&#21160;&#21152;&#36733;&#65292;&#26080;&#38656;&#37325;&#21551; loki &#26381;&#21153;&#65292;&#21487;&#33021;&#36890;&#36807; API &#26597;&#30475;&#21578;&#35686;&#35268;&#21017;&#29983;&#25928;
+</span>curl 10.103.236.201:3100/loki/api/v1/rules
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:DE448390-5906-409A-9D50-D57D08DC5C60" class="outline-4">
+<h4 id="h:DE448390-5906-409A-9D50-D57D08DC5C60"><a href="#h:DE448390-5906-409A-9D50-D57D08DC5C60">alertmanager 查看告警</a></h4>
+<div class="outline-text-4" id="text-h:DE448390-5906-409A-9D50-D57D08DC5C60">
+<p>
+UI <a href="http://10.103.236.201:9093/#/alerts">http://10.103.236.201:9093/#/alerts</a>
+</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>

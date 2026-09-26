@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Linux: Prometheus-exporter</title>
+<meta name="generator" content="Org Mode" />
+<script>
+/* main.css 默认把 body 隐藏起来，为的是切换深色模式时不闪白。
+   恢复可见完全交给 CSS 的 html.js:not(.ready) 选择器控制：
+   - 没有 JS：下面这句不会执行，html 上没有 .js，body 一开始就是可见的
+   - 有 JS 但 main.js 加载失败或抛异常：load 事件（或 2 秒兜底）照样会加上 .ready
+   任何一条路径都不会留下白屏。 */
+(function () {
+  var el = document.documentElement;
+  el.className += ' js';
+  function reveal() { el.className += ' ready'; }
+  window.addEventListener('load', reveal);
+  setTimeout(reveal, 2000);
+})();
+</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="alternate" type="application/rss+xml" title="Jasper Hsu's Blog" href="https://xuchangwei.com/rss.xml">
+<link rel="me" href="https://emacs.ch/@jasperhsu">
+<meta name="google-adsense-account" content="ca-pub-1741779893655624">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1741779893655624" crossorigin="anonymous"></script>
+<!-- from -->
+<!--
+<style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:24px;margin:16px auto 0;width:24px}#back-to-top.hidden{bottom:-56px;opacity:0}</style>
+-->
+<!-- Bootstrap 必须排在 main.css 之前 —— main.css 里有覆盖它的规则
+     （如 body.dark-theme .form-control）。见 assets/static/vendor/README.md -->
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/distro-htmlize.css">
+<link rel="stylesheet" href="/static/aandds.com/css/main.css">
+<link rel="stylesheet" href="/static/aandds.com/css/drollery.min.css">
+<script type="text/javascript" src="/static/aandds.com/js/main.js"></script>
+<meta name="description" content="https://prometheus.io/docs/instrumenting/exporters/" />
+<link rel="canonical" href="https://xuchangwei.com/linux/monitor/prometheus/exporter.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Linux: Prometheus-exporter" />
+<meta property="og:description" content="https://prometheus.io/docs/instrumenting/exporters/" />
+<meta property="og:url" content="https://xuchangwei.com/linux/monitor/prometheus/exporter.html" />
+<meta property="og:site_name" content="Jasper Hsu&apos;s Blog" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context":"https://schema.org","url":"https://xuchangwei.com/linux/monitor/prometheus/exporter.html","@type":"WebPage","name":"Linux: Prometheus-exporter","description":"https://prometheus.io/docs/instrumenting/exporters/"}</script>
+</head>
+<body>
+<div id="content" class="content">
+<header>
+<h1 class="title">Linux: Prometheus-exporter</h1>
+</header><nav id="table-of-contents" role="doc-toc">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orge8674d0">grafana 模板</a></li>
+<li><a href="#org76cf7b0">数据库</a>
+<ul>
+<li><a href="#org51e6fe2">mysqld-exporter</a>
+<ul>
+<li><a href="#org4c4ba49">数据库授权</a></li>
+<li><a href="#org168d8ff">部署方法1-docker-compose</a></li>
+<li><a href="#org8895bae">部署方法2-k8s</a></li>
+</ul>
+</li>
+<li><a href="#org8d775f9">Redis exporter</a>
+<ul>
+<li><a href="#orgfc6857c">部署方法1-docker-compose</a></li>
+<li><a href="#h:EF45D176-E7AE-4E2E-B646-9EDE63980F24">部署方法2-k8s</a></li>
+</ul>
+</li>
+<li><a href="#org05fde6f">MongoDB exporter</a></li>
+<li><a href="#orgfff3e36">部署方法1-docker-compose</a></li>
+</ul>
+</li>
+<li><a href="#org88f5b9f">硬件相关</a></li>
+<li><a href="#org5bef389">问题跟踪器和持续集成</a></li>
+<li><a href="#org21a26f5">消息系统</a>
+<ul>
+<li><a href="#orgee7152e">RocketMQ exporter</a></li>
+<li><a href="#org6d2d5fb">RabbitMQ exporter</a>
+<ul>
+<li><a href="#org915d912">部署方法2-k8s</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org4bb3ba3">存储</a></li>
+<li><a href="#org247989d">HTTP</a></li>
+<li><a href="#orgc6b6f58">APIs</a></li>
+<li><a href="#org499e594">日志</a></li>
+<li><a href="#orga8e8821">金融运营</a></li>
+<li><a href="#orgc6e0381">其他</a></li>
+</ul>
+</div>
+</nav>
+<ul class="org-ul">
+<li>TAGS: <a href="../../index.html">Linux</a></li>
+</ul>
+
+<p>
+<a href="https://prometheus.io/docs/instrumenting/exporters/">https://prometheus.io/docs/instrumenting/exporters/</a>
+</p>
+
+<p>
+指标导出器一些应用现实
+</p>
+<section id="outline-container-orge8674d0" class="outline-2">
+<h2 id="orge8674d0"><a href="#orge8674d0">grafana 模板</a></h2>
+<div class="outline-text-2" id="text-orge8674d0">
+<p>
+<a href="https://grafana.com/grafana/dashboards/">https://grafana.com/grafana/dashboards/</a>
+</p>
+
+
+<ul class="org-ul">
+<li>k8s clustr: 13105</li>
+<li>prometheus:25537</li>
+<li>node: 8919(中文汉化版) 1860(首选) node</li>
+<li>docker:14282</li>
+<li>mysql:7362 mysql-exporter 14057</li>
+<li>redis: 763</li>
+<li>blackbox: 14928</li>
+<li>JVM:4701</li>
+<li>nodejs
+<ul class="org-ul">
+<li>Node.js Exporter 14058</li>
+<li><a href="https://stackabuse.com/nodejs-application-monitoring-with-prometheus-and-grafana/">https://stackabuse.com/nodejs-application-monitoring-with-prometheus-and-grafana/</a></li>
+</ul></li>
+<li>rabbitmq:</li>
+</ul>
+</div>
+</section>
+<section id="outline-container-org76cf7b0" class="outline-2">
+<h2 id="org76cf7b0"><a href="#org76cf7b0">数据库</a></h2>
+<div class="outline-text-2" id="text-org76cf7b0">
+</div>
+<div id="outline-container-org51e6fe2" class="outline-3">
+<h3 id="org51e6fe2"><a href="#org51e6fe2">mysqld-exporter</a></h3>
+<div class="outline-text-3" id="text-org51e6fe2">
+<p>
+<a href="https://github.com/prometheus/mysqld_exporter">https://github.com/prometheus/mysqld_exporter</a>
+</p>
+</div>
+<div id="outline-container-org4c4ba49" class="outline-4">
+<h4 id="org4c4ba49"><a href="#org4c4ba49">数据库授权</a></h4>
+<div class="outline-text-4" id="text-org4c4ba49">
+<div class="org-src-container">
+<pre class="src src-sh">CREATE USER <span class="org-string">'mysqld_exporter'</span>@<span class="org-string">'%'</span> IDENTIFIED BY <span class="org-string">'hIhO6h_j(azn=F17'</span> WITH MAX_USER_CONNECTIONS 10;
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO <span class="org-string">'mysqld_exporter'</span>@<span class="org-string">'%'</span>;
+flush privileges;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org168d8ff" class="outline-4">
+<h4 id="org168d8ff"><a href="#org168d8ff">部署方法1-docker-compose</a></h4>
+<div class="outline-text-4" id="text-org168d8ff">
+<p>
+准备配置文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; .my.cnf <span class="org-sh-heredoc">
+[client]
+user=xxx
+password=xxxxx
+[client.servers]
+user=mysqld_exporter
+password=hIhO6h_j(azn=F17
+EOF</span>
+</pre>
+</div>
+
+<p>
+启动
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml <span class="org-sh-heredoc">
+volumes:
+networks:
+  vm_net:
+    name: vm_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/24
+services:
+  mysqld_exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    hostname: mysqld-exporter
+    container_name: mysqld_exporter
+    ports:
+      - 9104:9104
+    command:
+      - "--config.my-cnf=/opt/my.cnf"
+    volumes:
+      - .my.cnf:/opt/my.cnf
+    #restart: always
+    networks:
+      - vm_net
+EOF</span>
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl <span class="org-string">'http://localhost:9104/probe?auth_module=client.servers&amp;target=pc-txxx.mysql.polardb.singapore.rds.aliyuncs.com:3306'</span> | grep mysql_version_info
+</pre>
+</div>
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: mysql
+  metrics_path: /probe
+  params:
+    auth_module: [client.servers]
+  static_configs:
+  - targets:
+    - xx:3306
+    labels:
+      project: mysql-test
+  - targets:
+    - 47.xxx:3306
+    labels:
+      project: mysql-test2
+
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      <span class="org-comment-delimiter"># </span><span class="org-comment">The mysqld_exporter host:port
+</span>      replacement: 172.xxx:9104
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org8895bae" class="outline-4">
+<h4 id="org8895bae"><a href="#org8895bae">部署方法2-k8s</a></h4>
+<div class="outline-text-4" id="text-org8895bae">
+<p>
+安装 mysqld-export
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;exporter.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+data:
+  my.cnf: |-
+    [client.servers]
+    user=mysqld_exporter
+    password=hIhO6h_j(azn=F17
+kind: ConfigMap
+metadata:
+  name: mysqld-exporter-cm
+  namespace: monitoring
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqld-exporter
+  namespace: monitoring
+  #annotations:
+  #  prometheus.io/scrape: "true"
+  labels:
+    app: mysqld-exporter
+spec:
+  selector:
+    app: mysqld-exporter
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9104
+      targetPort: 9104
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysqld-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysqld-exporter
+  template:
+    metadata:
+      #annotations:
+      #  prometheus.io/path: "/metrics"
+      #  prometheus.io/port: "9104"
+      #  prometheus.io/scrape: "true"
+      labels:
+        app: mysqld-exporter
+    spec:
+      #nodeSelector:
+      #  type: ops-prod-prometheus
+      #imagePullSecrets:
+      #- name: docker-secret
+      containers:
+      - name: mysqld-exporter
+        image: prom/mysqld-exporter:v0.20.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/mysqld_exporter
+        - --config.my-cnf=/data/my.cnf
+        resources:
+          limits:
+            cpu: 300m
+            memory: 300Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        ports:
+        - containerPort: 9104
+        volumeMounts:
+        - mountPath: /data
+          name: conf
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: my.cnf
+            path: my.cnf
+          name: mysqld-exporter-cm
+        name: conf
+---
+#apiVersion: monitoring.coreos.com/v1
+#kind: ServiceMonitor
+#metadata:
+#  name: mysqld-exporter
+#  namespace: monitoring
+#  labels:
+#    app.kubernetes.io/name: mysqld-exporter
+#    app.kubernetes.io/instance: mysqld-exporter
+#    app.kubernetes.io/component: exporter
+#    release: kps
+#spec:
+#  endpoints:
+#    - path: /metrics
+#      port: tcp-9104
+#      #interval: 15s
+#  namespaceSelector:
+#    matchNames:
+#      - monitoring
+#  selector:
+#    matchLabels:
+#      app: mysqld-exporter
+EOF
+</span>
+kubectl apply -f exporter.yaml
+</pre>
+</div>
+
+<p>
+方法1-增加 prometheus 静态配置
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;prometheus-additional.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+- job_name: mysql
+  metrics_path: /probe
+  params:
+    auth_module: [client.servers]
+  static_configs:
+  - targets:
+    - 1xx.xx.rds.amazonaws.com:3306
+    labels:
+      business: jp-test
+      type: rds
+      service: "my1"
+  - targets:
+    - xx.xx.rds.amazonaws.com:3306
+    labels:
+      business: jp-test
+      type: rds
+      service: "my2"
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      # The mysqld_exporter host:port
+      replacement: mysqld-exporter:9104
+EOF
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">Update
+</span>kubectl -n monitoring create secret generic additional-scrape-configs --from-file=prometheus-additional.yaml --dry-run=client -oyaml|kubectl replace -f-
+</pre>
+</div>
+
+<p>
+方法2-ScrapeConfig
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;mysql-scrapeconfig.yaml &lt;&lt; EOF<span class="org-sh-heredoc">
+# &#22791;&#36873;&#26041;&#26696;:Prometheus Operator &gt;= v0.65 &#30340; ScrapeConfig CRD
+# &#21644;&#21407;&#26469;&#30340; static_configs &#20960;&#20046; 1:1,&#23454;&#20363;&#22810;&#30340;&#26102;&#20505;&#27604; ServiceMonitor &#22909;&#32500;&#25252;
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: mysql
+  namespace: monitoring
+  labels:
+    release: prometheus      # &#23545;&#24212; Prometheus CR &#30340; scrapeConfigSelector
+spec:
+  metricsPath: /probe
+  params:
+    auth_module:
+      - client.servers
+  staticConfigs:
+    - targets:
+        - 1xx.xx.rds.amazonaws.com:3306
+      labels:
+        business: jp-test
+        type: rds
+        service: "my1"
+    - targets:
+        - xx.xx.rds.amazonaws.com:3306
+      labels:
+        business: jp-test
+        type: rds
+        service: "my2"
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      # mysqld-exporter &#30340; host:port(&#36328; namespace &#20889;&#20840;:mysqld-exporter.monitoring.svc:9104)
+      replacement: mysqld-exporter:9104
+EOF</span>
+</pre>
+</div>
+
+<p>
+方法3-ServiceMonitor
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;mysql-servicemonitor.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mysql
+  namespace: monitoring
+  labels:
+    release: kps      # &#35753; Prometheus CR &#30340; serviceMonitorSelector &#33021;&#36873;&#20013;(kube-prometheus-stack &#40664;&#35748;)
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring           # mysqld-exporter Service &#25152;&#22312;&#30340; namespace
+  selector:
+    matchLabels:
+      app: mysqld-exporter
+  endpoints:
+    # ---------- my1 ----------
+    - port: metrics
+      path: /probe
+      interval: 30s
+      params:
+        auth_module:
+          - client.servers
+        target:
+          - 1xx.xx.rds.amazonaws.com:3306
+      relabelings:
+        - targetLabel: job
+          replacement: mysql
+        - targetLabel: instance
+          replacement: 1xx.xx.rds.amazonaws.com:3306
+        - targetLabel: business
+          replacement: jp-test
+        - targetLabel: type
+          replacement: rds
+        - targetLabel: service
+          replacement: my1
+
+    # ---------- my2 ----------
+    - port: metrics
+      path: /probe
+      interval: 30s
+      params:
+        auth_module:
+          - client.servers
+        target:
+          - xx.xx.rds.amazonaws.com:3306
+      relabelings:
+        - targetLabel: job
+          replacement: mysql
+        - targetLabel: instance
+          replacement: xx.xx.rds.amazonaws.com:3306
+        - targetLabel: business
+          replacement: jp-test
+        - targetLabel: type
+          replacement: rds
+        - targetLabel: service
+          replacement: my2
+EOF</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org8d775f9" class="outline-3">
+<h3 id="org8d775f9"><a href="#org8d775f9">Redis exporter</a></h3>
+<div class="outline-text-3" id="text-org8d775f9">
+<p>
+<a href="https://github.com/oliver006/redis_exporter">https://github.com/oliver006/redis_exporter</a>
+</p>
+</div>
+<div id="outline-container-orgfc6857c" class="outline-4">
+<h4 id="orgfc6857c"><a href="#orgfc6857c">部署方法1-docker-compose</a></h4>
+<div class="outline-text-4" id="text-orgfc6857c">
+<p>
+准备密码文件
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; redis-pwd-file <span class="org-sh-heredoc">
+{
+  "redis://redis6:6379": "",
+  "rediss://user1@replica.redixxxx.com:6379": "xxx"
+}
+EOF</span>
+</pre>
+</div>
+
+<p>
+启动redis-exporter
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml <span class="org-sh-heredoc">
+networks:
+  vm_net:
+    name: vm_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/24
+services:
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: redis_exporter
+    ports:
+      - 9121:9121
+    command:
+      - "--redis.password-file=/opt/sample-pwd-file.json"
+      - '--debug'
+    volumes:
+      - ./redis-pwd-file:/opt/sample-pwd-file.json
+    networks:
+      - vm_net
+EOF</span>
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl http://127.0.0.1:9121/scrape?<span class="org-variable-name">target</span>=redis://xxxx:6379
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-h:EF45D176-E7AE-4E2E-B646-9EDE63980F24" class="outline-4">
+<h4 id="h:EF45D176-E7AE-4E2E-B646-9EDE63980F24"><a href="#h:EF45D176-E7AE-4E2E-B646-9EDE63980F24">部署方法2-k8s</a></h4>
+<div class="outline-text-4" id="text-h:EF45D176-E7AE-4E2E-B646-9EDE63980F24">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;exporter.yaml &lt;&lt;EOF<span class="org-sh-heredoc">
+apiVersion: v1
+data:
+  sample-pwd-file.json: |-
+    {
+      "redis://redis6:6379": "",
+      "rediss://user@clustercfg.xxxx.cache.amazonaws.com:6379": "passwordxx"
+    }
+kind: ConfigMap
+metadata:
+  name: redis-pwd-config
+  namespace: monitoring
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  #annotations:
+  #  prometheus.io/scrape: "true"
+  labels:
+    app: redis-exporter
+spec:
+  selector:
+    app: redis-exporter
+  ports:
+    - name: tcp-9121
+      protocol: TCP
+      port: 9121
+      targetPort: 9121
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exporter
+  template:
+    metadata:
+      #annotations:
+      #  prometheus.io/path: "/metrics"
+      #  prometheus.io/port: "9121"
+      #  prometheus.io/scrape: "true"
+      labels:
+        app: redis-exporter
+    spec:
+      #nodeSelector:
+      #  type: ops-prod-prometheus
+      #imagePullSecrets:
+      #- name: docker-secret
+      containers:
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.91.1
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: REDIS_PASSWORD_FILE
+          value: /data/sample-pwd-file.json
+        resources:
+          limits:
+            cpu: 300m
+            memory: 300Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        ports:
+        - containerPort: 9121
+        volumeMounts:
+        - mountPath: /data
+          name: redis-pwd-file
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: sample-pwd-file.json
+            path: sample-pwd-file.json
+          name: redis-pwd-config
+        name: redis-pwd-file
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: redis-exporter
+    app.kubernetes.io/instance: redis-exporter
+    app.kubernetes.io/version: "1.91.1"
+    app.kubernetes.io/component: exporter
+    release: kps
+spec:
+  endpoints:
+    - path: /metrics
+      port: tcp-9121
+      #interval: 15s
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: redis-exporter
+EOF</span>
+</pre>
+</div>
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: redis-exporter
+  metrics_path: /scrape
+  static_configs:
+  - targets:
+    - redis://user1@replica.redixxxx.com:6379
+    labels:
+      dbtype: <span class="org-string">"redis"</span>
+      project: test
+  - targets:
+    - redis://xxx:6379
+    labels:
+      dbtype: <span class="org-string">"redis"</span>
+      project: test2
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: 172.xxx:9121
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org05fde6f" class="outline-3">
+<h3 id="org05fde6f"><a href="#org05fde6f">MongoDB exporter</a></h3>
+<div class="outline-text-3" id="text-org05fde6f">
+<p>
+<a href="https://github.com/percona/mongodb_exporter">https://github.com/percona/mongodb_exporter</a>
+</p>
+</div>
+</div>
+<div id="outline-container-orgfff3e36" class="outline-3">
+<h3 id="orgfff3e36"><a href="#orgfff3e36">部署方法1-docker-compose</a></h3>
+<div class="outline-text-3" id="text-orgfff3e36">
+<p>
+启动mongodb-exporter
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml <span class="org-sh-heredoc">
+networks:
+  vm_net:
+    name: vm_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/24
+services:
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.43
+    container_name: mongodb-exporter
+    #environment:
+    #  MONGODB_URI: "mongodb://user:pass@host1:27017,host2:27017/admin"
+    ports:
+      - 9216:9216
+    command:
+      - --mongodb.uri=mongodb://root:xxxs.com:3717,xxx.com:3717/admin?replicaSet=mgset-310035630,mongodb://root:xxx14@dxxcom:3717,ddsxxx:3717/admin?replicaSet=mgset-310037394
+      - '--collect-all'
+      - '--split-cluster=true'
+    networks:
+      - vm_net
+EOF</span>
+</pre>
+</div>
+
+<p>
+验证：
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">curl 127.0.0.1:9216/scrape?<span class="org-variable-name">target</span>=mongodb://ddsxxx:3717|grep mongodb_up
+</pre>
+</div>
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: mongodb-exporter
+  metrics_path: /scrape
+  static_configs:
+  - targets:
+    - mongodb://dxxx:3717
+    labels:
+      dbtype: <span class="org-string">"mongodb"</span>
+      project: <span class="org-string">"&#27979;&#35797;1"</span>
+  - targets:
+    - mongodb://ddxxx:3717
+    labels:
+      dbtype: <span class="org-string">"mongodb"</span>
+      project: <span class="org-string">"&#27979;&#35797;2"</span>
+  relabel_configs:
+  - source_labels: [__address__]
+    target_label: __param_target
+  - source_labels: [__param_target]
+    target_label: instance
+  - target_label: __address__
+    replacement: 172.xxx:9216
+</pre>
+</div>
+
+<p>
+grafana监控：<a href="https://github.com/percona/grafana-dashboards/blob/main/dashboards/MongoDB/MongoDB_Cluster_Summary.json">https://github.com/percona/grafana-dashboards/blob/main/dashboards/MongoDB/MongoDB_Cluster_Summary.json</a>
+</p>
+</div>
+</div>
+</section>
+<section id="outline-container-org88f5b9f" class="outline-2">
+<h2 id="org88f5b9f"><a href="#org88f5b9f">硬件相关</a></h2>
+</section>
+
+<section id="outline-container-org5bef389" class="outline-2">
+<h2 id="org5bef389"><a href="#org5bef389">问题跟踪器和持续集成</a></h2>
+</section>
+
+<section id="outline-container-org21a26f5" class="outline-2">
+<h2 id="org21a26f5"><a href="#org21a26f5">消息系统</a></h2>
+<div class="outline-text-2" id="text-org21a26f5">
+</div>
+<div id="outline-container-orgee7152e" class="outline-3">
+<h3 id="orgee7152e"><a href="#orgee7152e">RocketMQ exporter</a></h3>
+<div class="outline-text-3" id="text-orgee7152e">
+<p>
+<a href="https://github.com/apache/rocketmq-exporter">https://github.com/apache/rocketmq-exporter</a>
+</p>
+
+<p>
+启动redis-exporter
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">cat &lt;&lt;\EOF&gt; docker-compose.yml <span class="org-sh-heredoc">
+networks:
+  vm_net:
+    name: vm_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/24
+services:
+  rocketmq-exporter:
+    image: apache/rocketmq-exporter:0.0.2-SNAPSHOT
+    container_name: rocketmq-exporter
+    ports:
+      - 5557:5557
+    entrypoint:
+      - java
+      - -jar
+      - rocketmq-exporter.jar
+      - --server.port=5557
+      - --rocketmq.config.namesrvAddr=127.0.0.1:9876
+      - --rocketmq.config.enableACL=true
+      - --rocketmq.config.accessKey=C65GKxxxx
+      - --rocketmq.config.secretKey=oqHc0xxxx
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2048M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - vm_net
+EOF</span>
+</pre>
+</div>
+
+
+<p>
+pormetheus集成
+</p>
+<div class="org-src-container">
+<pre class="src src-sh">- job_name: rocketmq-exporter
+  static_configs:
+  - targets: [<span class="org-string">'172.xxx:5557'</span>]
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org6d2d5fb" class="outline-3">
+<h3 id="org6d2d5fb"><a href="#org6d2d5fb">RabbitMQ exporter</a></h3>
+<div class="outline-text-3" id="text-org6d2d5fb">
+<ul class="org-ul">
+<li><a href="https://github.com/kbudde/rabbitmq_exporter">https://github.com/kbudde/rabbitmq_exporter</a></li>
+</ul>
+
+<p>
+添加监控用户
+在 Amazon MQ Web 控制台创建监控用户步骤
+</p>
+<ol class="org-ol">
+<li>打开你的 Amazon MQ RabbitMQ Web 控制台（截图里那个 https 地址）</li>
+<li>登录（用初始 admin 账号）</li>
+<li>进入 Admin &gt; Users &gt; Add a user
+<ul class="org-ul">
+<li>Username：rmq-monitor</li>
+<li>Password：设置强密码</li>
+<li>Tags：填 monitoring （不要写 administrator）</li>
+</ul></li>
+<li>设置 vhost 权限（默认 vhost <code>/</code> ）
+<ul class="org-ul">
+<li>Read regex: <code>.*</code></li>
+<li>Write regex: 留空</li>
+<li>Configure regex: 留空</li>
+</ul></li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span class="org-comment-delimiter">#</span><span class="org-comment">&#39564;&#35777;&#36134;&#21495;&#26159;&#21542;&#21487;&#29992;
+</span>curl -u rmq-monitor:&#20320;&#30340;&#23494;&#30721; https://b-16993496-8824-465b-8fb7-94f1c35b3f78.mq.ap-southeast-1.on.aws/api/overview
+</pre>
+</div>
+</div>
+<div id="outline-container-org915d912" class="outline-4">
+<h4 id="org915d912"><a href="#org915d912">部署方法2-k8s</a></h4>
+<div class="outline-text-4" id="text-org915d912">
+<div class="org-src-container">
+<pre class="src src-shell">cat &gt;exporter.yaml&lt;&lt;\EOF<span class="org-sh-heredoc">
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-exporter-secret
+  namespace: monitoring
+type: Opaque
+stringData:
+  RABBIT_PASSWORD: "xxxxx"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-exporter
+  namespace: monitoring
+  #annotations:
+  #  prometheus.io/scrape: "true"
+  labels:
+    app: rabbitmq-exporter
+spec:
+  selector:
+    app: rabbitmq-exporter
+  ports:
+    - name: tcp-9419
+      protocol: TCP
+      port: 9419
+      targetPort: 9419
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq-exporter
+  template:
+    metadata:
+      #annotations:
+      #  prometheus.io/path: "/metrics"
+      #  prometheus.io/port: "9419"
+      #  prometheus.io/scrape: "true"
+      labels:
+        app: rabbitmq-exporter
+    spec:
+      #nodeSelector:
+      #  type: ops-prod-prometheus
+      #imagePullSecrets:
+      #- name: docker-secret
+      containers:
+      - name: rabbitmq-exporter
+        image: kbudde/rabbitmq-exporter:1.0.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: RABBIT_URL
+          value: "https://xx.mq.ap-southeast-1.on.aws"
+        - name: RABBIT_USER
+          value: "rmq-monitor"
+        - name: RABBIT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-exporter-secret
+              key: RABBIT_PASSWORD
+        - name: PUBLISH_PORT
+          value: "9419"
+        - name: RABBIT_TIMEOUT
+          value: "30"
+        # Amazon MQ &#19981;&#25903;&#25345; bert&#65292;&#24517;&#39035;&#26174;&#24335;&#20851;&#25481;&#65292;&#21542;&#21017; overview &#37319;&#38598;&#20250;&#22833;&#36133;
+        - name: RABBIT_CAPABILITIES
+          value: "no_sort"
+        # &#19981;&#37319;&#38598;&#38431;&#21015;&#38271;&#21015;&#34920;&#65292;&#38450;&#27490;&#25351;&#26631;&#29190;&#28856;&#65307;&#29983;&#20135;&#38431;&#21015;&#25968; &gt;50 &#26102;&#25353;&#38656;&#35843;&#25972;
+        - name: RABBIT_EXPORTERS
+          value: "overview,queue,node,exchange"
+          #value: "overview,queue"
+         #&#19981;&#37319;&#38598;&#38431;&#21015;&#38271;&#21015;&#34920;&#65292;&#38450;&#27490;&#25351;&#26631;&#29190;&#28856;&#65292;&#25353;&#38656;&#24320;&#21551;
+         #&#29983;&#20135;&#65292;&#38431;&#21015;&#25968;&#37327; &gt;50
+         #&#25490;&#38500;&#25152;&#26377; *_details &#31995;&#21015;&#36895;&#29575;&#26742;&#25351;&#26631;&#65292;&#20445;&#30041;&#26680;&#24515;&#25351;&#26631;&#65306;&#38431;&#21015;&#28145;&#24230;&#12289;unacked &#25968;&#37327;&#12289;&#28040;&#36153;&#32773;&#25968;&#12289;&#20869;&#23384;&#21344;&#29992;&#12290;
+        - name: EXCLUDE_METRICS
+          value: "queue_totals.messages_ready_details,queue_totals.messages_unacknowledged_details,message_stats.deliver_details,message_stats.publish_details,message_stats.ack_details,message_stats.redeliver_details"
+        # &#36229;&#36807;&#38408;&#20540;&#23601;&#19981;&#20877;&#36880;&#38431;&#21015;&#19978;&#25253;&#65292;&#36991;&#20813;&#25351;&#26631;&#29190;&#28856;
+        - name: MAX_QUEUES
+          value: "1000"
+        resources:
+          limits:
+            cpu: 300m
+            memory: 300Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        ports:
+        - containerPort: 9419
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq-exporter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: rabbitmq-exporter
+    app.kubernetes.io/instance: rabbitmq-exporter
+    app.kubernetes.io/component: exporter
+    release: kps
+# Amazon MQ &#30340; management API &#26597;&#35810;&#38431;&#21015;&#21015;&#34920;&#26412;&#36523;&#20250;&#28040;&#32791; broker CPU&#65292;&#37319;&#38598;&#38388;&#38548;&#19981;&#35201;&#23567;&#20110; 30s&#65292;&#25512;&#33616; 60s
+spec:
+  endpoints:
+    - path: /metrics
+      port: tcp-9419
+      interval: 60s
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: rabbitmq-exporter
+EOF
+</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="outline-container-org4bb3ba3" class="outline-2">
+<h2 id="org4bb3ba3"><a href="#org4bb3ba3">存储</a></h2>
+</section>
+
+<section id="outline-container-org247989d" class="outline-2">
+<h2 id="org247989d"><a href="#org247989d">HTTP</a></h2>
+</section>
+<section id="outline-container-orgc6b6f58" class="outline-2">
+<h2 id="orgc6b6f58"><a href="#orgc6b6f58">APIs</a></h2>
+</section>
+<section id="outline-container-org499e594" class="outline-2">
+<h2 id="org499e594"><a href="#org499e594">日志</a></h2>
+</section>
+<section id="outline-container-orga8e8821" class="outline-2">
+<h2 id="orga8e8821"><a href="#orga8e8821">金融运营</a></h2>
+</section>
+<section id="outline-container-orgc6e0381" class="outline-2">
+<h2 id="orgc6e0381"><a href="#orgc6e0381">其他</a></h2>
+</section>
+</div>
+<div id="postamble" class="status">
+<!-- 这里曾经放过一个手动 AdSense 广告位（<ins> + push）。
+     问题：AdSense 要约 6 秒才把 data-ad-status 置为 unfilled，
+     在那之前填不出广告的空位会显示成一块黄色方块，体验很差。
+     现改为使用 Google 自动广告 —— 由 Google 决定何时何地插入，
+     没有广告时就不会创建空位。加载器已在 <head> 里，无需额外代码，
+     开关在 AdSense 后台的「自动广告」。 -->
+<script type="text/javascript" src="/static/aandds.com/js/postamble.js"></script>
+</div>
+</body>
+</html>
